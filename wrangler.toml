@@ -16,7 +16,6 @@ ENAVIA_EXECUTOR_URL = "https://enavia-executor.brunovasque.workers.dev"
 DIRECTOR_COGNITIVE_URL = "https://nv-director-cognitive.brunovasque.workers.dev/director/cognitive"
 VERCEL_EXECUTOR_URL = "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch"
 ENAVIA_VERSION = "v2"
-ENAVIA_PROMPT_ID = "pmpt_692a06216ea48196ac1a7e37cf0f61c30682b799d2183928"
 OWNER = "Vasques"
 SYSTEM_NAME = "ENAVIA"
 
@@ -24,11 +23,6 @@ SYSTEM_NAME = "ENAVIA"
 binding = "ENAVIA_BRAIN"
 id = "722835b730dd44c79f6ff1f0cdc314a9"
 preview_id = "235fd25ad3b44217975f6ce0d77615d0"
-
-[[kv_namespaces]]
-binding = "ENAVIA_GIT"
-id = "c944c6f694f34056bd1eceaed851bb47"
-preview_id = "77196944095542b3bb7c80121950bcab"
 
 [[services]]
 binding = "EXECUTOR"
@@ -52,17 +46,16 @@ ENAVIA_EXECUTOR_URL = "https://enavia-executor.brunovasque.workers.dev"
 DIRECTOR_COGNITIVE_URL = "https://nv-director-cognitive.brunovasque.workers.dev/director/cognitive"
 VERCEL_EXECUTOR_URL = "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch"
 ENAVIA_VERSION = "v2"
-ENAVIA_PROMPT_ID = "pmpt_692a06216ea48196ac1a7e37cf0f61c30682b799d2183928"
 OWNER = "Vasques"
 SYSTEM_NAME = "ENAVIA"
+
+# NOTE (item 1 - isolamento): TEST usa o mesmo DIRECTOR_COGNITIVE_URL que PROD.
+# Isolamento completo requer um endpoint dedicado de TEST (ex: nv-director-cognitive-test).
+# Enquanto esse endpoint não existir, o tráfego TEST chega ao director cognitivo de PROD.
 
 [[env.test.kv_namespaces]]
 binding = "ENAVIA_BRAIN"
 id = "235fd25ad3b44217975f6ce0d77615d0"
-
-[[env.test.kv_namespaces]]
-binding = "ENAVIA_GIT"
-id = "77196944095542b3bb7c80121950bcab"
 
 [[env.test.services]]
 binding = "EXECUTOR"

@@ -39,6 +39,13 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate INTERNAL_TOKEN (TEST only)
+        if: ${{ github.event.inputs.target_env == 'test' }}
+        env:
+          INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+        run: |
+          test -n "$INTERNAL_TOKEN" || (echo "Missing INTERNAL_TOKEN secret — configure-o no GitHub antes de rodar o smoke de TEST." && exit 1)
+
       - name: Deploy TEST with Wrangler
         if: ${{ github.event.inputs.target_env == 'test' }}
         uses: cloudflare/wrangler-action@v3
@@ -46,6 +53,25 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --env test
+
+      - name: Smoke TEST — GET /audit
+        if: ${{ github.event.inputs.target_env == 'test' }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://enavia-worker-teste.brunovasque.workers.dev/audit)
+          echo "GET /audit → HTTP $STATUS"
+          [ "$STATUS" -eq 200 ] || { echo "Smoke FAILED: /audit returned $STATUS"; exit 1; }
+
+      - name: Smoke TEST — GET /__internal__/build (auth)
+        if: ${{ github.event.inputs.target_env == 'test' }}
+        env:
+          INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $INTERNAL_TOKEN" \
+            https://enavia-worker-teste.brunovasque.workers.dev/__internal__/build)
+          echo "GET /__internal__/build → HTTP $STATUS"
+          [ "$STATUS" -eq 200 ] || { echo "Smoke FAILED: /__internal__/build returned $STATUS"; exit 1; }
 
       - name: Deploy PROD with Wrangler
         if: ${{ github.event.inputs.target_env == 'prod' }}
