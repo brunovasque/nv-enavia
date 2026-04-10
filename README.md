@@ -53,6 +53,17 @@ O ambiente TEST usa um bucket Supabase **isolado** para evitar contaminação do
 
 O bucket `enavia-brain-test` deve existir no projeto Supabase antes do primeiro deploy em TEST.
 
+## Separação de ambientes Browser Executor
+
+O ambiente TEST usa um `BROWSER_EXECUTOR_URL` **isolado** para que execuções de browser em TEST não atinjam o executor real de PROD.
+
+| Ambiente | `BROWSER_EXECUTOR_URL` |
+|----------|-----------------------|
+| PROD (`[vars]`) | `https://run.nv-imoveis.com/browser/run` |
+| TEST (`[env.test.vars]`) | `https://run-test.nv-imoveis.com/browser/run` |
+
+O worker lê `env.BROWSER_EXECUTOR_URL` diretamente — nenhuma lógica foi alterada.
+
 ## Antes do primeiro deploy
 
 Preencher no `wrangler.toml`:
