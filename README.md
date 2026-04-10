@@ -42,6 +42,17 @@ Este repo foi criado para **governar o worker atual**, sem recriar arquitetura e
 - `OPENAI_API_KEY`
 - `INTERNAL_TOKEN`
 
+## Separação de ambientes Supabase Storage
+
+O ambiente TEST usa um bucket Supabase **isolado** para evitar contaminação do PROD.
+
+| Ambiente | `SUPABASE_BUCKET` |
+|----------|-------------------|
+| PROD (`[vars]`) | `enavia-brain` |
+| TEST (`[env.test.vars]`) | `enavia-brain-test` |
+
+O bucket `enavia-brain-test` deve existir no projeto Supabase antes do primeiro deploy em TEST.
+
 ## Antes do primeiro deploy
 
 Preencher no `wrangler.toml`:
