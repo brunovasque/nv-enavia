@@ -35,6 +35,6 @@ preview_id = "REPLACE_WITH_TEST_KV_NAMESPACE_ID"
 binding = "EXECUTOR"
 service = "REPLACE_WITH_EXECUTOR_SERVICE_NAME"
 
-a [[services]]
+[[services]]
 binding = "DEPLOY_WORKER"
 service = "REPLACE_WITH_DEPLOY_WORKER_SERVICE_NAME"
