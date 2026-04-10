@@ -3,38 +3,35 @@ main = "nv-enavia.js"
 compatibility_date = "2026-04-10"
 workers_dev = true
 
-# ============================================================
-# NV-ENAVIA — GOVERNANCE BOOTSTRAP
-# ------------------------------------------------------------
-# Este arquivo foi criado para governar o worker existente.
-# Não há mudança de lógica no nv-enavia.js.
-#
-# ANTES DE DEPLOYAR, preencher bindings/ids reais abaixo.
-# ============================================================
-
 [observability.logs]
 enabled = true
 
 [vars]
 ENAVIA_MODE = "supervised"
-# URL do executor/browser físico (DigitalOcean/noVNC ou gateway atual)
-BROWSER_EXECUTOR_URL = "https://browser.nv-imoveis.com/run"
+BROWSER_EXECUTOR_URL = "https://run.nv-imoveis.com/browser/run"
+SUPABASE_URL = "https://jsqvhmnjsbmtfyyukwsr.supabase.co"
+SUPABASE_BUCKET = "enavia-brain"
+OPENAI_MODEL = "gpt-5.2"
+ENAVIA_EXECUTOR_URL = "https://enavia-executor.brunovasque.workers.dev"
+ENAVIA_VERSION = "v2"
+ENAVIA_PROMPT_ID = "pmpt_692a06216ea48196ac1a7e37cf0f61c30682b799d2183928"
+OWNER = "Vasques"
+SYSTEM_NAME = "ENAVIA"
 
-# ============================================================
-# KV — preencher IDs reais do namespace do cérebro
-# ============================================================
 [[kv_namespaces]]
 binding = "ENAVIA_BRAIN"
-id = "REPLACE_WITH_PROD_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_TEST_KV_NAMESPACE_ID"
+id = "722835b730dd44c79f6ff1f0cdc314a9"
+preview_id = "235fd25ad3b44217975f6ce0d77615d0"
 
-# ============================================================
-# SERVICE BINDINGS — preencher nomes dos serviços reais
-# ============================================================
+[[kv_namespaces]]
+binding = "ENAVIA_GIT"
+id = "c944c6f694f34056bd1eceaed851bb47"
+preview_id = "77196944095542b3bb7c80121950bcab"
+
 [[services]]
 binding = "EXECUTOR"
-service = "REPLACE_WITH_EXECUTOR_SERVICE_NAME"
+service = "enavia-executor"
 
 [[services]]
 binding = "DEPLOY_WORKER"
-service = "REPLACE_WITH_DEPLOY_WORKER_SERVICE_NAME"
+service = "deploy-worker"
