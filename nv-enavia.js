@@ -384,9 +384,12 @@ async function buildBrain(env) {
 // ============================================================================
 // 🧠 MEMORY LOADER — PASSO 1 (BOOT)
 // Carrega memórias dinâmicas registradas em brain:index (KV)
+// _brainIndexRaw é lido uma única vez aqui e reutilizado em Memory Integration V1.
 // ============================================================================
+let _brainIndexRaw = null;
 try {
-  const storedIndex = await env.ENAVIA_BRAIN.get("brain:index");
+  _brainIndexRaw = await env.ENAVIA_BRAIN.get("brain:index");
+  const storedIndex = _brainIndexRaw;
   const memoryKeys = storedIndex ? JSON.parse(storedIndex) : [];
 
   for (const key of memoryKeys) {
@@ -505,9 +508,10 @@ function detectDirectorMemoryIntent(text = "") {
 
 // ============================================================================
 // 🧠 Memory Integration V1 — Carregar memórias dinâmicas do KV
+// Reutiliza _brainIndexRaw lido no PASSO 1 — sem double-load de brain:index.
 // ============================================================================
 try {
-  const storedIndex = await env.ENAVIA_BRAIN.get("brain:index");
+  const storedIndex = _brainIndexRaw;
   const dynamicKeys = storedIndex ? JSON.parse(storedIndex) : [];
 
   for (const key of dynamicKeys) {
