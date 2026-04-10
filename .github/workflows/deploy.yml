@@ -3,10 +3,10 @@ name: Deploy nv-enavia
 on:
   workflow_dispatch:
     inputs:
-      worker_name:
-        description: "Nome do worker no Cloudflare"
+      target_env:
+        description: "Ambiente de deploy"
         required: true
-        default: "nv-enavia"
+        default: "test"
       confirm_reason:
         description: "Motivo do deploy manual"
         required: true
@@ -39,9 +39,18 @@ jobs:
         with:
           node-version: 20
 
-      - name: Deploy with Wrangler
+      - name: Deploy TEST with Wrangler
+        if: ${{ github.event.inputs.target_env == 'test' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --name ${{ github.event.inputs.worker_name }}
+          command: deploy --env test
+
+      - name: Deploy PROD with Wrangler
+        if: ${{ github.event.inputs.target_env == 'prod' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
