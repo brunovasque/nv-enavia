@@ -1359,7 +1359,7 @@ if (method === "POST" && path === "/vercel/patch") {
     const body = await request.json();
     logNV("🔗 [VERCEL-PATCH] Requisição recebida para simulação.", body);
 
-    const vercelURL = "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch";
+    const vercelURL = env.VERCEL_EXECUTOR_URL;
 
     const vercelRes = await fetch(vercelURL, {
       method: "POST",
@@ -1412,7 +1412,7 @@ if (raw.mode === "deploy-vercel") {
   logNV("🚀 [MODE:DEPLOY-VERCEL] Pedido recebido do painel.", raw);
 
   try {
-    const vercelURL = "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch";
+    const vercelURL = env.VERCEL_EXECUTOR_URL;
 
     const forward = await fetch(vercelURL, {
       method: "POST",
@@ -4493,7 +4493,7 @@ async function handleDirectorCognitiveProxy(request, env) {
   }
 
   const r = await fetch(
-    "https://nv-director-cognitive.brunovasque.workers.dev/director/cognitive",
+    env.DIRECTOR_COGNITIVE_URL,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
