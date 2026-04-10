@@ -3186,7 +3186,7 @@ if (request.method === "POST") {
       if (!isInternalAuthorized(request, env)) {
         return new Response("unauthorized", { status: 401 });
       }
-      const envName = (env.SUPABASE_BUCKET || "").includes("test") ? "TEST" : "PROD";
+      const envName = (env.SUPABASE_BUCKET || "").toLowerCase().includes("test") ? "TEST" : "PROD";
       const workerName = envName === "TEST" ? "enavia-worker-teste" : "nv-enavia";
       return new Response(
         JSON.stringify(
