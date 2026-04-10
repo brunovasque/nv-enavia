@@ -2992,6 +2992,16 @@ if (request.method === "POST") {
   const url = new URL(request.url);
 
   if (url.pathname === "/browser/run" || url.pathname === "/browser/execute") {
+    // 🛡️ GUARD ANTI-REENTRADA — impede loop se BROWSER_EXECUTOR_URL apontar para o próprio worker
+    if (request.headers.get("X-NV-Browser-Source") === "enavia-worker") {
+      logNV("🔴 [BROWSER/RUN] reentrada detectada — abortando loop");
+      return withCORS(
+        jsonResponse(
+          { ok: false, error: "Loop detectado: request já veio do próprio worker" },
+          508
+        )
+      );
+    }
     try {
       const body = await request.json().catch(() => ({}));
 
@@ -3063,7 +3073,10 @@ if (body && typeof body === "object" && body.plan && Array.isArray(body.plan.ste
       
       const execRes = await fetch(executorUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-NV-Browser-Source": "enavia-worker",
+        },
         body: JSON.stringify(executorPayload),
       });
 
@@ -3101,6 +3114,16 @@ if (request.method === "POST") {
   const urlObj = new URL(request.url);
 
   if (urlObj.pathname === "/browser-test") {
+    // 🛡️ GUARD ANTI-REENTRADA — impede loop se BROWSER_EXECUTOR_URL apontar para o próprio worker
+    if (request.headers.get("X-NV-Browser-Source") === "enavia-worker") {
+      logNV("🔴 [BROWSER/TEST] reentrada detectada — abortando loop");
+      return withCORS(
+        jsonResponse(
+          { ok: false, error: "Loop detectado: request já veio do próprio worker" },
+          508
+        )
+      );
+    }
     try {
       const body = await request.json().catch(() => ({}));
 
@@ -3146,7 +3169,10 @@ if (request.method === "POST") {
 
       const execRes = await fetch(executorUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-NV-Browser-Source": "enavia-worker",
+        },
         body: JSON.stringify({ plan }),
       });
 
