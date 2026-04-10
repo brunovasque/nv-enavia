@@ -4376,6 +4376,10 @@ if (internalPath === "/__internal__/deploy-rollback" && method === "POST") {
 // POST /brain/director-query → Cérebro CANÔNICO do Director
 // -------------------------------------------------------
 if (method === "POST" && path === "/brain/director-query") {
+  if (!isInternalAuthorized(request, env)) {
+    return withCORS(new Response("unauthorized", { status: 401 }));
+  }
+
   try {
     const body = await request.json();
 
