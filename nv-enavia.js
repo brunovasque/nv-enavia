@@ -3335,6 +3335,44 @@ if (method === "POST" && path === "/enavia/observe") {
   }
 
 // ============================================================
+// 📋 GET /audit — Schema/contrato da rota (smoke de conectividade)
+// Não executa nada. Útil para validar que a rota está ativa.
+// ============================================================
+if (method === "GET" && path === "/audit") {
+  return jsonResponse({
+    ok: true,
+    route: "POST /audit",
+    description: "Audit endpoint canônico (read-only, não aplica nada). Envia para EXECUTOR + carimba no DEPLOY_WORKER.",
+    schema: {
+      execution_id: "string (obrigatório)",
+      mode: '"enavia_audit" (obrigatório, literal)',
+      source: "string (obrigatório)",
+      target: {
+        system: "string (obrigatório)",
+        workerId: "string (obrigatório)"
+      },
+      patch: {
+        type: '"patch_text" (obrigatório, literal)',
+        content: "string (obrigatório, conteúdo do patch)"
+      },
+      constraints: {
+        read_only: "true (obrigatório)",
+        no_auto_apply: "true (obrigatório)"
+      }
+    },
+    smoke_example: {
+      execution_id: "smoke-test-001",
+      mode: "enavia_audit",
+      source: "smoke-test",
+      target: { system: "enavia", workerId: "enavia-worker-teste" },
+      patch: { type: "patch_text", content: "// smoke test patch" },
+      constraints: { read_only: true, no_auto_apply: true }
+    },
+    timestamp: new Date().toISOString()
+  }, 200);
+}
+
+// ============================================================
 // 🧠 ENAVIA — AUDIT ENDPOINT (READ-ONLY, CANÔNICO v1)
 // POST /audit
 // ============================================================
@@ -4453,6 +4491,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /brain/get-module → Ler conteúdo de módulo",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",
             "  • GET  /engineer       → Testar rota do executor",
+            "  • GET  /audit          → Schema/contrato da rota POST /audit",
             "  • GET  /brain/read     → Ler System Prompt + estado",
             "  • GET  /brain/index    → INDEX completo do cérebro"
           ].join("\n"),
