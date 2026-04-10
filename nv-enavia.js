@@ -3183,12 +3183,17 @@ if (request.method === "POST") {
     // 🔎 INTERNAL — BUILD INFO (PROVA DE DEPLOY)
     // ============================================================
     if (method === "GET" && path === "/__internal__/build") {
+      if (!isInternalAuthorized(request, env)) {
+        return new Response("unauthorized", { status: 401 });
+      }
+      const envName = (env.SUPABASE_BUCKET || "").toLowerCase().includes("test") ? "TEST" : "PROD";
+      const workerName = envName === "TEST" ? "enavia-worker-teste" : "nv-enavia";
       return new Response(
         JSON.stringify(
           {
             ok: true,
-            worker: "nv-enavia",
-            env: "PROD",
+            worker: workerName,
+            env: envName,
             build: ENAVIA_BUILD,
             timestamp: new Date().toISOString(),
           },
