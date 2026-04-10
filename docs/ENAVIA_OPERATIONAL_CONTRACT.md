@@ -385,11 +385,13 @@ curl -s -H "Authorization: Bearer <TOKEN>" https://<WORKER_URL>/__internal__/bui
 | R2 | `DIRECTOR_COGNITIVE_URL` compartilhado TEST/PROD | 🟡 Medium | Open | Chamadas TEST chegam ao director de PROD. Isolamento requer endpoint dedicado. |
 | R3 | `BROWSER_EXECUTOR_URL` vazio em TEST | 🟢 Info | By design | `/browser/run` retorna erro claro em TEST. Não é bug. |
 | R4 | CORS `*` em todas as respostas | 🟢 Low | Open | Permissivo mas endpoints sensíveis têm Bearer auth. |
-| R5 | `ENAVIA_GIT` KV binding declarado mas nunca usado | 🟢 Low | Open | Slot de binding desnecessário. Pode ser legacy. |
-| R6 | `consolidateAfterSave` definida mas nunca chamada | 🟢 Low | Open | Memory V3 clustering inativa. Sem impacto operacional. |
-| R7 | Double-load de `brain:index` no boot | 🟢 Low | Open | 2 KV reads para o mesmo dado. Latência extra no cold start. |
-| R8 | `/propose` usa URL `https://executor.invalid/audit` | 🟢 Low | Open | Service Binding ignora host, mas URL é confusa. |
-| R9 | `deploy-apply` e `deploy-rollback` em modo passivo | 🟡 Info | By design | Recebem mas não executam. Deploy real é via `wrangler deploy`. |
+| R5 | `consolidateAfterSave` definida mas nunca chamada | 🟢 Low | Open | Memory V3 clustering inativa. Sem impacto operacional. |
+| R6 | `/propose` usa URL `https://executor.invalid/audit` | 🟢 Low | Open | Service Binding ignora host, mas URL é confusa. |
+| R7 | `deploy-apply` e `deploy-rollback` em modo passivo | 🟡 Info | By design | Recebem mas não executam. Deploy real é via `wrangler deploy`. |
+
+> **Itens resolvidos desde o diagnóstico anterior (não mais riscos abertos):**
+> - `ENAVIA_GIT` KV binding — **removido** do `wrangler.toml`. Binding eliminado, sem referência no código.
+> - Double-load de `brain:index` — **corrigido**: `_brainIndexRaw` é lido uma única vez no PASSO 1 e reutilizado em Memory Integration V1 (sem segundo KV read).
 
 ---
 
