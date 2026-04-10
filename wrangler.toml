@@ -35,3 +35,35 @@ service = "enavia-executor"
 [[services]]
 binding = "DEPLOY_WORKER"
 service = "deploy-worker"
+
+[env.test]
+name = "enavia-worker-teste"
+workers_dev = true
+
+[env.test.vars]
+ENAVIA_MODE = "supervised"
+BROWSER_EXECUTOR_URL = "https://run.nv-imoveis.com/browser/run"
+SUPABASE_URL = "https://jsqvhmnjsbmtfyyukwsr.supabase.co"
+SUPABASE_BUCKET = "enavia-brain"
+OPENAI_MODEL = "gpt-5.2"
+ENAVIA_EXECUTOR_URL = "https://enavia-executor.brunovasque.workers.dev"
+ENAVIA_VERSION = "v2"
+ENAVIA_PROMPT_ID = "pmpt_692a06216ea48196ac1a7e37cf0f61c30682b799d2183928"
+OWNER = "Vasques"
+SYSTEM_NAME = "ENAVIA"
+
+[[env.test.kv_namespaces]]
+binding = "ENAVIA_BRAIN"
+id = "235fd25ad3b44217975f6ce0d77615d0"
+
+[[env.test.kv_namespaces]]
+binding = "ENAVIA_GIT"
+id = "77196944095542b3bb7c80121950bcab"
+
+[[env.test.services]]
+binding = "EXECUTOR"
+service = "enavia-executor-test"
+
+[[env.test.services]]
+binding = "DEPLOY_WORKER"
+service = "deploy-worker"
