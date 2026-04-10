@@ -39,6 +39,13 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate INTERNAL_TOKEN (TEST only)
+        if: ${{ github.event.inputs.target_env == 'test' }}
+        env:
+          INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+        run: |
+          test -n "$INTERNAL_TOKEN" || (echo "Missing INTERNAL_TOKEN secret — configure-o no GitHub antes de rodar o smoke de TEST." && exit 1)
+
       - name: Deploy TEST with Wrangler
         if: ${{ github.event.inputs.target_env == 'test' }}
         uses: cloudflare/wrangler-action@v3
