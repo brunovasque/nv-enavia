@@ -66,4 +66,4 @@ service = "enavia-executor-test"
 
 [[env.test.services]]
 binding = "DEPLOY_WORKER"
-service = "deploy-worker"
+service = "deploy-worker-test"
