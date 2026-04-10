@@ -1,0 +1,40 @@
+name = "nv-enavia"
+main = "nv-enavia.js"
+compatibility_date = "2026-04-10"
+workers_dev = true
+
+# ============================================================
+# NV-ENAVIA — GOVERNANCE BOOTSTRAP
+# ------------------------------------------------------------
+# Este arquivo foi criado para governar o worker existente.
+# Não há mudança de lógica no nv-enavia.js.
+#
+# ANTES DE DEPLOYAR, preencher bindings/ids reais abaixo.
+# ============================================================
+
+[observability.logs]
+enabled = true
+
+[vars]
+ENAVIA_MODE = "supervised"
+# URL do executor/browser físico (DigitalOcean/noVNC ou gateway atual)
+BROWSER_EXECUTOR_URL = "https://browser.nv-imoveis.com/run"
+
+# ============================================================
+# KV — preencher IDs reais do namespace do cérebro
+# ============================================================
+[[kv_namespaces]]
+binding = "ENAVIA_BRAIN"
+id = "REPLACE_WITH_PROD_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_TEST_KV_NAMESPACE_ID"
+
+# ============================================================
+# SERVICE BINDINGS — preencher nomes dos serviços reais
+# ============================================================
+[[services]]
+binding = "EXECUTOR"
+service = "REPLACE_WITH_EXECUTOR_SERVICE_NAME"
+
+a [[services]]
+binding = "DEPLOY_WORKER"
+service = "REPLACE_WITH_DEPLOY_WORKER_SERVICE_NAME"
