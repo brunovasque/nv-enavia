@@ -1808,17 +1808,17 @@ async function closeContractInTest(env, contractId) {
     }
   }
 
-  // ── Gate 5: current task must be in a state that allows closure ──
-  // The task associated with the successful execution must be completable.
-  // We check that the task status is either "completed" or "in_progress" (execution succeeded).
+  // ── Gate 5: current task must be in a strictly final state ──
+  // Successful execution alone is not enough — the task must have been formally
+  // completed (status in TASK_DONE_STATUSES). "in_progress" is NOT sufficient.
   const tasks = decomposition.tasks || [];
   if (currentTaskId) {
     const task = tasks.find((t) => t.id === currentTaskId);
-    if (task && task.status !== "completed" && task.status !== "in_progress") {
+    if (task && !TASK_DONE_STATUSES.includes(task.status)) {
       return {
         ok: false,
         error: "TASK_NOT_CLOSEABLE",
-        message: `Task "${currentTaskId}" has status "${task.status}" — must be "completed" or "in_progress" (with successful execution) to close.`,
+        message: `Task "${currentTaskId}" has status "${task.status}" — must be in a final state (${TASK_DONE_STATUSES.join(", ")}) to close.`,
       };
     }
   }
@@ -1847,6 +1847,12 @@ async function closeContractInTest(env, contractId) {
   };
 
   state.updated_at = closedAt;
+
+  // ── Synchronize global contract state with closure ──
+  // The contract's canonical status_global must reflect the TEST closure
+  // so there is no divergence between contract_closure and the main state.
+  state.status_global = "completed";
+  state.next_action = "Contract closed in TEST. Awaiting PROD promotion decision.";
 
   // Persist to KV
   await persistContract(env, state, decomposition);

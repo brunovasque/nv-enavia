@@ -3480,6 +3480,8 @@ async function runTests() {
     assert(closeResult.contract_closure.closure_reason.includes("satisfied"), "closure_reason mentions satisfied");
     assert(closeResult.contract_closure.environment === "TEST", "environment is TEST");
     assert(closeResult.contract_closure.closed_by === "automatic", "closed_by is automatic");
+    // RISCO 2: status_global must be synchronized with closure
+    assert(closeResult.state.status_global === "completed", "status_global synchronized to completed");
   }
 
   // ---- Test 158: Contract with failed execution does NOT close ----
@@ -3564,6 +3566,8 @@ async function runTests() {
     assert(typeof state.contract_closure.closed_at === "string", "closed_at survives rehydration");
     assert(Array.isArray(state.contract_closure.closure_evidence), "closure_evidence survives rehydration");
     assert(state.contract_closure.environment === "TEST", "environment survives rehydration");
+    // RISCO 2: status_global synchronized with closure survives rehydration
+    assert(state.status_global === "completed", "status_global=completed survives rehydration");
   }
 
   // ---- Test 162: Summary/API reflects closure state ----
@@ -3584,6 +3588,9 @@ async function runTests() {
     assert(summaryResult.status === 200, "summary HTTP 200");
     assert(summaryResult.body.contract_closure !== null, "handler exposes contract_closure");
     assert(summaryResult.body.contract_closure.closure_status === "closed_in_test", "handler closure_status correct");
+    // RISCO 2: status_global reflected in summary
+    assert(summary.status_global === "completed", "summary status_global is completed after closure");
+    assert(summaryResult.body.status_global === "completed", "handler status_global is completed after closure");
   }
 
   // ---- Test 163: Already-closed contract returns ok with already_closed flag ----
@@ -3677,9 +3684,11 @@ async function runTests() {
     const { state } = await rehydrateContract(env, "ctr_c2_168");
     assert(state.contract_closure.environment === "TEST", "closure environment is TEST, not PROD");
     assert(state.contract_closure.closed_in_test === true, "closed_in_test flag is true");
-    // Verify status_global is NOT promoted to anything beyond the natural flow
+    // Verify status_global is synchronized but NOT promoted to PROD
+    assert(state.status_global === "completed", "status_global is completed (TEST closure)");
     assert(state.status_global !== "promoted", "status_global is not promoted");
     assert(state.status_global !== "prod", "status_global is not prod");
+    assert(state.contract_closure.environment === "TEST", "closure stays in TEST");
   }
 
   // ---- Test 169: handleCloseContractInTest route handler ----
@@ -3794,6 +3803,37 @@ async function runTests() {
     const closeResult = await closeContractInTest(env, "ctr_c2_175");
     assert(closeResult.ok === false, "closure rejected");
     assert(closeResult.error === "TASK_NOT_CLOSEABLE" || closeResult.error === "ACCEPTANCE_PENDING", "error is TASK_NOT_CLOSEABLE or ACCEPTANCE_PENDING");
+  }
+
+  // ---- Test 176: task in_progress with successful execution does NOT close ----
+  {
+    console.log("Test 176: task in_progress with successful execution does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, SINGLE_DOD_PAYLOAD, { contract_id: "ctr_c2_176" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c2_176");
+    await startTask(env, "ctr_c2_176", "task_001");
+
+    // Execute successfully — but do NOT completeTask (task stays in_progress)
+    const execResult = await executeCurrentMicroPr(env, "ctr_c2_176", { evidence: ["test ok"] });
+    assert(execResult.ok === true, "execution succeeded");
+
+    // Verify task is still in_progress
+    const { decomposition } = await rehydrateContract(env, "ctr_c2_176");
+    const task = decomposition.tasks.find((t) => t.id === "task_001");
+    assert(task.status === "in_progress", "task is still in_progress");
+
+    // Attempt closure — must be rejected (RISCO 1)
+    const closeResult = await closeContractInTest(env, "ctr_c2_176");
+    assert(closeResult.ok === false, "closure rejected for in_progress task");
+    // With in_progress task, the contract has active blockers from phase gate,
+    // or acceptance criteria are pending — any of these gates reject closure
+    assert(
+      closeResult.error === "TASK_NOT_CLOSEABLE" ||
+      closeResult.error === "ACCEPTANCE_PENDING" ||
+      closeResult.error === "ACTIVE_BLOCKERS",
+      "error blocks in_progress closure: " + closeResult.error
+    );
   }
 
   // ---- Summary ----
