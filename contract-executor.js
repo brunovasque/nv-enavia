@@ -139,6 +139,7 @@ const SPECIAL_PHASES = [
   "ingestion_blocked",
   "all_phases_complete",
   "plan_revision_pending",
+  "max_prs_exceeded",
 ];
 
 // ---------------------------------------------------------------------------
@@ -745,6 +746,23 @@ async function resolvePlanRevision(env, contractId, params) {
     revisedDecomposition = generateDecomposition(state);
   }
 
+  // F3 — Enforce max_micro_prs on the revised decomposition
+  const maxMicroPrs = typeof state.constraints.max_micro_prs === "number"
+    ? state.constraints.max_micro_prs
+    : null;
+  if (maxMicroPrs !== null) {
+    const taskCandidates = Array.isArray(revisedDecomposition.micro_pr_candidates)
+      ? revisedDecomposition.micro_pr_candidates.filter((m) => m.environment !== "PROD")
+      : [];
+    if (taskCandidates.length > maxMicroPrs) {
+      return {
+        ok: false,
+        error: "BLOCK_MAX_PRS_REACHED",
+        message: `Revised decomposition has ${taskCandidates.length} micro-PR candidates (excluding PROD), exceeding the limit of ${maxMicroPrs}. Provide a revised decomposition within the limit.`,
+      };
+    }
+  }
+
   // Transition: blocked → decomposed
   const transition = transitionStatusGlobal(state, "decomposed", "resolvePlanRevision");
   if (!transition.ok) {
@@ -807,6 +825,7 @@ async function handleResolvePlanRevision(request, env) {
   if (!result.ok) {
     const httpStatus = result.error === "CONTRACT_NOT_FOUND" ? 404
       : result.error === "CONTRACT_CANCELLED" ? 409
+      : result.error === "BLOCK_MAX_PRS_REACHED" ? 422
       : 400;
     return {
       status: httpStatus,
@@ -2649,6 +2668,37 @@ async function handleCreateContract(request, env) {
 
   // Generate decomposition
   const decomposition = generateDecomposition(state);
+
+  // F3 — Enforce max_micro_prs
+  // The PROD-promotion candidate (environment === "PROD") is excluded from
+  // the count; max_micro_prs governs only the task/TEST candidates.
+  const maxMicroPrs = typeof state.constraints.max_micro_prs === "number"
+    ? state.constraints.max_micro_prs
+    : null;
+  if (maxMicroPrs !== null) {
+    const taskCandidates = decomposition.micro_pr_candidates.filter(
+      (m) => m.environment !== "PROD"
+    );
+    if (taskCandidates.length > maxMicroPrs) {
+      if (state.status_global === "decomposed") {
+        const t = transitionStatusGlobal(
+          state,
+          "blocked",
+          "handleCreateContract:max-prs-exceeded"
+        );
+        if (!t.ok) {
+          return { status: 500, body: { ok: false, error: t.error, message: t.message } };
+        }
+      }
+      state.current_phase = "max_prs_exceeded";
+      if (!Array.isArray(state.blockers)) state.blockers = [];
+      state.blockers.push(
+        `max_micro_prs limit (${maxMicroPrs}) exceeded — decomposition generated ${taskCandidates.length} micro-PR candidates.`
+      );
+      state.next_action =
+        "Reduce definition_of_done or increase constraints.max_micro_prs to proceed.";
+    }
+  }
 
   // B4 — Bind and persist initial acceptance criteria
   const binding = bindAcceptanceCriteria(state, decomposition);

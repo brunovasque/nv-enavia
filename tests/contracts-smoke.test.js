@@ -5285,6 +5285,185 @@ async function runTests() {
     assert(Array.isArray(decomposition.tasks), "rehydrated decomposition has tasks");
   }
 
+  // ===========================================================================
+  // F3 — Enforcement of max_micro_prs
+  // ===========================================================================
+
+  // ---- Test 261: max_micro_prs within limit — contract created successfully ----
+  console.log("\nTest 261: F3 — max_micro_prs within limit creates decomposed contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // VALID_PAYLOAD has 3 DoD items → 3 task candidates; limit is 3 → OK
+    const result = await handleCreateContract(
+      mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f3_261" })),
+      env
+    );
+    assert(result.status === 201, "HTTP 201 when within limit");
+    assert(result.body.ok === true, "ok is true");
+    assert(result.body.status_global === "decomposed", 'status_global is "decomposed" when within limit');
+  }
+
+  // ---- Test 262: max_micro_prs exceeded — contract blocked ----
+  console.log("\nTest 262: F3 — max_micro_prs exceeded blocks contract at creation");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // 4 DoD items → 4 task candidates; limit is 3 → exceeded
+    const payload = Object.assign({}, VALID_PAYLOAD, {
+      contract_id: "ctr_f3_262",
+      definition_of_done: ["A", "B", "C", "D"],
+      constraints: Object.assign({}, VALID_PAYLOAD.constraints, { max_micro_prs: 3 }),
+    });
+    const result = await handleCreateContract(mockRequest(payload), env);
+    assert(result.status === 201, "HTTP 201 (contract persisted as blocked)");
+    assert(result.body.status_global === "blocked", 'status_global is "blocked" when limit exceeded');
+
+    // Verify state in KV
+    const { state } = await rehydrateContract(env, "ctr_f3_262");
+    assert(state.status_global === "blocked", "rehydrated status_global is blocked");
+    assert(state.current_phase === "max_prs_exceeded", 'rehydrated current_phase is "max_prs_exceeded"');
+    assert(Array.isArray(state.blockers) && state.blockers.length > 0, "blockers array is populated");
+    assert(
+      state.blockers.some((b) => b.includes("max_micro_prs")),
+      "blocker message references max_micro_prs"
+    );
+  }
+
+  // ---- Test 263: absence of max_micro_prs — default (10) applied, normal behaviour ----
+  console.log("\nTest 263: F3 — absence of max_micro_prs uses default limit, normal behaviour");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // No constraints provided → default max_micro_prs: 10; 3 DoD → 3 task candidates → within limit
+    const payloadNoConstraints = {
+      contract_id: "ctr_f3_263",
+      version: "v1",
+      operator: "test-operator",
+      goal: "Test no constraints",
+      scope: { workers: ["nv-enavia"], routes: ["/test"], environments: ["TEST", "PROD"] },
+      definition_of_done: ["Step A", "Step B", "Step C"],
+    };
+    const result = await handleCreateContract(mockRequest(payloadNoConstraints), env);
+    assert(result.status === 201, "HTTP 201 with no explicit constraints");
+    assert(result.body.status_global === "decomposed", 'status_global is "decomposed" with default limit');
+  }
+
+  // ---- Test 264: resolvePlanRevision with oversized new_decomposition fails ----
+  console.log("\nTest 264: F3 — resolvePlanRevision rejects oversized revised decomposition");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Create with VALID_PAYLOAD (max_micro_prs: 3, 3 DoD → 3 task candidates → decomposed)
+    const payload = Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f3_264" });
+    await handleCreateContract(mockRequest(payload), env);
+    // Reject the plan (contract is in decomposed state)
+    await rejectDecompositionPlan(env, "ctr_f3_264", { reason: "Test oversized resolve" });
+
+    // Provide a revised decomposition with 4 task candidates (> limit 3)
+    const oversizedDecomp = {
+      contract_id: "ctr_f3_264",
+      phases: [],
+      tasks: [],
+      micro_pr_candidates: [
+        { id: "micro_pr_001", task_id: "t1", environment: "TEST" },
+        { id: "micro_pr_002", task_id: "t2", environment: "TEST" },
+        { id: "micro_pr_003", task_id: "t3", environment: "TEST" },
+        { id: "micro_pr_004", task_id: "t4", environment: "TEST" },
+        { id: "micro_pr_005", task_id: null, environment: "PROD" },
+      ],
+      generated_at: new Date().toISOString(),
+    };
+    const result = await resolvePlanRevision(env, "ctr_f3_264", { new_decomposition: oversizedDecomp });
+    assert(result.ok === false, "resolvePlanRevision fails with oversized plan");
+    assert(result.error === "BLOCK_MAX_PRS_REACHED", "error is BLOCK_MAX_PRS_REACHED");
+
+    // State must remain blocked / plan_rejected (not transitioned)
+    const { state } = await rehydrateContract(env, "ctr_f3_264");
+    assert(state.status_global === "blocked", "contract remains blocked after failed resolve");
+    assert(state.plan_rejection !== null, "plan_rejection still active after failed resolve");
+  }
+
+  // ---- Test 265: resolvePlanRevision with plan within limit resolves successfully ----
+  console.log("\nTest 265: F3 — resolvePlanRevision accepts revised decomposition within limit");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Create with VALID_PAYLOAD (max_micro_prs: 3, 3 DoD → 3 task candidates → decomposed)
+    const payload = Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f3_265" });
+    await handleCreateContract(mockRequest(payload), env);
+    await rejectDecompositionPlan(env, "ctr_f3_265", { reason: "Test within-limit resolve" });
+
+    // Provide a revised decomposition with 3 task candidates (≤ limit 3)
+    const withinLimitDecomp = {
+      contract_id: "ctr_f3_265",
+      phases: [],
+      tasks: [],
+      micro_pr_candidates: [
+        { id: "micro_pr_001", task_id: "t1", environment: "TEST" },
+        { id: "micro_pr_002", task_id: "t2", environment: "TEST" },
+        { id: "micro_pr_003", task_id: "t3", environment: "TEST" },
+        { id: "micro_pr_004", task_id: null, environment: "PROD" },
+      ],
+      generated_at: new Date().toISOString(),
+    };
+    const result = await resolvePlanRevision(env, "ctr_f3_265", { new_decomposition: withinLimitDecomp });
+    assert(result.ok === true, "resolvePlanRevision succeeds with plan within limit");
+    assert(result.state.status_global === "decomposed", 'contract returns to "decomposed"');
+  }
+
+  // ---- Test 266: Rehydration after max_prs_exceeded block is consistent ----
+  console.log("\nTest 266: F3 — rehydration after max_prs_exceeded block is consistent");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = Object.assign({}, VALID_PAYLOAD, {
+      contract_id: "ctr_f3_266",
+      definition_of_done: ["X", "Y", "Z", "W"],
+      constraints: Object.assign({}, VALID_PAYLOAD.constraints, { max_micro_prs: 3 }),
+    });
+    await handleCreateContract(mockRequest(payload), env);
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_f3_266");
+    assert(state.status_global === "blocked", "rehydrated status_global is blocked");
+    assert(state.current_phase === "max_prs_exceeded", 'rehydrated current_phase is "max_prs_exceeded"');
+    assert(Array.isArray(state.blockers) && state.blockers.length > 0, "rehydrated blockers are populated");
+    assert(decomposition !== null, "rehydrated decomposition exists");
+    assert(Array.isArray(decomposition.micro_pr_candidates), "rehydrated micro_pr_candidates is array");
+  }
+
+  // ---- Test 267: Route handler — resolve with oversized plan returns HTTP 422 ----
+  console.log("\nTest 267: F3 — route handler returns HTTP 422 for oversized revised plan");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Create with VALID_PAYLOAD (max_micro_prs: 3, 3 DoD → 3 task candidates → decomposed)
+    const payload = Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f3_267" });
+    await handleCreateContract(mockRequest(payload), env);
+    await rejectDecompositionPlan(env, "ctr_f3_267", { reason: "Route test" });
+
+    // Oversized: 4 task candidates (> limit 3)
+    const oversizedDecomp = {
+      contract_id: "ctr_f3_267",
+      phases: [],
+      tasks: [],
+      micro_pr_candidates: [
+        { id: "micro_pr_001", task_id: "t1", environment: "TEST" },
+        { id: "micro_pr_002", task_id: "t2", environment: "TEST" },
+        { id: "micro_pr_003", task_id: "t3", environment: "TEST" },
+        { id: "micro_pr_004", task_id: "t4", environment: "TEST" },
+        { id: "micro_pr_005", task_id: null, environment: "PROD" },
+      ],
+      generated_at: new Date().toISOString(),
+    };
+    const result = await handleResolvePlanRevision(
+      mockRequest({ contract_id: "ctr_f3_267", new_decomposition: oversizedDecomp }),
+      env
+    );
+    assert(result.status === 422, "HTTP 422 for oversized revised plan via route handler");
+    assert(result.body.error === "BLOCK_MAX_PRS_REACHED", "error is BLOCK_MAX_PRS_REACHED in route response");
+  }
+
   // ---- Summary ----
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
