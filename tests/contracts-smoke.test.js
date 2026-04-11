@@ -38,6 +38,9 @@ import {
   NEXT_ACTION_TYPES,
   buildExecutionHandoff,
   HANDOFF_ACTIONABLE_TYPES,
+  bindAcceptanceCriteria,
+  ACCEPTANCE_CRITERIA_SCOPES,
+  ACCEPTANCE_CRITERIA_STATUSES,
   buildContractSummary,
 } from "../contract-executor.js";
 
@@ -1610,6 +1613,481 @@ async function runTests() {
     for (const field of requiredFields) {
       assert(handoff[field] !== undefined && handoff[field] !== null, `mandatory field "${field}" is present`);
     }
+  }
+
+  // ==========================================================================
+  // B4 — Acceptance Criteria Binder Smoke Tests
+  // ==========================================================================
+
+  // ---- Test 82: bindAcceptanceCriteria — valid binding from fresh contract ----
+  console.log("\nTest 82: bindAcceptanceCriteria — valid binding from fresh contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_001",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_001");
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    assert(binding !== null, "binding is not null for valid contract");
+    assert(Array.isArray(binding.phase_acceptance), "has phase_acceptance array");
+    assert(Array.isArray(binding.task_acceptance), "has task_acceptance array");
+    assert(Array.isArray(binding.handoff_acceptance), "has handoff_acceptance array");
+    assert(typeof binding.generated_at === "string", "has generated_at timestamp");
+    assert(binding.current_phase !== null, "has current_phase");
+    assert(binding.phase_acceptance.length > 0, "phase_acceptance has criteria for active phase");
+  }
+
+  // ---- Test 83: bindAcceptanceCriteria — criterion structure is canonical ----
+  console.log("\nTest 83: bindAcceptanceCriteria — criterion structure is canonical");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_struct",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_struct");
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    // Check first phase criterion
+    const criterion = binding.phase_acceptance[0];
+    assert(typeof criterion.id === "string", "criterion has id");
+    assert(ACCEPTANCE_CRITERIA_SCOPES.includes(criterion.scope), "criterion scope is valid");
+    assert(typeof criterion.description === "string" && criterion.description.length > 0, "criterion has description");
+    assert(ACCEPTANCE_CRITERIA_STATUSES.includes(criterion.status), "criterion status is valid");
+    assert(criterion.status === "pending", "criterion status defaults to pending");
+    assert(criterion.evidence_required === true, "criterion has evidence_required");
+    assert(typeof criterion.blocking === "boolean", "criterion has blocking boolean");
+  }
+
+  // ---- Test 84: bindAcceptanceCriteria — persisted and rehydrated via state ----
+  console.log("\nTest 84: bindAcceptanceCriteria — persisted and rehydrated via state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_persist",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Rehydrate and check the binding was persisted as part of state
+    const { state } = await rehydrateContract(env, "ctr_ac_persist");
+    assert(state.acceptance_criteria_binding !== undefined, "binding persisted in state");
+    assert(state.acceptance_criteria_binding !== null, "binding is not null in persisted state");
+    assert(
+      Array.isArray(state.acceptance_criteria_binding.phase_acceptance),
+      "persisted binding has phase_acceptance"
+    );
+    assert(
+      typeof state.acceptance_criteria_binding.generated_at === "string",
+      "persisted binding has generated_at"
+    );
+  }
+
+  // ---- Test 85: bindAcceptanceCriteria — rehydration consistency ----
+  console.log("\nTest 85: bindAcceptanceCriteria — rehydration maintains consistency");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_rehydrate",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Rehydrate twice — should be consistent
+    const { state: s1 } = await rehydrateContract(env, "ctr_ac_rehydrate");
+    const { state: s2 } = await rehydrateContract(env, "ctr_ac_rehydrate");
+
+    assert(
+      s1.acceptance_criteria_binding.phase_acceptance.length ===
+        s2.acceptance_criteria_binding.phase_acceptance.length,
+      "phase_acceptance length consistent across rehydrations"
+    );
+    assert(
+      s1.acceptance_criteria_binding.current_phase ===
+        s2.acceptance_criteria_binding.current_phase,
+      "current_phase consistent across rehydrations"
+    );
+    assert(
+      s1.acceptance_criteria_binding.phase_acceptance[0].id ===
+        s2.acceptance_criteria_binding.phase_acceptance[0].id,
+      "criterion ids consistent across rehydrations"
+    );
+  }
+
+  // ---- Test 86: bindAcceptanceCriteria — exposed in summary/API ----
+  console.log("\nTest 86: bindAcceptanceCriteria — exposed in summary/API");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_summary",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    const summaryResult = await handleGetContractSummary(env, "ctr_ac_summary");
+    assert(summaryResult.status === 200, "summary status 200");
+    assert(
+      summaryResult.body.acceptance_criteria_binding !== undefined,
+      "acceptance_criteria_binding present in summary"
+    );
+    assert(
+      summaryResult.body.acceptance_criteria_binding !== null,
+      "acceptance_criteria_binding is not null in summary"
+    );
+    assert(
+      Array.isArray(summaryResult.body.acceptance_criteria_binding.phase_acceptance),
+      "summary binding has phase_acceptance"
+    );
+    assert(
+      Array.isArray(summaryResult.body.acceptance_criteria_binding.handoff_acceptance),
+      "summary binding has handoff_acceptance"
+    );
+  }
+
+  // ---- Test 87: bindAcceptanceCriteria — exposed in GET contract ----
+  console.log("\nTest 87: bindAcceptanceCriteria — exposed in GET contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_get",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    const getResult = await handleGetContract(env, "ctr_ac_get");
+    assert(getResult.status === 200, "GET contract status 200");
+    assert(
+      getResult.body.contract.acceptance_criteria_binding !== undefined,
+      "acceptance_criteria_binding present in GET response"
+    );
+    assert(
+      getResult.body.contract.acceptance_criteria_binding !== null,
+      "acceptance_criteria_binding is not null in GET response"
+    );
+  }
+
+  // ---- Test 88: bindAcceptanceCriteria — null with missing state/decomposition ----
+  console.log("\nTest 88: bindAcceptanceCriteria — null with missing state/decomposition");
+  {
+    assert(bindAcceptanceCriteria(null, null) === null, "null state + null decomp → null");
+    assert(bindAcceptanceCriteria(null, { phases: [] }) === null, "null state → null");
+    assert(bindAcceptanceCriteria({}, null) === null, "null decomp → null");
+  }
+
+  // ---- Test 89: bindAcceptanceCriteria — controlled state with missing minimal data ----
+  console.log("\nTest 89: bindAcceptanceCriteria — controlled empty binding with no phases/tasks");
+  {
+    const state = buildInitialState({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_empty",
+    });
+    const decomposition = {
+      contract_id: "ctr_ac_empty",
+      phases: [],
+      tasks: [],
+      micro_pr_candidates: [],
+      generated_at: new Date().toISOString(),
+    };
+
+    const binding = bindAcceptanceCriteria(state, decomposition);
+    assert(binding !== null, "binding is not null even with empty decomposition");
+    assert(binding.phase_acceptance.length === 0, "no phase acceptance for no phases");
+    assert(binding.task_acceptance.length === 0, "no task acceptance for no current task");
+    assert(binding.handoff_acceptance.length === 0, "no handoff acceptance without handoff");
+    assert(binding.has_handoff === false, "has_handoff is false");
+  }
+
+  // ---- Test 89b: bindAcceptanceCriteria — evidence_required can be false for structural criteria ----
+  console.log("\nTest 89b: bindAcceptanceCriteria — evidence_required false for structural phase criterion");
+  {
+    const state = buildInitialState({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_evid_false",
+      definition_of_done: ["Only criterion"],
+    });
+    // Build decomposition with a phase that has no tasks assigned
+    const decomposition = generateDecomposition(state);
+
+    // Complete task and advance so we hit phase_02 which has no tasks
+    // (single DoD → task goes to phase_01 only, phase_02 is empty)
+    // Instead, directly create a phase with no tasks
+    const decompCustom = {
+      contract_id: "ctr_ac_evid_false",
+      phases: [
+        { id: "phase_empty", name: "Empty phase", status: "pending", tasks: [] },
+      ],
+      tasks: [],
+      micro_pr_candidates: [],
+      generated_at: new Date().toISOString(),
+    };
+    state.current_phase = "phase_empty";
+
+    const binding = bindAcceptanceCriteria(state, decompCustom);
+    assert(binding !== null, "binding exists for empty-phase contract");
+    assert(binding.phase_acceptance.length === 1, "one structural criterion for empty phase");
+    assert(
+      binding.phase_acceptance[0].evidence_required === false,
+      "structural phase criterion has evidence_required = false"
+    );
+    assert(
+      binding.phase_acceptance[0].blocking === false,
+      "structural phase criterion is non-blocking"
+    );
+  }
+
+  // ---- Test 90: bindAcceptanceCriteria — task acceptance when task is in_progress ----
+  console.log("\nTest 90: bindAcceptanceCriteria — task acceptance when task is in_progress");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_inprog",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    await startTask(env, "ctr_ac_inprog", "task_001");
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_inprog");
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    assert(binding !== null, "binding exists when task is in progress");
+    assert(binding.current_task === "task_001", "binding reflects current task");
+    assert(binding.task_acceptance.length > 0, "task_acceptance has criteria for in-progress task");
+    assert(
+      binding.task_acceptance[0].description.length > 0,
+      "task criterion has description"
+    );
+    // No-regression criterion should be present
+    const noRegression = binding.task_acceptance.find(c => c.id === "task_ac_no_regression");
+    assert(noRegression !== undefined, "no-regression criterion present for in-progress task");
+  }
+
+  // ---- Test 91: bindAcceptanceCriteria — handoff criteria linked when handoff exists ----
+  console.log("\nTest 91: bindAcceptanceCriteria — handoff acceptance when handoff exists");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_handoff",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_handoff");
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    // Fresh contract with queued task → handoff should exist
+    assert(binding.has_handoff === true, "has_handoff is true when handoff available");
+    assert(binding.handoff_acceptance.length > 0, "handoff_acceptance has criteria");
+    assert(binding.handoff_acceptance[0].scope === "handoff", "handoff criterion has scope 'handoff'");
+  }
+
+  // ---- Test 92: bindAcceptanceCriteria — no handoff criteria when contract completed ----
+  console.log("\nTest 92: bindAcceptanceCriteria — no handoff criteria when contract completed");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_done",
+      definition_of_done: ["Only criterion"],
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    await startTask(env, "ctr_ac_done", "task_001");
+    await completeTask(env, "ctr_ac_done", "task_001");
+    await advanceContractPhase(env, "ctr_ac_done");
+    await advanceContractPhase(env, "ctr_ac_done");
+    await advanceContractPhase(env, "ctr_ac_done");
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_done");
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    assert(binding !== null, "binding exists even for completed contract");
+    assert(binding.has_handoff === false, "has_handoff false for completed contract");
+    assert(binding.handoff_acceptance.length === 0, "no handoff criteria for completed contract");
+  }
+
+  // ---- Test 93: bindAcceptanceCriteria — blocked contract gives controlled binding ----
+  console.log("\nTest 93: bindAcceptanceCriteria — blocked contract gives controlled binding");
+  {
+    const state = buildInitialState({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_blocked",
+    });
+    state.current_phase = "ingestion_blocked";
+    state.status_global = "blocked";
+    state.blockers = ["missing environments"];
+
+    const decomposition = generateDecomposition(state);
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    assert(binding !== null, "binding exists for blocked contract");
+    assert(binding.has_handoff === false, "no handoff for blocked contract");
+    assert(binding.handoff_acceptance.length === 0, "no handoff criteria for blocked contract");
+  }
+
+  // ---- Test 94: bindAcceptanceCriteria — all criteria start as 'pending' ----
+  console.log("\nTest 94: bindAcceptanceCriteria — all criteria start as 'pending'");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_pending",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_pending");
+    const binding = bindAcceptanceCriteria(state, decomposition);
+
+    const allCriteria = [
+      ...binding.phase_acceptance,
+      ...binding.task_acceptance,
+      ...binding.handoff_acceptance,
+    ];
+    assert(allCriteria.length > 0, "has at least one criterion");
+    const allPending = allCriteria.every(c => c.status === "pending");
+    assert(allPending, "all criteria start as pending (no passed without evidence)");
+  }
+
+  // ---- Test 95: bindAcceptanceCriteria — no phase advance triggered ----
+  console.log("\nTest 95: bindAcceptanceCriteria — no phase advance triggered (pure function)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_pure",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state: stateBefore, decomposition: decompBefore } = await rehydrateContract(env, "ctr_ac_pure");
+
+    // Call binder
+    bindAcceptanceCriteria(stateBefore, decompBefore);
+
+    // State must not have changed
+    const { state: stateAfter, decomposition: decompAfter } = await rehydrateContract(env, "ctr_ac_pure");
+    assert(stateAfter.status_global === stateBefore.status_global, "status_global unchanged");
+    assert(stateAfter.current_phase === stateBefore.current_phase, "current_phase unchanged");
+    assert(stateAfter.current_task === stateBefore.current_task, "current_task unchanged");
+    assert(
+      JSON.stringify(decompAfter.tasks.map(t => t.status)) === JSON.stringify(decompBefore.tasks.map(t => t.status)),
+      "task statuses unchanged after binder call"
+    );
+    assert(
+      JSON.stringify(decompAfter.phases.map(p => p.status)) === JSON.stringify(decompBefore.phases.map(p => p.status)),
+      "phase statuses unchanged after binder call"
+    );
+  }
+
+  // ---- Test 96: bindAcceptanceCriteria — no execution triggered ----
+  console.log("\nTest 96: bindAcceptanceCriteria — no micro-PR execution triggered");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_no_exec",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_ac_no_exec");
+
+    bindAcceptanceCriteria(state, decomposition);
+
+    // Verify no task or mpr status changed
+    const { decomposition: decompAfter } = await rehydrateContract(env, "ctr_ac_no_exec");
+    const allTasksQueued = decompAfter.tasks.every(t => t.status === "queued");
+    assert(allTasksQueued, "all tasks still queued — no execution triggered");
+    const allMprsQueued = decompAfter.micro_pr_candidates.every(m => m.status === "queued");
+    assert(allMprsQueued, "all micro-PR candidates still queued — no execution triggered");
+  }
+
+  // ---- Test 97: bindAcceptanceCriteria — phase criteria track active phase correctly ----
+  console.log("\nTest 97: bindAcceptanceCriteria — phase criteria track active phase after advance");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_advance",
+      definition_of_done: ["First", "Second", "Third"],
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Binding before advance — should target phase_01
+    let { state, decomposition } = await rehydrateContract(env, "ctr_ac_advance");
+    let binding = bindAcceptanceCriteria(state, decomposition);
+    assert(binding.current_phase === "phase_01", "binding targets phase_01 initially");
+
+    // Complete task_001 and advance
+    await startTask(env, "ctr_ac_advance", "task_001");
+    await completeTask(env, "ctr_ac_advance", "task_001");
+    await advanceContractPhase(env, "ctr_ac_advance");
+
+    // Binding after advance — should target phase_02
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_ac_advance"));
+    binding = bindAcceptanceCriteria(state, decomposition);
+    assert(
+      binding.current_phase === "phase_02",
+      "binding targets phase_02 after advance"
+    );
+    assert(
+      binding.phase_acceptance.length > 0,
+      "phase_acceptance has criteria for phase_02"
+    );
+  }
+
+  // ---- Test 98: ACCEPTANCE_CRITERIA_SCOPES and ACCEPTANCE_CRITERIA_STATUSES exports ----
+  console.log("\nTest 98: ACCEPTANCE_CRITERIA_SCOPES and ACCEPTANCE_CRITERIA_STATUSES exports");
+  {
+    assert(Array.isArray(ACCEPTANCE_CRITERIA_SCOPES), "ACCEPTANCE_CRITERIA_SCOPES is array");
+    assert(ACCEPTANCE_CRITERIA_SCOPES.includes("phase"), "includes phase");
+    assert(ACCEPTANCE_CRITERIA_SCOPES.includes("task"), "includes task");
+    assert(ACCEPTANCE_CRITERIA_SCOPES.includes("handoff"), "includes handoff");
+    assert(Array.isArray(ACCEPTANCE_CRITERIA_STATUSES), "ACCEPTANCE_CRITERIA_STATUSES is array");
+    assert(ACCEPTANCE_CRITERIA_STATUSES.includes("pending"), "includes pending");
+    assert(ACCEPTANCE_CRITERIA_STATUSES.includes("passed"), "includes passed");
+    assert(ACCEPTANCE_CRITERIA_STATUSES.includes("failed"), "includes failed");
+    assert(ACCEPTANCE_CRITERIA_STATUSES.includes("waived"), "includes waived");
+  }
+
+  // ---- Test 99: bindAcceptanceCriteria — summary determinism ----
+  console.log("\nTest 99: bindAcceptanceCriteria — summary returns deterministic binding");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_determ",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    const summary1 = await handleGetContractSummary(env, "ctr_ac_determ");
+    const summary2 = await handleGetContractSummary(env, "ctr_ac_determ");
+
+    const b1 = summary1.body.acceptance_criteria_binding;
+    const b2 = summary2.body.acceptance_criteria_binding;
+    assert(
+      b1.phase_acceptance.length === b2.phase_acceptance.length,
+      "phase_acceptance length is deterministic across calls"
+    );
+    assert(
+      b1.handoff_acceptance.length === b2.handoff_acceptance.length,
+      "handoff_acceptance length is deterministic across calls"
+    );
+    assert(
+      b1.current_phase === b2.current_phase,
+      "current_phase is deterministic across calls"
+    );
   }
 
   // ---- Summary ----

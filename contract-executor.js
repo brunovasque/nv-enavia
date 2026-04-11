@@ -982,6 +982,170 @@ function buildExecutionHandoff(state, decomposition) {
   };
 }
 
+// ============================================================================
+// 📎 B4 — Acceptance Criteria Binder
+//
+// Pure function. Does NOT mutate state or decomposition.
+// Resolves acceptance criteria for the current phase, task, and handoff,
+// producing a canonical structure that can be persisted and rehydrated.
+//
+// Each criterion has:
+//   id, scope, description, status, evidence_required, blocking
+//
+// Returns { phase_acceptance, task_acceptance, handoff_acceptance,
+//           generated_at } or a controlled empty structure when data is
+//           insufficient.
+// ============================================================================
+
+// Valid scopes for acceptance criteria
+const ACCEPTANCE_CRITERIA_SCOPES = ["phase", "task", "handoff"];
+
+// Valid statuses for acceptance criteria
+const ACCEPTANCE_CRITERIA_STATUSES = ["pending", "passed", "failed", "waived"];
+
+/**
+ * Build a single canonical acceptance criterion object.
+ */
+function buildCriterion(id, scope, description, options) {
+  const opts = options || {};
+  return {
+    id,
+    scope,
+    description,
+    status: "pending",
+    evidence_required: opts.evidence_required !== undefined ? opts.evidence_required : true,
+    blocking: opts.blocking !== undefined ? opts.blocking : true,
+  };
+}
+
+/**
+ * bindAcceptanceCriteria(state, decomposition) → AcceptanceCriteriaBinding
+ *
+ * Pure, deterministic binder. Associates acceptance criteria to the current
+ * phase, current task, and (when applicable) the current execution handoff.
+ *
+ * Returns null only when state or decomposition are missing entirely.
+ * Returns a controlled empty binding when minimal data is absent.
+ */
+function bindAcceptanceCriteria(state, decomposition) {
+  // ── Guard: missing data → null ──
+  if (!state || !decomposition) {
+    return null;
+  }
+
+  const phases = decomposition.phases || [];
+  const tasks = decomposition.tasks || [];
+  const dod = state.definition_of_done || [];
+
+  // ── Resolve the active phase ──
+  // First try to match current_phase from state to a decomposition phase.
+  // Fallback: if current_phase is a special value (e.g. "decomposition_complete"),
+  // find the first incomplete phase from the decomposition.
+  const activePhase = phases.find((p) => p.id === state.current_phase)
+    || phases.find((p) => p.status !== "done");
+
+  // ── Phase acceptance criteria ──
+  const phaseAcceptance = [];
+  if (activePhase) {
+    // One criterion per task in this phase: all must complete
+    const phaseTasks = tasks.filter((t) => (activePhase.tasks || []).includes(t.id));
+    phaseTasks.forEach((t, idx) => {
+      phaseAcceptance.push(
+        buildCriterion(
+          `phase_ac_${String(idx + 1).padStart(3, "0")}`,
+          "phase",
+          `Task "${t.id}" in phase "${activePhase.id}" must be completed: ${t.description}`,
+          { evidence_required: true, blocking: true }
+        )
+      );
+    });
+
+    // If the phase has no tasks, add a structural criterion
+    if (phaseTasks.length === 0) {
+      phaseAcceptance.push(
+        buildCriterion(
+          "phase_ac_001",
+          "phase",
+          `Phase "${activePhase.id}" has no tasks — structural pass required.`,
+          { evidence_required: false, blocking: false }
+        )
+      );
+    }
+  }
+
+  // ── Task acceptance criteria ──
+  const taskAcceptance = [];
+  const currentTaskId = state.current_task;
+  const currentTask = currentTaskId
+    ? tasks.find((t) => t.id === currentTaskId)
+    : null;
+
+  if (currentTask) {
+    // Primary criterion: the task's own definition_of_done item
+    taskAcceptance.push(
+      buildCriterion(
+        "task_ac_001",
+        "task",
+        currentTask.description,
+        { evidence_required: true, blocking: true }
+      )
+    );
+
+    // Dependency criteria: all deps must already be done
+    const deps = currentTask.depends_on || [];
+    deps.forEach((depId, idx) => {
+      const depTask = tasks.find((t) => t.id === depId);
+      const depDesc = depTask ? depTask.description : depId;
+      taskAcceptance.push(
+        buildCriterion(
+          `task_ac_dep_${String(idx + 1).padStart(3, "0")}`,
+          "task",
+          `Dependency "${depId}" must be satisfied: ${depDesc}`,
+          { evidence_required: true, blocking: true }
+        )
+      );
+    });
+
+    // No-regression criterion
+    taskAcceptance.push(
+      buildCriterion(
+        "task_ac_no_regression",
+        "task",
+        "No new blockers introduced by this task.",
+        { evidence_required: true, blocking: true }
+      )
+    );
+  }
+
+  // ── Handoff acceptance criteria ──
+  const handoffAcceptance = [];
+  const handoff = buildExecutionHandoff(state, decomposition);
+  if (handoff) {
+    // Mirror the handoff's own acceptance_criteria as structured objects
+    const handoffCriteriaSource = handoff.acceptance_criteria || [];
+    handoffCriteriaSource.forEach((desc, idx) => {
+      handoffAcceptance.push(
+        buildCriterion(
+          `handoff_ac_${String(idx + 1).padStart(3, "0")}`,
+          "handoff",
+          desc,
+          { evidence_required: true, blocking: true }
+        )
+      );
+    });
+  }
+
+  return {
+    phase_acceptance: phaseAcceptance,
+    task_acceptance: taskAcceptance,
+    handoff_acceptance: handoffAcceptance,
+    current_phase: activePhase ? activePhase.id : state.current_phase,
+    current_task: currentTaskId || null,
+    has_handoff: handoff !== null,
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build enhanced contract summary with real progress
 // ---------------------------------------------------------------------------
@@ -1006,6 +1170,9 @@ function buildContractSummary(state, decomposition) {
   // B3 — Build execution handoff from resolved next action
   const executionHandoff = buildExecutionHandoff(state, decomposition);
 
+  // B4 — Bind acceptance criteria for current phase/task/handoff
+  const acceptanceCriteriaBinding = bindAcceptanceCriteria(state, decomposition);
+
   return {
     contract_id: state.contract_id,
     contract_name: state.contract_name,
@@ -1016,6 +1183,7 @@ function buildContractSummary(state, decomposition) {
     next_action: state.next_action,
     next_action_resolved: nextActionResolved,
     execution_handoff: executionHandoff,
+    acceptance_criteria_binding: acceptanceCriteriaBinding,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -1096,6 +1264,10 @@ async function handleCreateContract(request, env) {
 
   // Generate decomposition
   const decomposition = generateDecomposition(state);
+
+  // B4 — Bind and persist initial acceptance criteria
+  const binding = bindAcceptanceCriteria(state, decomposition);
+  state.acceptance_criteria_binding = binding;
 
   // Persist
   await persistContract(env, state, decomposition);
@@ -1202,6 +1374,10 @@ export {
   // B3 — Execution Handoff Builder
   buildExecutionHandoff,
   HANDOFF_ACTIONABLE_TYPES,
+  // B4 — Acceptance Criteria Binder
+  bindAcceptanceCriteria,
+  ACCEPTANCE_CRITERIA_SCOPES,
+  ACCEPTANCE_CRITERIA_STATUSES,
   // Summary
   buildContractSummary,
   // Route handlers
