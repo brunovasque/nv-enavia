@@ -9,7 +9,12 @@
 //
 // Fontes:
 //   - PM1 (memory-schema.js)  — tipos, enums e shape canônico
-//   - PM2 (memory-storage.js) — leitura via listMemoryIds + readMemoryById
+//   - PM2 (memory-storage.js) — leitura via readMemoryById (contrato público)
+//
+// Enumeração de IDs:
+//   PM3 lê diretamente a chave "memory:index" do KV, conforme o esquema de
+//   chaves documentado no cabeçalho de memory-storage.js (PM2).
+//   Isso evita ampliar a superfície pública da PM2 sem necessidade.
 //
 // KV prefix lido: memory:* (nunca toca contract:*)
 //
@@ -33,9 +38,32 @@ import {
 } from "./memory-schema.js";
 
 import {
-  listMemoryIds,
   readMemoryById,
 } from "./memory-storage.js";
+
+// ---------------------------------------------------------------------------
+// Internal KV key constants
+//
+// Mirrors the key scheme documented in schema/memory-storage.js (PM2):
+//   memory:index        → JSON array of all known memory_id strings
+//   memory:<memory_id>  → individual memory object
+//
+// PM3 reads "memory:index" directly to enumerate IDs without adding a new
+// function to PM2's public API. This is read-only and stays within the
+// "memory:*" prefix — never touches "contract:*".
+// ---------------------------------------------------------------------------
+const _PM3_INDEX_KEY = "memory:index";
+
+async function _readIndex(env) {
+  const raw = await env.ENAVIA_BRAIN.get(_PM3_INDEX_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_e) {
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Internal constants
@@ -138,7 +166,7 @@ function _sortComparator(a, b, context) {
 // object from KV. Skips any id that resolves to null (deleted/corrupted).
 // ---------------------------------------------------------------------------
 async function _loadAllMemories(env) {
-  const ids = await listMemoryIds(env);
+  const ids = await _readIndex(env);
   const results = [];
   for (const id of ids) {
     const mem = await readMemoryById(id, env);
