@@ -838,6 +838,150 @@ function resolveNextAction(state, decomposition) {
   };
 }
 
+// ============================================================================
+// 📦 B3 — Execution Handoff Builder
+//
+// Pure function. Does NOT mutate state or decomposition.
+// Reads the resolved next action and builds a canonical execution handoff
+// ready for the next micro-PR execution step.
+//
+// Returns null when there is no actionable next step (contract complete,
+// blocked, awaiting human, no_action, etc.).
+//
+// Returns { objective, scope, target_files, do_not_touch, smoke_tests,
+//           rollback, acceptance_criteria, source_phase, source_task,
+//           source_micro_pr, generated_at }
+// ============================================================================
+
+// Actionable next-action types that warrant a handoff
+const HANDOFF_ACTIONABLE_TYPES = ["start_task", "start_micro_pr"];
+
+function buildExecutionHandoff(state, decomposition) {
+  // ── Guard: missing data → controlled null ──
+  if (!state || !decomposition) {
+    return null;
+  }
+
+  const nextAction = resolveNextAction(state, decomposition);
+
+  // Only build handoff for actionable types
+  if (!nextAction || !HANDOFF_ACTIONABLE_TYPES.includes(nextAction.type)) {
+    return null;
+  }
+
+  const tasks = decomposition.tasks || [];
+  const mprs = decomposition.micro_pr_candidates || [];
+  const phases = decomposition.phases || [];
+
+  // Locate the target task and micro-PR
+  const targetTask = nextAction.task_id
+    ? tasks.find((t) => t.id === nextAction.task_id)
+    : null;
+  const targetMpr = nextAction.micro_pr_candidate_id
+    ? mprs.find((m) => m.id === nextAction.micro_pr_candidate_id)
+    : null;
+  const targetPhase = nextAction.phase_id
+    ? phases.find((p) => p.id === nextAction.phase_id)
+    : null;
+
+  // ── Objective — derived from task description or micro-PR title ──
+  const objective = targetTask
+    ? targetTask.description
+    : targetMpr
+      ? targetMpr.title
+      : nextAction.reason;
+
+  // If we cannot derive a meaningful objective, refuse to produce handoff
+  if (!objective) {
+    return null;
+  }
+
+  // ── Scope — from contract scope + micro-PR targets ──
+  const scopeWorkers = targetMpr
+    ? (targetMpr.target_workers || [])
+    : (state.scope && state.scope.workers) || [];
+  const scopeRoutes = targetMpr
+    ? (targetMpr.target_routes || [])
+    : (state.scope && state.scope.routes) || [];
+  const scope = {
+    environment: targetMpr ? targetMpr.environment : "TEST",
+    workers: scopeWorkers,
+    routes: scopeRoutes,
+    phase: targetPhase ? targetPhase.name : (nextAction.phase_id || null),
+  };
+
+  // ── Target files — deterministic from scope workers ──
+  const targetFiles = [];
+  for (const worker of scope.workers) {
+    if (worker === "nv-enavia") {
+      targetFiles.push("nv-enavia.js", "contract-executor.js", "wrangler.toml");
+    } else {
+      targetFiles.push(`${worker}.js`);
+    }
+  }
+  if (scope.routes.length > 0) {
+    targetFiles.push("tests/contracts-smoke.test.js");
+  }
+
+  // ── Do not touch — hard boundaries from contract governance ──
+  const doNotTouch = [
+    "PROD environment (unless handoff environment is PROD and human-approved)",
+    "Unrelated workers or routes outside contract scope",
+    "KV bindings not listed in contract scope",
+    "Existing tests unrelated to this task",
+  ];
+
+  // ── Smoke tests — derived from the task's definition_of_done linkage ──
+  const smokeTests = [];
+  if (targetTask) {
+    smokeTests.push(`Verify: ${targetTask.description}`);
+  }
+  if (targetMpr && targetMpr.environment === "TEST") {
+    smokeTests.push("Deploy to TEST and validate endpoint behavior");
+    smokeTests.push("Confirm no regression on existing routes");
+  }
+  if (targetMpr && targetMpr.environment === "PROD") {
+    smokeTests.push("Human-approved promotion to PROD");
+    smokeTests.push("Post-deploy smoke test in PROD");
+  }
+  if (smokeTests.length === 0) {
+    smokeTests.push("Verify task completion criteria");
+  }
+
+  // ── Rollback — deterministic per environment ──
+  const rollback = targetMpr && targetMpr.environment === "PROD"
+    ? "Immediate rollback via wrangler rollback; notify operator."
+    : "Revert branch changes; redeploy previous TEST version.";
+
+  // ── Acceptance criteria — from definition_of_done + task-specific ──
+  const acceptanceCriteria = [];
+  if (targetTask) {
+    acceptanceCriteria.push(targetTask.description);
+  }
+  if (targetMpr && targetMpr.environment === "TEST") {
+    acceptanceCriteria.push("Smoke test in TEST passes");
+  }
+  if (targetMpr && targetMpr.environment === "PROD") {
+    acceptanceCriteria.push("Human approval received for PROD promotion");
+    acceptanceCriteria.push("Smoke test in PROD passes");
+  }
+  acceptanceCriteria.push("No new blockers introduced");
+
+  return {
+    objective,
+    scope,
+    target_files: targetFiles,
+    do_not_touch: doNotTouch,
+    smoke_tests: smokeTests,
+    rollback,
+    acceptance_criteria: acceptanceCriteria,
+    source_phase: nextAction.phase_id,
+    source_task: nextAction.task_id,
+    source_micro_pr: nextAction.micro_pr_candidate_id,
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build enhanced contract summary with real progress
 // ---------------------------------------------------------------------------
@@ -859,6 +1003,9 @@ function buildContractSummary(state, decomposition) {
   // Resolve the structured next action
   const nextActionResolved = resolveNextAction(state, decomposition);
 
+  // B3 — Build execution handoff from resolved next action
+  const executionHandoff = buildExecutionHandoff(state, decomposition);
+
   return {
     contract_id: state.contract_id,
     contract_name: state.contract_name,
@@ -868,6 +1015,7 @@ function buildContractSummary(state, decomposition) {
     blockers: state.blockers,
     next_action: state.next_action,
     next_action_resolved: nextActionResolved,
+    execution_handoff: executionHandoff,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -1051,6 +1199,9 @@ export {
   // Next Action Engine
   resolveNextAction,
   NEXT_ACTION_TYPES,
+  // B3 — Execution Handoff Builder
+  buildExecutionHandoff,
+  HANDOFF_ACTIONABLE_TYPES,
   // Summary
   buildContractSummary,
   // Route handlers
