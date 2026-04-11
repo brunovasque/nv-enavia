@@ -2,6 +2,7 @@ import {
   handleCreateContract,
   handleGetContract,
   handleGetContractSummary,
+  handleExecuteContract,
 } from "./contract-executor.js";
 
 // ============================================================================
@@ -4538,6 +4539,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/execute → Execute current micro-PR in TEST (C1)
+      if (method === "POST" && path === "/contracts/execute") {
+        const result = await handleExecuteContract(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -4554,6 +4561,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /brain-query    → Buscar módulos no cérebro",
             "  • POST /brain/get-module → Ler conteúdo de módulo",
             "  • POST /contracts      → Criar contrato (Contract Executor v1)",
+            "  • POST /contracts/execute → Executar micro-PR corrente em TEST (C1)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",

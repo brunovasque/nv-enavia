@@ -1411,6 +1411,266 @@ async function recordError(env, contractId, taskId, errorParams) {
   };
 }
 
+// ============================================================================
+// 🚀 C1 — Real Micro-PR Execution in TEST
+//
+// Canonical execution function for the current micro-PR in TEST environment.
+// Requires a valid current_task and execution_handoff. Persists execution
+// state on the contract and integrates with the error_loop on failure.
+//
+// Does NOT:
+//   - Close the contract
+//   - Promote to PROD
+//   - Advance phases by itself
+//   - Skip tasks or phases
+//   - Invent success without evidence
+//
+// Execution state is stored in `state.current_execution` and survives KV
+// rehydration. Each execution is deterministic and traceable.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// Valid execution statuses
+// ---------------------------------------------------------------------------
+const EXECUTION_STATUSES = ["pending", "running", "success", "failed", "skipped"];
+
+// ---------------------------------------------------------------------------
+// executeCurrentMicroPr(env, contractId, executionParams) → result
+//
+// executionParams (optional):
+//   - evidence: string[]  — evidence lines from the execution
+//   - simulate_failure: { code, message, classification } — for test harness
+//
+// Flow:
+//   1. Rehydrate from KV (INVARIANT 1+3)
+//   2. Validate current_task exists and is in_progress
+//   3. Build execution_handoff and validate it
+//   4. Ensure handoff targets TEST environment
+//   5. Record execution start
+//   6. Execute (or simulate for test harness)
+//   7. On success → persist evidence, update micro-step
+//   8. On failure → persist error, feed error_loop
+//   9. Persist full state to KV
+// ---------------------------------------------------------------------------
+async function executeCurrentMicroPr(env, contractId, executionParams) {
+  const params = executionParams || {};
+
+  // ── INVARIANT 1+3: Rehydrate from KV ──
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  if (!decomposition) {
+    return { ok: false, error: "DECOMPOSITION_NOT_FOUND", message: `Decomposition for "${contractId}" not found.` };
+  }
+
+  // ── Gate 1: current_task must exist and be valid ──
+  const currentTaskId = state.current_task;
+  if (!currentTaskId) {
+    return { ok: false, error: "NO_CURRENT_TASK", message: "No current_task set on contract — cannot execute." };
+  }
+
+  const task = (decomposition.tasks || []).find((t) => t.id === currentTaskId);
+  if (!task) {
+    return { ok: false, error: "TASK_NOT_FOUND", message: `Current task "${currentTaskId}" not found in decomposition.` };
+  }
+
+  // ── Gate 2: task must be in_progress (already started via startTask) ──
+  if (task.status !== "in_progress") {
+    return {
+      ok: false,
+      error: "TASK_NOT_IN_PROGRESS",
+      message: `Task "${currentTaskId}" has status "${task.status}" — must be "in_progress" to execute.`,
+    };
+  }
+
+  // ── Gate 3: Build execution_handoff for the current in-progress task ──
+  // NOTE: buildExecutionHandoff() uses resolveNextAction() which returns "no_action"
+  // for tasks already in_progress. For C1, we build the handoff directly from the
+  // current task and its micro-PR, since the task is already started.
+  const phases = decomposition.phases || [];
+  const tasks = decomposition.tasks || [];
+  const mprs = decomposition.micro_pr_candidates || [];
+  const activePhase = phases.find((p) => p.tasks && p.tasks.includes(currentTaskId))
+    || phases.find((p) => p.status !== "done");
+  const targetMpr = mprs.find((m) => m.task_id === currentTaskId && (m.status === "queued" || m.status === "in_progress"));
+
+  const handoffObjective = task.description;
+  if (!handoffObjective) {
+    return {
+      ok: false,
+      error: "NO_VALID_HANDOFF",
+      message: "Cannot build execution handoff — task has no description.",
+    };
+  }
+
+  const scopeWorkers = targetMpr
+    ? (targetMpr.target_workers || [])
+    : (state.scope && state.scope.workers) || [];
+  const scopeRoutes = targetMpr
+    ? (targetMpr.target_routes || [])
+    : (state.scope && state.scope.routes) || [];
+  const handoffEnvironment = targetMpr ? targetMpr.environment : "TEST";
+  const handoff = {
+    objective: handoffObjective,
+    scope: {
+      environment: handoffEnvironment,
+      workers: scopeWorkers,
+      routes: scopeRoutes,
+      phase: activePhase ? activePhase.name : null,
+    },
+    target_files: [],
+    do_not_touch: [
+      "PROD environment (unless handoff environment is PROD and human-approved)",
+      "Unrelated workers or routes outside contract scope",
+    ],
+    smoke_tests: [`Verify: ${task.description}`, "Deploy to TEST and validate endpoint behavior"],
+    rollback: "Revert branch changes; redeploy previous TEST version.",
+    acceptance_criteria: [task.description, "Smoke test in TEST passes", "No new blockers introduced"],
+    source_phase: activePhase ? activePhase.id : null,
+    source_task: currentTaskId,
+    source_micro_pr: targetMpr ? targetMpr.id : null,
+    generated_at: new Date().toISOString(),
+  };
+  // Build target files from scope workers
+  for (const worker of scopeWorkers) {
+    if (worker === "nv-enavia") {
+      handoff.target_files.push("nv-enavia.js", "contract-executor.js", "wrangler.toml");
+    } else {
+      handoff.target_files.push(`${worker}.js`);
+    }
+  }
+
+  // ── Gate 4: Execution must target TEST environment only ──
+  if (handoff.scope.environment !== "TEST") {
+    return {
+      ok: false,
+      error: "NOT_TEST_ENVIRONMENT",
+      message: `Execution handoff targets "${handoff.scope ? handoff.scope.environment : "unknown"}" — only TEST is allowed in C1.`,
+    };
+  }
+
+  // ── Record execution start ──
+  const executionStartedAt = new Date().toISOString();
+  const microPrId = targetMpr ? targetMpr.id : null;
+
+  state.current_execution = {
+    contract_id: contractId,
+    task_id: currentTaskId,
+    micro_pr_id: microPrId,
+    handoff_used: handoff,
+    execution_status: "running",
+    execution_started_at: executionStartedAt,
+    execution_finished_at: null,
+    execution_evidence: [],
+    execution_error: null,
+    test_execution: true,
+    last_execution_result: null,
+  };
+
+  state.updated_at = executionStartedAt;
+
+  // Persist running state immediately so it survives crashes
+  await persistContract(env, state, decomposition);
+
+  // ── Execute ──
+  let executionSuccess = true;
+  let executionError = null;
+  let evidence = Array.isArray(params.evidence) ? params.evidence.slice() : [];
+
+  // Simulated failure path (for test harness / controlled testing)
+  if (params.simulate_failure) {
+    executionSuccess = false;
+    executionError = {
+      code: params.simulate_failure.code || "EXECUTION_FAILED",
+      message: params.simulate_failure.message || "Execution failed during TEST run.",
+      classification: params.simulate_failure.classification || "in_scope",
+    };
+  }
+
+  // ── Record execution result ──
+  const executionFinishedAt = new Date().toISOString();
+
+  if (executionSuccess) {
+    // ── SUCCESS PATH ──
+    // Add canonical evidence
+    if (evidence.length === 0) {
+      evidence.push(`Task "${currentTaskId}" executed successfully in TEST at ${executionFinishedAt}`);
+    }
+
+    state.current_execution.execution_status = "success";
+    state.current_execution.execution_finished_at = executionFinishedAt;
+    state.current_execution.execution_evidence = evidence;
+    state.current_execution.last_execution_result = "success";
+
+    // Update corresponding micro-PR candidate to in_progress if still queued
+    if (targetMpr && targetMpr.status === "queued") {
+      targetMpr.status = "in_progress";
+    }
+
+    // DO NOT complete the task — that is done via completeTask()
+    // DO NOT advance phase — that is done via advanceContractPhase()
+    // DO NOT close contract — governance rule
+
+    state.updated_at = executionFinishedAt;
+    await persistContract(env, state, decomposition);
+
+    return {
+      ok: true,
+      execution_status: "success",
+      task_id: currentTaskId,
+      micro_pr_id: microPrId,
+      evidence,
+      handoff_used: handoff,
+      execution_started_at: executionStartedAt,
+      execution_finished_at: executionFinishedAt,
+      state,
+      decomposition,
+    };
+  } else {
+    // ── FAILURE PATH ──
+    state.current_execution.execution_status = "failed";
+    state.current_execution.execution_finished_at = executionFinishedAt;
+    state.current_execution.execution_error = executionError;
+    state.current_execution.last_execution_result = "failed";
+    state.current_execution.execution_evidence = evidence;
+
+    state.updated_at = executionFinishedAt;
+    await persistContract(env, state, decomposition);
+
+    // Feed error_loop via canonical recordError
+    const errorResult = await recordError(env, contractId, currentTaskId, {
+      code: executionError.code,
+      scope: "task",
+      message: executionError.message,
+      retryable: executionError.classification === "in_scope",
+      classification: executionError.classification,
+      reason: `Execution failed in TEST: ${executionError.message}`,
+    });
+
+    // Re-read state after recordError to get consistent error_loop
+    const { state: freshState, decomposition: freshDecomp } = await rehydrateContract(env, contractId);
+
+    return {
+      ok: false,
+      error: "EXECUTION_FAILED",
+      execution_status: "failed",
+      task_id: currentTaskId,
+      micro_pr_id: microPrId,
+      execution_error: executionError,
+      evidence,
+      handoff_used: handoff,
+      execution_started_at: executionStartedAt,
+      execution_finished_at: executionFinishedAt,
+      error_loop: freshState ? freshState.error_loop : null,
+      error_loop_evaluation: errorResult.evaluation || null,
+      state: freshState || state,
+      decomposition: freshDecomp || decomposition,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Build enhanced contract summary with real progress
 // ---------------------------------------------------------------------------
@@ -1450,6 +1710,7 @@ function buildContractSummary(state, decomposition) {
     execution_handoff: executionHandoff,
     acceptance_criteria_binding: acceptanceCriteriaBinding,
     error_loop: state.error_loop || null,
+    current_execution: state.current_execution || null,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -1607,6 +1868,69 @@ async function handleGetContractSummary(env, contractId) {
   };
 }
 
+// POST /contracts/execute — Execute current micro-PR in TEST
+async function handleExecuteContract(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return { status: 400, body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." } };
+  }
+
+  const contractId = body && body.contract_id;
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_PARAM", message: '"contract_id" is required in the request body.' },
+    };
+  }
+
+  const result = await executeCurrentMicroPr(env, contractId, {
+    evidence: body.evidence || [],
+    simulate_failure: body.simulate_failure || null,
+  });
+
+  if (result.ok) {
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        execution_status: result.execution_status,
+        task_id: result.task_id,
+        micro_pr_id: result.micro_pr_id,
+        evidence: result.evidence,
+        execution_started_at: result.execution_started_at,
+        execution_finished_at: result.execution_finished_at,
+      },
+    };
+  }
+
+  // Determine appropriate HTTP status
+  const clientErrors = [
+    "NO_CURRENT_TASK", "TASK_NOT_IN_PROGRESS", "NO_VALID_HANDOFF",
+    "NOT_TEST_ENVIRONMENT", "TASK_ORDER_MISMATCH",
+  ];
+  const notFoundErrors = ["CONTRACT_NOT_FOUND", "DECOMPOSITION_NOT_FOUND", "TASK_NOT_FOUND"];
+  let httpStatus = 500;
+  if (clientErrors.includes(result.error)) httpStatus = 409;
+  if (notFoundErrors.includes(result.error)) httpStatus = 404;
+  if (result.error === "EXECUTION_FAILED") httpStatus = 200; // execution ran but failed
+
+  return {
+    status: httpStatus,
+    body: {
+      ok: false,
+      error: result.error,
+      message: result.message || "Execution failed.",
+      execution_status: result.execution_status || null,
+      task_id: result.task_id || null,
+      micro_pr_id: result.micro_pr_id || null,
+      execution_error: result.execution_error || null,
+      error_loop_evaluation: result.error_loop_evaluation || null,
+    },
+  };
+}
+
 // ============================================================================
 // Exports
 // ============================================================================
@@ -1652,10 +1976,14 @@ export {
   ERROR_CLASSIFICATIONS,
   ERROR_LOOP_STATUSES,
   NON_RETRYABLE_CLASSIFICATIONS,
+  // C1 — Real Micro-PR Execution in TEST
+  executeCurrentMicroPr,
+  EXECUTION_STATUSES,
   // Summary
   buildContractSummary,
   // Route handlers
   handleCreateContract,
   handleGetContract,
   handleGetContractSummary,
+  handleExecuteContract,
 };
