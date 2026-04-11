@@ -104,7 +104,7 @@ function transitionStatusGlobal(state, targetStatus, context) {
     return {
       ok: false,
       error: "UNKNOWN_SOURCE_STATUS",
-      message: `Current status_global "${from}" is not recognised.${context ? ` (context: ${context})` : ""}`,
+      message: `Current status_global "${from}" is not recognized.${context ? ` (context: ${context})` : ""}`,
     };
   }
 
