@@ -13,6 +13,9 @@
 // ============================================================================
 
 import {
+  VALID_STATUSES,
+  VALID_GLOBAL_TRANSITIONS,
+  transitionStatusGlobal,
   validateContractPayload,
   buildInitialState,
   generateDecomposition,
@@ -503,12 +506,12 @@ async function runTests() {
     const advanceResult = await advanceContractPhase(env, "ctr_test_001");
     assert(advanceResult.ok === true, "second advance succeeds");
     assert(advanceResult.state.status_global !== "blocked", "status_global is no longer blocked after successful advance");
-    assert(advanceResult.state.status_global === "in_progress", "status_global is in_progress after advancing to next phase");
+    assert(advanceResult.state.status_global === "executing", "status_global is executing after advancing to next phase");
     assert(advanceResult.state.blockers.length === 0, "blockers array is cleared on successful advance");
 
     // Verify via KV rehydration (Rule 1)
     const { state: rehydrated } = await rehydrateContract(env, "ctr_test_001");
-    assert(rehydrated.status_global === "in_progress", "rehydrated status confirms in_progress was persisted");
+    assert(rehydrated.status_global === "executing", "rehydrated status confirms executing was persisted");
     assert(rehydrated.blockers.length === 0, "rehydrated blockers confirms cleared");
   }
 
@@ -554,12 +557,12 @@ async function runTests() {
     result = await advanceContractPhase(env, "ctr_test_001");
     assert(result.ok === true, "phase_03 advance succeeds");
     assert(result.state.current_phase === "all_phases_complete", "current_phase is all_phases_complete");
-    assert(result.state.status_global === "completed", "status_global is completed");
+    assert(result.state.status_global === "executing", "status_global is executing after all phases done");
 
     // Verify final state via KV (Rule 1)
     const { state: finalState } = await rehydrateContract(env, "ctr_test_001");
     assert(finalState.current_phase === "all_phases_complete", "rehydrated final phase is all_phases_complete");
-    assert(finalState.status_global === "completed", "rehydrated final status is completed");
+    assert(finalState.status_global === "executing", "rehydrated final status is executing (awaiting formal closure)");
   }
 
   // ---- Test 25: advanceContractPhase uses TASK_DONE_STATUSES for all valid done states ----
@@ -1246,7 +1249,7 @@ async function runTests() {
   {
     const state = {
       contract_id: "ctr_approval",
-      status_global: "in_progress",
+      status_global: "executing",
       current_phase: "phase_03",
       blockers: [],
       constraints: { require_human_approval_per_pr: true },
@@ -1414,8 +1417,9 @@ async function runTests() {
 
     ({ state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle"));
     action = resolveNextAction(state, decomposition);
-    assert(action.type === "contract_complete", "lifecycle step 4: contract_complete");
-    assert(action.status === "completed", "lifecycle step 4: status is completed");
+    // With canonical state machine, all phases done → status is "executing" (awaiting closure)
+    assert(action.type === "awaiting_human_approval", "lifecycle step 4: awaiting_human_approval (all phases done, awaiting closure)");
+    assert(action.status === "awaiting_approval", "lifecycle step 4: status is awaiting_approval");
   }
 
   // ==========================================================================
@@ -3443,7 +3447,7 @@ async function runTests() {
     // Keep advancing if there are more phases
     while (advResult.ok) {
       const { state: s } = await rehydrateContract(env, contractId);
-      if (s.current_phase === "all_phases_complete" || s.status_global === "completed") break;
+      if (s.current_phase === "all_phases_complete") break;
       // Start next task if available
       const { decomposition: d } = await rehydrateContract(env, contractId);
       const nextTask = (d.tasks || []).find((t) => t.status === "queued");
