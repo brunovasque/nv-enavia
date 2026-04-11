@@ -603,6 +603,250 @@ async function discardMicroPrCandidate(env, contractId, microPrId, reason) {
   return { ok: true, state, decomposition, micro_pr_candidate: mpr };
 }
 
+// ============================================================================
+// 🎯 Next Action Engine — Deterministic Executable Queue
+//
+// Canonical function to resolve the next executable action for a contract.
+// Considers: current phase, task statuses, task dependencies, micro-PR
+// candidate statuses, and blockers.
+//
+// Returns a structured NextAction object — never a loose string.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// Next Action Types (exhaustive enum)
+// ---------------------------------------------------------------------------
+const NEXT_ACTION_TYPES = [
+  "start_task",
+  "start_micro_pr",
+  "phase_complete",
+  "contract_complete",
+  "contract_blocked",
+  "awaiting_human_approval",
+  "no_action",
+];
+
+// ---------------------------------------------------------------------------
+// resolveNextAction(state, decomposition) → NextAction
+//
+// Pure function. Does NOT mutate state or decomposition.
+// Returns:
+//   { type, phase_id, task_id, micro_pr_candidate_id, reason, status }
+// ---------------------------------------------------------------------------
+function resolveNextAction(state, decomposition) {
+  // Guard: missing data
+  if (!state || !decomposition) {
+    return {
+      type: "no_action",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: "Missing state or decomposition — cannot resolve next action.",
+      status: "error",
+    };
+  }
+
+  const phases = decomposition.phases || [];
+  const tasks = decomposition.tasks || [];
+  const mprs = decomposition.micro_pr_candidates || [];
+  const blockers = state.blockers || [];
+
+  // ── Rule 1: Contract already completed ──
+  if (state.status_global === "completed" || state.current_phase === "all_phases_complete") {
+    return {
+      type: "contract_complete",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: "All phases and tasks are complete.",
+      status: "completed",
+    };
+  }
+
+  // ── Rule 2: Contract blocked at ingestion level ──
+  if (state.current_phase === "ingestion_blocked") {
+    return {
+      type: "contract_blocked",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: blockers.length > 0
+        ? `Ingestion blocked: ${blockers.join("; ")}`
+        : "Contract is blocked at ingestion.",
+      status: "blocked",
+    };
+  }
+
+  // ── Rule 3: Human approval required (constraints check) ──
+  const constraints = state.constraints || {};
+  if (constraints.require_human_approval_per_pr) {
+    // Check if there is a micro-PR in_progress that needs human approval
+    const mprInProgress = mprs.find((m) => m.status === "in_progress");
+    if (mprInProgress) {
+      // A micro-PR is already in progress — may need human approval
+      // This is a "continue" state, not an "awaiting" state
+      // We only flag awaiting_human_approval when ALL tasks in a phase are
+      // done but the phase needs human sign-off to advance
+    }
+  }
+
+  // ── Determine active phase ──
+  const activePhase = phases.find((p) => p.status !== "done");
+
+  if (!activePhase) {
+    // All phases done but status_global not yet "completed" — waiting for sign-off
+    return {
+      type: "awaiting_human_approval",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: "All phases are done. Awaiting final human sign-off.",
+      status: "awaiting_approval",
+    };
+  }
+
+  // ── Gather tasks for the active phase ──
+  const phaseTasks = tasks.filter((t) => activePhase.tasks.includes(t.id));
+
+  // ── Rule 4: Check if ALL phase tasks are complete → phase_complete ──
+  const incompleteInPhase = phaseTasks.filter((t) => !TASK_DONE_STATUSES.includes(t.status));
+  if (incompleteInPhase.length === 0 && phaseTasks.length > 0) {
+    return {
+      type: "phase_complete",
+      phase_id: activePhase.id,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: `All tasks in phase "${activePhase.id}" are complete. Ready to advance.`,
+      status: "ready",
+    };
+  }
+
+  // ── Rule 5: Find the next executable task ──
+  // A task is executable if:
+  //   - it is in the active phase
+  //   - its status is "queued"
+  //   - all its dependencies are satisfied (status in TASK_DONE_STATUSES)
+  for (const task of phaseTasks) {
+    if (task.status !== "queued") continue;
+
+    const deps = task.depends_on || [];
+    const allDepsSatisfied = deps.every((depId) => {
+      const depTask = tasks.find((t) => t.id === depId);
+      return depTask && TASK_DONE_STATUSES.includes(depTask.status);
+    });
+
+    if (allDepsSatisfied) {
+      // Found an executable task — now check if it has a corresponding micro-PR
+      const correspondingMpr = mprs.find((m) => m.task_id === task.id && m.status === "queued");
+      return {
+        type: "start_task",
+        phase_id: activePhase.id,
+        task_id: task.id,
+        micro_pr_candidate_id: correspondingMpr ? correspondingMpr.id : null,
+        reason: `Task "${task.id}" is ready to start (all dependencies satisfied).`,
+        status: "ready",
+      };
+    }
+  }
+
+  // ── Rule 6: Check for executable micro-PR candidates ──
+  // A micro-PR is executable if:
+  //   - its linked task is completed (or it has no linked task)
+  //   - its status is "queued"
+  for (const mpr of mprs) {
+    if (mpr.status !== "queued") continue;
+
+    if (mpr.task_id) {
+      const linkedTask = tasks.find((t) => t.id === mpr.task_id);
+      if (linkedTask && TASK_DONE_STATUSES.includes(linkedTask.status)) {
+        return {
+          type: "start_micro_pr",
+          phase_id: activePhase.id,
+          task_id: mpr.task_id,
+          micro_pr_candidate_id: mpr.id,
+          reason: `Micro-PR "${mpr.id}" is ready (linked task "${mpr.task_id}" is complete).`,
+          status: "ready",
+        };
+      }
+    } else {
+      // Micro-PR without a linked task (e.g., PROD promotion)
+      // Only ready if all tasks are done
+      const allTasksDone = tasks.every((t) => TASK_DONE_STATUSES.includes(t.status));
+      if (allTasksDone) {
+        return {
+          type: "start_micro_pr",
+          phase_id: activePhase.id,
+          task_id: null,
+          micro_pr_candidate_id: mpr.id,
+          reason: `Micro-PR "${mpr.id}" is ready (no linked task; all tasks complete).`,
+          status: "ready",
+        };
+      }
+    }
+  }
+
+  // ── Rule 7: Check if all remaining tasks are blocked → contract_blocked ──
+  const remainingTasks = phaseTasks.filter((t) => !TASK_DONE_STATUSES.includes(t.status));
+  const allBlocked = remainingTasks.length > 0 && remainingTasks.every((t) => t.status === "blocked");
+  if (allBlocked) {
+    const blockedIds = remainingTasks.map((t) => t.id).join(", ");
+    return {
+      type: "contract_blocked",
+      phase_id: activePhase.id,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: `All remaining tasks in phase "${activePhase.id}" are blocked: ${blockedIds}.`,
+      status: "blocked",
+    };
+  }
+
+  // ── Rule 8: Tasks exist but none are executable (dependency not satisfied) ──
+  const queuedTasks = phaseTasks.filter((t) => t.status === "queued");
+  if (queuedTasks.length > 0) {
+    // There are queued tasks, but their dependencies aren't met
+    const waitingOn = [];
+    for (const task of queuedTasks) {
+      for (const depId of (task.depends_on || [])) {
+        const depTask = tasks.find((t) => t.id === depId);
+        if (depTask && !TASK_DONE_STATUSES.includes(depTask.status)) {
+          waitingOn.push(`"${task.id}" waits on "${depId}" (${depTask.status})`);
+        }
+      }
+    }
+    return {
+      type: "contract_blocked",
+      phase_id: activePhase.id,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: `No executable tasks — unmet dependencies: ${waitingOn.join("; ")}.`,
+      status: "blocked",
+    };
+  }
+
+  // ── Rule 9: Tasks in progress — just wait ──
+  const inProgressTasks = phaseTasks.filter((t) => t.status === "in_progress");
+  if (inProgressTasks.length > 0) {
+    return {
+      type: "no_action",
+      phase_id: activePhase.id,
+      task_id: inProgressTasks[0].id,
+      micro_pr_candidate_id: null,
+      reason: `Task "${inProgressTasks[0].id}" is currently in progress. Waiting for completion.`,
+      status: "in_progress",
+    };
+  }
+
+  // ── Fallback: no action determinable ──
+  return {
+    type: "no_action",
+    phase_id: activePhase ? activePhase.id : null,
+    task_id: null,
+    micro_pr_candidate_id: null,
+    reason: "No executable action found.",
+    status: "idle",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build enhanced contract summary with real progress
 // ---------------------------------------------------------------------------
@@ -621,6 +865,9 @@ function buildContractSummary(state, decomposition) {
   const mprsQueued = mprs.filter((m) => m.status === "queued").length;
   const mprsDiscarded = mprs.filter((m) => m.status === "discarded").length;
 
+  // Resolve the structured next action
+  const nextActionResolved = resolveNextAction(state, decomposition);
+
   return {
     contract_id: state.contract_id,
     contract_name: state.contract_name,
@@ -629,6 +876,7 @@ function buildContractSummary(state, decomposition) {
     current_task: state.current_task,
     blockers: state.blockers,
     next_action: state.next_action,
+    next_action_resolved: nextActionResolved,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -809,6 +1057,9 @@ export {
   completeMicroPrCandidate,
   blockMicroPrCandidate,
   discardMicroPrCandidate,
+  // Next Action Engine
+  resolveNextAction,
+  NEXT_ACTION_TYPES,
   // Summary
   buildContractSummary,
   // Route handlers
