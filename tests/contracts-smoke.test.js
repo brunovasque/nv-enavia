@@ -36,6 +36,8 @@ import {
   discardMicroPrCandidate,
   resolveNextAction,
   NEXT_ACTION_TYPES,
+  buildExecutionHandoff,
+  HANDOFF_ACTIONABLE_TYPES,
   buildContractSummary,
 } from "../contract-executor.js";
 
@@ -1395,6 +1397,219 @@ async function runTests() {
     action = resolveNextAction(state, decomposition);
     assert(action.type === "contract_complete", "lifecycle step 4: contract_complete");
     assert(action.status === "completed", "lifecycle step 4: status is completed");
+  }
+
+  // ==========================================================================
+  // B3 — Execution Handoff Builder Smoke Tests
+  // ==========================================================================
+
+  // ---- Test 72: buildExecutionHandoff — valid handoff from fresh contract ----
+  console.log("\nTest 72: buildExecutionHandoff — valid handoff from fresh contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_001",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_handoff_001");
+    const handoff = buildExecutionHandoff(state, decomposition);
+
+    assert(handoff !== null, "handoff is not null for actionable contract");
+    assert(typeof handoff.objective === "string" && handoff.objective.length > 0, "handoff has objective");
+    assert(typeof handoff.scope === "object" && handoff.scope !== null, "handoff has scope object");
+    assert(Array.isArray(handoff.target_files) && handoff.target_files.length > 0, "handoff has target_files");
+    assert(Array.isArray(handoff.do_not_touch) && handoff.do_not_touch.length > 0, "handoff has do_not_touch");
+    assert(Array.isArray(handoff.smoke_tests) && handoff.smoke_tests.length > 0, "handoff has smoke_tests");
+    assert(typeof handoff.rollback === "string" && handoff.rollback.length > 0, "handoff has rollback");
+    assert(Array.isArray(handoff.acceptance_criteria) && handoff.acceptance_criteria.length > 0, "handoff has acceptance_criteria");
+    assert(typeof handoff.generated_at === "string", "handoff has generated_at timestamp");
+    assert(handoff.source_phase !== null, "handoff has source_phase");
+    assert(handoff.source_task !== null, "handoff has source_task");
+  }
+
+  // ---- Test 73: buildExecutionHandoff — handoff persisted and rehydrated via summary ----
+  console.log("\nTest 73: buildExecutionHandoff — handoff persisted and rehydrated via summary");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_002",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Read summary which includes execution_handoff
+    const summaryResult = await handleGetContractSummary(env, "ctr_handoff_002");
+    assert(summaryResult.status === 200, "summary status 200");
+    assert(summaryResult.body.execution_handoff !== undefined, "execution_handoff present in summary");
+    assert(summaryResult.body.execution_handoff !== null, "execution_handoff is not null");
+    assert(summaryResult.body.execution_handoff.objective !== undefined, "execution_handoff has objective in summary");
+
+    // Verify the handoff fields match a standalone call
+    const { state, decomposition } = await rehydrateContract(env, "ctr_handoff_002");
+    const directHandoff = buildExecutionHandoff(state, decomposition);
+    assert(
+      summaryResult.body.execution_handoff.objective === directHandoff.objective,
+      "summary handoff objective matches direct handoff"
+    );
+    assert(
+      summaryResult.body.execution_handoff.source_task === directHandoff.source_task,
+      "summary handoff source_task matches direct handoff"
+    );
+  }
+
+  // ---- Test 74: buildExecutionHandoff — null when contract is completed ----
+  console.log("\nTest 74: buildExecutionHandoff — null when contract is completed");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_done",
+      definition_of_done: ["Only criterion"],
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Complete the contract fully
+    await startTask(env, "ctr_handoff_done", "task_001");
+    await completeTask(env, "ctr_handoff_done", "task_001");
+    await advanceContractPhase(env, "ctr_handoff_done"); // phase_01 done
+    await advanceContractPhase(env, "ctr_handoff_done"); // phase_02 done (no tasks)
+    await advanceContractPhase(env, "ctr_handoff_done"); // phase_03 → all_phases_complete
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_handoff_done");
+    const handoff = buildExecutionHandoff(state, decomposition);
+    assert(handoff === null, "handoff is null for completed contract");
+  }
+
+  // ---- Test 75: buildExecutionHandoff — null when contract is blocked ----
+  console.log("\nTest 75: buildExecutionHandoff — null when contract is blocked at ingestion");
+  {
+    const state = buildInitialState({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_blocked",
+    });
+    state.current_phase = "ingestion_blocked";
+    state.status_global = "blocked";
+    state.blockers = ["missing environments"];
+
+    const decomposition = generateDecomposition(state);
+    const handoff = buildExecutionHandoff(state, decomposition);
+    assert(handoff === null, "handoff is null for blocked contract");
+  }
+
+  // ---- Test 76: buildExecutionHandoff — null with missing state/decomposition ----
+  console.log("\nTest 76: buildExecutionHandoff — null with missing state/decomposition");
+  {
+    assert(buildExecutionHandoff(null, null) === null, "null state + null decomp → null");
+    assert(buildExecutionHandoff(null, { phases: [] }) === null, "null state → null");
+    assert(buildExecutionHandoff({}, null) === null, "null decomp → null");
+  }
+
+  // ---- Test 77: buildExecutionHandoff — not generated when task is in_progress ----
+  console.log("\nTest 77: buildExecutionHandoff — null when current task is in_progress");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_inprog",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    await startTask(env, "ctr_handoff_inprog", "task_001");
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_handoff_inprog");
+    // next action is no_action (in_progress), so no handoff
+    const handoff = buildExecutionHandoff(state, decomposition);
+    assert(handoff === null, "handoff is null when task is in_progress (no_action)");
+  }
+
+  // ---- Test 78: buildExecutionHandoff — respects phase/task ordering ----
+  console.log("\nTest 78: buildExecutionHandoff — respects phase/task ordering");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_order",
+      definition_of_done: ["First criterion", "Second criterion", "Third criterion"],
+    };
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Before any work, handoff should point to task_001 in phase_01
+    let { state, decomposition } = await rehydrateContract(env, "ctr_handoff_order");
+    let handoff = buildExecutionHandoff(state, decomposition);
+    assert(handoff !== null, "handoff exists for first task");
+    assert(handoff.source_task === "task_001", "handoff targets task_001 first");
+    assert(handoff.source_phase === "phase_01", "handoff in phase_01");
+
+    // Complete task_001 and advance phase
+    await startTask(env, "ctr_handoff_order", "task_001");
+    await completeTask(env, "ctr_handoff_order", "task_001");
+    await advanceContractPhase(env, "ctr_handoff_order");
+
+    // Now handoff should point to task_002 in phase_02
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_handoff_order"));
+    handoff = buildExecutionHandoff(state, decomposition);
+    assert(handoff !== null, "handoff exists for second task");
+    assert(handoff.source_task === "task_002", "handoff targets task_002 after task_001 complete");
+  }
+
+  // ---- Test 79: buildExecutionHandoff — no execution triggered ----
+  console.log("\nTest 79: buildExecutionHandoff — no execution triggered (pure function)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_pure",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state: stateBefore, decomposition: decompBefore } = await rehydrateContract(env, "ctr_handoff_pure");
+
+    // Call buildExecutionHandoff
+    buildExecutionHandoff(stateBefore, decompBefore);
+
+    // State must not have changed
+    const { state: stateAfter, decomposition: decompAfter } = await rehydrateContract(env, "ctr_handoff_pure");
+    assert(stateAfter.status_global === stateBefore.status_global, "status_global unchanged after handoff build");
+    assert(stateAfter.current_phase === stateBefore.current_phase, "current_phase unchanged after handoff build");
+    assert(stateAfter.current_task === stateBefore.current_task, "current_task unchanged after handoff build");
+    assert(
+      JSON.stringify(decompAfter.tasks.map(t => t.status)) === JSON.stringify(decompBefore.tasks.map(t => t.status)),
+      "all task statuses unchanged after handoff build"
+    );
+  }
+
+  // ---- Test 80: HANDOFF_ACTIONABLE_TYPES export is correct ----
+  console.log("\nTest 80: HANDOFF_ACTIONABLE_TYPES export");
+  {
+    assert(Array.isArray(HANDOFF_ACTIONABLE_TYPES), "HANDOFF_ACTIONABLE_TYPES is array");
+    assert(HANDOFF_ACTIONABLE_TYPES.includes("start_task"), "includes start_task");
+    assert(HANDOFF_ACTIONABLE_TYPES.includes("start_micro_pr"), "includes start_micro_pr");
+    assert(!HANDOFF_ACTIONABLE_TYPES.includes("no_action"), "does not include no_action");
+    assert(!HANDOFF_ACTIONABLE_TYPES.includes("contract_complete"), "does not include contract_complete");
+  }
+
+  // ---- Test 81: buildExecutionHandoff — all 7 mandatory fields present ----
+  console.log("\nTest 81: buildExecutionHandoff — all 7 mandatory handoff fields present");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_handoff_fields",
+    };
+    await handleCreateContract(mockRequest(payload), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_handoff_fields");
+    const handoff = buildExecutionHandoff(state, decomposition);
+
+    const requiredFields = ["objective", "scope", "target_files", "do_not_touch", "smoke_tests", "rollback", "acceptance_criteria"];
+    for (const field of requiredFields) {
+      assert(handoff[field] !== undefined && handoff[field] !== null, `mandatory field "${field}" is present`);
+    }
   }
 
   // ---- Summary ----
