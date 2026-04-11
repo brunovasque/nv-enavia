@@ -3872,7 +3872,7 @@ async function runTests() {
   }
 
   // ---- Test 178: Cancellation with reason persisted ----
-  console.log("\nTest 178: Cancellation with reason persisted and reidrated");
+  console.log("\nTest 178: Cancellation with reason persisted and rehydrated");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
