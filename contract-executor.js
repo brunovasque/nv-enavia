@@ -434,17 +434,24 @@ async function cancelContract(env, contractId, params) {
 
   const now = new Date().toISOString();
 
+  const previousStatusGlobal = state.status_global;
+  const previousCurrentPhase = state.current_phase;
+
+  const transition = transitionStatusGlobal(state, "cancelled", "cancelContract");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
+
   state.contract_cancellation = {
     cancelled: true,
     cancelled_at: now,
     cancel_reason: p.reason || null,
     cancelled_by: p.cancelled_by || "human",
     cancellation_evidence: Array.isArray(p.evidence) ? p.evidence : [],
-    previous_status_global: state.status_global,
-    previous_current_phase: state.current_phase,
+    previous_status_global: previousStatusGlobal,
+    previous_current_phase: previousCurrentPhase,
   };
 
-  transitionStatusGlobal(state, "cancelled", "cancelContract");
   state.next_action = "Contract cancelled. No further actions.";
   state.updated_at = now;
 
@@ -599,7 +606,10 @@ async function advanceContractPhase(env, contractId) {
       next_action: "Resolve incomplete tasks in active phase before advancing.",
       updated_at: now,
     });
-    transitionStatusGlobal(updatedState, "blocked", "advanceContractPhase:gate-blocked");
+    const transition = transitionStatusGlobal(updatedState, "blocked", "advanceContractPhase:gate-blocked");
+    if (!transition.ok) {
+      return { ok: false, error: transition.error, message: transition.message, state, decomposition, gate };
+    }
     await env.ENAVIA_BRAIN.put(
       `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_STATE}`,
       JSON.stringify(updatedState)
@@ -641,7 +651,10 @@ async function advanceContractPhase(env, contractId) {
       : "All phases complete. Awaiting human sign-off.",
     updated_at: now,
   });
-  transitionStatusGlobal(updatedState, targetGlobalStatus, "advanceContractPhase:advance");
+  const transition = transitionStatusGlobal(updatedState, targetGlobalStatus, "advanceContractPhase:advance");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message, state, decomposition, gate };
+  }
 
   await Promise.all([
     env.ENAVIA_BRAIN.put(
@@ -2112,7 +2125,10 @@ async function closeContractInTest(env, contractId) {
   // so there is no divergence between contract_closure and the main state.
   // "test-complete" signals TEST-only closure — "completed" is reserved for
   // the canonical terminal state after full promotion policy is respected.
-  transitionStatusGlobal(state, "test-complete", "closeContractInTest");
+  const transition = transitionStatusGlobal(state, "test-complete", "closeContractInTest");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
   state.next_action = "Contract closed in TEST. Awaiting PROD promotion decision.";
 
   // Persist to KV
@@ -2277,7 +2293,13 @@ async function handleCreateContract(request, env) {
   }
 
   if (blockers.length > 0) {
-    transitionStatusGlobal(state, "blocked", "handleCreateContract:ingestion-blocked");
+    const transition = transitionStatusGlobal(state, "blocked", "handleCreateContract:ingestion-blocked");
+    if (!transition.ok) {
+      return {
+        status: 500,
+        body: { ok: false, error: transition.error, message: transition.message },
+      };
+    }
     state.current_phase = "ingestion_blocked";
     state.blockers = blockers;
     state.next_action = "Resolve blockers before proceeding.";

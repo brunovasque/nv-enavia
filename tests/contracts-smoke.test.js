@@ -4490,6 +4490,147 @@ async function runTests() {
     assert(state.status_global === "executing", "status_global recovered to executing");
   }
 
+  // ==========================================================================
+  // G2 — Transition Guard Enforcement (callsites abort on failure)
+  // ==========================================================================
+
+  // ---- Test 216: cancelContract aborts on invalid transition (no persist) ----
+  console.log("\nTest 216: cancelContract aborts on invalid transition (terminal state)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g2_216",
+    }), env);
+    // First cancel succeeds
+    const first = await cancelContract(env, "ctr_g2_216", { reason: "first" });
+    assert(first.ok === true, "first cancel ok");
+    assert(first.state.status_global === "cancelled", "first cancel → cancelled");
+
+    // Manually reset to cancelled so idempotent guard doesn't fire,
+    // and try to cancel from a truly terminal state by removing the cancellation flag
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_216");
+    state.status_global = "completed"; // terminal — cancel should fail at transition
+    delete state.contract_cancellation;
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_216:state", JSON.stringify(state));
+
+    const result = await cancelContract(env, "ctr_g2_216", { reason: "from-completed" });
+    assert(result.ok === false, "cancel from completed rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+
+    // Verify KV was NOT overwritten — still shows "completed"
+    const { state: after } = await rehydrateContract(env, "ctr_g2_216");
+    assert(after.status_global === "completed", "KV still shows completed (no persist after failed transition)");
+  }
+
+  // ---- Test 217: advanceContractPhase gate-blocked aborts on invalid transition ----
+  console.log("\nTest 217: advanceContractPhase gate-blocked aborts on invalid transition");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g2_217",
+    }), env);
+
+    // Force contract into a terminal state where "blocked" transition is invalid
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_217");
+    state.status_global = "completed";
+    state.current_phase = "phase_01"; // not all_phases_complete so gate logic runs
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_217:state", JSON.stringify(state));
+
+    const result = await advanceContractPhase(env, "ctr_g2_217");
+    // The gate should fail (tasks not done) and try to transition to blocked,
+    // but completed → blocked is invalid
+    assert(result.ok === false, "advance rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+
+    // Verify KV was NOT overwritten
+    const { state: after } = await rehydrateContract(env, "ctr_g2_217");
+    assert(after.status_global === "completed", "KV still shows completed (no persist)");
+  }
+
+  // ---- Test 218: closeContractInTest aborts on invalid transition ----
+  console.log("\nTest 218: closeContractInTest aborts on invalid transition");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await makeEligibleForClosure(env, "ctr_g2_218");
+    // Close once — succeeds
+    const first = await closeContractInTest(env, "ctr_g2_218");
+    assert(first.ok === true, "first close ok");
+
+    // Manually set to cancelled (terminal) — close should be rejected
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_218");
+    state.status_global = "cancelled";
+    delete state.contract_closure; // remove closure so idempotent guard doesn't fire
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_218:state", JSON.stringify(state));
+
+    const result = await closeContractInTest(env, "ctr_g2_218");
+    assert(result.ok === false, "close from cancelled rejected");
+    // The cancellation guard fires before the transition guard — both prevent bad persist
+    assert(result.error === "CONTRACT_CANCELLED" || result.error === "INVALID_TRANSITION", "error blocks the operation");
+
+    // Verify KV was NOT overwritten
+    const { state: after } = await rehydrateContract(env, "ctr_g2_218");
+    assert(after.status_global === "cancelled", "KV still shows cancelled (no persist)");
+  }
+
+  // ---- Test 219: Valid transitions still work end-to-end ----
+  console.log("\nTest 219: Valid transitions still work end-to-end (regression)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g2_219",
+    }), env);
+
+    // decomposed → executing via advance
+    let { decomposition } = await rehydrateContract(env, "ctr_g2_219");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    const updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_g2_219:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    const advResult = await advanceContractPhase(env, "ctr_g2_219");
+    assert(advResult.ok === true, "advance ok");
+    assert(advResult.state.status_global === "executing", "executing after advance");
+
+    // executing → cancelled via cancel
+    const cancelResult = await cancelContract(env, "ctr_g2_219", { reason: "test" });
+    assert(cancelResult.ok === true, "cancel ok");
+    assert(cancelResult.state.status_global === "cancelled", "cancelled after cancel");
+
+    // Verify persisted
+    const { state } = await rehydrateContract(env, "ctr_g2_219");
+    assert(state.status_global === "cancelled", "cancelled persisted");
+  }
+
+  // ---- Test 220: closeContractInTest transition guard (failed state, bypasses cancel guard) ----
+  console.log("\nTest 220: closeContractInTest transition guard rejects failed → test-complete");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await makeEligibleForClosure(env, "ctr_g2_220");
+
+    // Manually set to failed (terminal, but NOT cancelled — so cancellation guard doesn't fire)
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_220");
+    state.status_global = "failed";
+    delete state.contract_closure;
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_220:state", JSON.stringify(state));
+
+    const result = await closeContractInTest(env, "ctr_g2_220");
+    assert(result.ok === false, "close from failed rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION (not CONTRACT_CANCELLED)");
+
+    // Verify KV was NOT overwritten
+    const { state: after } = await rehydrateContract(env, "ctr_g2_220");
+    assert(after.status_global === "failed", "KV still shows failed (no persist after failed transition)");
+  }
+
   // ---- Summary ----
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
