@@ -5464,6 +5464,82 @@ async function runTests() {
     assert(result.body.error === "BLOCK_MAX_PRS_REACHED", "error is BLOCK_MAX_PRS_REACHED in route response");
   }
 
+  // ============================================================================
+  // Fix 1 — closeContractInTest must block when plan is rejected
+  // ============================================================================
+
+  // ---- Test 268: closeContractInTest blocked when plan is rejected ----
+  console.log("\nTest 268: Fix1 — closeContractInTest returns PLAN_REJECTED when plan is rejected");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Create a valid contract (max_micro_prs: 3, 3 DoD items → decomposed)
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_fix1_268" })), env);
+    // Reject the plan
+    await rejectDecompositionPlan(env, "ctr_fix1_268", { reason: "Plan rejected for test" });
+
+    const result = await closeContractInTest(env, "ctr_fix1_268");
+    assert(result.ok === false, "closure rejected when plan is rejected");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 269: closeContractInTest proceeds normally when plan is NOT rejected ----
+  console.log("\nTest 269: Fix1 — closeContractInTest is not blocked when plan is not rejected (normal path)");
+  {
+    // Verify the cancellation guard still works (regression check)
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_fix1_269" })), env);
+    await cancelContract(env, "ctr_fix1_269", { reason: "Regression guard test" });
+
+    const result = await closeContractInTest(env, "ctr_fix1_269");
+    assert(result.ok === false, "closure still rejected when cancelled");
+    assert(result.error === "CONTRACT_CANCELLED", "cancellation guard still works (not broken by plan_rejection guard)");
+  }
+
+  // ============================================================================
+  // Fix 2 — resolveNextAction must return contract_blocked for max_prs_exceeded
+  // ============================================================================
+
+  // ---- Test 270: resolveNextAction returns contract_blocked for max_prs_exceeded ----
+  console.log("\nTest 270: Fix2 — resolveNextAction returns contract_blocked for max_prs_exceeded");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // 4 DoD items, max_micro_prs: 3 → blocked at creation (max_prs_exceeded)
+    const payload = Object.assign({}, VALID_PAYLOAD, {
+      contract_id: "ctr_fix2_270",
+      definition_of_done: ["X", "Y", "Z", "W"],
+      constraints: Object.assign({}, VALID_PAYLOAD.constraints, { max_micro_prs: 3 }),
+    });
+    await handleCreateContract(mockRequest(payload), env);
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_fix2_270");
+    assert(state.current_phase === "max_prs_exceeded", "precondition: current_phase is max_prs_exceeded");
+
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "contract_blocked", 'resolveNextAction returns "contract_blocked" for max_prs_exceeded');
+    assert(action.status === "blocked", 'action.status is "blocked"');
+    assert(typeof action.reason === "string" && action.reason.length > 0, "action.reason is a non-empty string");
+  }
+
+  // ---- Test 271: resolveNextAction normal path unaffected (no max_prs_exceeded) ----
+  console.log("\nTest 271: Fix2 — resolveNextAction normal task-ready path unaffected by fix");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Normal contract within limit → decomposed
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_fix2_271" })), env);
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_fix2_271");
+    assert(state.status_global === "decomposed", "precondition: contract is decomposed");
+    assert(state.current_phase !== "max_prs_exceeded", "precondition: not in max_prs_exceeded");
+
+    const action = resolveNextAction(state, decomposition);
+    // Normal decomposed contract should NOT return contract_blocked from max_prs check
+    assert(action.type !== "contract_blocked" || state.current_phase === "ingestion_blocked", "normal decomposed contract is not blocked by max_prs_exceeded rule");
+  }
+
   // ---- Summary ----
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
