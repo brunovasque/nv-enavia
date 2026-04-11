@@ -41,6 +41,13 @@ import {
   bindAcceptanceCriteria,
   ACCEPTANCE_CRITERIA_SCOPES,
   ACCEPTANCE_CRITERIA_STATUSES,
+  recordError,
+  evaluateErrorLoop,
+  buildErrorEntry,
+  MAX_RETRY_ATTEMPTS,
+  ERROR_CLASSIFICATIONS,
+  ERROR_LOOP_STATUSES,
+  NON_RETRYABLE_CLASSIFICATIONS,
   buildContractSummary,
 } from "../contract-executor.js";
 
@@ -2088,6 +2095,549 @@ async function runTests() {
       b1.current_phase === b2.current_phase,
       "current_phase is deterministic across calls"
     );
+  }
+
+  // ==========================================================================
+  // B5 — Controlled Error Loop Smoke Tests
+  // ==========================================================================
+
+  // ---- Test 100: B5 constants exported correctly ----
+  console.log("\nTest 100: B5 constants exported correctly");
+  {
+    assert(typeof MAX_RETRY_ATTEMPTS === "number", "MAX_RETRY_ATTEMPTS is number");
+    assert(MAX_RETRY_ATTEMPTS === 3, "MAX_RETRY_ATTEMPTS is 3");
+    assert(Array.isArray(ERROR_CLASSIFICATIONS), "ERROR_CLASSIFICATIONS is array");
+    assert(ERROR_CLASSIFICATIONS.includes("in_scope"), "includes in_scope");
+    assert(ERROR_CLASSIFICATIONS.includes("infra"), "includes infra");
+    assert(ERROR_CLASSIFICATIONS.includes("external"), "includes external");
+    assert(ERROR_CLASSIFICATIONS.includes("unknown"), "includes unknown");
+    assert(Array.isArray(ERROR_LOOP_STATUSES), "ERROR_LOOP_STATUSES is array");
+    assert(ERROR_LOOP_STATUSES.includes("clear"), "includes clear");
+    assert(ERROR_LOOP_STATUSES.includes("retrying"), "includes retrying");
+    assert(ERROR_LOOP_STATUSES.includes("blocked"), "includes blocked");
+    assert(ERROR_LOOP_STATUSES.includes("awaiting_human"), "includes awaiting_human");
+    assert(Array.isArray(NON_RETRYABLE_CLASSIFICATIONS), "NON_RETRYABLE_CLASSIFICATIONS is array");
+    assert(NON_RETRYABLE_CLASSIFICATIONS.includes("infra"), "non-retryable includes infra");
+    assert(NON_RETRYABLE_CLASSIFICATIONS.includes("external"), "non-retryable includes external");
+    assert(NON_RETRYABLE_CLASSIFICATIONS.includes("unknown"), "non-retryable includes unknown");
+    assert(!NON_RETRYABLE_CLASSIFICATIONS.includes("in_scope"), "non-retryable does NOT include in_scope");
+  }
+
+  // ---- Test 101: buildErrorEntry — canonical shape ----
+  console.log("\nTest 101: buildErrorEntry — canonical error entry shape");
+  {
+    const entry = buildErrorEntry({
+      code: "TEST_FAIL",
+      scope: "task",
+      message: "Test failure",
+      retryable: true,
+      reason: "assertion mismatch",
+      attempt: 1,
+      max_attempts: 3,
+      classification: "in_scope",
+    });
+    assert(entry.code === "TEST_FAIL", "entry has code");
+    assert(entry.scope === "task", "entry has scope");
+    assert(entry.message === "Test failure", "entry has message");
+    assert(entry.retryable === true, "entry has retryable");
+    assert(entry.reason === "assertion mismatch", "entry has reason");
+    assert(entry.attempt === 1, "entry has attempt");
+    assert(entry.max_attempts === 3, "entry has max_attempts");
+    assert(entry.resolution_state === "unresolved", "entry defaults to unresolved");
+    assert(entry.classification === "in_scope", "entry has classification");
+    assert(typeof entry.recorded_at === "string", "entry has recorded_at");
+  }
+
+  // ---- Test 102: buildErrorEntry — defaults for missing params ----
+  console.log("\nTest 102: buildErrorEntry — defaults for missing params");
+  {
+    const entry = buildErrorEntry();
+    assert(entry.code === "UNKNOWN_ERROR", "default code");
+    assert(entry.scope === "task", "default scope");
+    assert(entry.message === "No message provided.", "default message");
+    assert(entry.retryable === false, "default retryable is false");
+    assert(entry.reason === null, "default reason is null");
+    assert(entry.attempt === 1, "default attempt is 1");
+    assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, "default max_attempts");
+    assert(entry.classification === "unknown", "default classification is unknown");
+  }
+
+  // ---- Test 103: evaluateErrorLoop — clear when no errors ----
+  console.log("\nTest 103: evaluateErrorLoop — clear when no errors");
+  {
+    const result = evaluateErrorLoop(null, "task_001");
+    assert(result.loop_status === "clear", "null error_loop → clear");
+    assert(result.retry_allowed === false, "no retry allowed on clear");
+    assert(result.retry_count === 0, "retry count is 0");
+    assert(result.last_error === null, "last_error is null");
+    assert(result.escalation_reason === null, "no escalation reason");
+
+    const result2 = evaluateErrorLoop({}, "task_001");
+    assert(result2.loop_status === "clear", "empty error_loop → clear");
+
+    const result3 = evaluateErrorLoop({ task_001: { errors: [] } }, "task_001");
+    assert(result3.loop_status === "clear", "empty errors array → clear");
+  }
+
+  // ---- Test 104: recordError — retryable in_scope error increments attempt ----
+  console.log("\nTest 104: recordError — retryable in_scope error increments attempt");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      scope: "task",
+      message: "Build failed in scope",
+      retryable: true,
+      reason: "syntax error in file",
+      classification: "in_scope",
+    });
+
+    assert(result.ok === true, "recordError returns ok=true");
+    assert(result.evaluation.loop_status === "retrying", "loop_status is retrying");
+    assert(result.evaluation.retry_allowed === true, "retry_allowed is true");
+    assert(result.evaluation.retry_count === 1, "retry_count is 1");
+    assert(result.evaluation.last_error.code === "BUILD_FAIL", "last_error has correct code");
+    assert(result.evaluation.escalation_reason === null, "no escalation yet");
+
+    // Second error
+    const result2 = await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      scope: "task",
+      message: "Build failed again",
+      retryable: true,
+      reason: "second syntax error",
+      classification: "in_scope",
+    });
+    assert(result2.ok === true, "second recordError ok");
+    assert(result2.evaluation.retry_count === 2, "retry_count is 2");
+    assert(result2.evaluation.retry_allowed === true, "retry still allowed at count 2");
+    assert(result2.evaluation.loop_status === "retrying", "still retrying at count 2");
+  }
+
+  // ---- Test 105: recordError — third attempt hits limit and escalates to blocked ----
+  console.log("\nTest 105: recordError — third attempt hits limit → blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // Record 3 retryable errors
+    for (let i = 0; i < 3; i++) {
+      await recordError(env, "ctr_test_001", "task_001", {
+        code: "BUILD_FAIL",
+        scope: "task",
+        message: `Build failed attempt ${i + 1}`,
+        retryable: true,
+        reason: "repeating error",
+        classification: "in_scope",
+      });
+    }
+
+    // Evaluate the loop
+    const { state } = await rehydrateContract(env, "ctr_test_001");
+    const evaluation = evaluateErrorLoop(state.error_loop, "task_001");
+    assert(evaluation.loop_status === "blocked", "loop_status is blocked after 3 attempts");
+    assert(evaluation.retry_allowed === false, "retry_allowed is false after limit");
+    assert(evaluation.retry_count === 3, "retry_count is 3");
+    assert(evaluation.escalation_reason !== null, "escalation_reason is set");
+    assert(evaluation.escalation_reason.includes("Retry limit"), "escalation mentions retry limit");
+  }
+
+  // ---- Test 106: recordError — non-retryable error escalates immediately ----
+  console.log("\nTest 106: recordError — non-retryable error escalates immediately");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "EXTERNAL_DEP_FAIL",
+      scope: "task",
+      message: "External API not available",
+      retryable: false,
+      reason: "third-party dependency down",
+      classification: "external",
+    });
+
+    assert(result.ok === true, "recordError ok");
+    assert(result.evaluation.loop_status === "awaiting_human", "loop_status is awaiting_human");
+    assert(result.evaluation.retry_allowed === false, "retry not allowed for external error");
+    assert(result.evaluation.retry_count === 1, "retry_count is 1");
+    assert(result.evaluation.escalation_reason !== null, "escalation_reason set");
+    assert(result.evaluation.escalation_reason.includes("External dependency"), "reason mentions external dependency");
+  }
+
+  // ---- Test 107: recordError — infra error escalates immediately ----
+  console.log("\nTest 107: recordError — infra/secret/binding error escalates immediately");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "MISSING_SECRET",
+      scope: "task",
+      message: "KV binding not found",
+      retryable: false,
+      reason: "ENAVIA_BRAIN binding missing",
+      classification: "infra",
+    });
+
+    assert(result.ok === true, "recordError ok");
+    assert(result.evaluation.loop_status === "awaiting_human", "loop_status is awaiting_human for infra");
+    assert(result.evaluation.retry_allowed === false, "no retry for infra");
+    assert(result.evaluation.escalation_reason.includes("Infrastructure"), "reason mentions infrastructure");
+  }
+
+  // ---- Test 108: recordError — unknown error escalates immediately ----
+  console.log("\nTest 108: recordError — unknown classification escalates immediately");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "UNEXPECTED",
+      scope: "task",
+      message: "Something unknown happened",
+      retryable: false,
+      classification: "unknown",
+    });
+
+    assert(result.ok === true, "recordError ok");
+    assert(result.evaluation.loop_status === "awaiting_human", "loop_status is awaiting_human for unknown");
+    assert(result.evaluation.retry_allowed === false, "no retry for unknown");
+    assert(result.evaluation.escalation_reason.includes("Unknown error"), "reason mentions unknown");
+  }
+
+  // ---- Test 109: recordError — persists in KV and survives rehydration ----
+  console.log("\nTest 109: recordError — error loop persisted and survives rehydration");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "Rehydration test error",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    // Rehydrate from KV
+    const { state: rehydrated } = await rehydrateContract(env, "ctr_test_001");
+    assert(rehydrated.error_loop !== undefined, "error_loop exists after rehydration");
+    assert(rehydrated.error_loop !== null, "error_loop is not null after rehydration");
+    assert(rehydrated.error_loop.task_001 !== undefined, "task_001 entry exists in error_loop");
+    assert(rehydrated.error_loop.task_001.errors.length === 1, "1 error persisted");
+    assert(rehydrated.error_loop.task_001.loop_status === "retrying", "loop_status persisted as retrying");
+    assert(rehydrated.error_loop.task_001.retry_count === 1, "retry_count persisted as 1");
+    assert(rehydrated.error_loop.task_001.retry_allowed === true, "retry_allowed persisted as true");
+    assert(rehydrated.error_loop.task_001.last_error.code === "BUILD_FAIL", "last_error.code persisted");
+
+    // Rehydrate again — must be identical
+    const { state: rehydrated2 } = await rehydrateContract(env, "ctr_test_001");
+    assert(
+      rehydrated2.error_loop.task_001.errors.length === rehydrated.error_loop.task_001.errors.length,
+      "error count consistent across rehydrations"
+    );
+    assert(
+      rehydrated2.error_loop.task_001.loop_status === rehydrated.error_loop.task_001.loop_status,
+      "loop_status consistent across rehydrations"
+    );
+  }
+
+  // ---- Test 110: recordError — exposed in summary/API ----
+  console.log("\nTest 110: recordError — error_loop exposed in summary/API");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "Summary exposure test",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    const summaryResult = await handleGetContractSummary(env, "ctr_test_001");
+    assert(summaryResult.status === 200, "summary status 200");
+    assert(summaryResult.body.error_loop !== undefined, "error_loop present in summary");
+    assert(summaryResult.body.error_loop !== null, "error_loop not null in summary");
+    assert(summaryResult.body.error_loop.task_001 !== undefined, "task_001 error loop in summary");
+    assert(summaryResult.body.error_loop.task_001.loop_status === "retrying", "loop_status in summary");
+  }
+
+  // ---- Test 111: recordError — guard: contract not found ----
+  console.log("\nTest 111: recordError — guard: contract not found");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const result = await recordError(env, "no_contract", "task_001", {
+      code: "TEST",
+      message: "test",
+    });
+    assert(result.ok === false, "returns ok=false");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 112: recordError — guard: task not found ----
+  console.log("\nTest 112: recordError — guard: task not found");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await recordError(env, "ctr_test_001", "task_999", {
+      code: "TEST",
+      message: "test",
+    });
+    assert(result.ok === false, "returns ok=false");
+    assert(result.error === "TASK_NOT_FOUND", "error is TASK_NOT_FOUND");
+  }
+
+  // ---- Test 113: recordError — guard: cannot record error on completed task ----
+  console.log("\nTest 113: recordError — guard: cannot record error on completed task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    await completeTask(env, "ctr_test_001", "task_001");
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "LATE_ERROR",
+      message: "Too late",
+      classification: "in_scope",
+    });
+    assert(result.ok === false, "returns ok=false for completed task");
+    assert(result.error === "INVALID_ERROR_RECORD", "error is INVALID_ERROR_RECORD");
+  }
+
+  // ---- Test 114: recordError — guard: cannot record error on blocked task ----
+  console.log("\nTest 114: recordError — allowed on blocked task (still active)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await blockTask(env, "ctr_test_001", "task_001", "Manual block");
+
+    // blocked is NOT in TASK_DONE_STATUSES, so recording should work
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "RETRY_ON_BLOCKED",
+      message: "Error on blocked task",
+      retryable: true,
+      classification: "in_scope",
+    });
+    assert(result.ok === true, "recordError ok on blocked task");
+    assert(result.evaluation.loop_status === "retrying", "loop_status is retrying");
+  }
+
+  // ---- Test 115: recordError — does NOT advance phase or task ----
+  console.log("\nTest 115: recordError — does NOT advance phase or task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    const { state: stateBefore, decomposition: decompBefore } = await rehydrateContract(env, "ctr_test_001");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "No phase advance test",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    const { state: stateAfter, decomposition: decompAfter } = await rehydrateContract(env, "ctr_test_001");
+
+    assert(stateAfter.current_phase === stateBefore.current_phase, "current_phase unchanged after error");
+    assert(stateAfter.current_task === stateBefore.current_task, "current_task unchanged after error");
+    assert(stateAfter.status_global === stateBefore.status_global, "status_global unchanged after error");
+    assert(
+      JSON.stringify(decompAfter.tasks.map(t => t.status)) === JSON.stringify(decompBefore.tasks.map(t => t.status)),
+      "task statuses unchanged after error"
+    );
+    assert(
+      JSON.stringify(decompAfter.phases.map(p => p.status)) === JSON.stringify(decompBefore.phases.map(p => p.status)),
+      "phase statuses unchanged after error"
+    );
+  }
+
+  // ---- Test 116: recordError — does NOT trigger real execution ----
+  console.log("\nTest 116: recordError — does NOT trigger real execution");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "EXEC_CHECK",
+      message: "Execution guard test",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    // No micro-PR should have changed status
+    const allMprsQueued = decomposition.micro_pr_candidates.every(m => m.status === "queued");
+    assert(allMprsQueued, "all micro-PR candidates still queued — no execution triggered");
+  }
+
+  // ---- Test 117: recordError — error_loop exposed in GET contract ----
+  console.log("\nTest 117: recordError — error_loop exposed in GET contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "GET_TEST",
+      message: "GET contract exposure test",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    const getResult = await handleGetContract(env, "ctr_test_001");
+    assert(getResult.status === 200, "GET contract status 200");
+    assert(getResult.body.contract.error_loop !== undefined, "error_loop present in GET response");
+    assert(getResult.body.contract.error_loop.task_001 !== undefined, "task_001 error loop in GET response");
+  }
+
+  // ---- Test 118: evaluateErrorLoop — mixed: retryable then non-retryable ----
+  console.log("\nTest 118: evaluateErrorLoop — mixed classification: last error determines state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // First: retryable
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "First attempt",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    let { state } = await rehydrateContract(env, "ctr_test_001");
+    let eval1 = evaluateErrorLoop(state.error_loop, "task_001");
+    assert(eval1.loop_status === "retrying", "still retrying after first in_scope error");
+
+    // Second: infra (non-retryable) → should escalate
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "INFRA_FAIL",
+      message: "Infra error",
+      retryable: false,
+      classification: "infra",
+    });
+
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    let eval2 = evaluateErrorLoop(state.error_loop, "task_001");
+    assert(eval2.loop_status === "awaiting_human", "escalated to awaiting_human after infra error");
+    assert(eval2.retry_allowed === false, "no retry after infra error");
+  }
+
+  // ---- Test 119: recordError — error on queued task works ----
+  console.log("\nTest 119: recordError — error on queued task works");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "PRE_START_ERR",
+      message: "Error before task start",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    assert(result.ok === true, "recordError ok on queued task");
+    assert(result.evaluation.loop_status === "retrying", "loop_status is retrying");
+  }
+
+  // ---- Test 120: summary without errors shows null error_loop ----
+  console.log("\nTest 120: summary without errors shows null error_loop");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    const summaryResult = await handleGetContractSummary(env, "ctr_test_001");
+    assert(summaryResult.status === 200, "summary status 200");
+    // error_loop should be null when no errors recorded
+    assert(summaryResult.body.error_loop === null || summaryResult.body.error_loop === undefined,
+      "error_loop is null/undefined when no errors");
+  }
+
+  // ---- Test 121: recordError — multiple tasks have independent loops ----
+  console.log("\nTest 121: recordError — multiple tasks have independent error loops");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR_TASK1",
+      message: "Error on task 1",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    await recordError(env, "ctr_test_001", "task_002", {
+      code: "ERR_TASK2",
+      message: "Error on task 2",
+      retryable: false,
+      classification: "infra",
+    });
+
+    const { state } = await rehydrateContract(env, "ctr_test_001");
+    assert(state.error_loop.task_001.loop_status === "retrying", "task_001 loop is retrying");
+    assert(state.error_loop.task_002.loop_status === "awaiting_human", "task_002 loop is awaiting_human");
+    assert(state.error_loop.task_001.errors.length === 1, "task_001 has 1 error");
+    assert(state.error_loop.task_002.errors.length === 1, "task_002 has 1 error");
+  }
+
+  // ---- Test 122: recordError — does NOT close contract ----
+  console.log("\nTest 122: recordError — does NOT close contract even at max errors");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    for (let i = 0; i < 5; i++) {
+      await recordError(env, "ctr_test_001", "task_001", {
+        code: "REPEATED_FAIL",
+        message: `Attempt ${i + 1}`,
+        retryable: true,
+        classification: "in_scope",
+      });
+    }
+
+    const { state } = await rehydrateContract(env, "ctr_test_001");
+    assert(state.status_global !== "completed", "status_global is NOT completed after many errors");
+    assert(state.current_phase !== "all_phases_complete", "current_phase is NOT all_phases_complete");
+  }
+
+  // ---- Test 123: buildErrorEntry — invalid classification defaults to unknown ----
+  console.log("\nTest 123: buildErrorEntry — invalid classification defaults to unknown");
+  {
+    const entry = buildErrorEntry({ classification: "made_up_category" });
+    assert(entry.classification === "unknown", "invalid classification defaults to unknown");
   }
 
   // ---- Summary ----
