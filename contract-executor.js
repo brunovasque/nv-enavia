@@ -335,7 +335,7 @@ async function advanceContractPhase(env, contractId) {
     const now = new Date().toISOString();
     const updatedState = Object.assign({}, state, {
       status_global: "blocked",
-      blockers: [...(state.blockers || []), gate.reason],
+      blockers: [...new Set([...(state.blockers || []), gate.reason])],
       next_action: "Resolve incomplete tasks in active phase before advancing.",
       updated_at: now,
     });

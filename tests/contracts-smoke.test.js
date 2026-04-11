@@ -305,9 +305,9 @@ async function runTests() {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
     // Before contract exists — must return null, not stale memory
-    const { state: stateMissing, decomposition: decompMissing } = await rehydrateContract(env, "does_not_exist");
+    const { state: stateMissing, decomposition: decompositionMissing } = await rehydrateContract(env, "does_not_exist");
     assert(stateMissing === null, "rehydrate returns null state for missing contract");
-    assert(decompMissing === null, "rehydrate returns null decomposition for missing contract");
+    assert(decompositionMissing === null, "rehydrate returns null decomposition for missing contract");
 
     // After contract is persisted — must return persisted values
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
