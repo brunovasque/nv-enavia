@@ -1807,6 +1807,44 @@ async function runTests() {
     assert(binding.has_handoff === false, "has_handoff is false");
   }
 
+  // ---- Test 89b: bindAcceptanceCriteria — evidence_required can be false for structural criteria ----
+  console.log("\nTest 89b: bindAcceptanceCriteria — evidence_required false for structural phase criterion");
+  {
+    const state = buildInitialState({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_ac_evid_false",
+      definition_of_done: ["Only criterion"],
+    });
+    // Build decomposition with a phase that has no tasks assigned
+    const decomposition = generateDecomposition(state);
+
+    // Complete task and advance so we hit phase_02 which has no tasks
+    // (single DoD → task goes to phase_01 only, phase_02 is empty)
+    // Instead, directly create a phase with no tasks
+    const decompCustom = {
+      contract_id: "ctr_ac_evid_false",
+      phases: [
+        { id: "phase_empty", name: "Empty phase", status: "pending", tasks: [] },
+      ],
+      tasks: [],
+      micro_pr_candidates: [],
+      generated_at: new Date().toISOString(),
+    };
+    state.current_phase = "phase_empty";
+
+    const binding = bindAcceptanceCriteria(state, decompCustom);
+    assert(binding !== null, "binding exists for empty-phase contract");
+    assert(binding.phase_acceptance.length === 1, "one structural criterion for empty phase");
+    assert(
+      binding.phase_acceptance[0].evidence_required === false,
+      "structural phase criterion has evidence_required = false"
+    );
+    assert(
+      binding.phase_acceptance[0].blocking === false,
+      "structural phase criterion is non-blocking"
+    );
+  }
+
   // ---- Test 90: bindAcceptanceCriteria — task acceptance when task is in_progress ----
   console.log("\nTest 90: bindAcceptanceCriteria — task acceptance when task is in_progress");
   {

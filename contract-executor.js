@@ -1013,7 +1013,7 @@ function buildCriterion(id, scope, description, options) {
     scope,
     description,
     status: "pending",
-    evidence_required: opts.evidence_required || true,
+    evidence_required: opts.evidence_required !== undefined ? opts.evidence_required : true,
     blocking: opts.blocking !== undefined ? opts.blocking : true,
   };
 }
