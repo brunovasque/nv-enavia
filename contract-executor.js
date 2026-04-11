@@ -677,18 +677,9 @@ function resolveNextAction(state, decomposition) {
     };
   }
 
-  // ── Rule 3: Human approval required (constraints check) ──
-  const constraints = state.constraints || {};
-  if (constraints.require_human_approval_per_pr) {
-    // Check if there is a micro-PR in_progress that needs human approval
-    const mprInProgress = mprs.find((m) => m.status === "in_progress");
-    if (mprInProgress) {
-      // A micro-PR is already in progress — may need human approval
-      // This is a "continue" state, not an "awaiting" state
-      // We only flag awaiting_human_approval when ALL tasks in a phase are
-      // done but the phase needs human sign-off to advance
-    }
-  }
+  // ── Rule 3: All phases done but contract not yet completed ──
+  // This covers the case where human approval is needed for final sign-off.
+  // (See awaiting_human_approval return below after active phase check.)
 
   // ── Determine active phase ──
   const activePhase = phases.find((p) => p.status !== "done");
