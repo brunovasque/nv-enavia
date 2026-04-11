@@ -970,9 +970,6 @@ async function runTests() {
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     await startTask(env, "ctr_test_001", "task_001");
-    await completeMicroPrCandidate(
-      env, "ctr_test_001", "micro_pr_001"
-    ).catch(() => {}); // Will fail because micro_pr is queued, not in_progress
     await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
     await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
 
