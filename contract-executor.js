@@ -897,10 +897,16 @@ function buildExecutionHandoff(state, decomposition) {
   }
 
   // ── Scope — from contract scope + micro-PR targets ──
+  const scopeWorkers = targetMpr
+    ? (targetMpr.target_workers || [])
+    : (state.scope && state.scope.workers) || [];
+  const scopeRoutes = targetMpr
+    ? (targetMpr.target_routes || [])
+    : (state.scope && state.scope.routes) || [];
   const scope = {
     environment: targetMpr ? targetMpr.environment : "TEST",
-    workers: targetMpr ? (targetMpr.target_workers || []) : (state.scope && state.scope.workers || []),
-    routes: targetMpr ? (targetMpr.target_routes || []) : (state.scope && state.scope.routes || []),
+    workers: scopeWorkers,
+    routes: scopeRoutes,
     phase: targetPhase ? targetPhase.name : (nextAction.phase_id || null),
   };
 
