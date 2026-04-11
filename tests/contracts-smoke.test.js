@@ -2838,7 +2838,7 @@ async function runTests() {
 
     assert(result.ok === true, "recordError ok");
     const entry = result.error_loop.task_001.errors[0];
-    assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, "entry.max_attempts is canonical MAX_RETRY_ATTEMPTS (99 ignored)");
+    assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, "entry.max_attempts equals canonical MAX_RETRY_ATTEMPTS, caller-supplied 99 was ignored");
     assert(entry.max_attempts === 3, "canonical value is 3");
   }
 
@@ -2914,8 +2914,9 @@ async function runTests() {
     assert(state.error_loop.task_001.loop_status === "blocked", "blocked at attempt 3 (limit=3, not 99)");
     assert(state.error_loop.task_001.retry_allowed === false, "retry not allowed");
     // All entries must store canonical MAX_RETRY_ATTEMPTS, not the caller-supplied values
-    for (const entry of state.error_loop.task_001.errors) {
-      assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, `entry max_attempts is canonical: ${entry.max_attempts}`);
+    for (let i = 0; i < state.error_loop.task_001.errors.length; i++) {
+      const entry = state.error_loop.task_001.errors[i];
+      assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, `entry[${i}] (${entry.code}) max_attempts is canonical: expected ${MAX_RETRY_ATTEMPTS}, got ${entry.max_attempts}`);
     }
   }
 
