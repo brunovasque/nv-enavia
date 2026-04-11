@@ -1038,6 +1038,9 @@ function bindAcceptanceCriteria(state, decomposition) {
   const dod = state.definition_of_done || [];
 
   // ── Resolve the active phase ──
+  // First try to match current_phase from state to a decomposition phase.
+  // Fallback: if current_phase is a special value (e.g. "decomposition_complete"),
+  // find the first incomplete phase from the decomposition.
   const activePhase = phases.find((p) => p.id === state.current_phase)
     || phases.find((p) => p.status !== "done");
 
