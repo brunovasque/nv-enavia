@@ -28,6 +28,16 @@ const KV_INDEX_KEY = "contract:index";
 const VALID_STATUSES = ["draft", "approved", "decomposed", "blocked", "failed", "in_progress", "completed"];
 
 // ---------------------------------------------------------------------------
+// Valid statuses for Tasks
+// ---------------------------------------------------------------------------
+const VALID_TASK_STATUSES = ["queued", "in_progress", "completed", "blocked"];
+
+// ---------------------------------------------------------------------------
+// Valid statuses for Micro-PR Candidates
+// ---------------------------------------------------------------------------
+const VALID_MICRO_PR_STATUSES = ["queued", "in_progress", "completed", "blocked", "discarded"];
+
+// ---------------------------------------------------------------------------
 // Special (non-decomposition) values for current_phase
 // ---------------------------------------------------------------------------
 const SPECIAL_PHASES = [
@@ -163,7 +173,7 @@ function generateDecomposition(state) {
     const task = {
       id: taskId,
       description: criterion,
-      status: "pending",
+      status: "queued",
       phase: idx < dod.length - 1 ? "phase_02" : "phase_03",
       depends_on: idx > 0 ? [`task_${String(idx).padStart(3, "0")}`] : [],
     };
@@ -174,7 +184,7 @@ function generateDecomposition(state) {
       id: `micro_pr_${String(idx + 1).padStart(3, "0")}`,
       task_id: taskId,
       title: `${state.contract_id} — ${criterion.slice(0, 80)}`,
-      status: "pending",
+      status: "queued",
       target_workers: workers,
       target_routes: routes,
       environment: "TEST",
@@ -186,7 +196,7 @@ function generateDecomposition(state) {
     id: `micro_pr_${String(dod.length + 1).padStart(3, "0")}`,
     task_id: null,
     title: `${state.contract_id} — Promoção para PROD`,
-    status: "pending",
+    status: "queued",
     target_workers: workers,
     target_routes: routes,
     environment: "PROD",
@@ -416,6 +426,227 @@ async function advanceContractPhase(env, contractId) {
 }
 
 // ============================================================================
+// 📌 Canonical Status Change Functions — Single Path
+//
+// These are the ONLY functions allowed to mutate task and micro_pr_candidate
+// statuses. All status changes MUST go through these functions.
+// Each function:
+//   1. Rehydrates from KV (Invariant 1 + 3)
+//   2. Validates the transition
+//   3. Updates the status
+//   4. Updates current_task on state
+//   5. Persists to KV (Invariant 5)
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// TASK STATUS FUNCTIONS
+// ---------------------------------------------------------------------------
+
+async function startTask(env, contractId, taskId) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const task = (decomposition.tasks || []).find((t) => t.id === taskId);
+  if (!task) {
+    return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
+  }
+  if (task.status !== "queued") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Task "${taskId}" cannot start from status "${task.status}". Must be "queued".` };
+  }
+
+  task.status = "in_progress";
+  const now = new Date().toISOString();
+  state.current_task = taskId;
+  state.updated_at = now;
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, task };
+}
+
+async function completeTask(env, contractId, taskId) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const task = (decomposition.tasks || []).find((t) => t.id === taskId);
+  if (!task) {
+    return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
+  }
+  if (task.status !== "in_progress") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Task "${taskId}" cannot complete from status "${task.status}". Must be "in_progress".` };
+  }
+
+  task.status = "completed";
+  const now = new Date().toISOString();
+  // If this was the current task, advance to next queued task or clear
+  if (state.current_task === taskId) {
+    const nextTask = (decomposition.tasks || []).find((t) => t.status === "queued");
+    state.current_task = nextTask ? nextTask.id : null;
+  }
+  state.updated_at = now;
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, task };
+}
+
+async function blockTask(env, contractId, taskId, reason) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const task = (decomposition.tasks || []).find((t) => t.id === taskId);
+  if (!task) {
+    return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
+  }
+  if (task.status !== "queued" && task.status !== "in_progress") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Task "${taskId}" cannot be blocked from status "${task.status}". Must be "queued" or "in_progress".` };
+  }
+
+  task.status = "blocked";
+  task.block_reason = reason || "No reason provided.";
+  const now = new Date().toISOString();
+  // If this was the current task, advance to next queued task or clear
+  if (state.current_task === taskId) {
+    const nextTask = (decomposition.tasks || []).find((t) => t.status === "queued");
+    state.current_task = nextTask ? nextTask.id : null;
+  }
+  state.updated_at = now;
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, task };
+}
+
+// ---------------------------------------------------------------------------
+// MICRO-PR CANDIDATE STATUS FUNCTIONS
+// ---------------------------------------------------------------------------
+
+async function startMicroPrCandidate(env, contractId, microPrId) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
+  if (!mpr) {
+    return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
+  }
+  if (mpr.status !== "queued") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Micro-PR "${microPrId}" cannot start from status "${mpr.status}". Must be "queued".` };
+  }
+
+  mpr.status = "in_progress";
+  state.updated_at = new Date().toISOString();
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, micro_pr_candidate: mpr };
+}
+
+async function completeMicroPrCandidate(env, contractId, microPrId) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
+  if (!mpr) {
+    return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
+  }
+  if (mpr.status !== "in_progress") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Micro-PR "${microPrId}" cannot complete from status "${mpr.status}". Must be "in_progress".` };
+  }
+
+  mpr.status = "completed";
+  state.updated_at = new Date().toISOString();
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, micro_pr_candidate: mpr };
+}
+
+async function blockMicroPrCandidate(env, contractId, microPrId, reason) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
+  if (!mpr) {
+    return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
+  }
+  if (mpr.status !== "queued" && mpr.status !== "in_progress") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Micro-PR "${microPrId}" cannot be blocked from status "${mpr.status}". Must be "queued" or "in_progress".` };
+  }
+
+  mpr.status = "blocked";
+  mpr.block_reason = reason || "No reason provided.";
+  state.updated_at = new Date().toISOString();
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, micro_pr_candidate: mpr };
+}
+
+async function discardMicroPrCandidate(env, contractId, microPrId, reason) {
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
+  if (!mpr) {
+    return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
+  }
+  if (mpr.status === "completed" || mpr.status === "discarded") {
+    return { ok: false, error: "INVALID_TRANSITION", message: `Micro-PR "${microPrId}" cannot be discarded from status "${mpr.status}".` };
+  }
+
+  mpr.status = "discarded";
+  mpr.discard_reason = reason || "No reason provided.";
+  state.updated_at = new Date().toISOString();
+
+  await persistContract(env, state, decomposition);
+  return { ok: true, state, decomposition, micro_pr_candidate: mpr };
+}
+
+// ---------------------------------------------------------------------------
+// Build enhanced contract summary with real progress
+// ---------------------------------------------------------------------------
+function buildContractSummary(state, decomposition) {
+  const tasks = (decomposition && decomposition.tasks) || [];
+  const mprs = (decomposition && decomposition.micro_pr_candidates) || [];
+
+  const tasksCompleted = tasks.filter((t) => TASK_DONE_STATUSES.includes(t.status)).length;
+  const tasksBlocked = tasks.filter((t) => t.status === "blocked").length;
+  const tasksInProgress = tasks.filter((t) => t.status === "in_progress").length;
+  const tasksQueued = tasks.filter((t) => t.status === "queued").length;
+
+  const mprsCompleted = mprs.filter((m) => m.status === "completed").length;
+  const mprsBlocked = mprs.filter((m) => m.status === "blocked").length;
+  const mprsInProgress = mprs.filter((m) => m.status === "in_progress").length;
+  const mprsQueued = mprs.filter((m) => m.status === "queued").length;
+  const mprsDiscarded = mprs.filter((m) => m.status === "discarded").length;
+
+  return {
+    contract_id: state.contract_id,
+    contract_name: state.contract_name,
+    status_global: state.status_global,
+    current_phase: state.current_phase,
+    current_task: state.current_task,
+    blockers: state.blockers,
+    next_action: state.next_action,
+    tasks_total: tasks.length,
+    tasks_completed: tasksCompleted,
+    tasks_blocked: tasksBlocked,
+    tasks_in_progress: tasksInProgress,
+    tasks_queued: tasksQueued,
+    micro_pr_candidates_total: mprs.length,
+    micro_pr_candidates_completed: mprsCompleted,
+    micro_pr_candidates_blocked: mprsBlocked,
+    micro_pr_candidates_in_progress: mprsInProgress,
+    micro_pr_candidates_queued: mprsQueued,
+    micro_pr_candidates_discarded: mprsDiscarded,
+    phases_count: decomposition ? decomposition.phases.length : 0,
+    created_at: state.created_at,
+    updated_at: state.updated_at,
+  };
+}
+
+// ============================================================================
 // 🌐 Route Handlers
 // ============================================================================
 
@@ -547,21 +778,7 @@ async function handleGetContractSummary(env, contractId) {
 
   return {
     status: 200,
-    body: {
-      ok: true,
-      contract_id: state.contract_id,
-      contract_name: state.contract_name,
-      status_global: state.status_global,
-      current_phase: state.current_phase,
-      current_task: state.current_task,
-      blockers: state.blockers,
-      next_action: state.next_action,
-      phases_count: decomposition ? decomposition.phases.length : 0,
-      tasks_count: decomposition ? decomposition.tasks.length : 0,
-      micro_pr_candidates_count: decomposition ? decomposition.micro_pr_candidates.length : 0,
-      created_at: state.created_at,
-      updated_at: state.updated_at,
-    },
+    body: Object.assign({ ok: true }, buildContractSummary(state, decomposition)),
   };
 }
 
@@ -582,6 +799,18 @@ export {
   advanceContractPhase,
   TASK_DONE_STATUSES,
   SPECIAL_PHASES,
+  VALID_TASK_STATUSES,
+  VALID_MICRO_PR_STATUSES,
+  // Canonical status change functions — single path
+  startTask,
+  completeTask,
+  blockTask,
+  startMicroPrCandidate,
+  completeMicroPrCandidate,
+  blockMicroPrCandidate,
+  discardMicroPrCandidate,
+  // Summary
+  buildContractSummary,
   // Route handlers
   handleCreateContract,
   handleGetContract,
