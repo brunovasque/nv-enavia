@@ -690,6 +690,145 @@ async function handleRejectDecompositionPlan(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// F2b — Resolve Plan Revision (formal exit from plan_revision_pending)
+//
+// resolvePlanRevision(env, contractId, params)
+//   params.revised_by         — identifier of the actor (optional, defaults to "human")
+//   params.new_decomposition  — the revised decomposition object (optional;
+//                                if omitted, re-generates from current state)
+//
+// Behaviour:
+//   1. Rehydrates from KV (INVARIANT 1+3)
+//   2. Validates contract exists
+//   3. Validates contract is in plan_revision_pending / plan rejected
+//   4. Transitions status_global: blocked → decomposed
+//   5. Clears plan_rejection.plan_rejected (preserves history via plan_rejection_history)
+//   6. Replaces decomposition with revised version
+//   7. Restores current_phase to decomposition_complete
+//   8. Persists updated state + decomposition
+// ---------------------------------------------------------------------------
+async function resolvePlanRevision(env, contractId, params) {
+  const p = params || {};
+
+  // INVARIANT 1+3 — rehydrate from KV
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+
+  // F1 — Cancellation guard
+  if (isCancelledContract(state)) {
+    return cancelledResult(contractId);
+  }
+
+  // Validate: must be in plan_revision_pending / plan rejected
+  if (!isPlanRejected(state)) {
+    return {
+      ok: false,
+      error: "NOT_IN_PLAN_REVISION",
+      message: `Contract "${contractId}" is not in plan revision — cannot resolve.`,
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  // Preserve rejection history before clearing
+  const previousRejection = JSON.parse(JSON.stringify(state.plan_rejection));
+
+  // Build or accept the revised decomposition
+  let revisedDecomposition;
+  if (p.new_decomposition && typeof p.new_decomposition === "object") {
+    revisedDecomposition = p.new_decomposition;
+  } else {
+    // Re-generate from current state (default behaviour)
+    revisedDecomposition = generateDecomposition(state);
+  }
+
+  // Transition: blocked → decomposed
+  const transition = transitionStatusGlobal(state, "decomposed", "resolvePlanRevision");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
+
+  // Move rejection to history array, clear active rejection
+  if (!state.plan_rejection_history) {
+    state.plan_rejection_history = [];
+  }
+  previousRejection.resolved_at = now;
+  previousRejection.resolved_by = p.revised_by || "human";
+  state.plan_rejection_history.push(previousRejection);
+
+  // Clear the active plan_rejection
+  state.plan_rejection = null;
+
+  // Restore to decomposed-ready state
+  state.current_phase = "decomposition_complete";
+  state.next_action = "Plano revisado. Revisar decomposição e aprovar plano de micro-PRs.";
+  state.updated_at = now;
+
+  await persistContract(env, state, revisedDecomposition);
+
+  return {
+    ok: true,
+    message: "Plan revision resolved. Contract returned to decomposed state.",
+    plan_rejection_history: state.plan_rejection_history,
+    state,
+    decomposition: revisedDecomposition,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleResolvePlanRevision(request, env) → { status, body }
+//
+// Route handler for POST /contracts/resolve-plan-revision
+// ---------------------------------------------------------------------------
+async function handleResolvePlanRevision(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return { status: 400, body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." } };
+  }
+
+  const contractId = body.contract_id;
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_CONTRACT_ID", message: "contract_id is required." },
+    };
+  }
+
+  const result = await resolvePlanRevision(env, contractId, {
+    revised_by: body.revised_by || "human",
+    new_decomposition: body.new_decomposition || null,
+  });
+
+  if (!result.ok) {
+    const httpStatus = result.error === "CONTRACT_NOT_FOUND" ? 404
+      : result.error === "CONTRACT_CANCELLED" ? 409
+      : 400;
+    return {
+      status: httpStatus,
+      body: {
+        ok: false,
+        error: result.error,
+        message: result.message,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      message: result.message,
+      plan_rejection_history: result.plan_rejection_history,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // INVARIANT 2 — Mandatory Phase Gate
 //
 // Returns { canAdvance, activePhaseId, reason }.
@@ -870,6 +1009,7 @@ async function startTask(env, contractId, taskId) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const task = (decomposition.tasks || []).find((t) => t.id === taskId);
   if (!task) {
     return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
@@ -893,6 +1033,7 @@ async function completeTask(env, contractId, taskId) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const task = (decomposition.tasks || []).find((t) => t.id === taskId);
   if (!task) {
     return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
@@ -920,6 +1061,7 @@ async function blockTask(env, contractId, taskId, reason) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const task = (decomposition.tasks || []).find((t) => t.id === taskId);
   if (!task) {
     return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
@@ -952,6 +1094,7 @@ async function startMicroPrCandidate(env, contractId, microPrId) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -973,6 +1116,7 @@ async function completeMicroPrCandidate(env, contractId, microPrId) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -994,6 +1138,7 @@ async function blockMicroPrCandidate(env, contractId, microPrId, reason) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -1016,6 +1161,7 @@ async function discardMicroPrCandidate(env, contractId, microPrId, reason) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -2416,6 +2562,7 @@ function buildContractSummary(state, decomposition) {
     contract_closure: state.contract_closure || null,
     contract_cancellation: state.contract_cancellation || null,
     plan_rejection: state.plan_rejection || null,
+    plan_rejection_history: state.plan_rejection_history || [],
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -2700,9 +2847,10 @@ export {
   // F1 — Formal Contract Cancellation
   cancelContract,
   isCancelledContract,
-  // F2 — Formal Decomposition Plan Rejection
+  // F2 — Formal Decomposition Plan Rejection + Resolution
   rejectDecompositionPlan,
   isPlanRejected,
+  resolvePlanRevision,
   // Summary
   buildContractSummary,
   // Route handlers
@@ -2713,4 +2861,5 @@ export {
   handleCloseContractInTest,
   handleCancelContract,
   handleRejectDecompositionPlan,
+  handleResolvePlanRevision,
 };
