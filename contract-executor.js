@@ -138,6 +138,7 @@ const SPECIAL_PHASES = [
   "decomposition_complete",
   "ingestion_blocked",
   "all_phases_complete",
+  "plan_revision_pending",
 ];
 
 // ---------------------------------------------------------------------------
@@ -396,6 +397,22 @@ function cancelledResult(contractId) {
 }
 
 // ---------------------------------------------------------------------------
+// Plan-rejected guard — used by mutation functions that should not proceed
+// while the decomposition plan is rejected and pending revision.
+// ---------------------------------------------------------------------------
+function isPlanRejected(state) {
+  return !!(state && state.plan_rejection && state.plan_rejection.plan_rejected === true);
+}
+
+function planRejectedResult(contractId) {
+  return {
+    ok: false,
+    error: "PLAN_REJECTED",
+    message: `Contract "${contractId}" has a rejected decomposition plan — resolve the plan revision before proceeding.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // F1 — Formal Contract Cancellation
 //
 // cancelContract(env, contractId, params)
@@ -518,6 +535,161 @@ async function handleCancelContract(request, env) {
 }
 
 // ---------------------------------------------------------------------------
+// F2 — Formal Decomposition Plan Rejection / Revision
+//
+// rejectDecompositionPlan(env, contractId, params)
+//   params.reason        — human-readable rejection reason (required)
+//   params.rejected_by   — identifier of the actor (optional, defaults to "human")
+//
+// Behaviour:
+//   1. Rehydrates from KV (INVARIANT 1+3)
+//   2. Validates contract exists
+//   3. Validates contract is in a rejectable state (decomposed)
+//   4. Idempotent if plan already rejected
+//   5. Transitions status_global → blocked
+//   6. Persists plan_rejection metadata + snapshot of previous decomposition
+//   7. Blocks any further normal execution until plan is revised
+// ---------------------------------------------------------------------------
+async function rejectDecompositionPlan(env, contractId, params) {
+  const p = params || {};
+
+  // INVARIANT 1+3 — rehydrate from KV
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+
+  // F1 — Cancellation guard (cancelled contracts cannot have plan rejected)
+  if (isCancelledContract(state)) {
+    return cancelledResult(contractId);
+  }
+
+  // Idempotent: plan already rejected
+  if (isPlanRejected(state)) {
+    return {
+      ok: true,
+      already_rejected: true,
+      plan_rejection: state.plan_rejection,
+      message: "Decomposition plan already rejected — awaiting revision.",
+      state,
+      decomposition,
+    };
+  }
+
+  // Validate rejectable state: only "decomposed" contracts can have their plan rejected
+  if (state.status_global !== "decomposed") {
+    return {
+      ok: false,
+      error: "PLAN_NOT_REJECTABLE",
+      message: `Contract status_global is "${state.status_global}" — plan can only be rejected when status is "decomposed".`,
+    };
+  }
+
+  // Reason is required for rejection
+  if (!p.reason || typeof p.reason !== "string" || p.reason.trim() === "") {
+    return {
+      ok: false,
+      error: "MISSING_REJECTION_REASON",
+      message: "A non-empty reason is required to reject the decomposition plan.",
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  const previousStatusGlobal = state.status_global;
+  const previousCurrentPhase = state.current_phase;
+
+  // Transition: decomposed → blocked
+  const transition = transitionStatusGlobal(state, "blocked", "rejectDecompositionPlan");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
+
+  // Build plan_rejection metadata
+  const planRevision = (state.plan_rejection && state.plan_rejection.plan_revision)
+    ? state.plan_rejection.plan_revision + 1
+    : 1;
+
+  state.plan_rejection = {
+    plan_rejected: true,
+    plan_rejected_at: now,
+    plan_rejection_reason: p.reason.trim(),
+    plan_rejected_by: p.rejected_by || "human",
+    plan_revision: planRevision,
+    previous_status_global: previousStatusGlobal,
+    previous_current_phase: previousCurrentPhase,
+    previous_decomposition_snapshot: decomposition ? JSON.parse(JSON.stringify(decomposition)) : null,
+  };
+
+  state.current_phase = "plan_revision_pending";
+  state.next_action = "Decomposition plan rejected — awaiting revised plan.";
+  state.updated_at = now;
+
+  await persistContract(env, state, decomposition);
+
+  return {
+    ok: true,
+    already_rejected: false,
+    plan_rejection: state.plan_rejection,
+    message: "Decomposition plan rejected. Contract blocked until plan is revised.",
+    state,
+    decomposition,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleRejectDecompositionPlan(request, env) → { status, body }
+//
+// Route handler for POST /contracts/reject-plan
+// ---------------------------------------------------------------------------
+async function handleRejectDecompositionPlan(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return { status: 400, body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." } };
+  }
+
+  const contractId = body.contract_id;
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_CONTRACT_ID", message: "contract_id is required." },
+    };
+  }
+
+  const result = await rejectDecompositionPlan(env, contractId, {
+    reason: body.reason || null,
+    rejected_by: body.rejected_by || "human",
+  });
+
+  if (!result.ok) {
+    const httpStatus = result.error === "CONTRACT_NOT_FOUND" ? 404
+      : result.error === "CONTRACT_CANCELLED" ? 409
+      : 400;
+    return {
+      status: httpStatus,
+      body: {
+        ok: false,
+        error: result.error,
+        message: result.message,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      already_rejected: result.already_rejected || false,
+      plan_rejection: result.plan_rejection,
+      message: result.message,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // INVARIANT 2 — Mandatory Phase Gate
 //
 // Returns { canAdvance, activePhaseId, reason }.
@@ -593,6 +765,11 @@ async function advanceContractPhase(env, contractId) {
   // F1 — Cancellation guard
   if (isCancelledContract(state)) {
     return cancelledResult(contractId);
+  }
+
+  // F2 — Plan-rejection guard
+  if (isPlanRejected(state)) {
+    return planRejectedResult(contractId);
   }
 
   // INVARIANT 2 — evaluate phase gate against persisted state
@@ -912,6 +1089,20 @@ function resolveNextAction(state, decomposition) {
       micro_pr_candidate_id: null,
       reason: "Contract has been formally cancelled.",
       status: "cancelled",
+    };
+  }
+
+  // ── Rule 0b: Decomposition plan rejected — awaiting revision ──
+  if (isPlanRejected(state)) {
+    return {
+      type: "plan_rejected",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: state.plan_rejection.plan_rejection_reason
+        ? `Decomposition plan rejected: ${state.plan_rejection.plan_rejection_reason}`
+        : "Decomposition plan rejected — awaiting revised plan.",
+      status: "blocked",
     };
   }
 
@@ -1734,6 +1925,9 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
   // F1 — Cancellation guard
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
 
+  // F2 — Plan-rejection guard
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
+
   // ── Gate 1: current_task must exist and be valid ──
   const currentTaskId = state.current_task;
   if (!currentTaskId) {
@@ -2221,6 +2415,7 @@ function buildContractSummary(state, decomposition) {
     current_execution: state.current_execution || null,
     contract_closure: state.contract_closure || null,
     contract_cancellation: state.contract_cancellation || null,
+    plan_rejection: state.plan_rejection || null,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -2505,6 +2700,9 @@ export {
   // F1 — Formal Contract Cancellation
   cancelContract,
   isCancelledContract,
+  // F2 — Formal Decomposition Plan Rejection
+  rejectDecompositionPlan,
+  isPlanRejected,
   // Summary
   buildContractSummary,
   // Route handlers
@@ -2514,4 +2712,5 @@ export {
   handleExecuteContract,
   handleCloseContractInTest,
   handleCancelContract,
+  handleRejectDecompositionPlan,
 };
