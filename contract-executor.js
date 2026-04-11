@@ -184,7 +184,6 @@ function generateDecomposition(state) {
   });
 
   // Assign tasks to phases
-  phases[0].tasks.push("task_001");
   tasks.forEach((t) => {
     if (t.phase === "phase_02" && t.id !== "task_001") {
       phases[1].tasks.push(t.id);
