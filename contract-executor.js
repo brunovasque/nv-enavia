@@ -1146,6 +1146,262 @@ function bindAcceptanceCriteria(state, decomposition) {
   };
 }
 
+// ============================================================================
+// 🔁 B5 — Controlled Error Loop
+//
+// Deterministic, persistable error loop for micro-PR/task execution errors.
+// Does NOT execute micro-PRs, advance phases, or close contracts.
+// Only records errors, counts retries, and decides safe continuity state.
+//
+// The error loop is stored on the contract state as `error_loop` and survives
+// KV rehydration. Each task/micro-PR has its own entry keyed by task_id.
+//
+// Error classification determines retry eligibility:
+//   - "in_scope"   → retryable if within limits and cause is identified
+//   - "infra"      → escalates immediately (missing secret/binding/dependency)
+//   - "external"   → escalates immediately (out-of-contract dependency)
+//   - "unknown"    → escalates immediately (cause not identified)
+//
+// Loop statuses:
+//   - "retrying"        → retry allowed, within limits
+//   - "blocked"         → retry exhausted or non-retryable error
+//   - "awaiting_human"  → requires human intervention
+//   - "clear"           → no errors recorded
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// Error Loop Constants
+// ---------------------------------------------------------------------------
+const MAX_RETRY_ATTEMPTS = 3;
+
+const ERROR_CLASSIFICATIONS = ["in_scope", "infra", "external", "unknown"];
+
+const ERROR_LOOP_STATUSES = ["clear", "retrying", "blocked", "awaiting_human"];
+
+// Classifications that are NOT eligible for automatic retry
+const NON_RETRYABLE_CLASSIFICATIONS = ["infra", "external", "unknown"];
+
+// ---------------------------------------------------------------------------
+// buildErrorEntry(params) → canonical error entry
+//
+// Pure function. Builds a single error entry for the error loop history.
+// ---------------------------------------------------------------------------
+function buildErrorEntry(params) {
+  const p = params || {};
+  return {
+    code: p.code || "UNKNOWN_ERROR",
+    scope: p.scope || "task",
+    message: p.message || "No message provided.",
+    retryable: p.retryable !== undefined ? p.retryable : false,
+    reason: p.reason || null,
+    attempt: typeof p.attempt === "number" ? p.attempt : 1,
+    max_attempts: typeof p.max_attempts === "number" ? p.max_attempts : MAX_RETRY_ATTEMPTS,
+    resolution_state: p.resolution_state || "unresolved",
+    classification: ERROR_CLASSIFICATIONS.includes(p.classification)
+      ? p.classification
+      : "unknown",
+    recorded_at: p.recorded_at || new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// evaluateErrorLoop(errorLoop, taskId) → { loop_status, retry_allowed,
+//   active_retry_count, retry_count, last_error, escalation_reason }
+//
+// Pure function. Evaluates the current error loop state for a given task.
+// Does NOT mutate anything.
+//
+// `active_retry_count` is the counter for the current retry cycle — used for
+// all retry/escalation decisions. `retry_count` is kept as total error history
+// length for observability but is NOT used for decision-making.
+// ---------------------------------------------------------------------------
+function evaluateErrorLoop(errorLoop, taskId) {
+  const defaultResult = {
+    loop_status: "clear",
+    retry_allowed: false,
+    active_retry_count: 0,
+    retry_count: 0,
+    last_error: null,
+    escalation_reason: null,
+  };
+
+  if (!errorLoop || !taskId) {
+    return defaultResult;
+  }
+
+  const taskLoop = errorLoop[taskId];
+  if (!taskLoop || !Array.isArray(taskLoop.errors) || taskLoop.errors.length === 0) {
+    return defaultResult;
+  }
+
+  const errors = taskLoop.errors;
+  const lastError = errors[errors.length - 1];
+  const activeRetryCount = typeof taskLoop.active_retry_count === "number"
+    ? taskLoop.active_retry_count
+    : errors.length;
+  const totalErrorCount = errors.length;
+  const maxAttempts = lastError.max_attempts || MAX_RETRY_ATTEMPTS;
+
+  // Non-retryable classification → immediate escalation
+  if (NON_RETRYABLE_CLASSIFICATIONS.includes(lastError.classification)) {
+    let escalationReason;
+    if (lastError.classification === "infra") {
+      escalationReason = "Infrastructure/secret/binding/dependency error — requires human intervention.";
+    } else if (lastError.classification === "external") {
+      escalationReason = "External dependency outside contract scope — requires human intervention.";
+    } else {
+      escalationReason = "Unknown error cause — cannot determine safe retry path.";
+    }
+    return {
+      loop_status: "awaiting_human",
+      retry_allowed: false,
+      active_retry_count: activeRetryCount,
+      retry_count: totalErrorCount,
+      last_error: lastError,
+      escalation_reason: escalationReason,
+    };
+  }
+
+  // Retry limit reached — uses active_retry_count, not total history
+  if (activeRetryCount >= maxAttempts) {
+    return {
+      loop_status: "blocked",
+      retry_allowed: false,
+      active_retry_count: activeRetryCount,
+      retry_count: totalErrorCount,
+      last_error: lastError,
+      escalation_reason: `Retry limit reached (${activeRetryCount}/${maxAttempts}) for task "${taskId}".`,
+    };
+  }
+
+  // Retryable and within limits
+  if (lastError.retryable && lastError.classification === "in_scope") {
+    return {
+      loop_status: "retrying",
+      retry_allowed: true,
+      active_retry_count: activeRetryCount,
+      retry_count: totalErrorCount,
+      last_error: lastError,
+      escalation_reason: null,
+    };
+  }
+
+  // Fallback: not clearly retryable → escalate
+  return {
+    loop_status: "awaiting_human",
+    retry_allowed: false,
+    active_retry_count: activeRetryCount,
+    retry_count: totalErrorCount,
+    last_error: lastError,
+    escalation_reason: `Error not eligible for retry: retryable=${lastError.retryable}, classification="${lastError.classification}".`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// recordError(env, contractId, taskId, errorParams) → { ok, state,
+//   decomposition, error_loop, evaluation }
+//
+// Records a canonical error in the error loop for a given task.
+// Rehydrates from KV, appends the error, evaluates the loop, and persists.
+// Does NOT advance phases, complete tasks, or execute micro-PRs.
+// ---------------------------------------------------------------------------
+async function recordError(env, contractId, taskId, errorParams) {
+  // INVARIANT 1+3 — rehydrate from KV
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  if (!decomposition) {
+    return { ok: false, error: "DECOMPOSITION_NOT_FOUND", message: `Decomposition for "${contractId}" not found.` };
+  }
+
+  // Validate task exists
+  const task = (decomposition.tasks || []).find((t) => t.id === taskId);
+  if (!task) {
+    return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
+  }
+
+  // Guard: cannot record error on completed/discarded task
+  if (TASK_DONE_STATUSES.includes(task.status)) {
+    return {
+      ok: false,
+      error: "INVALID_ERROR_RECORD",
+      message: `Task "${taskId}" has status "${task.status}" — cannot record error on completed/done task.`,
+    };
+  }
+
+  // Guard: cannot record error on blocked task — blocked is a formal stop
+  if (task.status === "blocked") {
+    return {
+      ok: false,
+      error: "TASK_BLOCKED",
+      message: `Task "${taskId}" is blocked — cannot record new error. Resolve the block first.`,
+    };
+  }
+
+  // Initialize error_loop on state if absent
+  if (!state.error_loop) {
+    state.error_loop = {};
+  }
+
+  // Initialize task error loop entry if absent
+  if (!state.error_loop[taskId]) {
+    state.error_loop[taskId] = {
+      errors: [],
+      active_retry_count: 0,
+      loop_status: "clear",
+      retry_count: 0,
+      last_error: null,
+      retry_allowed: false,
+      escalation_reason: null,
+    };
+  }
+
+  const taskLoop = state.error_loop[taskId];
+
+  // Increment active retry count for the current cycle
+  taskLoop.active_retry_count = (taskLoop.active_retry_count || 0) + 1;
+
+  // Build and record the error entry
+  const attempt = taskLoop.active_retry_count;
+  const maxAttempts = (errorParams && typeof errorParams.max_attempts === "number")
+    ? errorParams.max_attempts
+    : MAX_RETRY_ATTEMPTS;
+  const entry = buildErrorEntry(
+    Object.assign({}, errorParams, { attempt, max_attempts: maxAttempts })
+  );
+  taskLoop.errors.push(entry);
+
+  // Evaluate the loop state after recording
+  const evaluation = evaluateErrorLoop(state.error_loop, taskId);
+
+  // Persist evaluation results back into the task loop
+  taskLoop.loop_status = evaluation.loop_status;
+  taskLoop.active_retry_count = evaluation.active_retry_count;
+  taskLoop.retry_count = evaluation.retry_count;
+  taskLoop.last_error = evaluation.last_error;
+  taskLoop.retry_allowed = evaluation.retry_allowed;
+  taskLoop.escalation_reason = evaluation.escalation_reason;
+
+  // Update timestamp
+  state.updated_at = new Date().toISOString();
+
+  // Persist to KV (do NOT change task status, phase, or contract status)
+  await env.ENAVIA_BRAIN.put(
+    `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_STATE}`,
+    JSON.stringify(state)
+  );
+
+  return {
+    ok: true,
+    state,
+    decomposition,
+    error_loop: state.error_loop,
+    evaluation,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build enhanced contract summary with real progress
 // ---------------------------------------------------------------------------
@@ -1184,6 +1440,7 @@ function buildContractSummary(state, decomposition) {
     next_action_resolved: nextActionResolved,
     execution_handoff: executionHandoff,
     acceptance_criteria_binding: acceptanceCriteriaBinding,
+    error_loop: state.error_loop || null,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -1378,6 +1635,14 @@ export {
   bindAcceptanceCriteria,
   ACCEPTANCE_CRITERIA_SCOPES,
   ACCEPTANCE_CRITERIA_STATUSES,
+  // B5 — Controlled Error Loop
+  recordError,
+  evaluateErrorLoop,
+  buildErrorEntry,
+  MAX_RETRY_ATTEMPTS,
+  ERROR_CLASSIFICATIONS,
+  ERROR_LOOP_STATUSES,
+  NON_RETRYABLE_CLASSIFICATIONS,
   // Summary
   buildContractSummary,
   // Route handlers
