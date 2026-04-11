@@ -1,0 +1,109 @@
+{
+  "_comment": "ENAVIA Contract Executor v1 — Payload Examples",
+  "_doc": "docs/ENAVIA_CONTRACT_EXECUTOR_V1.md",
+  "_version": "v1",
+
+  "minimal_contract": {
+    "contract_id": "ctr_001",
+    "version": "v1",
+    "created_at": "2026-04-11T00:00:00Z",
+    "operator": "bruno",
+    "goal": "Proteger /brain/director-query com isInternalAuthorized()",
+    "scope": {
+      "environments": ["TEST", "PROD"]
+    },
+    "definition_of_done": [
+      "/brain/director-query retorna 401 sem token",
+      "Smoke em TEST passado",
+      "Deploy PROD autorizado pelo operador"
+    ]
+  },
+
+  "full_contract": {
+    "contract_id": "ctr_002",
+    "version": "v1",
+    "created_at": "2026-04-11T00:00:00Z",
+    "operator": "bruno",
+    "goal": "Corrigir double-load de brain:index em buildBrain() — eliminar segundo KV read",
+    "scope": {
+      "workers": ["nv-enavia"],
+      "routes": ["boot — buildBrain()"],
+      "environments": ["TEST", "PROD"]
+    },
+    "constraints": {
+      "max_micro_prs": 2,
+      "require_human_approval_per_pr": true,
+      "test_before_prod": true,
+      "rollback_on_failure": true
+    },
+    "definition_of_done": [
+      "buildBrain() lê brain:index exatamente uma vez por boot",
+      "GET /debug-brain confirma estado correto em TEST",
+      "/__internal__/build retorna ok:true com env=TEST",
+      "Deploy em PROD autorizado e confirmado",
+      "GET /debug-brain confirma estado correto em PROD"
+    ],
+    "context": {
+      "source_snapshot": "P5 diagnóstico 2026-04-10 — double-load KV em buildBrain()",
+      "notes": "Reduz latência de cold start. Baixo risco. Patch cirúrgico no bloco Memory Integration V1."
+    }
+  },
+
+  "contract_state_examples": {
+    "status_open": {
+      "ok": true,
+      "contract_id": "ctr_001",
+      "contract_status": "open",
+      "action_taken": "Contrato recebido. Aguardando decomposição.",
+      "result": {
+        "micro_pr_id": null,
+        "audit_verdict": "n/a",
+        "deploy_environment": "n/a",
+        "deploy_status": "n/a"
+      },
+      "blockers": [],
+      "next_action_required": "Aguardar proposta de decomposição da ENAVIA",
+      "summary": "Contrato aberto. ENAVIA irá propor plano de micro-PRs."
+    },
+
+    "status_blocked": {
+      "ok": false,
+      "contract_id": "ctr_001",
+      "contract_status": "blocked",
+      "error_code": "BLOCK_EXECUTOR_UNAVAILABLE",
+      "error_message": "Service Binding EXECUTOR não respondeu após 2 tentativas",
+      "affected_step": "micro_pr_001 — audit via /audit",
+      "rollback_executed": false,
+      "next_action_required": "Verificar enavia-executor-test no Cloudflare Dashboard e retomar contrato"
+    },
+
+    "status_completed": {
+      "ok": true,
+      "contract_id": "ctr_001",
+      "contract_status": "completed",
+      "action_taken": "Último micro-PR merged em PROD. Smoke test confirmado.",
+      "result": {
+        "micro_pr_id": "micro_pr_001",
+        "audit_verdict": "approve",
+        "deploy_environment": "PROD",
+        "deploy_status": "success"
+      },
+      "blockers": [],
+      "next_action_required": "Humano confirma encerramento do contrato",
+      "summary": "Todos os critérios do Definition of Done foram satisfeitos. Aguardando confirmação de encerramento."
+    }
+  },
+
+  "micro_pr_example": {
+    "id": "micro_pr_001",
+    "title": "fix: proteger /brain/director-query com isInternalAuthorized()",
+    "status": "TEST_VALIDATED",
+    "environment": "TEST",
+    "branch": "copilot/ctr001-protect-director-query",
+    "pr_url": "https://github.com/brunovasque/nv-enavia/pull/XX",
+    "audit": {
+      "verdict": "approve",
+      "risk_level": "low"
+    }
+  }
+}
