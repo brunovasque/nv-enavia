@@ -61,6 +61,11 @@ import {
   cancelContract,
   isCancelledContract,
   handleCancelContract,
+  rejectDecompositionPlan,
+  isPlanRejected,
+  handleRejectDecompositionPlan,
+  resolvePlanRevision,
+  handleResolvePlanRevision,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -4629,6 +4634,655 @@ async function runTests() {
     // Verify KV was NOT overwritten
     const { state: after } = await rehydrateContract(env, "ctr_g2_220");
     assert(after.status_global === "failed", "KV still shows failed (no persist after failed transition)");
+  }
+
+  // ============================================================================
+  // 🔒 F2 — Formal Decomposition Plan Rejection Tests
+  // ============================================================================
+  console.log("\n" + "=".repeat(50));
+  console.log("F2 — Formal Decomposition Plan Rejection Tests");
+  console.log("=".repeat(50));
+
+  // ---- Test 221: Successful rejection of decomposition plan ----
+  console.log("\nTest 221: Successful rejection of decomposition plan");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_221" })), env);
+
+    const result = await rejectDecompositionPlan(env, "ctr_f2_221", {
+      reason: "Decomposition misses critical auth module",
+      rejected_by: "tech-lead",
+    });
+
+    assert(result.ok === true, "rejection succeeded");
+    assert(result.already_rejected === false, "not already rejected");
+    assert(result.plan_rejection.plan_rejected === true, "plan_rejected flag is true");
+    assert(result.plan_rejection.plan_rejection_reason === "Decomposition misses critical auth module", "reason persisted");
+    assert(result.plan_rejection.plan_rejected_by === "tech-lead", "rejected_by persisted");
+    assert(result.plan_rejection.plan_rejected_at !== undefined, "plan_rejected_at set");
+    assert(result.plan_rejection.plan_revision === 1, "plan_revision is 1");
+    assert(result.plan_rejection.previous_status_global === "decomposed", "previous status preserved");
+    assert(result.plan_rejection.previous_current_phase === "decomposition_complete", "previous phase preserved");
+    assert(result.plan_rejection.previous_decomposition_snapshot !== null, "decomposition snapshot preserved");
+    assert(result.state.status_global === "blocked", "status_global transitioned to blocked");
+    assert(result.state.current_phase === "plan_revision_pending", "current_phase is plan_revision_pending");
+    assert(result.state.next_action === "Decomposition plan rejected — awaiting revised plan.", "next_action updated");
+  }
+
+  // ---- Test 222: Rejection reason is persisted and survives rehydration ----
+  console.log("\nTest 222: Rejection reason is persisted and survives rehydration");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_222" })), env);
+
+    await rejectDecompositionPlan(env, "ctr_f2_222", { reason: "Phases are out of order" });
+
+    const { state } = await rehydrateContract(env, "ctr_f2_222");
+    assert(state.plan_rejection !== undefined, "plan_rejection survived rehydration");
+    assert(state.plan_rejection.plan_rejected === true, "plan_rejected flag survived");
+    assert(state.plan_rejection.plan_rejection_reason === "Phases are out of order", "reason survived rehydration");
+    assert(state.plan_rejection.plan_rejected_at !== undefined, "timestamp survived rehydration");
+    assert(state.status_global === "blocked", "status_global survived as blocked");
+    assert(state.current_phase === "plan_revision_pending", "current_phase survived as plan_revision_pending");
+  }
+
+  // ---- Test 223: Rehydration maintains plan rejected/in revision state ----
+  console.log("\nTest 223: Rehydration maintains plan rejected/in revision state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_223" })), env);
+
+    await rejectDecompositionPlan(env, "ctr_f2_223", { reason: "Testing persistence" });
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_f2_223");
+    assert(state.plan_rejection !== undefined, "plan_rejection survived rehydration");
+    assert(state.plan_rejection.plan_rejected === true, "plan_rejected flag survived");
+    assert(state.plan_rejection.previous_decomposition_snapshot !== null, "snapshot survived rehydration");
+    assert(isPlanRejected(state) === true, "isPlanRejected returns true after rehydration");
+  }
+
+  // ---- Test 224: Summary/API exposes plan rejection state correctly ----
+  console.log("\nTest 224: Summary/API exposes plan rejection state correctly");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_224" })), env);
+
+    await rejectDecompositionPlan(env, "ctr_f2_224", { reason: "Summary test" });
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_f2_224");
+    const summary = buildContractSummary(state, decomposition);
+
+    assert(summary.plan_rejection !== null, "summary has plan_rejection");
+    assert(summary.plan_rejection.plan_rejected === true, "summary plan_rejected flag");
+    assert(summary.plan_rejection.plan_rejection_reason === "Summary test", "summary rejection reason");
+    assert(summary.status_global === "blocked", "summary status_global is blocked");
+
+    // Also check resolveNextAction
+    const nextAction = resolveNextAction(state, decomposition);
+    assert(nextAction.type === "plan_rejected", "resolveNextAction type is plan_rejected");
+    assert(nextAction.status === "blocked", "resolveNextAction status is blocked");
+  }
+
+  // ---- Test 225: Contract with rejected plan does not execute normally ----
+  console.log("\nTest 225: Contract with rejected plan does not execute normally");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_225" })), env);
+
+    await rejectDecompositionPlan(env, "ctr_f2_225", { reason: "Block execution test" });
+
+    // Try to advance phase — should be blocked
+    const advResult = await advanceContractPhase(env, "ctr_f2_225");
+    assert(advResult.ok === false, "advance blocked");
+    assert(advResult.error === "PLAN_REJECTED", "advance error is PLAN_REJECTED");
+
+    // Try to execute — should be blocked
+    const execResult = await executeCurrentMicroPr(env, "ctr_f2_225", {});
+    assert(execResult.ok === false, "execute blocked");
+    assert(execResult.error === "PLAN_REJECTED", "execute error is PLAN_REJECTED");
+  }
+
+  // ---- Test 226: Idempotent rejection ----
+  console.log("\nTest 226: Idempotent rejection");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_226" })), env);
+
+    const first = await rejectDecompositionPlan(env, "ctr_f2_226", { reason: "First rejection" });
+    assert(first.ok === true, "first rejection ok");
+    assert(first.already_rejected === false, "first is not already rejected");
+
+    // Second rejection on same contract — idempotent
+    const second = await rejectDecompositionPlan(env, "ctr_f2_226", { reason: "Second rejection" });
+    assert(second.ok === true, "second rejection ok (idempotent)");
+    assert(second.already_rejected === true, "second is already_rejected");
+    assert(second.plan_rejection.plan_rejection_reason === "First rejection", "original reason preserved");
+  }
+
+  // ---- Test 227: Nonexistent contract fails gracefully ----
+  console.log("\nTest 227: Nonexistent contract fails gracefully");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await rejectDecompositionPlan(env, "ctr_f2_nonexistent", { reason: "Does not exist" });
+    assert(result.ok === false, "rejection failed");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 228: Normal flow not broken for non-rejected contracts ----
+  console.log("\nTest 228: Normal flow not broken for non-rejected contracts");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_228" })), env);
+
+    // Contract should be in decomposed state, isPlanRejected should be false
+    const { state, decomposition } = await rehydrateContract(env, "ctr_f2_228");
+    assert(isPlanRejected(state) === false, "isPlanRejected is false for normal contract");
+    assert(state.status_global === "decomposed", "status_global is decomposed");
+
+    // advanceContractPhase should work normally (not blocked by plan rejection)
+    const advResult = await advanceContractPhase(env, "ctr_f2_228");
+    // It may succeed or fail for other reasons, but NOT for PLAN_REJECTED
+    assert(advResult.error !== "PLAN_REJECTED", "advance not blocked by PLAN_REJECTED");
+  }
+
+  // ---- Test 229: Rejection only valid from decomposed state ----
+  console.log("\nTest 229: Rejection only valid from decomposed state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_229" })), env);
+
+    // Advance to executing
+    const adv = await advanceContractPhase(env, "ctr_f2_229");
+
+    // Try to reject plan from executing — should fail
+    const result = await rejectDecompositionPlan(env, "ctr_f2_229", { reason: "Too late" });
+    assert(result.ok === false, "rejection from executing failed");
+    assert(result.error === "PLAN_NOT_REJECTABLE", "error is PLAN_NOT_REJECTABLE");
+  }
+
+  // ---- Test 230: Missing reason fails validation ----
+  console.log("\nTest 230: Missing reason fails validation");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_230" })), env);
+
+    const result = await rejectDecompositionPlan(env, "ctr_f2_230", {});
+    assert(result.ok === false, "rejection without reason failed");
+    assert(result.error === "MISSING_REJECTION_REASON", "error is MISSING_REJECTION_REASON");
+  }
+
+  // ---- Test 231: Cancelled contract cannot have plan rejected ----
+  console.log("\nTest 231: Cancelled contract cannot have plan rejected");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_231" })), env);
+
+    await cancelContract(env, "ctr_f2_231", { reason: "Cancelled" });
+
+    const result = await rejectDecompositionPlan(env, "ctr_f2_231", { reason: "Too late" });
+    assert(result.ok === false, "rejection of cancelled contract failed");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 232: Route handler POST /contracts/reject-plan — success ----
+  console.log("\nTest 232: Route handler POST /contracts/reject-plan — success");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_232" })), env);
+
+    const result = await handleRejectDecompositionPlan(
+      mockRequest({ contract_id: "ctr_f2_232", reason: "Route test", rejected_by: "reviewer" }),
+      env
+    );
+
+    assert(result.status === 200, "HTTP 200 on success");
+    assert(result.body.ok === true, "body.ok is true");
+    assert(result.body.plan_rejection.plan_rejection_reason === "Route test", "reason in response");
+    assert(result.body.plan_rejection.plan_rejected_by === "reviewer", "rejected_by in response");
+  }
+
+  // ---- Test 233: Route handler — missing contract_id ----
+  console.log("\nTest 233: Route handler — missing contract_id");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await handleRejectDecompositionPlan(
+      mockRequest({ reason: "No contract id" }),
+      env
+    );
+
+    assert(result.status === 400, "HTTP 400 for missing contract_id");
+    assert(result.body.error === "MISSING_CONTRACT_ID", "error is MISSING_CONTRACT_ID");
+  }
+
+  // ---- Test 234: Route handler — contract not found ----
+  console.log("\nTest 234: Route handler — contract not found");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await handleRejectDecompositionPlan(
+      mockRequest({ contract_id: "ctr_f2_nonexistent", reason: "test" }),
+      env
+    );
+
+    assert(result.status === 404, "HTTP 404 for not found");
+    assert(result.body.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 235: Route handler — invalid JSON ----
+  console.log("\nTest 235: Route handler — invalid JSON");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await handleRejectDecompositionPlan(mockRequest(null), env);
+
+    assert(result.status === 400, "HTTP 400 for invalid JSON");
+    assert(result.body.error === "INVALID_JSON", "error is INVALID_JSON");
+  }
+
+  // ---- Test 236: GET contract after rejection shows full plan_rejection state ----
+  console.log("\nTest 236: GET contract after rejection shows full plan_rejection state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_236" })), env);
+
+    await rejectDecompositionPlan(env, "ctr_f2_236", { reason: "GET test" });
+
+    const result = await handleGetContract(env, "ctr_f2_236");
+    assert(result.status === 200, "GET returns 200");
+    assert(result.body.contract.plan_rejection !== undefined, "GET shows plan_rejection data");
+    assert(result.body.contract.plan_rejection.plan_rejected === true, "plan_rejected flag in GET");
+    assert(result.body.contract.plan_rejection.plan_rejection_reason === "GET test", "reason in GET");
+  }
+
+  // ---- Test 237: Summary after rejection shows plan rejection data ----
+  console.log("\nTest 237: Summary after rejection shows plan rejection data");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_237" })), env);
+
+    await rejectDecompositionPlan(env, "ctr_f2_237", { reason: "Summary reject test" });
+
+    const result = await handleGetContractSummary(env, "ctr_f2_237");
+    assert(result.status === 200, "summary returns 200");
+    assert(result.body.plan_rejection !== null, "summary has plan_rejection");
+    assert(result.body.plan_rejection.plan_rejected === true, "summary plan_rejected");
+    assert(result.body.plan_rejection.plan_rejection_reason === "Summary reject test", "summary rejection reason");
+    assert(result.body.status_global === "blocked", "summary status_global is blocked");
+  }
+
+  // ---- Test 238: Default rejected_by is "human" ----
+  console.log("\nTest 238: Default rejected_by is human");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f2_238" })), env);
+
+    const result = await rejectDecompositionPlan(env, "ctr_f2_238", { reason: "Default actor test" });
+    assert(result.ok === true, "rejection ok");
+    assert(result.plan_rejection.plan_rejected_by === "human", "default rejected_by is human");
+  }
+
+  // ============================================================================
+  // 🔒 F2 RISCO 1 — Plan-rejected guard on all operational mutations
+  // ============================================================================
+  console.log("\n" + "=".repeat(50));
+  console.log("F2 RISCO 1 — Plan-rejected guard on all operational mutations");
+  console.log("=".repeat(50));
+
+  // ---- Test 239: Plan rejected blocks startTask ----
+  console.log("\nTest 239: Plan rejected blocks startTask");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_239" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_239", { reason: "Block startTask test" });
+
+    const result = await startTask(env, "ctr_r1_239", "task_001");
+    assert(result.ok === false, "startTask blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 240: Plan rejected blocks completeTask ----
+  console.log("\nTest 240: Plan rejected blocks completeTask");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_240" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_240", { reason: "Block completeTask test" });
+
+    const result = await completeTask(env, "ctr_r1_240", "task_001");
+    assert(result.ok === false, "completeTask blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 241: Plan rejected blocks blockTask ----
+  console.log("\nTest 241: Plan rejected blocks blockTask");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_241" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_241", { reason: "Block blockTask test" });
+
+    const result = await blockTask(env, "ctr_r1_241", "task_001", "reason");
+    assert(result.ok === false, "blockTask blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 242: Plan rejected blocks startMicroPrCandidate ----
+  console.log("\nTest 242: Plan rejected blocks startMicroPrCandidate");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_242" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_242", { reason: "Block startMicroPr test" });
+
+    const result = await startMicroPrCandidate(env, "ctr_r1_242", "micro_pr_001");
+    assert(result.ok === false, "startMicroPrCandidate blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 243: Plan rejected blocks completeMicroPrCandidate ----
+  console.log("\nTest 243: Plan rejected blocks completeMicroPrCandidate");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_243" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_243", { reason: "Block completeMicroPr test" });
+
+    const result = await completeMicroPrCandidate(env, "ctr_r1_243", "micro_pr_001");
+    assert(result.ok === false, "completeMicroPrCandidate blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 244: Plan rejected blocks blockMicroPrCandidate ----
+  console.log("\nTest 244: Plan rejected blocks blockMicroPrCandidate");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_244" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_244", { reason: "Block blockMicroPr test" });
+
+    const result = await blockMicroPrCandidate(env, "ctr_r1_244", "micro_pr_001", "reason");
+    assert(result.ok === false, "blockMicroPrCandidate blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ---- Test 245: Plan rejected blocks discardMicroPrCandidate ----
+  console.log("\nTest 245: Plan rejected blocks discardMicroPrCandidate");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_245" })), env);
+    await rejectDecompositionPlan(env, "ctr_r1_245", { reason: "Block discardMicroPr test" });
+
+    const result = await discardMicroPrCandidate(env, "ctr_r1_245", "micro_pr_001", "reason");
+    assert(result.ok === false, "discardMicroPrCandidate blocked");
+    assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
+  }
+
+  // ============================================================================
+  // 🔒 F2 RISCO 2 — Formal plan revision resolution
+  // ============================================================================
+  console.log("\n" + "=".repeat(50));
+  console.log("F2 RISCO 2 — Formal plan revision resolution");
+  console.log("=".repeat(50));
+
+  // ---- Test 246: Successful plan revision resolution ----
+  console.log("\nTest 246: Successful plan revision resolution");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_246" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_246", { reason: "Bad plan" });
+
+    const result = await resolvePlanRevision(env, "ctr_r2_246", { revised_by: "tech-lead" });
+    assert(result.ok === true, "resolution succeeded");
+    assert(result.state.status_global === "decomposed", "status_global back to decomposed");
+    assert(result.state.current_phase === "decomposition_complete", "current_phase back to decomposition_complete");
+    assert(result.state.plan_rejection === null, "plan_rejection cleared");
+    assert(Array.isArray(result.state.plan_rejection_history), "plan_rejection_history is array");
+    assert(result.state.plan_rejection_history.length === 1, "one rejection in history");
+    assert(result.state.plan_rejection_history[0].plan_rejection_reason === "Bad plan", "history preserves reason");
+    assert(result.state.plan_rejection_history[0].resolved_by === "tech-lead", "history preserves resolved_by");
+    assert(result.state.plan_rejection_history[0].resolved_at !== undefined, "history preserves resolved_at");
+  }
+
+  // ---- Test 247: Resolution clears plan_rejection and isPlanRejected returns false ----
+  console.log("\nTest 247: Resolution clears plan_rejection");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_247" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_247", { reason: "Clear test" });
+
+    assert(isPlanRejected((await rehydrateContract(env, "ctr_r2_247")).state) === true, "rejected before resolve");
+
+    await resolvePlanRevision(env, "ctr_r2_247", {});
+
+    const { state } = await rehydrateContract(env, "ctr_r2_247");
+    assert(isPlanRejected(state) === false, "isPlanRejected false after resolve");
+    assert(state.plan_rejection === null, "plan_rejection is null after resolve");
+  }
+
+  // ---- Test 248: Resolution removes plan_revision_pending ----
+  console.log("\nTest 248: Resolution removes plan_revision_pending");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_248" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_248", { reason: "Phase test" });
+
+    const { state: before } = await rehydrateContract(env, "ctr_r2_248");
+    assert(before.current_phase === "plan_revision_pending", "in plan_revision_pending before resolve");
+
+    await resolvePlanRevision(env, "ctr_r2_248", {});
+
+    const { state: after } = await rehydrateContract(env, "ctr_r2_248");
+    assert(after.current_phase === "decomposition_complete", "decomposition_complete after resolve");
+  }
+
+  // ---- Test 249: After resolution, operations unblocked ----
+  console.log("\nTest 249: After resolution, operations unblocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_249" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_249", { reason: "Unblock test" });
+
+    // Blocked while rejected
+    const blocked = await advanceContractPhase(env, "ctr_r2_249");
+    assert(blocked.ok === false, "advance blocked while rejected");
+    assert(blocked.error === "PLAN_REJECTED", "blocked reason is PLAN_REJECTED");
+
+    // Resolve
+    await resolvePlanRevision(env, "ctr_r2_249", {});
+
+    // Now advance should work (not blocked by PLAN_REJECTED)
+    const unblocked = await advanceContractPhase(env, "ctr_r2_249");
+    assert(unblocked.error !== "PLAN_REJECTED", "advance not blocked by PLAN_REJECTED after resolve");
+  }
+
+  // ---- Test 250: Resolution invalid when contract not in revision ----
+  console.log("\nTest 250: Resolution invalid when contract not in revision");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_250" })), env);
+
+    // Not rejected — try to resolve
+    const result = await resolvePlanRevision(env, "ctr_r2_250", {});
+    assert(result.ok === false, "resolve without rejection fails");
+    assert(result.error === "NOT_IN_PLAN_REVISION", "error is NOT_IN_PLAN_REVISION");
+  }
+
+  // ---- Test 251: Resolution on nonexistent contract fails ----
+  console.log("\nTest 251: Resolution on nonexistent contract fails");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await resolvePlanRevision(env, "ctr_r2_nonexistent", {});
+    assert(result.ok === false, "resolve on nonexistent fails");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 252: Resolution on cancelled contract fails ----
+  console.log("\nTest 252: Resolution on cancelled contract fails");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_252" })), env);
+    await cancelContract(env, "ctr_r2_252", { reason: "test" });
+
+    const result = await resolvePlanRevision(env, "ctr_r2_252", {});
+    assert(result.ok === false, "resolve on cancelled fails");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 253: Summary after resolution shows clean state ----
+  console.log("\nTest 253: Summary after resolution shows clean state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_253" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_253", { reason: "Summary test" });
+    await resolvePlanRevision(env, "ctr_r2_253", {});
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_r2_253");
+    const summary = buildContractSummary(state, decomposition);
+
+    assert(summary.plan_rejection === null, "summary plan_rejection is null after resolve");
+    assert(summary.plan_rejection_history.length === 1, "summary has rejection history");
+    assert(summary.status_global === "decomposed", "summary status_global is decomposed after resolve");
+  }
+
+  // ---- Test 254: Multiple reject-resolve cycles preserve history ----
+  console.log("\nTest 254: Multiple reject-resolve cycles preserve history");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_254" })), env);
+
+    // Cycle 1
+    await rejectDecompositionPlan(env, "ctr_r2_254", { reason: "First rejection" });
+    await resolvePlanRevision(env, "ctr_r2_254", { revised_by: "reviewer-1" });
+
+    // Cycle 2
+    await rejectDecompositionPlan(env, "ctr_r2_254", { reason: "Second rejection" });
+    await resolvePlanRevision(env, "ctr_r2_254", { revised_by: "reviewer-2" });
+
+    const { state } = await rehydrateContract(env, "ctr_r2_254");
+    assert(state.plan_rejection === null, "plan_rejection null after two cycles");
+    assert(state.plan_rejection_history.length === 2, "two rejections in history");
+    assert(state.plan_rejection_history[0].plan_rejection_reason === "First rejection", "first reason preserved");
+    assert(state.plan_rejection_history[1].plan_rejection_reason === "Second rejection", "second reason preserved");
+    assert(state.plan_rejection_history[0].resolved_by === "reviewer-1", "first resolved_by preserved");
+    assert(state.plan_rejection_history[1].resolved_by === "reviewer-2", "second resolved_by preserved");
+  }
+
+  // ---- Test 255: Route handler POST /contracts/resolve-plan-revision — success ----
+  console.log("\nTest 255: Route handler POST /contracts/resolve-plan-revision — success");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_255" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_255", { reason: "Route test" });
+
+    const result = await handleResolvePlanRevision(
+      mockRequest({ contract_id: "ctr_r2_255", revised_by: "admin" }),
+      env
+    );
+
+    assert(result.status === 200, "HTTP 200 on success");
+    assert(result.body.ok === true, "body.ok is true");
+    assert(result.body.plan_rejection_history.length === 1, "history in response");
+  }
+
+  // ---- Test 256: Route handler — missing contract_id ----
+  console.log("\nTest 256: Route handler resolve — missing contract_id");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await handleResolvePlanRevision(mockRequest({}), env);
+    assert(result.status === 400, "HTTP 400 for missing contract_id");
+    assert(result.body.error === "MISSING_CONTRACT_ID", "error is MISSING_CONTRACT_ID");
+  }
+
+  // ---- Test 257: Route handler — contract not found ----
+  console.log("\nTest 257: Route handler resolve — contract not found");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await handleResolvePlanRevision(
+      mockRequest({ contract_id: "ctr_r2_nonexistent" }),
+      env
+    );
+    assert(result.status === 404, "HTTP 404 for not found");
+    assert(result.body.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 258: Route handler — invalid JSON ----
+  console.log("\nTest 258: Route handler resolve — invalid JSON");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+
+    const result = await handleResolvePlanRevision(mockRequest(null), env);
+    assert(result.status === 400, "HTTP 400 for invalid JSON");
+    assert(result.body.error === "INVALID_JSON", "error is INVALID_JSON");
+  }
+
+  // ---- Test 259: Normal flow still works for non-rejected contracts ----
+  console.log("\nTest 259: Normal flow still works for non-rejected contracts");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_259" })), env);
+
+    // startTask should work normally (not blocked by PLAN_REJECTED)
+    const result = await startTask(env, "ctr_r2_259", "task_001");
+    assert(result.error !== "PLAN_REJECTED", "startTask not blocked on non-rejected contract");
+  }
+
+  // ---- Test 260: Rehydration after resolve is consistent ----
+  console.log("\nTest 260: Rehydration after resolve is consistent");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r2_260" })), env);
+    await rejectDecompositionPlan(env, "ctr_r2_260", { reason: "Rehydrate test" });
+    await resolvePlanRevision(env, "ctr_r2_260", {});
+
+    // Rehydrate and verify consistency
+    const { state, decomposition } = await rehydrateContract(env, "ctr_r2_260");
+    assert(state.status_global === "decomposed", "rehydrated status_global is decomposed");
+    assert(state.current_phase === "decomposition_complete", "rehydrated current_phase is decomposition_complete");
+    assert(state.plan_rejection === null, "rehydrated plan_rejection is null");
+    assert(state.plan_rejection_history.length === 1, "rehydrated history has 1 entry");
+    assert(decomposition !== null, "rehydrated decomposition exists");
+    assert(Array.isArray(decomposition.phases), "rehydrated decomposition has phases");
+    assert(Array.isArray(decomposition.tasks), "rehydrated decomposition has tasks");
   }
 
   // ---- Summary ----

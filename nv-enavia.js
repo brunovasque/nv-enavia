@@ -5,6 +5,8 @@ import {
   handleExecuteContract,
   handleCloseContractInTest,
   handleCancelContract,
+  handleRejectDecompositionPlan,
+  handleResolvePlanRevision,
 } from "./contract-executor.js";
 
 // ============================================================================
@@ -4559,6 +4561,18 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/reject-plan → Formal decomposition plan rejection (F2)
+      if (method === "POST" && path === "/contracts/reject-plan") {
+        const result = await handleRejectDecompositionPlan(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // POST /contracts/resolve-plan-revision → Resolve plan revision (F2b)
+      if (method === "POST" && path === "/contracts/resolve-plan-revision") {
+        const result = await handleResolvePlanRevision(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -4578,6 +4592,8 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /contracts/execute → Executar micro-PR corrente em TEST (C1)",
             "  • POST /contracts/close-test → Fechamento automático de contrato em TEST (C2)",
             "  • POST /contracts/cancel → Cancelamento formal de contrato (F1)",
+            "  • POST /contracts/reject-plan → Rejeição formal do plano de decomposição (F2)",
+            "  • POST /contracts/resolve-plan-revision → Resolução de revisão do plano (F2b)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",
