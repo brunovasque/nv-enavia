@@ -23,9 +23,103 @@ const KV_SUFFIX_DECOMPOSITION = ":decomposition";
 const KV_INDEX_KEY = "contract:index";
 
 // ---------------------------------------------------------------------------
-// Valid statuses for Phase A
+// Canonical global statuses for the Contract Executor state machine.
+//
+// Semantics:
+//   draft           — contract created but not yet approved
+//   approved        — contract approved, awaiting decomposition
+//   decomposed      — contract decomposed into phases/tasks, ready to execute
+//   executing       — at least one phase/task is actively being worked on
+//   validating      — execution done, results under validation (reserved)
+//   blocked         — execution blocked by unresolved blockers
+//   awaiting-human  — execution paused, waiting for human decision (reserved)
+//   test-complete   — all TEST-environment criteria satisfied, awaiting PROD decision
+//   prod-pending    — PROD promotion approved but not yet executed (reserved)
+//   completed       — canonical terminal state after full promotion
+//   cancelled       — contract formally cancelled
+//   failed          — contract failed irrecoverably
 // ---------------------------------------------------------------------------
-const VALID_STATUSES = ["draft", "approved", "decomposed", "blocked", "failed", "in_progress", "completed", "cancelled", "test-complete"];
+const VALID_STATUSES = [
+  "draft",
+  "approved",
+  "decomposed",
+  "executing",
+  "validating",
+  "blocked",
+  "awaiting-human",
+  "test-complete",
+  "prod-pending",
+  "completed",
+  "cancelled",
+  "failed",
+];
+
+// ---------------------------------------------------------------------------
+// Valid transitions: { from_status: [allowed_target_statuses] }
+//
+// Any transition not listed here is invalid and will be rejected by
+// transitionStatusGlobal(). Terminal states (completed, cancelled, failed)
+// have no outgoing transitions.
+// ---------------------------------------------------------------------------
+const VALID_GLOBAL_TRANSITIONS = {
+  "draft":          ["approved", "cancelled"],
+  "approved":       ["decomposed", "cancelled"],
+  "decomposed":     ["executing", "blocked", "cancelled"],
+  "executing":      ["executing", "validating", "blocked", "awaiting-human", "test-complete", "completed", "cancelled", "failed"],
+  "validating":     ["executing", "blocked", "awaiting-human", "test-complete", "completed", "cancelled", "failed"],
+  "blocked":        ["executing", "decomposed", "cancelled", "failed"],
+  "awaiting-human": ["executing", "blocked", "cancelled"],
+  "test-complete":  ["prod-pending", "cancelled"],
+  "prod-pending":   ["completed", "cancelled", "failed"],
+  "completed":      [],
+  "cancelled":      [],
+  "failed":         [],
+};
+
+// ---------------------------------------------------------------------------
+// transitionStatusGlobal(state, targetStatus, context)
+//
+// Single authoritative path for every status_global mutation.
+//   - Validates that targetStatus is a known canonical status.
+//   - Validates that the transition from the current status is allowed.
+//   - Mutates state.status_global in place (like the rest of the codebase).
+//   - Returns { ok, previous, current } on success.
+//   - Returns { ok: false, error, message } on invalid transition.
+//
+// `context` is an optional string for debugging (e.g. "advanceContractPhase").
+// ---------------------------------------------------------------------------
+function transitionStatusGlobal(state, targetStatus, context) {
+  const from = state.status_global;
+
+  if (!VALID_STATUSES.includes(targetStatus)) {
+    return {
+      ok: false,
+      error: "INVALID_STATUS",
+      message: `"${targetStatus}" is not a valid canonical status_global.${context ? ` (context: ${context})` : ""}`,
+    };
+  }
+
+  const allowed = VALID_GLOBAL_TRANSITIONS[from];
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "UNKNOWN_SOURCE_STATUS",
+      message: `Current status_global "${from}" is not recognized.${context ? ` (context: ${context})` : ""}`,
+    };
+  }
+
+  if (!allowed.includes(targetStatus)) {
+    return {
+      ok: false,
+      error: "INVALID_TRANSITION",
+      message: `Transition "${from}" → "${targetStatus}" is not allowed.${context ? ` (context: ${context})` : ""}`,
+    };
+  }
+
+  const previous = from;
+  state.status_global = targetStatus;
+  return { ok: true, previous, current: targetStatus };
+}
 
 // ---------------------------------------------------------------------------
 // Valid statuses for Tasks
@@ -340,17 +434,24 @@ async function cancelContract(env, contractId, params) {
 
   const now = new Date().toISOString();
 
+  const previousStatusGlobal = state.status_global;
+  const previousCurrentPhase = state.current_phase;
+
+  const transition = transitionStatusGlobal(state, "cancelled", "cancelContract");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
+
   state.contract_cancellation = {
     cancelled: true,
     cancelled_at: now,
     cancel_reason: p.reason || null,
     cancelled_by: p.cancelled_by || "human",
     cancellation_evidence: Array.isArray(p.evidence) ? p.evidence : [],
-    previous_status_global: state.status_global,
-    previous_current_phase: state.current_phase,
+    previous_status_global: previousStatusGlobal,
+    previous_current_phase: previousCurrentPhase,
   };
 
-  state.status_global = "cancelled";
   state.next_action = "Contract cancelled. No further actions.";
   state.updated_at = now;
 
@@ -501,11 +602,14 @@ async function advanceContractPhase(env, contractId) {
     // Cannot advance — stay in current phase or mark blocked
     const now = new Date().toISOString();
     const updatedState = Object.assign({}, state, {
-      status_global: "blocked",
       blockers: [...new Set([...(state.blockers || []), gate.reason])],
       next_action: "Resolve incomplete tasks in active phase before advancing.",
       updated_at: now,
     });
+    const transition = transitionStatusGlobal(updatedState, "blocked", "advanceContractPhase:gate-blocked");
+    if (!transition.ok) {
+      return { ok: false, error: transition.error, message: transition.message, state, decomposition, gate };
+    }
     await env.ENAVIA_BRAIN.put(
       `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_STATE}`,
       JSON.stringify(updatedState)
@@ -534,10 +638,12 @@ async function advanceContractPhase(env, contractId) {
   }
 
   const updatedDecomposition = Object.assign({}, decomposition, { phases: updatedPhases });
+  // When all phases are done, the contract remains "executing" (awaiting formal
+  // closure / sign-off).  "completed" is reserved for the canonical terminal state
+  // after full promotion policy is respected.
+  const targetGlobalStatus = "executing";
   const updatedState = Object.assign({}, state, {
     current_phase: nextPhaseValue,
-    // Clear blocked status — gate passed, contract is progressing
-    status_global: nextPhase ? "in_progress" : "completed",
     // Clear blockers since the gate that caused them has now passed
     blockers: [],
     next_action: nextPhase
@@ -545,6 +651,10 @@ async function advanceContractPhase(env, contractId) {
       : "All phases complete. Awaiting human sign-off.",
     updated_at: now,
   });
+  const transition = transitionStatusGlobal(updatedState, targetGlobalStatus, "advanceContractPhase:advance");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message, state, decomposition, gate };
+  }
 
   await Promise.all([
     env.ENAVIA_BRAIN.put(
@@ -805,15 +915,17 @@ function resolveNextAction(state, decomposition) {
     };
   }
 
-  // ── Rule 1: Contract already completed ──
-  if (state.status_global === "completed" || state.current_phase === "all_phases_complete") {
+  // ── Rule 1: Contract in a terminal state (completed or test-complete) ──
+  if (state.status_global === "completed" || state.status_global === "test-complete") {
     return {
       type: "contract_complete",
       phase_id: null,
       task_id: null,
       micro_pr_candidate_id: null,
-      reason: "All phases and tasks are complete.",
-      status: "completed",
+      reason: state.status_global === "test-complete"
+        ? "Contract closed in TEST. Awaiting PROD promotion decision."
+        : "All phases and tasks are complete.",
+      status: state.status_global,
     };
   }
 
@@ -2013,7 +2125,10 @@ async function closeContractInTest(env, contractId) {
   // so there is no divergence between contract_closure and the main state.
   // "test-complete" signals TEST-only closure — "completed" is reserved for
   // the canonical terminal state after full promotion policy is respected.
-  state.status_global = "test-complete";
+  const transition = transitionStatusGlobal(state, "test-complete", "closeContractInTest");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
   state.next_action = "Contract closed in TEST. Awaiting PROD promotion decision.";
 
   // Persist to KV
@@ -2178,7 +2293,13 @@ async function handleCreateContract(request, env) {
   }
 
   if (blockers.length > 0) {
-    state.status_global = "blocked";
+    const transition = transitionStatusGlobal(state, "blocked", "handleCreateContract:ingestion-blocked");
+    if (!transition.ok) {
+      return {
+        status: 500,
+        body: { ok: false, error: transition.error, message: transition.message },
+      };
+    }
     state.current_phase = "ingestion_blocked";
     state.blockers = blockers;
     state.next_action = "Resolve blockers before proceeding.";
@@ -2330,6 +2451,10 @@ async function handleExecuteContract(request, env) {
 // Exports
 // ============================================================================
 export {
+  // Global State Machine
+  VALID_STATUSES,
+  VALID_GLOBAL_TRANSITIONS,
+  transitionStatusGlobal,
   validateContractPayload,
   buildInitialState,
   generateDecomposition,

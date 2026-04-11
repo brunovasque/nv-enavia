@@ -13,6 +13,9 @@
 // ============================================================================
 
 import {
+  VALID_STATUSES,
+  VALID_GLOBAL_TRANSITIONS,
+  transitionStatusGlobal,
   validateContractPayload,
   buildInitialState,
   generateDecomposition,
@@ -503,12 +506,12 @@ async function runTests() {
     const advanceResult = await advanceContractPhase(env, "ctr_test_001");
     assert(advanceResult.ok === true, "second advance succeeds");
     assert(advanceResult.state.status_global !== "blocked", "status_global is no longer blocked after successful advance");
-    assert(advanceResult.state.status_global === "in_progress", "status_global is in_progress after advancing to next phase");
+    assert(advanceResult.state.status_global === "executing", "status_global is executing after advancing to next phase");
     assert(advanceResult.state.blockers.length === 0, "blockers array is cleared on successful advance");
 
     // Verify via KV rehydration (Rule 1)
     const { state: rehydrated } = await rehydrateContract(env, "ctr_test_001");
-    assert(rehydrated.status_global === "in_progress", "rehydrated status confirms in_progress was persisted");
+    assert(rehydrated.status_global === "executing", "rehydrated status confirms executing was persisted");
     assert(rehydrated.blockers.length === 0, "rehydrated blockers confirms cleared");
   }
 
@@ -554,12 +557,12 @@ async function runTests() {
     result = await advanceContractPhase(env, "ctr_test_001");
     assert(result.ok === true, "phase_03 advance succeeds");
     assert(result.state.current_phase === "all_phases_complete", "current_phase is all_phases_complete");
-    assert(result.state.status_global === "completed", "status_global is completed");
+    assert(result.state.status_global === "executing", "status_global is executing after all phases done");
 
     // Verify final state via KV (Rule 1)
     const { state: finalState } = await rehydrateContract(env, "ctr_test_001");
     assert(finalState.current_phase === "all_phases_complete", "rehydrated final phase is all_phases_complete");
-    assert(finalState.status_global === "completed", "rehydrated final status is completed");
+    assert(finalState.status_global === "executing", "rehydrated final status is executing (awaiting formal closure)");
   }
 
   // ---- Test 25: advanceContractPhase uses TASK_DONE_STATUSES for all valid done states ----
@@ -1246,7 +1249,7 @@ async function runTests() {
   {
     const state = {
       contract_id: "ctr_approval",
-      status_global: "in_progress",
+      status_global: "executing",
       current_phase: "phase_03",
       blockers: [],
       constraints: { require_human_approval_per_pr: true },
@@ -1414,8 +1417,9 @@ async function runTests() {
 
     ({ state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle"));
     action = resolveNextAction(state, decomposition);
-    assert(action.type === "contract_complete", "lifecycle step 4: contract_complete");
-    assert(action.status === "completed", "lifecycle step 4: status is completed");
+    // With canonical state machine, all phases done → status is "executing" (awaiting closure)
+    assert(action.type === "awaiting_human_approval", "lifecycle step 4: awaiting_human_approval (all phases done, awaiting closure)");
+    assert(action.status === "awaiting_approval", "lifecycle step 4: status is awaiting_approval");
   }
 
   // ==========================================================================
@@ -3443,7 +3447,7 @@ async function runTests() {
     // Keep advancing if there are more phases
     while (advResult.ok) {
       const { state: s } = await rehydrateContract(env, contractId);
-      if (s.current_phase === "all_phases_complete" || s.status_global === "completed") break;
+      if (s.current_phase === "all_phases_complete") break;
       // Start next task if available
       const { decomposition: d } = await rehydrateContract(env, contractId);
       const nextTask = (d.tasks || []).find((t) => t.status === "queued");
@@ -4190,6 +4194,441 @@ async function runTests() {
     // isCancelledContract returns false for normal contract
     const { state } = await rehydrateContract(env, "ctr_f1_198");
     assert(isCancelledContract(state) === false, "isCancelledContract is false for normal contract");
+  }
+
+  // ==========================================================================
+  // G1 — Canonical Global State Machine Smoke Tests
+  // ==========================================================================
+
+  // ---- Test 199: VALID_STATUSES export contains all 12 canonical states ----
+  console.log("\nTest 199: VALID_STATUSES export contains all 12 canonical states");
+  {
+    assert(Array.isArray(VALID_STATUSES), "VALID_STATUSES is an array");
+    const expected = [
+      "draft", "approved", "decomposed", "executing", "validating",
+      "blocked", "awaiting-human", "test-complete", "prod-pending",
+      "completed", "cancelled", "failed",
+    ];
+    assert(VALID_STATUSES.length === expected.length, `VALID_STATUSES has ${expected.length} entries`);
+    for (const s of expected) {
+      assert(VALID_STATUSES.includes(s), `VALID_STATUSES includes "${s}"`);
+    }
+  }
+
+  // ---- Test 200: VALID_GLOBAL_TRANSITIONS export has entry for every canonical state ----
+  console.log("\nTest 200: VALID_GLOBAL_TRANSITIONS covers every canonical state");
+  {
+    assert(typeof VALID_GLOBAL_TRANSITIONS === "object", "VALID_GLOBAL_TRANSITIONS is an object");
+    for (const s of VALID_STATUSES) {
+      assert(Array.isArray(VALID_GLOBAL_TRANSITIONS[s]), `VALID_GLOBAL_TRANSITIONS has entry for "${s}"`);
+    }
+    // Terminal states have no outgoing transitions
+    assert(VALID_GLOBAL_TRANSITIONS["completed"].length === 0, "completed has no outgoing transitions");
+    assert(VALID_GLOBAL_TRANSITIONS["cancelled"].length === 0, "cancelled has no outgoing transitions");
+    assert(VALID_GLOBAL_TRANSITIONS["failed"].length === 0, "failed has no outgoing transitions");
+  }
+
+  // ---- Test 201: transitionStatusGlobal — valid transition succeeds ----
+  console.log("\nTest 201: transitionStatusGlobal — valid transition succeeds");
+  {
+    const state = { status_global: "decomposed" };
+    const result = transitionStatusGlobal(state, "executing", "test");
+    assert(result.ok === true, "transition ok");
+    assert(result.previous === "decomposed", "previous is decomposed");
+    assert(result.current === "executing", "current is executing");
+    assert(state.status_global === "executing", "state mutated to executing");
+  }
+
+  // ---- Test 202: transitionStatusGlobal — invalid target status rejected ----
+  console.log("\nTest 202: transitionStatusGlobal — invalid target status rejected");
+  {
+    const state = { status_global: "decomposed" };
+    const result = transitionStatusGlobal(state, "invented_status", "test");
+    assert(result.ok === false, "transition rejected");
+    assert(result.error === "INVALID_STATUS", "error is INVALID_STATUS");
+    assert(state.status_global === "decomposed", "state unchanged");
+  }
+
+  // ---- Test 203: transitionStatusGlobal — disallowed transition rejected ----
+  console.log("\nTest 203: transitionStatusGlobal — disallowed transition rejected");
+  {
+    const state = { status_global: "completed" };
+    const result = transitionStatusGlobal(state, "executing", "test");
+    assert(result.ok === false, "transition rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+    assert(state.status_global === "completed", "state unchanged");
+  }
+
+  // ---- Test 204: transitionStatusGlobal — unknown source status rejected ----
+  console.log("\nTest 204: transitionStatusGlobal — unknown source status rejected");
+  {
+    const state = { status_global: "some_legacy_status" };
+    const result = transitionStatusGlobal(state, "executing", "test");
+    assert(result.ok === false, "transition rejected");
+    assert(result.error === "UNKNOWN_SOURCE_STATUS", "error is UNKNOWN_SOURCE_STATUS");
+    assert(state.status_global === "some_legacy_status", "state unchanged");
+  }
+
+  // ---- Test 205: Terminal states reject all transitions ----
+  console.log("\nTest 205: Terminal states reject all transitions");
+  {
+    for (const terminal of ["completed", "cancelled", "failed"]) {
+      for (const target of VALID_STATUSES) {
+        const state = { status_global: terminal };
+        const result = transitionStatusGlobal(state, target, "test-terminal");
+        assert(result.ok === false, `${terminal} → ${target} rejected`);
+        assert(state.status_global === terminal, `${terminal} unchanged`);
+      }
+    }
+  }
+
+  // ---- Test 206: Every non-terminal state can reach cancelled ----
+  console.log("\nTest 206: Every non-terminal state can reach cancelled");
+  {
+    const nonTerminal = VALID_STATUSES.filter(
+      (s) => !["completed", "cancelled", "failed"].includes(s)
+    );
+    for (const from of nonTerminal) {
+      const state = { status_global: from };
+      const result = transitionStatusGlobal(state, "cancelled", "test-cancel-reach");
+      assert(result.ok === true, `${from} → cancelled allowed`);
+      assert(state.status_global === "cancelled", `${from} transitioned to cancelled`);
+    }
+  }
+
+  // ---- Test 207: Creation/decomposition produces coherent state ----
+  console.log("\nTest 207: Creation/decomposition produces coherent state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const result = await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_207",
+    }), env);
+    assert(result.body.ok === true, "contract created");
+    assert(result.body.status_global === "decomposed", "status_global is decomposed");
+    assert(VALID_STATUSES.includes(result.body.status_global), "status_global is canonical");
+  }
+
+  // ---- Test 208: Advance produces executing (not in_progress) ----
+  console.log("\nTest 208: Advance produces executing (not in_progress)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_208",
+    }), env);
+
+    // Complete all tasks in phase_01
+    let { decomposition } = await rehydrateContract(env, "ctr_g1_208");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    const updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_g1_208:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    const result = await advanceContractPhase(env, "ctr_g1_208");
+    assert(result.ok === true, "advance succeeded");
+    assert(result.state.status_global === "executing", "status_global is executing");
+    assert(result.state.status_global !== "in_progress", "NOT in_progress (old state)");
+    assert(VALID_STATUSES.includes(result.state.status_global), "status_global is canonical");
+  }
+
+  // ---- Test 209: All phases complete → still executing (not completed) ----
+  console.log("\nTest 209: All phases complete → executing (reserved terminal)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_209",
+      definition_of_done: ["Single criterion"],
+    }), env);
+
+    // Run through all phases
+    let { decomposition } = await rehydrateContract(env, "ctr_g1_209");
+    for (const phase of decomposition.phases) {
+      const tasks = decomposition.tasks.map((t) =>
+        phase.tasks.includes(t.id) ? { ...t, status: "done" } : t
+      );
+      await kv.put("contract:ctr_g1_209:decomposition", JSON.stringify({ ...decomposition, tasks }));
+      decomposition = { ...decomposition, tasks };
+      await advanceContractPhase(env, "ctr_g1_209");
+      ({ decomposition } = await rehydrateContract(env, "ctr_g1_209"));
+    }
+
+    const { state } = await rehydrateContract(env, "ctr_g1_209");
+    assert(state.current_phase === "all_phases_complete", "current_phase is all_phases_complete");
+    assert(state.status_global === "executing", "status_global is executing (not completed)");
+    assert(state.status_global !== "completed", "completed is reserved for terminal closure");
+  }
+
+  // ---- Test 210: Cancellation from decomposed state ----
+  console.log("\nTest 210: Cancellation from decomposed state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_210",
+    }), env);
+    const result = await cancelContract(env, "ctr_g1_210", { reason: "test cancel" });
+    assert(result.ok === true, "cancellation succeeded");
+    assert(result.state.status_global === "cancelled", "status_global is cancelled");
+    const { state } = await rehydrateContract(env, "ctr_g1_210");
+    assert(state.status_global === "cancelled", "rehydrated status_global is cancelled");
+  }
+
+  // ---- Test 211: test-complete via closeContractInTest ----
+  console.log("\nTest 211: test-complete via closeContractInTest");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await makeEligibleForClosure(env, "ctr_g1_211");
+    const result = await closeContractInTest(env, "ctr_g1_211");
+    assert(result.ok === true, "closure succeeded");
+    assert(result.state.status_global === "test-complete", "status_global is test-complete");
+    const { state } = await rehydrateContract(env, "ctr_g1_211");
+    assert(state.status_global === "test-complete", "rehydrated status_global is test-complete");
+  }
+
+  // ---- Test 212: completed not used by advanceContractPhase ----
+  console.log("\nTest 212: completed never set by advanceContractPhase");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_212",
+      definition_of_done: ["Only criterion"],
+    }), env);
+
+    // Advance through all phases
+    let keepGoing = true;
+    while (keepGoing) {
+      let { decomposition } = await rehydrateContract(env, "ctr_g1_212");
+      const pending = decomposition.phases.find((p) => p.status !== "done");
+      if (!pending) { keepGoing = false; break; }
+      const tasks = decomposition.tasks.map((t) =>
+        pending.tasks.includes(t.id) ? { ...t, status: "done" } : t
+      );
+      await kv.put("contract:ctr_g1_212:decomposition", JSON.stringify({ ...decomposition, tasks }));
+      const r = await advanceContractPhase(env, "ctr_g1_212");
+      if (!r.ok) { keepGoing = false; break; }
+      assert(r.state.status_global !== "completed", `advance did not set completed (was ${r.state.status_global})`);
+    }
+    const { state } = await rehydrateContract(env, "ctr_g1_212");
+    assert(state.status_global !== "completed", "final status is NOT completed (reserved for terminal)");
+  }
+
+  // ---- Test 213: Reidratação mantém estados corretamente ----
+  console.log("\nTest 213: Rehydration preserves canonical states correctly");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_213",
+    }), env);
+
+    // Check decomposed survives rehydration
+    let { state } = await rehydrateContract(env, "ctr_g1_213");
+    assert(state.status_global === "decomposed", "decomposed survives rehydration");
+
+    // Advance and check executing survives
+    let { decomposition } = await rehydrateContract(env, "ctr_g1_213");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    const updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_g1_213:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+    await advanceContractPhase(env, "ctr_g1_213");
+    ({ state } = await rehydrateContract(env, "ctr_g1_213"));
+    assert(state.status_global === "executing", "executing survives rehydration");
+
+    // Cancel and check cancelled survives
+    await cancelContract(env, "ctr_g1_213", { reason: "test" });
+    ({ state } = await rehydrateContract(env, "ctr_g1_213"));
+    assert(state.status_global === "cancelled", "cancelled survives rehydration");
+  }
+
+  // ---- Test 214: Summary/API coerente com a state machine ----
+  console.log("\nTest 214: Summary reflects canonical state machine states");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g1_214",
+    }), env);
+
+    // Summary after creation
+    let summary = await handleGetContractSummary(env, "ctr_g1_214");
+    assert(summary.body.status_global === "decomposed", "summary status_global is decomposed");
+    assert(VALID_STATUSES.includes(summary.body.status_global), "summary status is canonical");
+
+    // Cancel and check summary
+    await cancelContract(env, "ctr_g1_214", { reason: "test" });
+    summary = await handleGetContractSummary(env, "ctr_g1_214");
+    assert(summary.body.status_global === "cancelled", "summary status_global is cancelled after cancellation");
+    assert(VALID_STATUSES.includes(summary.body.status_global), "cancelled summary status is canonical");
+  }
+
+  // ---- Test 215: Blocked state is a canonical state ----
+  console.log("\nTest 215: Blocked state is a canonical state");
+  {
+    assert(VALID_STATUSES.includes("blocked"), "blocked is in VALID_STATUSES");
+    // Verify blocked can be reached from decomposed
+    const state = { status_global: "decomposed" };
+    const result = transitionStatusGlobal(state, "blocked", "test-215");
+    assert(result.ok === true, "decomposed → blocked transition valid");
+    assert(state.status_global === "blocked", "status_global is blocked");
+    // Verify blocked → executing recovery
+    const result2 = transitionStatusGlobal(state, "executing", "test-215-recovery");
+    assert(result2.ok === true, "blocked → executing recovery valid");
+    assert(state.status_global === "executing", "status_global recovered to executing");
+  }
+
+  // ==========================================================================
+  // G2 — Transition Guard Enforcement (callsites abort on failure)
+  // ==========================================================================
+
+  // ---- Test 216: cancelContract aborts on invalid transition (no persist) ----
+  console.log("\nTest 216: cancelContract aborts on invalid transition (terminal state)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g2_216",
+    }), env);
+    // First cancel succeeds
+    const first = await cancelContract(env, "ctr_g2_216", { reason: "first" });
+    assert(first.ok === true, "first cancel ok");
+    assert(first.state.status_global === "cancelled", "first cancel → cancelled");
+
+    // Manually reset to cancelled so idempotent guard doesn't fire,
+    // and try to cancel from a truly terminal state by removing the cancellation flag
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_216");
+    state.status_global = "completed"; // terminal — cancel should fail at transition
+    delete state.contract_cancellation;
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_216:state", JSON.stringify(state));
+
+    const result = await cancelContract(env, "ctr_g2_216", { reason: "from-completed" });
+    assert(result.ok === false, "cancel from completed rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+
+    // Verify KV was NOT overwritten — still shows "completed"
+    const { state: after } = await rehydrateContract(env, "ctr_g2_216");
+    assert(after.status_global === "completed", "KV still shows completed (no persist after failed transition)");
+  }
+
+  // ---- Test 217: advanceContractPhase gate-blocked aborts on invalid transition ----
+  console.log("\nTest 217: advanceContractPhase gate-blocked aborts on invalid transition");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g2_217",
+    }), env);
+
+    // Force contract into a terminal state where "blocked" transition is invalid
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_217");
+    state.status_global = "completed";
+    state.current_phase = "phase_01"; // not all_phases_complete so gate logic runs
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_217:state", JSON.stringify(state));
+
+    const result = await advanceContractPhase(env, "ctr_g2_217");
+    // The gate should fail (tasks not done) and try to transition to blocked,
+    // but completed → blocked is invalid
+    assert(result.ok === false, "advance rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+
+    // Verify KV was NOT overwritten
+    const { state: after } = await rehydrateContract(env, "ctr_g2_217");
+    assert(after.status_global === "completed", "KV still shows completed (no persist)");
+  }
+
+  // ---- Test 218: closeContractInTest aborts on invalid transition ----
+  console.log("\nTest 218: closeContractInTest aborts on invalid transition");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await makeEligibleForClosure(env, "ctr_g2_218");
+    // Close once — succeeds
+    const first = await closeContractInTest(env, "ctr_g2_218");
+    assert(first.ok === true, "first close ok");
+
+    // Manually set to cancelled (terminal) — close should be rejected
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_218");
+    state.status_global = "cancelled";
+    delete state.contract_closure; // remove closure so idempotent guard doesn't fire
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_218:state", JSON.stringify(state));
+
+    const result = await closeContractInTest(env, "ctr_g2_218");
+    assert(result.ok === false, "close from cancelled rejected");
+    // The cancellation guard fires before the transition guard — both prevent bad persist
+    assert(result.error === "CONTRACT_CANCELLED" || result.error === "INVALID_TRANSITION", "error blocks the operation");
+
+    // Verify KV was NOT overwritten
+    const { state: after } = await rehydrateContract(env, "ctr_g2_218");
+    assert(after.status_global === "cancelled", "KV still shows cancelled (no persist)");
+  }
+
+  // ---- Test 219: Valid transitions still work end-to-end ----
+  console.log("\nTest 219: Valid transitions still work end-to-end (regression)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest({
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_g2_219",
+    }), env);
+
+    // decomposed → executing via advance
+    let { decomposition } = await rehydrateContract(env, "ctr_g2_219");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    const updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_g2_219:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    const advResult = await advanceContractPhase(env, "ctr_g2_219");
+    assert(advResult.ok === true, "advance ok");
+    assert(advResult.state.status_global === "executing", "executing after advance");
+
+    // executing → cancelled via cancel
+    const cancelResult = await cancelContract(env, "ctr_g2_219", { reason: "test" });
+    assert(cancelResult.ok === true, "cancel ok");
+    assert(cancelResult.state.status_global === "cancelled", "cancelled after cancel");
+
+    // Verify persisted
+    const { state } = await rehydrateContract(env, "ctr_g2_219");
+    assert(state.status_global === "cancelled", "cancelled persisted");
+  }
+
+  // ---- Test 220: closeContractInTest transition guard (failed state, bypasses cancel guard) ----
+  console.log("\nTest 220: closeContractInTest transition guard rejects failed → test-complete");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await makeEligibleForClosure(env, "ctr_g2_220");
+
+    // Manually set to failed (terminal, but NOT cancelled — so cancellation guard doesn't fire)
+    let { state, decomposition } = await rehydrateContract(env, "ctr_g2_220");
+    state.status_global = "failed";
+    delete state.contract_closure;
+    await env.ENAVIA_BRAIN.put("contract:ctr_g2_220:state", JSON.stringify(state));
+
+    const result = await closeContractInTest(env, "ctr_g2_220");
+    assert(result.ok === false, "close from failed rejected");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION (not CONTRACT_CANCELLED)");
+
+    // Verify KV was NOT overwritten
+    const { state: after } = await rehydrateContract(env, "ctr_g2_220");
+    assert(after.status_global === "failed", "KV still shows failed (no persist after failed transition)");
   }
 
   // ---- Summary ----
