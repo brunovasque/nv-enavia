@@ -21,8 +21,10 @@ import {
   handleGetContractSummary,
   rehydrateContract,
   checkPhaseGate,
+  isValidPhaseValue,
   advanceContractPhase,
   TASK_DONE_STATUSES,
+  SPECIAL_PHASES,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -413,6 +415,136 @@ async function runTests() {
     const result = await advanceContractPhase(env, "no_such_contract");
     assert(result.ok === false, "advance returns ok=false for missing contract");
     assert(result.error === "CONTRACT_NOT_FOUND", "error code is CONTRACT_NOT_FOUND");
+  }
+
+  // ============================================================================
+  // HARDENING TESTS — v1 Drift Prevention + Phase Gate Enforcement
+  // ============================================================================
+
+  // ---- Test 21: isValidPhaseValue — accepts known decomposition phases ----
+  console.log("\nTest 21: isValidPhaseValue validates against decomposition phases");
+  {
+    const state = buildInitialState(VALID_PAYLOAD);
+    const decomposition = generateDecomposition(state);
+    assert(isValidPhaseValue("phase_01", decomposition) === true, "phase_01 is valid");
+    assert(isValidPhaseValue("phase_02", decomposition) === true, "phase_02 is valid");
+    assert(isValidPhaseValue("phase_03", decomposition) === true, "phase_03 is valid");
+    assert(isValidPhaseValue("decomposition_complete", decomposition) === true, "decomposition_complete is valid (special phase)");
+    assert(isValidPhaseValue("all_phases_complete", decomposition) === true, "all_phases_complete is valid (special phase)");
+    assert(isValidPhaseValue("ingestion_blocked", decomposition) === true, "ingestion_blocked is valid (special phase)");
+    assert(isValidPhaseValue("stale_memory_phase", decomposition) === false, "arbitrary phase is rejected");
+    assert(isValidPhaseValue("phase_99", decomposition) === false, "non-existent phase is rejected");
+    assert(isValidPhaseValue("", decomposition) === false, "empty string is rejected");
+  }
+
+  // ---- Test 22: SPECIAL_PHASES constant is exported and complete ----
+  console.log("\nTest 22: SPECIAL_PHASES constant exported correctly");
+  {
+    assert(Array.isArray(SPECIAL_PHASES), "SPECIAL_PHASES is an array");
+    assert(SPECIAL_PHASES.includes("decomposition_complete"), "includes decomposition_complete");
+    assert(SPECIAL_PHASES.includes("ingestion_blocked"), "includes ingestion_blocked");
+    assert(SPECIAL_PHASES.includes("all_phases_complete"), "includes all_phases_complete");
+  }
+
+  // ---- Test 23: advanceContractPhase clears blocked status after successful advance ----
+  console.log("\nTest 23: advanceContractPhase clears blocked status on successful advance (drift fix)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // First, call advance with pending tasks to mark as blocked
+    const blockedResult = await advanceContractPhase(env, "ctr_test_001");
+    assert(blockedResult.ok === false, "first advance blocked as expected");
+    assert(blockedResult.state.status_global === "blocked", "status_global is blocked");
+
+    // Now complete all tasks in phase_01
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    const updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_test_001:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    // Advance again — should succeed AND clear blocked status
+    const advanceResult = await advanceContractPhase(env, "ctr_test_001");
+    assert(advanceResult.ok === true, "second advance succeeds");
+    assert(advanceResult.state.status_global !== "blocked", "status_global is no longer blocked after successful advance");
+    assert(advanceResult.state.status_global === "in_progress", "status_global is in_progress after advancing to next phase");
+    assert(advanceResult.state.blockers.length === 0, "blockers array is cleared on successful advance");
+
+    // Verify via KV rehydration (Rule 1)
+    const { state: rehydrated } = await rehydrateContract(env, "ctr_test_001");
+    assert(rehydrated.status_global === "in_progress", "rehydrated status confirms in_progress was persisted");
+    assert(rehydrated.blockers.length === 0, "rehydrated blockers confirms cleared");
+  }
+
+  // ---- Test 24: Full multi-phase lifecycle — advance through all phases ----
+  console.log("\nTest 24: Full lifecycle: advance through all phases until completion");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // Complete and advance phase_01
+    let { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    let updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_test_001:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    let result = await advanceContractPhase(env, "ctr_test_001");
+    assert(result.ok === true, "phase_01 advance succeeds");
+    assert(result.state.current_phase === "phase_02", "current_phase is now phase_02");
+
+    // Complete and advance phase_02
+    ({ decomposition } = await rehydrateContract(env, "ctr_test_001"));
+    const phase02 = decomposition.phases.find((p) => p.id === "phase_02");
+    updatedTasks = decomposition.tasks.map((t) =>
+      phase02.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_test_001:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    result = await advanceContractPhase(env, "ctr_test_001");
+    assert(result.ok === true, "phase_02 advance succeeds");
+    assert(result.state.current_phase === "phase_03", "current_phase is now phase_03");
+
+    // Complete and advance phase_03 (final)
+    ({ decomposition } = await rehydrateContract(env, "ctr_test_001"));
+    const phase03 = decomposition.phases.find((p) => p.id === "phase_03");
+    updatedTasks = decomposition.tasks.map((t) =>
+      phase03.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    await kv.put("contract:ctr_test_001:decomposition", JSON.stringify({ ...decomposition, tasks: updatedTasks }));
+
+    result = await advanceContractPhase(env, "ctr_test_001");
+    assert(result.ok === true, "phase_03 advance succeeds");
+    assert(result.state.current_phase === "all_phases_complete", "current_phase is all_phases_complete");
+    assert(result.state.status_global === "completed", "status_global is completed");
+
+    // Verify final state via KV (Rule 1)
+    const { state: finalState } = await rehydrateContract(env, "ctr_test_001");
+    assert(finalState.current_phase === "all_phases_complete", "rehydrated final phase is all_phases_complete");
+    assert(finalState.status_global === "completed", "rehydrated final status is completed");
+  }
+
+  // ---- Test 25: advanceContractPhase uses TASK_DONE_STATUSES for all valid done states ----
+  console.log("\nTest 25: Phase gate recognizes all TASK_DONE_STATUSES");
+  {
+    const state = buildInitialState(VALID_PAYLOAD);
+    const decomposition = generateDecomposition(state);
+    const activePhaseId = decomposition.phases.find((p) => p.status !== "done").id;
+    const tasksInPhase = decomposition.phases.find((p) => p.id === activePhaseId).tasks;
+
+    // Test each done status variant
+    for (const doneStatus of TASK_DONE_STATUSES) {
+      const modifiedTasks = decomposition.tasks.map((t) =>
+        tasksInPhase.includes(t.id) ? { ...t, status: doneStatus } : t
+      );
+      const gate = checkPhaseGate(state, { ...decomposition, tasks: modifiedTasks });
+      assert(gate.canAdvance === true, `gate passes when task status is "${doneStatus}"`);
+    }
   }
 
   // ---- Summary ----

@@ -25,7 +25,16 @@ const KV_INDEX_KEY = "contract:index";
 // ---------------------------------------------------------------------------
 // Valid statuses for Phase A
 // ---------------------------------------------------------------------------
-const VALID_STATUSES = ["draft", "approved", "decomposed", "blocked", "failed"];
+const VALID_STATUSES = ["draft", "approved", "decomposed", "blocked", "failed", "in_progress", "completed"];
+
+// ---------------------------------------------------------------------------
+// Special (non-decomposition) values for current_phase
+// ---------------------------------------------------------------------------
+const SPECIAL_PHASES = [
+  "decomposition_complete",
+  "ingestion_blocked",
+  "all_phases_complete",
+];
 
 // ---------------------------------------------------------------------------
 // Required fields for a minimal contract payload
@@ -312,6 +321,19 @@ function checkPhaseGate(state, decomposition) {
 }
 
 // ---------------------------------------------------------------------------
+// INVARIANT 3 — Single Advance Path: Phase Transition Validation
+//
+// Validates that a proposed current_phase value is a known phase from the
+// contract's decomposition or one of the special lifecycle phases.
+// Prevents drift to arbitrary/stale phase values.
+// ---------------------------------------------------------------------------
+function isValidPhaseValue(phaseValue, decomposition) {
+  if (SPECIAL_PHASES.includes(phaseValue)) return true;
+  if (!decomposition || !Array.isArray(decomposition.phases)) return false;
+  return decomposition.phases.some((p) => p.id === phaseValue);
+}
+
+// ---------------------------------------------------------------------------
 // Advance contract phase — enforces all 3 invariants:
 //   1. Source of Truth: state always rehydrated from KV before action
 //   2. Phase Gate: advancement only happens when acceptance criteria are met
@@ -352,11 +374,27 @@ async function advanceContractPhase(env, contractId) {
     p.id === gate.activePhaseId ? Object.assign({}, p, { status: "done" }) : p
   );
   const nextPhase = updatedPhases.find((p) => p.status !== "done");
+  const nextPhaseValue = nextPhase ? nextPhase.id : "all_phases_complete";
+
+  // Validate that the target phase is a known value (prevents drift)
+  if (!isValidPhaseValue(nextPhaseValue, decomposition)) {
+    return {
+      ok: false,
+      error: "INVALID_PHASE_TRANSITION",
+      message: `Phase "${nextPhaseValue}" is not a valid phase for contract "${contractId}".`,
+      state,
+      decomposition,
+      gate,
+    };
+  }
 
   const updatedDecomposition = Object.assign({}, decomposition, { phases: updatedPhases });
   const updatedState = Object.assign({}, state, {
-    current_phase: nextPhase ? nextPhase.id : "all_phases_complete",
-    status_global: nextPhase ? state.status_global : "completed",
+    current_phase: nextPhaseValue,
+    // Clear blocked status — gate passed, contract is progressing
+    status_global: nextPhase ? "in_progress" : "completed",
+    // Clear blockers since the gate that caused them has now passed
+    blockers: [],
     next_action: nextPhase
       ? `Execute tasks in phase "${nextPhase.id}".`
       : "All phases complete. Awaiting human sign-off.",
@@ -540,8 +578,10 @@ export {
   // Invariants (Rules 1, 2, 3)
   rehydrateContract,
   checkPhaseGate,
+  isValidPhaseValue,
   advanceContractPhase,
   TASK_DONE_STATUSES,
+  SPECIAL_PHASES,
   // Route handlers
   handleCreateContract,
   handleGetContract,
