@@ -1851,7 +1851,9 @@ async function closeContractInTest(env, contractId) {
   // ── Synchronize global contract state with closure ──
   // The contract's canonical status_global must reflect the TEST closure
   // so there is no divergence between contract_closure and the main state.
-  state.status_global = "completed";
+  // "test-complete" signals TEST-only closure — "completed" is reserved for
+  // the canonical terminal state after full promotion policy is respected.
+  state.status_global = "test-complete";
   state.next_action = "Contract closed in TEST. Awaiting PROD promotion decision.";
 
   // Persist to KV

@@ -3481,7 +3481,7 @@ async function runTests() {
     assert(closeResult.contract_closure.environment === "TEST", "environment is TEST");
     assert(closeResult.contract_closure.closed_by === "automatic", "closed_by is automatic");
     // RISCO 2: status_global must be synchronized with closure
-    assert(closeResult.state.status_global === "completed", "status_global synchronized to completed");
+    assert(closeResult.state.status_global === "test-complete", "status_global synchronized to test-complete");
   }
 
   // ---- Test 158: Contract with failed execution does NOT close ----
@@ -3567,7 +3567,7 @@ async function runTests() {
     assert(Array.isArray(state.contract_closure.closure_evidence), "closure_evidence survives rehydration");
     assert(state.contract_closure.environment === "TEST", "environment survives rehydration");
     // RISCO 2: status_global synchronized with closure survives rehydration
-    assert(state.status_global === "completed", "status_global=completed survives rehydration");
+    assert(state.status_global === "test-complete", "status_global=test-complete survives rehydration");
   }
 
   // ---- Test 162: Summary/API reflects closure state ----
@@ -3589,8 +3589,8 @@ async function runTests() {
     assert(summaryResult.body.contract_closure !== null, "handler exposes contract_closure");
     assert(summaryResult.body.contract_closure.closure_status === "closed_in_test", "handler closure_status correct");
     // RISCO 2: status_global reflected in summary
-    assert(summary.status_global === "completed", "summary status_global is completed after closure");
-    assert(summaryResult.body.status_global === "completed", "handler status_global is completed after closure");
+    assert(summary.status_global === "test-complete", "summary status_global is test-complete after closure");
+    assert(summaryResult.body.status_global === "test-complete", "handler status_global is test-complete after closure");
   }
 
   // ---- Test 163: Already-closed contract returns ok with already_closed flag ----
@@ -3685,7 +3685,7 @@ async function runTests() {
     assert(state.contract_closure.environment === "TEST", "closure environment is TEST, not PROD");
     assert(state.contract_closure.closed_in_test === true, "closed_in_test flag is true");
     // Verify status_global is synchronized but NOT promoted to PROD
-    assert(state.status_global === "completed", "status_global is completed (TEST closure)");
+    assert(state.status_global === "test-complete", "status_global is test-complete (TEST closure)");
     assert(state.status_global !== "promoted", "status_global is not promoted");
     assert(state.status_global !== "prod", "status_global is not prod");
     assert(state.contract_closure.environment === "TEST", "closure stays in TEST");
