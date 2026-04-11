@@ -51,7 +51,7 @@ const GATE_STATUS = {
 // Retorna next_action coerente com o gate_status.
 // Determinístico e auditável.
 // ---------------------------------------------------------------------------
-const _NEXT_ACTION = {
+const _NEXT_ACTIONS = {
   [GATE_STATUS.APPROVED_NOT_REQUIRED]: "Prosseguir diretamente com a execução do plano.",
   [GATE_STATUS.APPROVAL_REQUIRED]:     "Aguardar aprovação humana formal — execução bloqueada até decisão explícita.",
   [GATE_STATUS.APPROVED]:              "Prosseguir com a execução do plano conforme aprovado.",
@@ -125,7 +125,7 @@ function evaluateApprovalGate(plan) {
     needs_human_approval,
     can_proceed,
     reason,
-    next_action: _NEXT_ACTION[gate_status],
+    next_action: _NEXT_ACTIONS[gate_status],
   };
 }
 
@@ -162,7 +162,7 @@ function approvePlan(plan) {
     needs_human_approval: plan.needs_human_approval,
     can_proceed:          true,
     reason:               `Plano aprovado por decisão humana explícita${plan_reason ? ` — ${plan_reason}` : ""}.`,
-    next_action:          _NEXT_ACTION[GATE_STATUS.APPROVED],
+    next_action:          _NEXT_ACTIONS[GATE_STATUS.APPROVED],
   };
 }
 
@@ -202,7 +202,7 @@ function rejectPlan(plan, reason) {
     reason:               extra
       ? `Plano rejeitado por decisão humana — ${extra}.`
       : "Plano rejeitado por decisão humana.",
-    next_action:          _NEXT_ACTION[GATE_STATUS.REJECTED],
+    next_action:          _NEXT_ACTIONS[GATE_STATUS.REJECTED],
   };
 }
 
