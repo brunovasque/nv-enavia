@@ -1,3 +1,9 @@
+import {
+  handleCreateContract,
+  handleGetContract,
+  handleGetContractSummary,
+} from "./contract-executor.js";
+
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
 // Arquitetura modular com carregamento sob demanda, fila inteligente,
@@ -4509,6 +4515,30 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       }
 
       // -------------------------------------------------------
+      // 📜 CONTRACT EXECUTOR v1 — Fase A Routes
+      // -------------------------------------------------------
+
+      // POST /contracts → Create a new contract
+      if (method === "POST" && path === "/contracts") {
+        const result = await handleCreateContract(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // GET /contracts → Read full contract (requires ?id=...)
+      if (method === "GET" && path === "/contracts") {
+        const contractId = url.searchParams.get("id");
+        const result = await handleGetContract(env, contractId);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // GET /contracts/summary → Read contract summary (requires ?id=...)
+      if (method === "GET" && path === "/contracts/summary") {
+        const contractId = url.searchParams.get("id");
+        const result = await handleGetContractSummary(env, contractId);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
       if (method === "GET" && path === "/") {
@@ -4523,6 +4553,9 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /debug-load     → Carregar módulos via FILA",
             "  • POST /brain-query    → Buscar módulos no cérebro",
             "  • POST /brain/get-module → Ler conteúdo de módulo",
+            "  • POST /contracts      → Criar contrato (Contract Executor v1)",
+            "  • GET  /contracts?id=  → Ler estado completo do contrato",
+            "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",
             "  • GET  /engineer       → Testar rota do executor",
             "  • GET  /audit          → Schema/contrato da rota POST /audit",
