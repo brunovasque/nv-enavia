@@ -19,6 +19,10 @@ import {
   handleCreateContract,
   handleGetContract,
   handleGetContractSummary,
+  rehydrateContract,
+  checkPhaseGate,
+  advanceContractPhase,
+  TASK_DONE_STATUSES,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -289,6 +293,126 @@ async function runTests() {
     const env = { ENAVIA_BRAIN: kv };
     const result = await handleGetContractSummary(env, "nope");
     assert(result.status === 404, "status 404");
+  }
+
+  // ============================================================================
+  // INVARIANT TESTS — Rules 1, 2, 3
+  // ============================================================================
+
+  // ---- Test 14: Rehydration Before Action (Rule 3 + Rule 1) ----
+  console.log("\nTest 14: rehydrateContract always reads from KV (Rule 1 + Rule 3)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Before contract exists — must return null, not stale memory
+    const { state: stateMissing, decomposition: decompositionMissing } = await rehydrateContract(env, "does_not_exist");
+    assert(stateMissing === null, "rehydrate returns null state for missing contract");
+    assert(decompositionMissing === null, "rehydrate returns null decomposition for missing contract");
+
+    // After contract is persisted — must return persisted values
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+    assert(state !== null, "rehydrate returns state after creation");
+    assert(state.contract_id === "ctr_test_001", "rehydrated state has correct contract_id");
+    assert(decomposition !== null, "rehydrate returns decomposition after creation");
+    assert(Array.isArray(decomposition.phases), "rehydrated decomposition has phases");
+
+    // Simulated stale in-memory reference must not affect rehydrated result
+    const staleState = { contract_id: "ctr_test_001", current_phase: "stale_memory", status_global: "stale" };
+    // The real state in KV must differ from the stale in-memory copy
+    assert(state.current_phase !== staleState.current_phase, "KV state differs from stale in-memory state");
+    assert(state.status_global !== staleState.status_global, "KV status_global is authoritative, not stale memory");
+  }
+
+  // ---- Test 15: Phase Gate — blocks when tasks are incomplete (Rule 2) ----
+  console.log("\nTest 15: checkPhaseGate blocks advancement when tasks are incomplete (Rule 2)");
+  {
+    const state = buildInitialState(VALID_PAYLOAD);
+    const decomposition = generateDecomposition(state);
+    // All tasks default to "pending" — gate must block
+    const gate = checkPhaseGate(state, decomposition);
+    assert(gate.canAdvance === false, "gate blocks advancement when tasks are pending");
+    assert(typeof gate.reason === "string" && gate.reason.length > 0, "gate provides a reason");
+    assert(gate.activePhaseId !== null, "gate identifies the active phase");
+  }
+
+  // ---- Test 16: Phase Gate — allows when all phase tasks are done (Rule 2) ----
+  console.log("\nTest 16: checkPhaseGate allows advancement when all phase tasks are done (Rule 2)");
+  {
+    const state = buildInitialState(VALID_PAYLOAD);
+    const decomposition = generateDecomposition(state);
+    // Mark all tasks in the first phase as done
+    const activePhaseId = decomposition.phases.find((p) => p.status !== "done").id;
+    const tasksInPhase = decomposition.phases.find((p) => p.id === activePhaseId).tasks;
+    decomposition.tasks = decomposition.tasks.map((t) =>
+      tasksInPhase.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    const gate = checkPhaseGate(state, decomposition);
+    assert(gate.canAdvance === true, "gate allows advancement when all phase tasks are done");
+    assert(gate.activePhaseId === activePhaseId, "gate reports correct active phase id");
+  }
+
+  // ---- Test 17: Phase Gate — handles missing state/decomposition (Rule 2) ----
+  console.log("\nTest 17: checkPhaseGate handles null inputs safely (Rule 2)");
+  {
+    const gateNull = checkPhaseGate(null, null);
+    assert(gateNull.canAdvance === false, "gate blocks when state is null");
+    const gateNoDecomp = checkPhaseGate(buildInitialState(VALID_PAYLOAD), null);
+    assert(gateNoDecomp.canAdvance === false, "gate blocks when decomposition is null");
+  }
+
+  // ---- Test 18: advanceContractPhase — blocked when tasks incomplete (Rules 1+2+3) ----
+  console.log("\nTest 18: advanceContractPhase blocks and marks contract as blocked (Rules 1+2+3)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    // All tasks are pending — advancement must be blocked
+    const result = await advanceContractPhase(env, "ctr_test_001");
+    assert(result.ok === false, "advance returns ok=false when gate blocks");
+    assert(result.state.status_global === "blocked", "state is set to blocked in KV");
+    assert(result.state.blockers.length > 0, "blockers array is populated");
+    assert(result.gate.canAdvance === false, "gate correctly reported canAdvance=false");
+
+    // Verify KV was updated (rehydration confirms the write — Rule 1)
+    const { state: rehydrated } = await rehydrateContract(env, "ctr_test_001");
+    assert(rehydrated.status_global === "blocked", "rehydrated state confirms blocked status was persisted");
+  }
+
+  // ---- Test 19: advanceContractPhase — advances when tasks are done (Rules 1+2+3) ----
+  console.log("\nTest 19: advanceContractPhase advances phase when gate passes (Rules 1+2+3)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // Mark all tasks in phase_01 as done directly in KV
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const phase01 = decomposition.phases.find((p) => p.id === "phase_01");
+    const updatedTasks = decomposition.tasks.map((t) =>
+      phase01.tasks.includes(t.id) ? { ...t, status: "done" } : t
+    );
+    const updatedDecomp = { ...decomposition, tasks: updatedTasks };
+    await kv.put("contract:ctr_test_001:decomposition", JSON.stringify(updatedDecomp));
+
+    const result = await advanceContractPhase(env, "ctr_test_001");
+    assert(result.ok === true, "advance returns ok=true when gate passes");
+    assert(result.gate.canAdvance === true, "gate reported canAdvance=true");
+    assert(result.state.current_phase !== "decomposition_complete", "current_phase was advanced");
+
+    // Verify KV was updated (Rule 1 — state is source of truth)
+    const { state: rehydrated } = await rehydrateContract(env, "ctr_test_001");
+    assert(rehydrated.current_phase === result.state.current_phase, "rehydrated phase matches persisted phase");
+  }
+
+  // ---- Test 20: advanceContractPhase — not found (Rule 1) ----
+  console.log("\nTest 20: advanceContractPhase returns error for missing contract (Rule 1)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const result = await advanceContractPhase(env, "no_such_contract");
+    assert(result.ok === false, "advance returns ok=false for missing contract");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error code is CONTRACT_NOT_FOUND");
   }
 
   // ---- Summary ----

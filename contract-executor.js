@@ -251,6 +251,132 @@ async function readContractDecomposition(env, contractId) {
   return JSON.parse(raw);
 }
 
+// ---------------------------------------------------------------------------
+// INVARIANT 1 — Source of Truth Rule
+// INVARIANT 3 — Rehydration Before Action
+//
+// rehydrateContract must be called before ANY executor action that depends
+// on the contract state. Model memory / in-scope variables are never the
+// source of truth; only the values returned here are authoritative.
+// ---------------------------------------------------------------------------
+async function rehydrateContract(env, contractId) {
+  const [state, decomposition] = await Promise.all([
+    readContractState(env, contractId),
+    readContractDecomposition(env, contractId),
+  ]);
+  return { state, decomposition };
+}
+
+// ---------------------------------------------------------------------------
+// INVARIANT 2 — Mandatory Phase Gate
+//
+// Returns { canAdvance, activePhaseId, reason }.
+//   canAdvance = true  → all tasks in the active decomposition phase are done;
+//                        current_phase may be advanced.
+//   canAdvance = false → active phase still has incomplete tasks;
+//                        current_phase must stay or become "blocked".
+//
+// "Done" means task.status is one of TASK_DONE_STATUSES.
+// ---------------------------------------------------------------------------
+const TASK_DONE_STATUSES = ["done", "merged", "completed", "skipped"];
+
+function checkPhaseGate(state, decomposition) {
+  if (!state || !decomposition) {
+    return { canAdvance: false, activePhaseId: null, reason: "Missing state or decomposition — cannot evaluate phase gate." };
+  }
+
+  const phases = decomposition.phases || [];
+  const tasks = decomposition.tasks || [];
+
+  // Find the first phase that is not yet done (active phase)
+  const activePhase = phases.find((p) => p.status !== "done");
+
+  if (!activePhase) {
+    // All phases are done — no further advancement needed
+    return { canAdvance: true, activePhaseId: null, reason: "All phases are complete." };
+  }
+
+  const phaseTasks = tasks.filter((t) => activePhase.tasks.includes(t.id));
+  const incompleteTasks = phaseTasks.filter((t) => !TASK_DONE_STATUSES.includes(t.status));
+
+  if (incompleteTasks.length > 0) {
+    const taskIds = incompleteTasks.map((t) => t.id).join(", ");
+    return {
+      canAdvance: false,
+      activePhaseId: activePhase.id,
+      reason: `Phase "${activePhase.id}" has ${incompleteTasks.length} incomplete task(s): ${taskIds}.`,
+    };
+  }
+
+  return { canAdvance: true, activePhaseId: activePhase.id, reason: `Phase "${activePhase.id}" acceptance criteria met.` };
+}
+
+// ---------------------------------------------------------------------------
+// Advance contract phase — enforces all 3 invariants:
+//   1. Source of Truth: state always rehydrated from KV before action
+//   2. Phase Gate: advancement only happens when acceptance criteria are met
+//   3. Rehydration: explicit KV read before any decision
+//
+// Returns { ok, state, decomposition, gate, error? }
+// ---------------------------------------------------------------------------
+async function advanceContractPhase(env, contractId) {
+  // INVARIANT 1 + 3 — always read from KV, never from memory
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found in KV.` };
+  }
+
+  // INVARIANT 2 — evaluate phase gate against persisted state
+  const gate = checkPhaseGate(state, decomposition);
+
+  if (!gate.canAdvance) {
+    // Cannot advance — stay in current phase or mark blocked
+    const now = new Date().toISOString();
+    const updatedState = Object.assign({}, state, {
+      status_global: "blocked",
+      blockers: [...new Set([...(state.blockers || []), gate.reason])],
+      next_action: "Resolve incomplete tasks in active phase before advancing.",
+      updated_at: now,
+    });
+    await env.ENAVIA_BRAIN.put(
+      `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_STATE}`,
+      JSON.stringify(updatedState)
+    );
+    return { ok: false, state: updatedState, decomposition, gate };
+  }
+
+  // Gate passed — mark active phase as done and advance to next pending phase
+  const now = new Date().toISOString();
+  const updatedPhases = (decomposition.phases || []).map((p) =>
+    p.id === gate.activePhaseId ? Object.assign({}, p, { status: "done" }) : p
+  );
+  const nextPhase = updatedPhases.find((p) => p.status !== "done");
+
+  const updatedDecomposition = Object.assign({}, decomposition, { phases: updatedPhases });
+  const updatedState = Object.assign({}, state, {
+    current_phase: nextPhase ? nextPhase.id : "all_phases_complete",
+    status_global: nextPhase ? state.status_global : "completed",
+    next_action: nextPhase
+      ? `Execute tasks in phase "${nextPhase.id}".`
+      : "All phases complete. Awaiting human sign-off.",
+    updated_at: now,
+  });
+
+  await Promise.all([
+    env.ENAVIA_BRAIN.put(
+      `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_STATE}`,
+      JSON.stringify(updatedState)
+    ),
+    env.ENAVIA_BRAIN.put(
+      `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_DECOMPOSITION}`,
+      JSON.stringify(updatedDecomposition)
+    ),
+  ]);
+
+  return { ok: true, state: updatedState, decomposition: updatedDecomposition, gate };
+}
+
 // ============================================================================
 // 🌐 Route Handlers
 // ============================================================================
@@ -411,6 +537,12 @@ export {
   persistContract,
   readContractState,
   readContractDecomposition,
+  // Invariants (Rules 1, 2, 3)
+  rehydrateContract,
+  checkPhaseGate,
+  advanceContractPhase,
+  TASK_DONE_STATUSES,
+  // Route handlers
   handleCreateContract,
   handleGetContract,
   handleGetContractSummary,
