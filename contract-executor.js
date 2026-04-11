@@ -1240,7 +1240,7 @@ function evaluateErrorLoop(errorLoop, taskId) {
     ? taskLoop.active_retry_count
     : errors.length;
   const totalErrorCount = errors.length;
-  const maxAttempts = lastError.max_attempts || MAX_RETRY_ATTEMPTS;
+  const maxAttempts = MAX_RETRY_ATTEMPTS;
 
   // Non-retryable classification → immediate escalation
   if (NON_RETRYABLE_CLASSIFICATIONS.includes(lastError.classification)) {
@@ -1340,6 +1340,17 @@ async function recordError(env, contractId, taskId, errorParams) {
     };
   }
 
+  // Guard: cannot record error when the error loop itself is already blocked —
+  // prevents bypassing the retry limit by registering a new error with a larger
+  // max_attempts after the canonical limit was already reached.
+  if (state.error_loop && state.error_loop[taskId] && state.error_loop[taskId].loop_status === "blocked") {
+    return {
+      ok: false,
+      error: "TASK_BLOCKED",
+      message: `Task "${taskId}" error loop is blocked — cannot record new error. Resolve the block first.`,
+    };
+  }
+
   // Initialize error_loop on state if absent
   if (!state.error_loop) {
     state.error_loop = {};
@@ -1363,13 +1374,11 @@ async function recordError(env, contractId, taskId, errorParams) {
   // Increment active retry count for the current cycle
   taskLoop.active_retry_count = (taskLoop.active_retry_count || 0) + 1;
 
-  // Build and record the error entry
+  // Build and record the error entry — always use canonical MAX_RETRY_ATTEMPTS;
+  // caller-supplied max_attempts is ignored to keep the limit immutable.
   const attempt = taskLoop.active_retry_count;
-  const maxAttempts = (errorParams && typeof errorParams.max_attempts === "number")
-    ? errorParams.max_attempts
-    : MAX_RETRY_ATTEMPTS;
   const entry = buildErrorEntry(
-    Object.assign({}, errorParams, { attempt, max_attempts: maxAttempts })
+    Object.assign({}, errorParams, { attempt, max_attempts: MAX_RETRY_ATTEMPTS })
   );
   taskLoop.errors.push(entry);
 
