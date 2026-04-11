@@ -257,6 +257,20 @@ async function supersedeMemory(memory_id, replacementMemoryOrId, meta, env) {
 }
 
 // ---------------------------------------------------------------------------
+// listMemoryIds(env)
+//
+// Returns the current list of all known memory_id strings from the index.
+// Thin public wrapper around the internal _readIndex helper.
+// Used by PM3 read pipeline to enumerate all persisted memories.
+//
+// Returns:
+//   string[]  — array of memory_id strings (may be empty)
+// ---------------------------------------------------------------------------
+async function listMemoryIds(env) {
+  return _readIndex(env);
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 export {
@@ -265,4 +279,5 @@ export {
   updateMemory,
   archiveMemory,
   supersedeMemory,
+  listMemoryIds,
 };
