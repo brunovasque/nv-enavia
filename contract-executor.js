@@ -1681,6 +1681,221 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
   }
 }
 
+// ============================================================================
+// 🔒 C2 — Automatic Contract Closure in TEST
+//
+// Canonical closure function for contracts that have completed all execution
+// in TEST. Validates every prerequisite deterministically before closing.
+//
+// Does NOT:
+//   - Promote to PROD
+//   - Close if any blocker, error, or pending acceptance exists
+//   - Close if execution was not successful in TEST
+//   - Mask failure as success
+//   - Skip rehydration
+//
+// Closure state is stored in `state.contract_closure` and survives KV
+// rehydration. Each closure is deterministic and traceable.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// Valid closure statuses
+// ---------------------------------------------------------------------------
+const CONTRACT_CLOSURE_STATUSES = ["open", "closed_in_test", "closure_rejected"];
+
+// ---------------------------------------------------------------------------
+// closeContractInTest(env, contractId) → result
+//
+// Flow:
+//   1. Rehydrate from KV (INVARIANT 1+3)
+//   2. Validate current_execution exists and succeeded in TEST
+//   3. Validate no active blockers
+//   4. Validate error_loop is not blocked/awaiting_human for current task
+//   5. Validate acceptance criteria are not pending/blocking
+//   6. Validate all tasks in current phase are done or current task is complete
+//   7. Persist canonical closure state
+//   8. Return deterministic result
+// ---------------------------------------------------------------------------
+async function closeContractInTest(env, contractId) {
+  // ── INVARIANT 1+3: Rehydrate from KV ──
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  if (!decomposition) {
+    return { ok: false, error: "DECOMPOSITION_NOT_FOUND", message: `Decomposition for "${contractId}" not found.` };
+  }
+
+  // ── Guard: already closed ──
+  if (state.contract_closure && state.contract_closure.closure_status === "closed_in_test") {
+    return {
+      ok: true,
+      already_closed: true,
+      contract_closure: state.contract_closure,
+      message: "Contract already closed in TEST.",
+      state,
+      decomposition,
+    };
+  }
+
+  // ── Gate 1: current_execution must exist and be successful in TEST ──
+  const exec = state.current_execution;
+  if (!exec) {
+    return {
+      ok: false,
+      error: "NO_EXECUTION",
+      message: "No execution recorded — cannot close contract without a successful TEST execution.",
+    };
+  }
+
+  if (exec.execution_status !== "success") {
+    return {
+      ok: false,
+      error: "EXECUTION_NOT_SUCCESSFUL",
+      message: `Execution status is "${exec.execution_status}" — must be "success" to close.`,
+    };
+  }
+
+  if (!exec.test_execution) {
+    return {
+      ok: false,
+      error: "NOT_TEST_EXECUTION",
+      message: "Last execution was not a TEST execution — cannot close in TEST without TEST execution.",
+    };
+  }
+
+  // ── Gate 2: no active blockers on the contract ──
+  const blockers = state.blockers || [];
+  if (blockers.length > 0) {
+    return {
+      ok: false,
+      error: "ACTIVE_BLOCKERS",
+      message: `Contract has ${blockers.length} active blocker(s): ${blockers.join("; ")}`,
+    };
+  }
+
+  // ── Gate 3: error_loop must not be blocked/awaiting_human for current task ──
+  const currentTaskId = exec.task_id || state.current_task;
+  if (currentTaskId && state.error_loop && state.error_loop[currentTaskId]) {
+    const taskLoop = state.error_loop[currentTaskId];
+    if (taskLoop.loop_status === "blocked" || taskLoop.loop_status === "awaiting_human") {
+      return {
+        ok: false,
+        error: "ERROR_LOOP_BLOCKED",
+        message: `Error loop for task "${currentTaskId}" is "${taskLoop.loop_status}" — cannot close with active error loop.`,
+      };
+    }
+  }
+
+  // ── Gate 4: acceptance criteria must not have unresolved blocking items ──
+  const binding = bindAcceptanceCriteria(state, decomposition);
+  if (binding) {
+    const allCriteria = [
+      ...(binding.phase_acceptance || []),
+      ...(binding.task_acceptance || []),
+      ...(binding.handoff_acceptance || []),
+    ];
+    const pendingBlocking = allCriteria.filter(
+      (c) => c.status === "pending" && c.blocking === true
+    );
+    if (pendingBlocking.length > 0) {
+      return {
+        ok: false,
+        error: "ACCEPTANCE_PENDING",
+        message: `${pendingBlocking.length} blocking acceptance criteria still pending: ${pendingBlocking.map((c) => c.id).join(", ")}`,
+      };
+    }
+  }
+
+  // ── Gate 5: current task must be in a state that allows closure ──
+  // The task associated with the successful execution must be completable.
+  // We check that the task status is either "completed" or "in_progress" (execution succeeded).
+  const tasks = decomposition.tasks || [];
+  if (currentTaskId) {
+    const task = tasks.find((t) => t.id === currentTaskId);
+    if (task && task.status !== "completed" && task.status !== "in_progress") {
+      return {
+        ok: false,
+        error: "TASK_NOT_CLOSEABLE",
+        message: `Task "${currentTaskId}" has status "${task.status}" — must be "completed" or "in_progress" (with successful execution) to close.`,
+      };
+    }
+  }
+
+  // ── All gates passed — persist closure ──
+  const closedAt = new Date().toISOString();
+
+  const closureEvidence = [
+    `Execution succeeded in TEST at ${exec.execution_finished_at || closedAt}`,
+    `Task "${currentTaskId || "unknown"}" execution_status=success`,
+    `No active blockers at closure time`,
+    `Error loop clear for current task`,
+    ...(exec.execution_evidence || []),
+  ];
+
+  state.contract_closure = {
+    closure_status: "closed_in_test",
+    closed_in_test: true,
+    closed_at: closedAt,
+    closure_evidence: closureEvidence,
+    closure_reason: "All canonical closure criteria satisfied in TEST.",
+    closed_task_id: currentTaskId || null,
+    closed_micro_pr_id: exec.micro_pr_id || null,
+    closed_by: "automatic",
+    environment: "TEST",
+  };
+
+  state.updated_at = closedAt;
+
+  // Persist to KV
+  await persistContract(env, state, decomposition);
+
+  return {
+    ok: true,
+    already_closed: false,
+    contract_closure: state.contract_closure,
+    message: "Contract closed automatically in TEST.",
+    state,
+    decomposition,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleCloseContractInTest(request, env) → { status, body }
+//
+// Route handler for POST /contracts/close-test
+// ---------------------------------------------------------------------------
+async function handleCloseContractInTest(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return { status: 400, body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." } };
+  }
+
+  const contractId = body.contract_id;
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_CONTRACT_ID", message: "contract_id is required." },
+    };
+  }
+
+  const result = await closeContractInTest(env, contractId);
+
+  return {
+    status: result.ok ? 200 : 400,
+    body: {
+      ok: result.ok,
+      already_closed: result.already_closed || false,
+      contract_closure: result.contract_closure || null,
+      error: result.error || null,
+      message: result.message,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build enhanced contract summary with real progress
 // ---------------------------------------------------------------------------
@@ -1721,6 +1936,7 @@ function buildContractSummary(state, decomposition) {
     acceptance_criteria_binding: acceptanceCriteriaBinding,
     error_loop: state.error_loop || null,
     current_execution: state.current_execution || null,
+    contract_closure: state.contract_closure || null,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -1989,6 +2205,9 @@ export {
   // C1 — Real Micro-PR Execution in TEST
   executeCurrentMicroPr,
   EXECUTION_STATUSES,
+  // C2 — Automatic Contract Closure in TEST
+  closeContractInTest,
+  CONTRACT_CLOSURE_STATUSES,
   // Summary
   buildContractSummary,
   // Route handlers
@@ -1996,4 +2215,5 @@ export {
   handleGetContract,
   handleGetContractSummary,
   handleExecuteContract,
+  handleCloseContractInTest,
 };

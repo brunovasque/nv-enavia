@@ -3,6 +3,7 @@ import {
   handleGetContract,
   handleGetContractSummary,
   handleExecuteContract,
+  handleCloseContractInTest,
 } from "./contract-executor.js";
 
 // ============================================================================
@@ -4545,6 +4546,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/close-test → Automatic contract closure in TEST (C2)
+      if (method === "POST" && path === "/contracts/close-test") {
+        const result = await handleCloseContractInTest(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -4562,6 +4569,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /brain/get-module → Ler conteúdo de módulo",
             "  • POST /contracts      → Criar contrato (Contract Executor v1)",
             "  • POST /contracts/execute → Executar micro-PR corrente em TEST (C1)",
+            "  • POST /contracts/close-test → Fechamento automático de contrato em TEST (C2)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",
