@@ -2578,8 +2578,8 @@ async function runTests() {
     const summaryResult = await handleGetContractSummary(env, "ctr_test_001");
     assert(summaryResult.status === 200, "summary status 200");
     // error_loop should be null when no errors recorded
-    assert(summaryResult.body.error_loop === null || summaryResult.body.error_loop === undefined,
-      "error_loop is null/undefined when no errors");
+    assert(summaryResult.body.error_loop === null,
+      "error_loop is null when no errors");
   }
 
   // ---- Test 121: recordError — multiple tasks have independent loops ----
