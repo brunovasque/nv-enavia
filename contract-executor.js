@@ -1298,6 +1298,20 @@ function resolveNextAction(state, decomposition) {
     };
   }
 
+  // ── Rule 2b: Contract blocked because max_micro_prs limit was exceeded ──
+  if (state.current_phase === "max_prs_exceeded") {
+    return {
+      type: "contract_blocked",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: blockers.length > 0
+        ? `max_micro_prs limit exceeded: ${blockers.join("; ")}`
+        : "Contract is blocked — max_micro_prs limit exceeded.",
+      status: "blocked",
+    };
+  }
+
   // ── Rule 3: All phases done but contract not yet completed ──
   // This covers the case where human approval is needed for final sign-off.
   // (See awaiting_human_approval return below after active phase check.)
@@ -2356,6 +2370,9 @@ async function closeContractInTest(env, contractId) {
 
   // F1 — Cancellation guard
   if (isCancelledContract(state)) { return cancelledResult(contractId); }
+
+  // F2 — Plan-rejection guard (rejected plan must block TEST closure)
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
 
   // ── Guard: already closed ──
   if (state.contract_closure && state.contract_closure.closure_status === "closed_in_test") {
