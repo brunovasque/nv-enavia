@@ -3318,6 +3318,99 @@ async function runTests() {
     assert(result.body.execution_status === "failed", "execution_status is failed");
   }
 
+  // ---- Test 152: Task with TEST micro-PR executes with non-null micro_pr_id ----
+  {
+    console.log("Test 152: Execution requires real TEST micro-PR — micro_pr_id is never null");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_152" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_152");
+    await startTask(env, "ctr_c1_152", "task_001");
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_152", { evidence: ["real mpr"] });
+    assert(result.ok === true, "execution succeeded");
+    assert(result.micro_pr_id !== null, "micro_pr_id is NOT null");
+    assert(result.micro_pr_id === "micro_pr_001", "micro_pr_id is the real TEST micro-PR");
+
+    // Verify in persisted state too
+    const { state } = await rehydrateContract(env, "ctr_c1_152");
+    assert(state.current_execution.micro_pr_id !== null, "persisted micro_pr_id is NOT null");
+  }
+
+  // ---- Test 153: Task without TEST micro-PR fails with NO_ACTIVE_TEST_MICRO_PR ----
+  {
+    console.log("Test 153: Task without TEST micro-PR fails controlled");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_153" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_153");
+    await startTask(env, "ctr_c1_153", "task_001");
+
+    // Manually remove the TEST micro-PR for task_001 so there's none available
+    let { state, decomposition } = await rehydrateContract(env, "ctr_c1_153");
+    decomposition.micro_pr_candidates = decomposition.micro_pr_candidates.filter(
+      (m) => !(m.task_id === "task_001" && m.environment === "TEST")
+    );
+    await env.ENAVIA_BRAIN.put("contract:ctr_c1_153:decomposition", JSON.stringify(decomposition));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_153");
+    assert(result.ok === false, "execution fails");
+    assert(result.error === "NO_ACTIVE_TEST_MICRO_PR", "error is NO_ACTIVE_TEST_MICRO_PR");
+    assert(result.message.includes("task_001"), "message references the task");
+  }
+
+  // ---- Test 154: TEST + PROD micro-PRs for same task → selects TEST explicitly ----
+  {
+    console.log("Test 154: Simultaneous TEST + PROD micro-PRs — selects TEST");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_154" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_154");
+    await startTask(env, "ctr_c1_154", "task_001");
+
+    // Add a PROD micro-PR for the same task (before the TEST one in array order)
+    let { decomposition } = await rehydrateContract(env, "ctr_c1_154");
+    decomposition.micro_pr_candidates.unshift({
+      id: "micro_pr_prod_001",
+      task_id: "task_001",
+      title: "ctr_c1_154 — PROD duplicate",
+      status: "queued",
+      target_workers: ["nv-enavia"],
+      target_routes: ["/test-route"],
+      environment: "PROD",
+    });
+    await env.ENAVIA_BRAIN.put("contract:ctr_c1_154:decomposition", JSON.stringify(decomposition));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_154", { evidence: ["test+prod"] });
+    assert(result.ok === true, "execution succeeded");
+    assert(result.micro_pr_id === "micro_pr_001", "selected the TEST micro-PR, not the PROD one");
+    assert(result.handoff_used.scope.environment === "TEST", "handoff environment is TEST");
+  }
+
+  // ---- Test 155: Only PROD micro-PR for task → fails with NO_ACTIVE_TEST_MICRO_PR ----
+  {
+    console.log("Test 155: Only PROD micro-PR for task — fails controlled");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_155" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_155");
+    await startTask(env, "ctr_c1_155", "task_001");
+
+    // Replace the TEST micro-PR with a PROD-only one
+    let { decomposition } = await rehydrateContract(env, "ctr_c1_155");
+    decomposition.micro_pr_candidates = decomposition.micro_pr_candidates.map((m) => {
+      if (m.task_id === "task_001" && m.environment === "TEST") {
+        return Object.assign({}, m, { environment: "PROD" });
+      }
+      return m;
+    });
+    await env.ENAVIA_BRAIN.put("contract:ctr_c1_155:decomposition", JSON.stringify(decomposition));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_155");
+    assert(result.ok === false, "execution fails");
+    assert(result.error === "NO_ACTIVE_TEST_MICRO_PR", "error is NO_ACTIVE_TEST_MICRO_PR");
+  }
+
   // ---- Summary ----
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);

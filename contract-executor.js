@@ -1494,7 +1494,21 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
   const mprs = decomposition.micro_pr_candidates || [];
   const activePhase = phases.find((p) => p.tasks && p.tasks.includes(currentTaskId))
     || phases.find((p) => p.status !== "done");
-  const targetMpr = mprs.find((m) => m.task_id === currentTaskId && (m.status === "queued" || m.status === "in_progress"));
+  // Select the TEST micro-PR explicitly: must match task, environment, and actionable status.
+  // filter() + explicit pick avoids depending on array order.
+  const testMprCandidates = mprs.filter(
+    (m) => m.task_id === currentTaskId && m.environment === "TEST" && (m.status === "queued" || m.status === "in_progress")
+  );
+  const targetMpr = testMprCandidates.length > 0 ? testMprCandidates[0] : null;
+
+  // Gate 3a: A real TEST micro-PR is mandatory for C1 execution
+  if (!targetMpr) {
+    return {
+      ok: false,
+      error: "NO_ACTIVE_TEST_MICRO_PR",
+      message: `No active TEST micro-PR found for task "${currentTaskId}" — C1 requires a real micro-PR in TEST environment.`,
+    };
+  }
 
   const handoffObjective = task.description;
   if (!handoffObjective) {
@@ -1505,13 +1519,9 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     };
   }
 
-  const scopeWorkers = targetMpr
-    ? (targetMpr.target_workers || [])
-    : (state.scope && state.scope.workers) || [];
-  const scopeRoutes = targetMpr
-    ? (targetMpr.target_routes || [])
-    : (state.scope && state.scope.routes) || [];
-  const handoffEnvironment = targetMpr ? targetMpr.environment : "TEST";
+  const scopeWorkers = targetMpr.target_workers || [];
+  const scopeRoutes = targetMpr.target_routes || [];
+  const handoffEnvironment = targetMpr.environment;
   const handoff = {
     objective: handoffObjective,
     scope: {
@@ -1530,7 +1540,7 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     acceptance_criteria: [task.description, "Smoke test in TEST passes", "No new blockers introduced"],
     source_phase: activePhase ? activePhase.id : null,
     source_task: currentTaskId,
-    source_micro_pr: targetMpr ? targetMpr.id : null,
+    source_micro_pr: targetMpr.id,
     generated_at: new Date().toISOString(),
   };
   // Build target files from scope workers
@@ -1553,7 +1563,7 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
 
   // ── Record execution start ──
   const executionStartedAt = new Date().toISOString();
-  const microPrId = targetMpr ? targetMpr.id : null;
+  const microPrId = targetMpr.id;
 
   state.current_execution = {
     contract_id: contractId,
@@ -1908,7 +1918,7 @@ async function handleExecuteContract(request, env) {
   // Determine appropriate HTTP status
   const clientErrors = [
     "NO_CURRENT_TASK", "TASK_NOT_IN_PROGRESS", "NO_VALID_HANDOFF",
-    "NOT_TEST_ENVIRONMENT", "TASK_ORDER_MISMATCH",
+    "NOT_TEST_ENVIRONMENT", "TASK_ORDER_MISMATCH", "NO_ACTIVE_TEST_MICRO_PR",
   ];
   const notFoundErrors = ["CONTRACT_NOT_FOUND", "DECOMPOSITION_NOT_FOUND", "TASK_NOT_FOUND"];
   let httpStatus = 500;
