@@ -3544,7 +3544,9 @@ async function runTests() {
 
     const closeResult = await closeContractInTest(env, "ctr_c2_160");
     assert(closeResult.ok === false, "closure rejected");
-    assert(closeResult.error === "ACCEPTANCE_PENDING" || closeResult.error === "ACTIVE_BLOCKERS", "error indicates pending work");
+    // After completing task_001 with remaining tasks, the phase gate blocks advancement
+    // and sets contract to blocked — so ACTIVE_BLOCKERS fires before ACCEPTANCE_PENDING
+    assert(closeResult.error === "ACTIVE_BLOCKERS", "error is ACTIVE_BLOCKERS (incomplete tasks in phase)");
   }
 
   // ---- Test 161: Closure persists and survives rehydration ----
@@ -3757,7 +3759,8 @@ async function runTests() {
 
     const closeResult = await closeContractInTest(env, "ctr_c2_173");
     assert(closeResult.ok === false, "closure rejected");
-    assert(closeResult.error === "TASK_NOT_CLOSEABLE" || closeResult.error === "ACTIVE_BLOCKERS" || closeResult.error === "ACCEPTANCE_PENDING", "error indicates blocked/non-closeable state");
+    // When a task is blocked, the phase gate sets contract.blockers — so ACTIVE_BLOCKERS fires first
+    assert(closeResult.error === "ACTIVE_BLOCKERS", "error is ACTIVE_BLOCKERS (blocked task causes phase-level blocker)");
   }
 
   // ---- Test 174: Summary without closure shows null contract_closure ----
@@ -3770,6 +3773,27 @@ async function runTests() {
     const { state, decomposition } = await rehydrateContract(env, "ctr_c2_174");
     const summary = buildContractSummary(state, decomposition);
     assert(summary.contract_closure === null, "contract_closure is null before closure");
+  }
+
+  // ---- Test 175: TASK_NOT_CLOSEABLE when task is queued (manually injected) ----
+  {
+    console.log("Test 175: TASK_NOT_CLOSEABLE when execution task is queued");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_175");
+
+    // Manually set the executed task back to "queued" to trigger TASK_NOT_CLOSEABLE
+    let { state, decomposition } = await rehydrateContract(env, "ctr_c2_175");
+    const execTaskId = state.current_execution.task_id;
+    const task = decomposition.tasks.find((t) => t.id === execTaskId);
+    if (task) task.status = "queued";
+    // Clear blockers to ensure we reach the task gate
+    state.blockers = [];
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_175:state", JSON.stringify(state));
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_175:decomposition", JSON.stringify(decomposition));
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_175");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "TASK_NOT_CLOSEABLE" || closeResult.error === "ACCEPTANCE_PENDING", "error is TASK_NOT_CLOSEABLE or ACCEPTANCE_PENDING");
   }
 
   // ---- Summary ----
