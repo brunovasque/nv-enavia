@@ -65,7 +65,7 @@ const LEVEL_TO_PLAN_TYPE = {
 //   classification {object} — saída canônica do classifyRequest (PM4):
 //     complexity_level     {string}  — "A" | "B" | "C"  (obrigatório)
 //     risk_level           {string}  — "baixo" | "médio" | "alto"
-//     needs_human_approval {boolean}
+//     needs_human_approval {boolean}  — (opcional) se ausente, assume true para C e false para A/B
 //     reason               {string}
 //   envelope {object} — saída canônica do buildOutputEnvelope (PM5):
 //     output_mode {string}  — "quick_reply" | "tactical_plan" | "formal_contract"
