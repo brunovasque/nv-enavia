@@ -25,7 +25,7 @@ const KV_INDEX_KEY = "contract:index";
 // ---------------------------------------------------------------------------
 // Valid statuses for Phase A
 // ---------------------------------------------------------------------------
-const VALID_STATUSES = ["draft", "approved", "decomposed", "blocked", "failed", "in_progress", "completed"];
+const VALID_STATUSES = ["draft", "approved", "decomposed", "blocked", "failed", "in_progress", "completed", "cancelled", "test-complete"];
 
 // ---------------------------------------------------------------------------
 // Valid statuses for Tasks
@@ -287,6 +287,136 @@ async function rehydrateContract(env, contractId) {
 }
 
 // ---------------------------------------------------------------------------
+// Cancelled-contract guard — used by all mutation functions
+// ---------------------------------------------------------------------------
+function isCancelledContract(state) {
+  return state && state.status_global === "cancelled";
+}
+
+function cancelledResult(contractId) {
+  return {
+    ok: false,
+    error: "CONTRACT_CANCELLED",
+    message: `Contract "${contractId}" is cancelled — no further actions allowed.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// F1 — Formal Contract Cancellation
+//
+// cancelContract(env, contractId, params)
+//   params.reason       — human-readable cancellation reason (optional)
+//   params.cancelled_by — identifier of the actor (optional, defaults to "human")
+//   params.evidence     — array of evidence strings (optional)
+//
+// Behaviour:
+//   1. Rehydrates from KV (INVARIANT 1+3)
+//   2. Validates contract exists
+//   3. Idempotent if already cancelled
+//   4. Persists cancellation state
+//   5. Blocks any further normal execution
+// ---------------------------------------------------------------------------
+async function cancelContract(env, contractId, params) {
+  const p = params || {};
+
+  // INVARIANT 1+3 — rehydrate from KV
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+
+  // Idempotent: already cancelled
+  if (isCancelledContract(state)) {
+    return {
+      ok: true,
+      already_cancelled: true,
+      contract_cancellation: state.contract_cancellation,
+      message: "Contract already cancelled.",
+      state,
+      decomposition,
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  state.contract_cancellation = {
+    cancelled: true,
+    cancelled_at: now,
+    cancel_reason: p.reason || null,
+    cancelled_by: p.cancelled_by || "human",
+    cancellation_evidence: Array.isArray(p.evidence) ? p.evidence : [],
+    previous_status_global: state.status_global,
+    previous_current_phase: state.current_phase,
+  };
+
+  state.status_global = "cancelled";
+  state.next_action = "Contract cancelled. No further actions.";
+  state.updated_at = now;
+
+  await persistContract(env, state, decomposition);
+
+  return {
+    ok: true,
+    already_cancelled: false,
+    contract_cancellation: state.contract_cancellation,
+    message: "Contract cancelled successfully.",
+    state,
+    decomposition,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleCancelContract(request, env) → { status, body }
+//
+// Route handler for POST /contracts/cancel
+// ---------------------------------------------------------------------------
+async function handleCancelContract(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return { status: 400, body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." } };
+  }
+
+  const contractId = body.contract_id;
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_CONTRACT_ID", message: "contract_id is required." },
+    };
+  }
+
+  const result = await cancelContract(env, contractId, {
+    reason: body.reason || null,
+    cancelled_by: body.cancelled_by || "human",
+    evidence: body.evidence || [],
+  });
+
+  if (!result.ok) {
+    const httpStatus = result.error === "CONTRACT_NOT_FOUND" ? 404 : 400;
+    return {
+      status: httpStatus,
+      body: {
+        ok: false,
+        error: result.error,
+        message: result.message,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      already_cancelled: result.already_cancelled || false,
+      contract_cancellation: result.contract_cancellation,
+      message: result.message,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // INVARIANT 2 — Mandatory Phase Gate
 //
 // Returns { canAdvance, activePhaseId, reason }.
@@ -357,6 +487,11 @@ async function advanceContractPhase(env, contractId) {
 
   if (!state) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found in KV.` };
+  }
+
+  // F1 — Cancellation guard
+  if (isCancelledContract(state)) {
+    return cancelledResult(contractId);
   }
 
   // INVARIANT 2 — evaluate phase gate against persisted state
@@ -447,6 +582,7 @@ async function startTask(env, contractId, taskId) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const task = (decomposition.tasks || []).find((t) => t.id === taskId);
   if (!task) {
     return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
@@ -469,6 +605,7 @@ async function completeTask(env, contractId, taskId) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const task = (decomposition.tasks || []).find((t) => t.id === taskId);
   if (!task) {
     return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
@@ -495,6 +632,7 @@ async function blockTask(env, contractId, taskId, reason) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const task = (decomposition.tasks || []).find((t) => t.id === taskId);
   if (!task) {
     return { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` };
@@ -526,6 +664,7 @@ async function startMicroPrCandidate(env, contractId, microPrId) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -546,6 +685,7 @@ async function completeMicroPrCandidate(env, contractId, microPrId) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -566,6 +706,7 @@ async function blockMicroPrCandidate(env, contractId, microPrId, reason) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -587,6 +728,7 @@ async function discardMicroPrCandidate(env, contractId, microPrId, reason) {
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
   }
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
   const mpr = (decomposition.micro_pr_candidates || []).find((m) => m.id === microPrId);
   if (!mpr) {
     return { ok: false, error: "MICRO_PR_NOT_FOUND", message: `Micro-PR "${microPrId}" not found in contract "${contractId}".` };
@@ -650,6 +792,18 @@ function resolveNextAction(state, decomposition) {
   const tasks = decomposition.tasks || [];
   const mprs = decomposition.micro_pr_candidates || [];
   const blockers = state.blockers || [];
+
+  // ── Rule 0: Contract cancelled — no further actions ──
+  if (isCancelledContract(state)) {
+    return {
+      type: "contract_cancelled",
+      phase_id: null,
+      task_id: null,
+      micro_pr_candidate_id: null,
+      reason: "Contract has been formally cancelled.",
+      status: "cancelled",
+    };
+  }
 
   // ── Rule 1: Contract already completed ──
   if (state.status_global === "completed" || state.current_phase === "all_phases_complete") {
@@ -1465,6 +1619,9 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     return { ok: false, error: "DECOMPOSITION_NOT_FOUND", message: `Decomposition for "${contractId}" not found.` };
   }
 
+  // F1 — Cancellation guard
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
+
   // ── Gate 1: current_task must exist and be valid ──
   const currentTaskId = state.current_task;
   if (!currentTaskId) {
@@ -1727,6 +1884,9 @@ async function closeContractInTest(env, contractId) {
     return { ok: false, error: "DECOMPOSITION_NOT_FOUND", message: `Decomposition for "${contractId}" not found.` };
   }
 
+  // F1 — Cancellation guard
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
+
   // ── Guard: already closed ──
   if (state.contract_closure && state.contract_closure.closure_status === "closed_in_test") {
     return {
@@ -1945,6 +2105,7 @@ function buildContractSummary(state, decomposition) {
     error_loop: state.error_loop || null,
     current_execution: state.current_execution || null,
     contract_closure: state.contract_closure || null,
+    contract_cancellation: state.contract_cancellation || null,
     tasks_total: tasks.length,
     tasks_completed: tasksCompleted,
     tasks_blocked: tasksBlocked,
@@ -2216,6 +2377,9 @@ export {
   // C2 — Automatic Contract Closure in TEST
   closeContractInTest,
   CONTRACT_CLOSURE_STATUSES,
+  // F1 — Formal Contract Cancellation
+  cancelContract,
+  isCancelledContract,
   // Summary
   buildContractSummary,
   // Route handlers
@@ -2224,4 +2388,5 @@ export {
   handleGetContractSummary,
   handleExecuteContract,
   handleCloseContractInTest,
+  handleCancelContract,
 };

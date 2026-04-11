@@ -55,6 +55,9 @@ import {
   closeContractInTest,
   CONTRACT_CLOSURE_STATUSES,
   handleCloseContractInTest,
+  cancelContract,
+  isCancelledContract,
+  handleCancelContract,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -3834,6 +3837,359 @@ async function runTests() {
       closeResult.error === "ACTIVE_BLOCKERS",
       "error blocks in_progress closure: " + closeResult.error
     );
+  }
+
+  // ============================================================================
+  // 🔒 F1 — Formal Contract Cancellation Tests
+  // ============================================================================
+  console.log("\n" + "=".repeat(50));
+  console.log("F1 — Formal Contract Cancellation Tests");
+  console.log("=".repeat(50));
+
+  // ---- Test 177: Successful cancellation of existing contract ----
+  console.log("\nTest 177: Successful cancellation of existing contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_177" })), env);
+
+    const result = await cancelContract(env, "ctr_f1_177", {
+      reason: "Client requested cancellation",
+      cancelled_by: "admin",
+      evidence: ["Email from client"],
+    });
+
+    assert(result.ok === true, "cancellation succeeded");
+    assert(result.already_cancelled === false, "not already cancelled");
+    assert(result.contract_cancellation.cancelled === true, "cancelled flag is true");
+    assert(result.contract_cancellation.cancel_reason === "Client requested cancellation", "reason persisted");
+    assert(result.contract_cancellation.cancelled_by === "admin", "cancelled_by persisted");
+    assert(result.contract_cancellation.cancellation_evidence.length === 1, "evidence persisted");
+    assert(result.contract_cancellation.cancelled_at !== undefined, "cancelled_at set");
+    assert(result.contract_cancellation.previous_status_global === "decomposed", "previous status preserved");
+    assert(result.state.status_global === "cancelled", "status_global is cancelled");
+    assert(result.state.next_action === "Contract cancelled. No further actions.", "next_action updated");
+  }
+
+  // ---- Test 178: Cancellation with reason persisted ----
+  console.log("\nTest 178: Cancellation with reason persisted and rehydrated");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_178" })), env);
+
+    await cancelContract(env, "ctr_f1_178", { reason: "Budget cut" });
+
+    // Rehydrate and check persistence
+    const { state } = await rehydrateContract(env, "ctr_f1_178");
+    assert(state.status_global === "cancelled", "rehydrated status_global is cancelled");
+    assert(state.contract_cancellation.cancel_reason === "Budget cut", "rehydrated reason matches");
+    assert(state.contract_cancellation.cancelled === true, "rehydrated cancelled flag");
+    assert(state.contract_cancellation.cancelled_at !== undefined, "rehydrated cancelled_at set");
+  }
+
+  // ---- Test 179: Rehydration maintains cancelled state ----
+  console.log("\nTest 179: Rehydration maintains cancelled state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_179" })), env);
+    await cancelContract(env, "ctr_f1_179", { reason: "Testing persistence" });
+
+    // Rehydrate
+    const { state, decomposition } = await rehydrateContract(env, "ctr_f1_179");
+    assert(state.status_global === "cancelled", "status_global survived rehydration");
+    assert(state.contract_cancellation !== undefined, "contract_cancellation survived rehydration");
+    assert(state.contract_cancellation.cancelled === true, "cancelled flag survived");
+    assert(isCancelledContract(state) === true, "isCancelledContract returns true after rehydration");
+    assert(decomposition !== null, "decomposition still exists");
+  }
+
+  // ---- Test 180: Summary/API exposes cancelled contract ----
+  console.log("\nTest 180: Summary/API exposes cancelled contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_180" })), env);
+    await cancelContract(env, "ctr_f1_180", { reason: "Summary test" });
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_f1_180");
+    const summary = buildContractSummary(state, decomposition);
+    assert(summary.status_global === "cancelled", "summary shows cancelled");
+    assert(summary.contract_cancellation !== null, "summary has contract_cancellation");
+    assert(summary.contract_cancellation.cancelled === true, "summary cancellation flag");
+    assert(summary.contract_cancellation.cancel_reason === "Summary test", "summary cancel_reason");
+
+    // resolveNextAction returns contract_cancelled
+    const nextAction = resolveNextAction(state, decomposition);
+    assert(nextAction.type === "contract_cancelled", "next action type is contract_cancelled");
+    assert(nextAction.status === "cancelled", "next action status is cancelled");
+  }
+
+  // ---- Test 181: Already cancelled contract returns idempotent response ----
+  console.log("\nTest 181: Already cancelled contract returns idempotent response");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_181" })), env);
+
+    // Cancel first time
+    const first = await cancelContract(env, "ctr_f1_181", { reason: "First cancel" });
+    assert(first.ok === true, "first cancellation ok");
+    assert(first.already_cancelled === false, "first is not already_cancelled");
+
+    // Cancel second time — idempotent
+    const second = await cancelContract(env, "ctr_f1_181", { reason: "Second cancel" });
+    assert(second.ok === true, "second cancellation ok (idempotent)");
+    assert(second.already_cancelled === true, "second is already_cancelled");
+    assert(second.contract_cancellation.cancel_reason === "First cancel", "original reason preserved");
+  }
+
+  // ---- Test 182: Cancellation of non-existent contract fails ----
+  console.log("\nTest 182: Cancellation of non-existent contract fails");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const result = await cancelContract(env, "ctr_f1_nonexistent", {});
+    assert(result.ok === false, "cancellation failed");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 183: Cancelled contract cannot advance phase ----
+  console.log("\nTest 183: Cancelled contract cannot advance phase");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_183" })), env);
+    await cancelContract(env, "ctr_f1_183", { reason: "Block advance" });
+
+    const result = await advanceContractPhase(env, "ctr_f1_183");
+    assert(result.ok === false, "advance rejected");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 184: Cancelled contract cannot start task ----
+  console.log("\nTest 184: Cancelled contract cannot start task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_184" })), env);
+    await cancelContract(env, "ctr_f1_184", { reason: "Block startTask" });
+
+    const result = await startTask(env, "ctr_f1_184", "task_001");
+    assert(result.ok === false, "startTask rejected");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 185: Cancelled contract cannot complete task ----
+  console.log("\nTest 185: Cancelled contract cannot complete task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_185" })), env);
+    // Start task first, then cancel, then try to complete
+    await advanceContractPhase(env, "ctr_f1_185");
+    await startTask(env, "ctr_f1_185", "task_001");
+    await cancelContract(env, "ctr_f1_185", { reason: "Block completeTask" });
+
+    const result = await completeTask(env, "ctr_f1_185", "task_001");
+    assert(result.ok === false, "completeTask rejected");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 186: Cancelled contract cannot execute micro-PR ----
+  console.log("\nTest 186: Cancelled contract cannot execute micro-PR");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_186" })), env);
+    await advanceContractPhase(env, "ctr_f1_186");
+    await startTask(env, "ctr_f1_186", "task_001");
+    await cancelContract(env, "ctr_f1_186", { reason: "Block execution" });
+
+    const result = await executeCurrentMicroPr(env, "ctr_f1_186", {});
+    assert(result.ok === false, "execution rejected");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 187: Cancelled contract cannot close in TEST ----
+  console.log("\nTest 187: Cancelled contract cannot close in TEST");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_187" })), env);
+    await cancelContract(env, "ctr_f1_187", { reason: "Block closure" });
+
+    const result = await closeContractInTest(env, "ctr_f1_187");
+    assert(result.ok === false, "closure rejected");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 188: Cancelled contract cannot block/discard micro-PR ----
+  console.log("\nTest 188: Cancelled contract cannot block/discard micro-PR");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_188" })), env);
+    await cancelContract(env, "ctr_f1_188", { reason: "Block micro-PR ops" });
+
+    const r1 = await startMicroPrCandidate(env, "ctr_f1_188", "micro_pr_001");
+    assert(r1.ok === false && r1.error === "CONTRACT_CANCELLED", "startMicroPr blocked");
+    const r2 = await completeMicroPrCandidate(env, "ctr_f1_188", "micro_pr_001");
+    assert(r2.ok === false && r2.error === "CONTRACT_CANCELLED", "completeMicroPr blocked");
+    const r3 = await blockMicroPrCandidate(env, "ctr_f1_188", "micro_pr_001");
+    assert(r3.ok === false && r3.error === "CONTRACT_CANCELLED", "blockMicroPr blocked");
+    const r4 = await discardMicroPrCandidate(env, "ctr_f1_188", "micro_pr_001");
+    assert(r4.ok === false && r4.error === "CONTRACT_CANCELLED", "discardMicroPr blocked");
+  }
+
+  // ---- Test 189: handleCancelContract route handler — success ----
+  console.log("\nTest 189: handleCancelContract route handler — success");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_189" })), env);
+
+    const req = mockRequest({ contract_id: "ctr_f1_189", reason: "Route test", cancelled_by: "operator" });
+    const result = await handleCancelContract(req, env);
+    assert(result.status === 200, "HTTP 200");
+    assert(result.body.ok === true, "body.ok is true");
+    assert(result.body.contract_cancellation.cancel_reason === "Route test", "reason in response");
+    assert(result.body.already_cancelled === false, "not already cancelled");
+  }
+
+  // ---- Test 190: handleCancelContract — missing contract_id ----
+  console.log("\nTest 190: handleCancelContract — missing contract_id");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const req = mockRequest({ reason: "no id" });
+    const result = await handleCancelContract(req, env);
+    assert(result.status === 400, "HTTP 400");
+    assert(result.body.error === "MISSING_CONTRACT_ID", "error is MISSING_CONTRACT_ID");
+  }
+
+  // ---- Test 191: handleCancelContract — invalid JSON ----
+  console.log("\nTest 191: handleCancelContract — invalid JSON");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const req = mockRequest(null);
+    const result = await handleCancelContract(req, env);
+    assert(result.status === 400, "HTTP 400 for invalid JSON");
+    assert(result.body.error === "INVALID_JSON", "error is INVALID_JSON");
+  }
+
+  // ---- Test 192: handleCancelContract — contract not found ----
+  console.log("\nTest 192: handleCancelContract — contract not found");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const req = mockRequest({ contract_id: "nonexistent" });
+    const result = await handleCancelContract(req, env);
+    assert(result.status === 404, "HTTP 404");
+    assert(result.body.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 193: handleCancelContract — idempotent via route ----
+  console.log("\nTest 193: handleCancelContract — idempotent via route");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_193" })), env);
+
+    // First cancel
+    const r1 = await handleCancelContract(mockRequest({ contract_id: "ctr_f1_193", reason: "First" }), env);
+    assert(r1.status === 200, "first cancel HTTP 200");
+    assert(r1.body.already_cancelled === false, "first not already cancelled");
+
+    // Second cancel — idempotent
+    const r2 = await handleCancelContract(mockRequest({ contract_id: "ctr_f1_193", reason: "Second" }), env);
+    assert(r2.status === 200, "second cancel HTTP 200 (idempotent)");
+    assert(r2.body.already_cancelled === true, "second already cancelled");
+  }
+
+  // ---- Test 194: Cancellation without reason still works ----
+  console.log("\nTest 194: Cancellation without reason still works");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_194" })), env);
+
+    const result = await cancelContract(env, "ctr_f1_194", {});
+    assert(result.ok === true, "cancellation ok without reason");
+    assert(result.contract_cancellation.cancel_reason === null, "cancel_reason is null");
+    assert(result.contract_cancellation.cancelled_by === "human", "default cancelled_by is human");
+  }
+
+  // ---- Test 195: GET contract after cancellation shows full state ----
+  console.log("\nTest 195: GET contract after cancellation shows full state");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_195" })), env);
+    await cancelContract(env, "ctr_f1_195", { reason: "GET test" });
+
+    const result = await handleGetContract(env, "ctr_f1_195");
+    assert(result.status === 200, "GET returns 200");
+    assert(result.body.contract.status_global === "cancelled", "GET shows cancelled status");
+    assert(result.body.contract.contract_cancellation !== undefined, "GET shows cancellation data");
+    assert(result.body.contract.contract_cancellation.cancelled === true, "cancellation flag in GET");
+  }
+
+  // ---- Test 196: Summary after cancellation shows cancellation data ----
+  console.log("\nTest 196: Summary after cancellation shows cancellation data");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_196" })), env);
+    await cancelContract(env, "ctr_f1_196", { reason: "Summary cancel test" });
+
+    const result = await handleGetContractSummary(env, "ctr_f1_196");
+    assert(result.status === 200, "summary HTTP 200");
+    assert(result.body.status_global === "cancelled", "summary status_global cancelled");
+    assert(result.body.contract_cancellation !== null, "summary has contract_cancellation");
+  }
+
+  // ---- Test 197: blockTask on cancelled contract is blocked ----
+  console.log("\nTest 197: blockTask on cancelled contract is blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_f1_197" })), env);
+    await cancelContract(env, "ctr_f1_197", { reason: "Block blockTask" });
+
+    const result = await blockTask(env, "ctr_f1_197", "task_001", "test");
+    assert(result.ok === false, "blockTask rejected");
+    assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
+  }
+
+  // ---- Test 198: No existing behaviour broken — normal contract still works after adding cancellation ----
+  console.log("\nTest 198: Normal contract lifecycle still works (regression)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload = Object.assign({}, VALID_PAYLOAD, {
+      contract_id: "ctr_f1_198",
+      definition_of_done: ["Single criterion"],
+    });
+    await handleCreateContract(mockRequest(payload), env);
+
+    // Advance phase
+    const adv = await advanceContractPhase(env, "ctr_f1_198");
+    assert(adv.ok !== undefined, "advance phase works");
+
+    // Start task
+    const st = await startTask(env, "ctr_f1_198", "task_001");
+    assert(st.ok === true, "startTask works on non-cancelled contract");
+
+    // Complete task
+    const ct = await completeTask(env, "ctr_f1_198", "task_001");
+    assert(ct.ok === true, "completeTask works on non-cancelled contract");
+
+    // isCancelledContract returns false for normal contract
+    const { state } = await rehydrateContract(env, "ctr_f1_198");
+    assert(isCancelledContract(state) === false, "isCancelledContract is false for normal contract");
   }
 
   // ---- Summary ----
