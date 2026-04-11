@@ -2795,6 +2795,130 @@ async function runTests() {
     assert(evaluation.retry_count === 4, "retry_count (total history) is 4");
   }
 
+  // ---- Test 128: evaluateErrorLoop — uses canonical MAX_RETRY_ATTEMPTS, ignores lastError.max_attempts ----
+  console.log("\nTest 128: evaluateErrorLoop — limit is immutable/canonical, ignores lastError.max_attempts");
+  {
+    // Build an error loop where lastError has a higher max_attempts — must be ignored
+    const errorLoop = {
+      task_001: {
+        errors: [
+          buildErrorEntry({ code: "E1", classification: "in_scope", retryable: true, max_attempts: 3 }),
+          buildErrorEntry({ code: "E2", classification: "in_scope", retryable: true, max_attempts: 3 }),
+          buildErrorEntry({ code: "E3", classification: "in_scope", retryable: true, max_attempts: 3 }),
+          // 4th error claims max_attempts=10 to try to bypass the block
+          buildErrorEntry({ code: "E4", classification: "in_scope", retryable: true, max_attempts: 10 }),
+        ],
+        active_retry_count: 4,
+      },
+    };
+
+    const evaluation = evaluateErrorLoop(errorLoop, "task_001");
+    // Even though lastError.max_attempts is 10, canonical limit is 3 — must stay blocked
+    assert(evaluation.loop_status === "blocked", "still blocked despite lastError.max_attempts=10");
+    assert(evaluation.retry_allowed === false, "retry_allowed is false");
+    assert(evaluation.active_retry_count === 4, "active_retry_count is 4");
+    assert(evaluation.escalation_reason.includes("Retry limit"), "escalation mentions retry limit");
+  }
+
+  // ---- Test 129: recordError — max_attempts from caller is ignored, entry always stores canonical value ----
+  console.log("\nTest 129: recordError — caller-supplied max_attempts is stripped, canonical value stored");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR_BYPASS",
+      message: "Attempt to set higher limit",
+      retryable: true,
+      classification: "in_scope",
+      max_attempts: 99,
+    });
+
+    assert(result.ok === true, "recordError ok");
+    const entry = result.error_loop.task_001.errors[0];
+    assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, "entry.max_attempts is canonical MAX_RETRY_ATTEMPTS (99 ignored)");
+    assert(entry.max_attempts === 3, "canonical value is 3");
+  }
+
+  // ---- Test 130: recordError — blocked error loop rejects new error even without explicit blockTask call ----
+  console.log("\nTest 130: recordError — blocked error loop (via limit) rejects further errors without explicit blockTask");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // Hit the canonical limit (3 errors)
+    for (let i = 0; i < 3; i++) {
+      await recordError(env, "ctr_test_001", "task_001", {
+        code: "LOOP_ERR",
+        message: `Error attempt ${i + 1}`,
+        retryable: true,
+        classification: "in_scope",
+      });
+    }
+
+    // Verify error loop is blocked
+    let { state } = await rehydrateContract(env, "ctr_test_001");
+    assert(state.error_loop.task_001.loop_status === "blocked", "error loop is blocked after 3 attempts");
+
+    // Now try to record a 4th error with a larger max_attempts — must be rejected
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "BYPASS_ATTEMPT",
+      message: "Should not bypass the blocked loop",
+      retryable: true,
+      classification: "in_scope",
+      max_attempts: 10,
+    });
+
+    assert(result.ok === false, "recordError returns ok=false on error-loop-blocked task");
+    assert(result.error === "TASK_BLOCKED", "error is TASK_BLOCKED");
+
+    // Verify error loop was NOT mutated
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.error_loop.task_001.errors.length === 3, "still only 3 errors in history");
+    assert(state.error_loop.task_001.active_retry_count === 3, "active_retry_count unchanged at 3");
+    assert(state.error_loop.task_001.loop_status === "blocked", "loop_status remains blocked");
+  }
+
+  // ---- Test 131: evaluateErrorLoop — limit stable across multiple errors with varying max_attempts ----
+  console.log("\nTest 131: evaluateErrorLoop — canonical limit is stable even if errors carry different max_attempts");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // Record errors passing different max_attempts values — all must be ignored
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR1", message: "err1", retryable: true, classification: "in_scope", max_attempts: 1,
+    });
+    let { state } = await rehydrateContract(env, "ctr_test_001");
+    // With canonical limit=3, active=1 → must be retrying (not blocked at 1)
+    assert(state.error_loop.task_001.loop_status === "retrying", "retrying at attempt 1 (limit=3, not 1)");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR2", message: "err2", retryable: true, classification: "in_scope", max_attempts: 5,
+    });
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    // active=2 < 3 → still retrying
+    assert(state.error_loop.task_001.loop_status === "retrying", "retrying at attempt 2 (limit=3, not 5)");
+
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR3", message: "err3", retryable: true, classification: "in_scope", max_attempts: 99,
+    });
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    // active=3 >= 3 → blocked (not still retrying due to max_attempts=99)
+    assert(state.error_loop.task_001.loop_status === "blocked", "blocked at attempt 3 (limit=3, not 99)");
+    assert(state.error_loop.task_001.retry_allowed === false, "retry not allowed");
+    // All entries must store canonical MAX_RETRY_ATTEMPTS, not the caller-supplied values
+    for (const entry of state.error_loop.task_001.errors) {
+      assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, `entry max_attempts is canonical: ${entry.max_attempts}`);
+    }
+  }
+
   // ---- Summary ----
   console.log(`\n${"=".repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
