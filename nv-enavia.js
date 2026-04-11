@@ -4,6 +4,7 @@ import {
   handleGetContractSummary,
   handleExecuteContract,
   handleCloseContractInTest,
+  handleCancelContract,
 } from "./contract-executor.js";
 
 // ============================================================================
@@ -4552,6 +4553,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/cancel → Formal contract cancellation (F1)
+      if (method === "POST" && path === "/contracts/cancel") {
+        const result = await handleCancelContract(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -4570,6 +4577,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /contracts      → Criar contrato (Contract Executor v1)",
             "  • POST /contracts/execute → Executar micro-PR corrente em TEST (C1)",
             "  • POST /contracts/close-test → Fechamento automático de contrato em TEST (C2)",
+            "  • POST /contracts/cancel → Cancelamento formal de contrato (F1)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",
