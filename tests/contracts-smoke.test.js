@@ -2168,6 +2168,7 @@ async function runTests() {
     const result = evaluateErrorLoop(null, "task_001");
     assert(result.loop_status === "clear", "null error_loop → clear");
     assert(result.retry_allowed === false, "no retry allowed on clear");
+    assert(result.active_retry_count === 0, "active_retry_count is 0");
     assert(result.retry_count === 0, "retry count is 0");
     assert(result.last_error === null, "last_error is null");
     assert(result.escalation_reason === null, "no escalation reason");
@@ -2199,7 +2200,7 @@ async function runTests() {
     assert(result.ok === true, "recordError returns ok=true");
     assert(result.evaluation.loop_status === "retrying", "loop_status is retrying");
     assert(result.evaluation.retry_allowed === true, "retry_allowed is true");
-    assert(result.evaluation.retry_count === 1, "retry_count is 1");
+    assert(result.evaluation.active_retry_count === 1, "active_retry_count is 1");
     assert(result.evaluation.last_error.code === "BUILD_FAIL", "last_error has correct code");
     assert(result.evaluation.escalation_reason === null, "no escalation yet");
 
@@ -2213,7 +2214,7 @@ async function runTests() {
       classification: "in_scope",
     });
     assert(result2.ok === true, "second recordError ok");
-    assert(result2.evaluation.retry_count === 2, "retry_count is 2");
+    assert(result2.evaluation.active_retry_count === 2, "active_retry_count is 2");
     assert(result2.evaluation.retry_allowed === true, "retry still allowed at count 2");
     assert(result2.evaluation.loop_status === "retrying", "still retrying at count 2");
   }
@@ -2243,7 +2244,8 @@ async function runTests() {
     const evaluation = evaluateErrorLoop(state.error_loop, "task_001");
     assert(evaluation.loop_status === "blocked", "loop_status is blocked after 3 attempts");
     assert(evaluation.retry_allowed === false, "retry_allowed is false after limit");
-    assert(evaluation.retry_count === 3, "retry_count is 3");
+    assert(evaluation.active_retry_count === 3, "active_retry_count is 3");
+    assert(evaluation.retry_count === 3, "retry_count (total history) is 3");
     assert(evaluation.escalation_reason !== null, "escalation_reason is set");
     assert(evaluation.escalation_reason.includes("Retry limit"), "escalation mentions retry limit");
   }
@@ -2340,6 +2342,7 @@ async function runTests() {
     assert(rehydrated.error_loop.task_001 !== undefined, "task_001 entry exists in error_loop");
     assert(rehydrated.error_loop.task_001.errors.length === 1, "1 error persisted");
     assert(rehydrated.error_loop.task_001.loop_status === "retrying", "loop_status persisted as retrying");
+    assert(rehydrated.error_loop.task_001.active_retry_count === 1, "active_retry_count persisted as 1");
     assert(rehydrated.error_loop.task_001.retry_count === 1, "retry_count persisted as 1");
     assert(rehydrated.error_loop.task_001.retry_allowed === true, "retry_allowed persisted as true");
     assert(rehydrated.error_loop.task_001.last_error.code === "BUILD_FAIL", "last_error.code persisted");
@@ -2349,6 +2352,10 @@ async function runTests() {
     assert(
       rehydrated2.error_loop.task_001.errors.length === rehydrated.error_loop.task_001.errors.length,
       "error count consistent across rehydrations"
+    );
+    assert(
+      rehydrated2.error_loop.task_001.active_retry_count === rehydrated.error_loop.task_001.active_retry_count,
+      "active_retry_count consistent across rehydrations"
     );
     assert(
       rehydrated2.error_loop.task_001.loop_status === rehydrated.error_loop.task_001.loop_status,
@@ -2424,23 +2431,23 @@ async function runTests() {
     assert(result.error === "INVALID_ERROR_RECORD", "error is INVALID_ERROR_RECORD");
   }
 
-  // ---- Test 114: recordError — guard: cannot record error on blocked task ----
-  console.log("\nTest 114: recordError — allowed on blocked task (still active)");
+  // ---- Test 114: recordError — guard: blocked task rejects recordError ----
+  console.log("\nTest 114: recordError — blocked task rejects recordError");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     await blockTask(env, "ctr_test_001", "task_001", "Manual block");
 
-    // blocked is NOT in TASK_DONE_STATUSES, so recording should work
+    // blocked task must NOT accept new errors
     const result = await recordError(env, "ctr_test_001", "task_001", {
       code: "RETRY_ON_BLOCKED",
       message: "Error on blocked task",
       retryable: true,
       classification: "in_scope",
     });
-    assert(result.ok === true, "recordError ok on blocked task");
-    assert(result.evaluation.loop_status === "retrying", "loop_status is retrying");
+    assert(result.ok === false, "recordError returns ok=false on blocked task");
+    assert(result.error === "TASK_BLOCKED", "error is TASK_BLOCKED");
   }
 
   // ---- Test 115: recordError — does NOT advance phase or task ----
@@ -2638,6 +2645,154 @@ async function runTests() {
   {
     const entry = buildErrorEntry({ classification: "made_up_category" });
     assert(entry.classification === "unknown", "invalid classification defaults to unknown");
+  }
+
+  // ---- Test 124: active_retry_count is independent from total error history ----
+  console.log("\nTest 124: active_retry_count is independent from total error history");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // Record 2 retryable errors — active cycle at 2, history at 2
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "First error",
+      retryable: true,
+      classification: "in_scope",
+    });
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "Second error",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    let { state } = await rehydrateContract(env, "ctr_test_001");
+    assert(state.error_loop.task_001.active_retry_count === 2, "active_retry_count is 2");
+    assert(state.error_loop.task_001.errors.length === 2, "history has 2 errors");
+    assert(state.error_loop.task_001.retry_count === 2, "retry_count (history) is 2");
+
+    // Directly reset the active_retry_count to simulate a new cycle
+    // (e.g., after human intervention clears the active cycle)
+    state.error_loop.task_001.active_retry_count = 0;
+    await env.ENAVIA_BRAIN.put("contract:ctr_test_001:state", JSON.stringify(state));
+
+    // Record a new error — should use reset active count, not total history
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "BUILD_FAIL",
+      message: "Third error after cycle reset",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.error_loop.task_001.active_retry_count === 1, "active_retry_count is 1 after cycle reset");
+    assert(state.error_loop.task_001.errors.length === 3, "history has 3 errors (all preserved)");
+    assert(state.error_loop.task_001.loop_status === "retrying", "loop_status is retrying (not blocked)");
+    assert(state.error_loop.task_001.retry_allowed === true, "retry_allowed is true in new cycle");
+  }
+
+  // ---- Test 125: active_retry_count blocks at limit, not total history ----
+  console.log("\nTest 125: active_retry_count blocks at limit, not total history");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // Record 2 errors then reset cycle
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR1", message: "err1", retryable: true, classification: "in_scope",
+    });
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "ERR2", message: "err2", retryable: true, classification: "in_scope",
+    });
+
+    // Reset active cycle (human cleared the block)
+    let { state } = await rehydrateContract(env, "ctr_test_001");
+    state.error_loop.task_001.active_retry_count = 0;
+    await env.ENAVIA_BRAIN.put("contract:ctr_test_001:state", JSON.stringify(state));
+
+    // Now record 3 more errors in the new cycle — should block at 3, not earlier
+    for (let i = 0; i < 3; i++) {
+      await recordError(env, "ctr_test_001", "task_001", {
+        code: "NEW_CYCLE",
+        message: `new cycle attempt ${i + 1}`,
+        retryable: true,
+        classification: "in_scope",
+      });
+    }
+
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.error_loop.task_001.active_retry_count === 3, "active_retry_count is 3");
+    assert(state.error_loop.task_001.errors.length === 5, "history has 5 total errors");
+    assert(state.error_loop.task_001.loop_status === "blocked", "blocked by active cycle limit");
+    assert(state.error_loop.task_001.retry_allowed === false, "retry not allowed");
+    assert(
+      state.error_loop.task_001.escalation_reason.includes("Retry limit"),
+      "escalation mentions retry limit"
+    );
+  }
+
+  // ---- Test 126: blocked task rejects recordError consistently ----
+  console.log("\nTest 126: blocked task rejects recordError — no error loop mutation");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+
+    // Record one error first
+    await recordError(env, "ctr_test_001", "task_001", {
+      code: "INITIAL_ERR",
+      message: "Error before block",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    // Block the task
+    await blockTask(env, "ctr_test_001", "task_001", "Formally blocked");
+
+    // Try to record another error — must fail
+    const result = await recordError(env, "ctr_test_001", "task_001", {
+      code: "POST_BLOCK_ERR",
+      message: "Should not be recorded",
+      retryable: true,
+      classification: "in_scope",
+    });
+
+    assert(result.ok === false, "recordError fails on blocked task");
+    assert(result.error === "TASK_BLOCKED", "error is TASK_BLOCKED");
+
+    // Verify error loop was NOT mutated
+    const { state } = await rehydrateContract(env, "ctr_test_001");
+    assert(state.error_loop.task_001.errors.length === 1, "still only 1 error in history");
+    assert(state.error_loop.task_001.active_retry_count === 1, "active_retry_count unchanged");
+  }
+
+  // ---- Test 127: evaluateErrorLoop uses active_retry_count field ----
+  console.log("\nTest 127: evaluateErrorLoop uses active_retry_count from task loop");
+  {
+    // Simulate a task loop with many history errors but low active_retry_count
+    const errorLoop = {
+      task_001: {
+        errors: [
+          buildErrorEntry({ code: "E1", classification: "in_scope", retryable: true }),
+          buildErrorEntry({ code: "E2", classification: "in_scope", retryable: true }),
+          buildErrorEntry({ code: "E3", classification: "in_scope", retryable: true }),
+          buildErrorEntry({ code: "E4", classification: "in_scope", retryable: true }),
+        ],
+        active_retry_count: 1,
+      },
+    };
+
+    const evaluation = evaluateErrorLoop(errorLoop, "task_001");
+    assert(evaluation.loop_status === "retrying", "retrying despite 4 total errors (active=1)");
+    assert(evaluation.retry_allowed === true, "retry_allowed is true");
+    assert(evaluation.active_retry_count === 1, "active_retry_count is 1");
+    assert(evaluation.retry_count === 4, "retry_count (total history) is 4");
   }
 
   // ---- Summary ----

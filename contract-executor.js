@@ -1206,15 +1206,20 @@ function buildErrorEntry(params) {
 
 // ---------------------------------------------------------------------------
 // evaluateErrorLoop(errorLoop, taskId) → { loop_status, retry_allowed,
-//   retry_count, last_error, escalation_reason }
+//   active_retry_count, retry_count, last_error, escalation_reason }
 //
 // Pure function. Evaluates the current error loop state for a given task.
 // Does NOT mutate anything.
+//
+// `active_retry_count` is the counter for the current retry cycle — used for
+// all retry/escalation decisions. `retry_count` is kept as total error history
+// length for observability but is NOT used for decision-making.
 // ---------------------------------------------------------------------------
 function evaluateErrorLoop(errorLoop, taskId) {
   const defaultResult = {
     loop_status: "clear",
     retry_allowed: false,
+    active_retry_count: 0,
     retry_count: 0,
     last_error: null,
     escalation_reason: null,
@@ -1231,7 +1236,10 @@ function evaluateErrorLoop(errorLoop, taskId) {
 
   const errors = taskLoop.errors;
   const lastError = errors[errors.length - 1];
-  const retryCount = errors.length;
+  const activeRetryCount = typeof taskLoop.active_retry_count === "number"
+    ? taskLoop.active_retry_count
+    : errors.length;
+  const totalErrorCount = errors.length;
   const maxAttempts = lastError.max_attempts || MAX_RETRY_ATTEMPTS;
 
   // Non-retryable classification → immediate escalation
@@ -1247,20 +1255,22 @@ function evaluateErrorLoop(errorLoop, taskId) {
     return {
       loop_status: "awaiting_human",
       retry_allowed: false,
-      retry_count: retryCount,
+      active_retry_count: activeRetryCount,
+      retry_count: totalErrorCount,
       last_error: lastError,
       escalation_reason: escalationReason,
     };
   }
 
-  // Retry limit reached → blocked
-  if (retryCount >= maxAttempts) {
+  // Retry limit reached — uses active_retry_count, not total history
+  if (activeRetryCount >= maxAttempts) {
     return {
       loop_status: "blocked",
       retry_allowed: false,
-      retry_count: retryCount,
+      active_retry_count: activeRetryCount,
+      retry_count: totalErrorCount,
       last_error: lastError,
-      escalation_reason: `Retry limit reached (${retryCount}/${maxAttempts}) for task "${taskId}".`,
+      escalation_reason: `Retry limit reached (${activeRetryCount}/${maxAttempts}) for task "${taskId}".`,
     };
   }
 
@@ -1269,7 +1279,8 @@ function evaluateErrorLoop(errorLoop, taskId) {
     return {
       loop_status: "retrying",
       retry_allowed: true,
-      retry_count: retryCount,
+      active_retry_count: activeRetryCount,
+      retry_count: totalErrorCount,
       last_error: lastError,
       escalation_reason: null,
     };
@@ -1279,7 +1290,8 @@ function evaluateErrorLoop(errorLoop, taskId) {
   return {
     loop_status: "awaiting_human",
     retry_allowed: false,
-    retry_count: retryCount,
+    active_retry_count: activeRetryCount,
+    retry_count: totalErrorCount,
     last_error: lastError,
     escalation_reason: `Error not eligible for retry: retryable=${lastError.retryable}, classification="${lastError.classification}".`,
   };
@@ -1319,6 +1331,15 @@ async function recordError(env, contractId, taskId, errorParams) {
     };
   }
 
+  // Guard: cannot record error on blocked task — blocked is a formal stop
+  if (task.status === "blocked") {
+    return {
+      ok: false,
+      error: "TASK_BLOCKED",
+      message: `Task "${taskId}" is blocked — cannot record new error. Resolve the block first.`,
+    };
+  }
+
   // Initialize error_loop on state if absent
   if (!state.error_loop) {
     state.error_loop = {};
@@ -1328,6 +1349,7 @@ async function recordError(env, contractId, taskId, errorParams) {
   if (!state.error_loop[taskId]) {
     state.error_loop[taskId] = {
       errors: [],
+      active_retry_count: 0,
       loop_status: "clear",
       retry_count: 0,
       last_error: null,
@@ -1338,8 +1360,11 @@ async function recordError(env, contractId, taskId, errorParams) {
 
   const taskLoop = state.error_loop[taskId];
 
+  // Increment active retry count for the current cycle
+  taskLoop.active_retry_count = (taskLoop.active_retry_count || 0) + 1;
+
   // Build and record the error entry
-  const attempt = taskLoop.errors.length + 1;
+  const attempt = taskLoop.active_retry_count;
   const maxAttempts = (errorParams && typeof errorParams.max_attempts === "number")
     ? errorParams.max_attempts
     : MAX_RETRY_ATTEMPTS;
@@ -1353,6 +1378,7 @@ async function recordError(env, contractId, taskId, errorParams) {
 
   // Persist evaluation results back into the task loop
   taskLoop.loop_status = evaluation.loop_status;
+  taskLoop.active_retry_count = evaluation.active_retry_count;
   taskLoop.retry_count = evaluation.retry_count;
   taskLoop.last_error = evaluation.last_error;
   taskLoop.retry_allowed = evaluation.retry_allowed;
