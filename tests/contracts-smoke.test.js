@@ -25,6 +25,16 @@ import {
   advanceContractPhase,
   TASK_DONE_STATUSES,
   SPECIAL_PHASES,
+  VALID_TASK_STATUSES,
+  VALID_MICRO_PR_STATUSES,
+  startTask,
+  completeTask,
+  blockTask,
+  startMicroPrCandidate,
+  completeMicroPrCandidate,
+  blockMicroPrCandidate,
+  discardMicroPrCandidate,
+  buildContractSummary,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -284,7 +294,7 @@ async function runTests() {
     assert(result.body.contract_id === "ctr_test_001", "contract_id matches");
     assert(result.body.status_global === "decomposed", "status_global is decomposed");
     assert(result.body.phases_count === 3, "phases_count is 3");
-    assert(result.body.tasks_count === 3, "tasks_count is 3");
+    assert(result.body.tasks_total === 3, "tasks_total is 3");
     assert(typeof result.body.next_action === "string", "next_action is string");
   }
 
@@ -545,6 +555,458 @@ async function runTests() {
       const gate = checkPhaseGate(state, { ...decomposition, tasks: modifiedTasks });
       assert(gate.canAdvance === true, `gate passes when task status is "${doneStatus}"`);
     }
+  }
+
+  // ============================================================================
+  // STATUS TRACKING TESTS — Task + Micro-PR Candidate State Management
+  // ============================================================================
+
+  // ---- Test 26: VALID_TASK_STATUSES and VALID_MICRO_PR_STATUSES exported ----
+  console.log("\nTest 26: Status constants exported correctly");
+  {
+    assert(Array.isArray(VALID_TASK_STATUSES), "VALID_TASK_STATUSES is an array");
+    assert(VALID_TASK_STATUSES.includes("queued"), "includes queued");
+    assert(VALID_TASK_STATUSES.includes("in_progress"), "includes in_progress");
+    assert(VALID_TASK_STATUSES.includes("completed"), "includes completed");
+    assert(VALID_TASK_STATUSES.includes("blocked"), "includes blocked");
+    assert(Array.isArray(VALID_MICRO_PR_STATUSES), "VALID_MICRO_PR_STATUSES is an array");
+    assert(VALID_MICRO_PR_STATUSES.includes("queued"), "micro_pr includes queued");
+    assert(VALID_MICRO_PR_STATUSES.includes("in_progress"), "micro_pr includes in_progress");
+    assert(VALID_MICRO_PR_STATUSES.includes("completed"), "micro_pr includes completed");
+    assert(VALID_MICRO_PR_STATUSES.includes("blocked"), "micro_pr includes blocked");
+    assert(VALID_MICRO_PR_STATUSES.includes("discarded"), "micro_pr includes discarded");
+  }
+
+  // ---- Test 27: Tasks default to "queued" status ----
+  console.log("\nTest 27: Tasks and micro_pr_candidates default to 'queued' status");
+  {
+    const state = buildInitialState(VALID_PAYLOAD);
+    const decomp = generateDecomposition(state);
+    for (const t of decomp.tasks) {
+      assert(t.status === "queued", `task ${t.id} starts as queued`);
+    }
+    for (const m of decomp.micro_pr_candidates) {
+      assert(m.status === "queued", `micro_pr ${m.id} starts as queued`);
+    }
+  }
+
+  // ---- Test 28: startTask — success ----
+  console.log("\nTest 28: startTask transitions task to in_progress");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await startTask(env, "ctr_test_001", "task_001");
+    assert(result.ok === true, "startTask returns ok=true");
+    assert(result.task.status === "in_progress", "task status is in_progress");
+    assert(result.state.current_task === "task_001", "current_task updated to task_001");
+
+    // Verify KV persistence
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const task = decomposition.tasks.find((t) => t.id === "task_001");
+    assert(task.status === "in_progress", "persisted task status is in_progress");
+  }
+
+  // ---- Test 29: startTask — invalid transition ----
+  console.log("\nTest 29: startTask rejects non-queued task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    // Try starting again (already in_progress)
+    const result = await startTask(env, "ctr_test_001", "task_001");
+    assert(result.ok === false, "startTask returns ok=false for in_progress task");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 30: startTask — contract not found ----
+  console.log("\nTest 30: startTask returns error for missing contract");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const result = await startTask(env, "no_contract", "task_001");
+    assert(result.ok === false, "returns ok=false");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 31: startTask — task not found ----
+  console.log("\nTest 31: startTask returns error for missing task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await startTask(env, "ctr_test_001", "task_999");
+    assert(result.ok === false, "returns ok=false");
+    assert(result.error === "TASK_NOT_FOUND", "error is TASK_NOT_FOUND");
+  }
+
+  // ---- Test 32: completeTask — success ----
+  console.log("\nTest 32: completeTask transitions task to completed");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    const result = await completeTask(env, "ctr_test_001", "task_001");
+    assert(result.ok === true, "completeTask returns ok=true");
+    assert(result.task.status === "completed", "task status is completed");
+
+    // current_task should advance to next queued task
+    assert(result.state.current_task === "task_002", "current_task advanced to task_002");
+
+    // Verify KV persistence
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const task = decomposition.tasks.find((t) => t.id === "task_001");
+    assert(task.status === "completed", "persisted task status is completed");
+  }
+
+  // ---- Test 33: completeTask — invalid transition ----
+  console.log("\nTest 33: completeTask rejects non-in_progress task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    // task_001 is queued, not in_progress
+    const result = await completeTask(env, "ctr_test_001", "task_001");
+    assert(result.ok === false, "completeTask returns ok=false for queued task");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 34: blockTask — success from queued ----
+  console.log("\nTest 34: blockTask transitions queued task to blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await blockTask(env, "ctr_test_001", "task_002", "Dependency missing");
+    assert(result.ok === true, "blockTask returns ok=true");
+    assert(result.task.status === "blocked", "task status is blocked");
+    assert(result.task.block_reason === "Dependency missing", "block_reason set");
+
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const task = decomposition.tasks.find((t) => t.id === "task_002");
+    assert(task.status === "blocked", "persisted task status is blocked");
+  }
+
+  // ---- Test 35: blockTask — success from in_progress ----
+  console.log("\nTest 35: blockTask transitions in_progress task to blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    const result = await blockTask(env, "ctr_test_001", "task_001", "CI failed");
+    assert(result.ok === true, "blockTask returns ok=true");
+    assert(result.task.status === "blocked", "task status is blocked");
+    // current_task should move to next queued task
+    assert(result.state.current_task === "task_002", "current_task advanced after blocking");
+  }
+
+  // ---- Test 36: blockTask — invalid transition from completed ----
+  console.log("\nTest 36: blockTask rejects completed task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    await completeTask(env, "ctr_test_001", "task_001");
+    const result = await blockTask(env, "ctr_test_001", "task_001", "Too late");
+    assert(result.ok === false, "blockTask returns ok=false for completed task");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 37: startMicroPrCandidate — success ----
+  console.log("\nTest 37: startMicroPrCandidate transitions to in_progress");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    assert(result.ok === true, "startMicroPrCandidate returns ok=true");
+    assert(result.micro_pr_candidate.status === "in_progress", "micro_pr status is in_progress");
+
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const mpr = decomposition.micro_pr_candidates.find((m) => m.id === "micro_pr_001");
+    assert(mpr.status === "in_progress", "persisted micro_pr status is in_progress");
+  }
+
+  // ---- Test 38: startMicroPrCandidate — invalid transition ----
+  console.log("\nTest 38: startMicroPrCandidate rejects non-queued");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    const result = await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    assert(result.ok === false, "startMicroPrCandidate returns ok=false");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 39: startMicroPrCandidate — not found ----
+  console.log("\nTest 39: startMicroPrCandidate returns error for missing micro_pr");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_999");
+    assert(result.ok === false, "returns ok=false");
+    assert(result.error === "MICRO_PR_NOT_FOUND", "error is MICRO_PR_NOT_FOUND");
+  }
+
+  // ---- Test 40: completeMicroPrCandidate — success ----
+  console.log("\nTest 40: completeMicroPrCandidate transitions to completed");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    const result = await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    assert(result.ok === true, "completeMicroPrCandidate returns ok=true");
+    assert(result.micro_pr_candidate.status === "completed", "micro_pr status is completed");
+
+    const { decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const mpr = decomposition.micro_pr_candidates.find((m) => m.id === "micro_pr_001");
+    assert(mpr.status === "completed", "persisted micro_pr status is completed");
+  }
+
+  // ---- Test 41: completeMicroPrCandidate — invalid transition ----
+  console.log("\nTest 41: completeMicroPrCandidate rejects non-in_progress");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    assert(result.ok === false, "completeMicroPrCandidate returns ok=false for queued");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 42: blockMicroPrCandidate — success from queued ----
+  console.log("\nTest 42: blockMicroPrCandidate transitions queued to blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await blockMicroPrCandidate(env, "ctr_test_001", "micro_pr_002", "Blocked by dependency");
+    assert(result.ok === true, "blockMicroPrCandidate returns ok=true");
+    assert(result.micro_pr_candidate.status === "blocked", "micro_pr status is blocked");
+    assert(result.micro_pr_candidate.block_reason === "Blocked by dependency", "block_reason set");
+  }
+
+  // ---- Test 43: blockMicroPrCandidate — success from in_progress ----
+  console.log("\nTest 43: blockMicroPrCandidate transitions in_progress to blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    const result = await blockMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Review failed");
+    assert(result.ok === true, "blockMicroPrCandidate returns ok=true");
+    assert(result.micro_pr_candidate.status === "blocked", "micro_pr status is blocked");
+  }
+
+  // ---- Test 44: blockMicroPrCandidate — invalid transition from completed ----
+  console.log("\nTest 44: blockMicroPrCandidate rejects completed micro_pr");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    const result = await blockMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Too late");
+    assert(result.ok === false, "blockMicroPrCandidate returns ok=false for completed");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 45: discardMicroPrCandidate — success from queued ----
+  console.log("\nTest 45: discardMicroPrCandidate transitions queued to discarded");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const result = await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_002", "No longer needed");
+    assert(result.ok === true, "discardMicroPrCandidate returns ok=true");
+    assert(result.micro_pr_candidate.status === "discarded", "micro_pr status is discarded");
+    assert(result.micro_pr_candidate.discard_reason === "No longer needed", "discard_reason set");
+  }
+
+  // ---- Test 46: discardMicroPrCandidate — success from in_progress ----
+  console.log("\nTest 46: discardMicroPrCandidate transitions in_progress to discarded");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    const result = await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Approach changed");
+    assert(result.ok === true, "discardMicroPrCandidate returns ok=true");
+    assert(result.micro_pr_candidate.status === "discarded", "micro_pr status is discarded");
+  }
+
+  // ---- Test 47: discardMicroPrCandidate — success from blocked ----
+  console.log("\nTest 47: discardMicroPrCandidate transitions blocked to discarded");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await blockMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Blocked");
+    const result = await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Giving up");
+    assert(result.ok === true, "discardMicroPrCandidate returns ok=true from blocked");
+    assert(result.micro_pr_candidate.status === "discarded", "micro_pr status is discarded");
+  }
+
+  // ---- Test 48: discardMicroPrCandidate — rejects completed ----
+  console.log("\nTest 48: discardMicroPrCandidate rejects completed micro_pr");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    const result = await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Nope");
+    assert(result.ok === false, "discardMicroPrCandidate returns ok=false for completed");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 49: discardMicroPrCandidate — rejects already discarded ----
+  console.log("\nTest 49: discardMicroPrCandidate rejects already discarded");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "First discard");
+    const result = await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_001", "Second discard");
+    assert(result.ok === false, "discardMicroPrCandidate returns ok=false for already discarded");
+    assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
+  }
+
+  // ---- Test 50: current_task tracks correctly through lifecycle ----
+  console.log("\nTest 50: current_task tracks correctly through task lifecycle");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // Initially current_task is null
+    let { state } = await rehydrateContract(env, "ctr_test_001");
+    assert(state.current_task === null, "current_task starts as null");
+
+    // Start task_001 → current_task = task_001
+    await startTask(env, "ctr_test_001", "task_001");
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.current_task === "task_001", "current_task is task_001 after start");
+
+    // Complete task_001 → current_task should advance to task_002 (next queued)
+    await completeTask(env, "ctr_test_001", "task_001");
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.current_task === "task_002", "current_task advanced to task_002");
+
+    // Start task_002
+    await startTask(env, "ctr_test_001", "task_002");
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.current_task === "task_002", "current_task is task_002 after start");
+
+    // Block task_002 → current_task should advance to task_003
+    await blockTask(env, "ctr_test_001", "task_002", "Blocked!");
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.current_task === "task_003", "current_task advanced to task_003 after block");
+
+    // Start and complete task_003 → current_task should be null (no more queued)
+    await startTask(env, "ctr_test_001", "task_003");
+    await completeTask(env, "ctr_test_001", "task_003");
+    ({ state } = await rehydrateContract(env, "ctr_test_001"));
+    assert(state.current_task === null, "current_task is null when no more queued tasks");
+  }
+
+  // ---- Test 51: buildContractSummary reflects real progress ----
+  console.log("\nTest 51: buildContractSummary reflects real task and micro-PR progress");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // Initial summary — all queued
+    let { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+    let summary = buildContractSummary(state, decomposition);
+    assert(summary.tasks_total === 3, "tasks_total is 3");
+    assert(summary.tasks_queued === 3, "tasks_queued is 3 initially");
+    assert(summary.tasks_completed === 0, "tasks_completed is 0 initially");
+    assert(summary.tasks_blocked === 0, "tasks_blocked is 0 initially");
+    assert(summary.tasks_in_progress === 0, "tasks_in_progress is 0 initially");
+    assert(summary.micro_pr_candidates_total === 4, "micro_pr_candidates_total is 4");
+    assert(summary.micro_pr_candidates_queued === 4, "micro_pr_candidates_queued is 4 initially");
+
+    // Start task_001 and micro_pr_001
+    await startTask(env, "ctr_test_001", "task_001");
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_test_001"));
+    summary = buildContractSummary(state, decomposition);
+    assert(summary.tasks_in_progress === 1, "tasks_in_progress is 1 after starting task");
+    assert(summary.tasks_queued === 2, "tasks_queued is 2 after starting one task");
+    assert(summary.micro_pr_candidates_in_progress === 1, "micro_pr in_progress is 1");
+    assert(summary.current_task === "task_001", "summary current_task is task_001");
+
+    // Complete task_001 and micro_pr_001
+    await completeTask(env, "ctr_test_001", "task_001");
+    await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_test_001"));
+    summary = buildContractSummary(state, decomposition);
+    assert(summary.tasks_completed === 1, "tasks_completed is 1");
+    assert(summary.tasks_in_progress === 0, "tasks_in_progress is 0 after completion");
+    assert(summary.micro_pr_candidates_completed === 1, "micro_pr_candidates_completed is 1");
+
+    // Block task_002 and discard micro_pr_002
+    await blockTask(env, "ctr_test_001", "task_002", "Blocked");
+    await discardMicroPrCandidate(env, "ctr_test_001", "micro_pr_002", "Discarded");
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_test_001"));
+    summary = buildContractSummary(state, decomposition);
+    assert(summary.tasks_blocked === 1, "tasks_blocked is 1");
+    assert(summary.micro_pr_candidates_discarded === 1, "micro_pr_candidates_discarded is 1");
+  }
+
+  // ---- Test 52: handleGetContractSummary reflects enhanced progress ----
+  console.log("\nTest 52: handleGetContractSummary includes enhanced progress fields");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    await startMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+    await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
+
+    const result = await handleGetContractSummary(env, "ctr_test_001");
+    assert(result.status === 200, "status 200");
+    assert(result.body.ok === true, "ok is true");
+    assert(result.body.current_task === "task_001", "current_task in summary");
+    assert(result.body.tasks_total === 3, "tasks_total in summary");
+    assert(result.body.tasks_in_progress === 1, "tasks_in_progress in summary");
+    assert(result.body.micro_pr_candidates_completed === 1, "micro_pr_candidates_completed in summary");
+    assert(result.body.micro_pr_candidates_total === 4, "micro_pr_candidates_total in summary");
+    assert(typeof result.body.next_action === "string", "next_action present in summary");
+  }
+
+  // ---- Test 53: Old routes still work (regression check) ----
+  console.log("\nTest 53: Old routes still work (regression check)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Create
+    const createResult = await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    assert(createResult.status === 201, "create still returns 201");
+    assert(createResult.body.ok === true, "create still returns ok");
+    // Read
+    const readResult = await handleGetContract(env, "ctr_test_001");
+    assert(readResult.status === 200, "read still returns 200");
+    assert(readResult.body.contract.contract_id === "ctr_test_001", "read still has contract_id");
+    // Summary
+    const summaryResult = await handleGetContractSummary(env, "ctr_test_001");
+    assert(summaryResult.status === 200, "summary still returns 200");
+    assert(summaryResult.body.contract_id === "ctr_test_001", "summary still has contract_id");
+    // Advance
+    const advanceResult = await advanceContractPhase(env, "ctr_test_001");
+    assert(advanceResult.ok === false, "advance still works (blocked, tasks queued)");
+    // Not found
+    const notFound = await handleGetContract(env, "nope");
+    assert(notFound.status === 404, "not found still returns 404");
   }
 
   // ---- Summary ----
