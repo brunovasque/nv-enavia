@@ -149,11 +149,16 @@ const RISK_TERMS = [
   "perda de dados",
 ];
 
-// Limiar para "texto longo" (palavras)
+// Limiar para "texto longo" (palavras).
+// 80 palavras ≈ 1–2 parágrafos densos — sinal de escopo não trivial.
+// 200 palavras ≈ pedido extenso com múltiplos sub-objetivos descritos.
+// Estes valores podem ser ajustados por revisão humana sem quebrar contratos.
 const THRESHOLD_LONG_TEXT      = 80;
 const THRESHOLD_VERY_LONG_TEXT = 200;
 
-// Limiar de marcadores de lista consecutivos que indicam múltiplas entregas
+// Limiar de linhas com marcadores de lista (-, *, 1., 2. …) que indicam
+// múltiplas entregas estruturadas. 3 ou mais linhas = escopo multi-etapa
+// intencional (uma ou duas podem ser estilo informal).
 const THRESHOLD_LIST_MARKERS   = 3;
 
 // ---------------------------------------------------------------------------
