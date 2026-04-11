@@ -210,18 +210,39 @@ function validateMemoryObject(obj) {
     errors.push("'is_canonical' must be a boolean");
   }
 
-  // expires_at — opcional; se presente, deve ser string não vazia
+  // created_at / updated_at — ISO 8601 date strings
+  // Validated here in addition to the required-string check above.
+  for (const field of ["created_at", "updated_at"]) {
+    if (typeof obj[field] === "string" && obj[field].trim() !== "") {
+      if (Number.isNaN(Date.parse(obj[field]))) {
+        errors.push(`'${field}' must be a valid ISO 8601 date string`);
+      }
+    }
+  }
+
+  // expires_at — opcional; se presente, deve ser ISO 8601 válido
   if (obj.expires_at !== null && obj.expires_at !== undefined) {
     if (typeof obj.expires_at !== "string" || obj.expires_at.trim() === "") {
       errors.push(
         "'expires_at' must be a non-empty ISO 8601 string when provided"
       );
+    } else if (Number.isNaN(Date.parse(obj.expires_at))) {
+      errors.push("'expires_at' must be a valid ISO 8601 date string");
     }
   }
 
-  // flags — deve ser array
+  // flags — deve ser array cujos itens pertencem ao enum MEMORY_FLAGS
   if (!Array.isArray(obj.flags)) {
     errors.push("'flags' must be an array");
+  } else {
+    const validFlags = Object.values(MEMORY_FLAGS);
+    for (const flag of obj.flags) {
+      if (!validFlags.includes(flag)) {
+        errors.push(
+          `'flags' contains unknown value '${flag}'; allowed: ${validFlags.join(", ")}`
+        );
+      }
+    }
   }
 
   return errors.length === 0 ? { valid: true } : { valid: false, errors };
@@ -234,7 +255,9 @@ function validateMemoryObject(obj) {
 // canônico. Não persiste, não valida. Para validar, use validateMemoryObject().
 // ---------------------------------------------------------------------------
 function buildMemoryObject(partial) {
-  return Object.assign({}, MEMORY_CANONICAL_SHAPE, partial);
+  return Object.assign({}, MEMORY_CANONICAL_SHAPE, partial, {
+    flags: Array.isArray(partial && partial.flags) ? [...partial.flags] : [],
+  });
 }
 
 // ---------------------------------------------------------------------------

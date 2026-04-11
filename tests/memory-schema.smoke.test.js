@@ -235,12 +235,50 @@ async function runTests() {
     assert(result.errors.some(e => e.includes("is_canonical")),   "error mentions is_canonical");
   }
 
-  // non-array flags
+  // non-array flags — set directly after build to bypass default normalization
   {
-    const obj = makeValidMemory({ flags: "is_canonical" });
+    const obj = Object.assign(makeValidMemory(), { flags: "is_canonical" });
     const result = validateMemoryObject(obj);
     assert(result.valid === false,                                 "rejects string flags");
     assert(result.errors.some(e => e.includes("flags")),          "error mentions flags");
+  }
+
+  // flags array with unknown/invalid flag value
+  {
+    const obj = Object.assign(makeValidMemory(), { flags: ["invalid_flag"] });
+    const result = validateMemoryObject(obj);
+    assert(result.valid === false,                                 "rejects unknown flag in flags array");
+    assert(result.errors.some(e => e.includes("flags")),          "error mentions flags for unknown value");
+  }
+
+  // flags array with mix of valid and invalid flags
+  {
+    const obj = Object.assign(makeValidMemory(), { flags: [MEMORY_FLAGS.IS_CANONICAL, "not_a_flag"] });
+    const result = validateMemoryObject(obj);
+    assert(result.valid === false,                                 "rejects flags array with one invalid item");
+  }
+
+  // valid flags array with all known values
+  {
+    const obj = makeValidMemory({ flags: [MEMORY_FLAGS.IS_CANONICAL, MEMORY_FLAGS.IS_SUPERSEDED] });
+    const result = validateMemoryObject(obj);
+    assert(result.valid === true,                                  "accepts flags array with valid flag values");
+  }
+
+  // invalid created_at — non-date string
+  {
+    const obj = Object.assign(makeValidMemory(), { created_at: "not-a-date" });
+    const result = validateMemoryObject(obj);
+    assert(result.valid === false,                                 "rejects invalid created_at 'not-a-date'");
+    assert(result.errors.some(e => e.includes("created_at")),     "error mentions created_at");
+  }
+
+  // invalid updated_at — non-date string
+  {
+    const obj = Object.assign(makeValidMemory(), { updated_at: "not-a-date" });
+    const result = validateMemoryObject(obj);
+    assert(result.valid === false,                                 "rejects invalid updated_at 'not-a-date'");
+    assert(result.errors.some(e => e.includes("updated_at")),     "error mentions updated_at");
   }
 
   // null/undefined/non-object input
@@ -278,6 +316,13 @@ async function runTests() {
     const result = validateMemoryObject(obj);
     assert(result.valid === false, "rejects empty string expires_at");
     assert(result.errors.some(e => e.includes("expires_at")), "error mentions expires_at");
+  }
+
+  {
+    const obj = Object.assign(makeValidMemory(), { expires_at: "not-a-date" });
+    const result = validateMemoryObject(obj);
+    assert(result.valid === false, "rejects non-ISO expires_at 'not-a-date'");
+    assert(result.errors.some(e => e.includes("expires_at")), "error mentions expires_at for bad ISO");
   }
 
   // -------------------------------------------------------------------------
@@ -333,6 +378,24 @@ async function runTests() {
   {
     const obj = buildMemoryObject({ priority: MEMORY_PRIORITY.CRITICAL });
     assert(obj.priority === MEMORY_PRIORITY.CRITICAL, "override wins over default");
+  }
+
+  // two objects built without explicit flags must not share the same array reference
+  {
+    const obj1 = buildMemoryObject({ memory_id: "mem_iso_1" });
+    const obj2 = buildMemoryObject({ memory_id: "mem_iso_2" });
+    assert(obj1.flags !== obj2.flags, "each buildMemoryObject call produces a distinct flags array");
+    obj1.flags.push("x");
+    assert(obj2.flags.length === 0, "mutating obj1.flags does not affect obj2.flags");
+  }
+
+  // object built with explicit flags array must get a copy, not the same reference
+  {
+    const inputFlags = [MEMORY_FLAGS.IS_CANONICAL];
+    const obj = buildMemoryObject({ memory_id: "mem_iso_3", flags: inputFlags });
+    assert(obj.flags !== inputFlags, "buildMemoryObject copies the provided flags array");
+    inputFlags.push(MEMORY_FLAGS.IS_EXPIRED);
+    assert(obj.flags.length === 1, "mutating original flags input does not affect built object");
   }
 
   // -------------------------------------------------------------------------
