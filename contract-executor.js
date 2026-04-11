@@ -215,7 +215,6 @@ function buildInitialState(body) {
     scope: body.scope || {},
     constraints: Object.assign(
       {
-        max_micro_prs: 10,
         require_human_approval_per_pr: true,
         test_before_prod: true,
         rollback_on_failure: true,

@@ -5330,12 +5330,12 @@ async function runTests() {
     );
   }
 
-  // ---- Test 263: absence of max_micro_prs — default (10) applied, normal behaviour ----
-  console.log("\nTest 263: F3 — absence of max_micro_prs uses default limit, normal behaviour");
+  // ---- Test 263: absence of max_micro_prs — no enforcement applied ----
+  console.log("\nTest 263: F3 — absence of max_micro_prs means no enforcement");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
-    // No constraints provided → default max_micro_prs: 10; 3 DoD → 3 task candidates → within limit
+    // No constraints provided → max_micro_prs absent → enforcement skipped entirely
     const payloadNoConstraints = {
       contract_id: "ctr_f3_263",
       version: "v1",
@@ -5346,7 +5346,7 @@ async function runTests() {
     };
     const result = await handleCreateContract(mockRequest(payloadNoConstraints), env);
     assert(result.status === 201, "HTTP 201 with no explicit constraints");
-    assert(result.body.status_global === "decomposed", 'status_global is "decomposed" with default limit');
+    assert(result.body.status_global === "decomposed", 'status_global is "decomposed" — no limit enforced');
   }
 
   // ---- Test 264: resolvePlanRevision with oversized new_decomposition fails ----
