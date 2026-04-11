@@ -49,6 +49,9 @@ import {
   ERROR_LOOP_STATUSES,
   NON_RETRYABLE_CLASSIFICATIONS,
   buildContractSummary,
+  executeCurrentMicroPr,
+  EXECUTION_STATUSES,
+  handleExecuteContract,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -2918,6 +2921,494 @@ async function runTests() {
       const entry = state.error_loop.task_001.errors[i];
       assert(entry.max_attempts === MAX_RETRY_ATTEMPTS, `entry[${i}] (${entry.code}) max_attempts is canonical: expected ${MAX_RETRY_ATTEMPTS}, got ${entry.max_attempts}`);
     }
+  }
+
+  // ==========================================================================
+  // 🚀 C1 — Real Micro-PR Execution in TEST
+  // ==========================================================================
+  console.log("\n📜 C1 — Real Micro-PR Execution in TEST\n");
+
+  // ---- Test 132: EXECUTION_STATUSES export ----
+  {
+    console.log("Test 132: EXECUTION_STATUSES export is correct");
+    assert(Array.isArray(EXECUTION_STATUSES), "EXECUTION_STATUSES is an array");
+    assert(EXECUTION_STATUSES.includes("pending"), "includes pending");
+    assert(EXECUTION_STATUSES.includes("running"), "includes running");
+    assert(EXECUTION_STATUSES.includes("success"), "includes success");
+    assert(EXECUTION_STATUSES.includes("failed"), "includes failed");
+    assert(EXECUTION_STATUSES.length === 5, "has 5 statuses");
+  }
+
+  // ---- Test 133: Successful execution in TEST with valid handoff ----
+  {
+    console.log("Test 133: Successful execution in TEST with valid handoff");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_133" }));
+    await handleCreateContract(req, env);
+
+    // Advance phase from decomposition_complete to phase_01
+    await advanceContractPhase(env, "ctr_c1_133");
+    // Start the first task
+    await startTask(env, "ctr_c1_133", "task_001");
+
+    // Verify task is in_progress and current_task is set
+    let { state, decomposition } = await rehydrateContract(env, "ctr_c1_133");
+    assert(state.current_task === "task_001", "current_task is task_001");
+    assert(decomposition.tasks[0].status === "in_progress", "task_001 is in_progress");
+
+    // Execute
+    const result = await executeCurrentMicroPr(env, "ctr_c1_133", {
+      evidence: ["Smoke test passed", "Endpoint returned 200"],
+    });
+
+    assert(result.ok === true, "execution succeeded");
+    assert(result.execution_status === "success", "execution_status is success");
+    assert(result.task_id === "task_001", "task_id is task_001");
+    assert(result.micro_pr_id === "micro_pr_001", "micro_pr_id is micro_pr_001");
+    assert(Array.isArray(result.evidence), "evidence is array");
+    assert(result.evidence.length === 2, "evidence has 2 items");
+    assert(result.evidence[0] === "Smoke test passed", "evidence[0] correct");
+    assert(result.handoff_used !== null, "handoff_used is not null");
+    assert(typeof result.execution_started_at === "string", "execution_started_at is ISO string");
+    assert(typeof result.execution_finished_at === "string", "execution_finished_at is ISO string");
+  }
+
+  // ---- Test 134: Execution state persisted on contract (current_execution) ----
+  {
+    console.log("Test 134: Execution state persisted on contract");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_134" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_134");
+    await startTask(env, "ctr_c1_134", "task_001");
+
+    await executeCurrentMicroPr(env, "ctr_c1_134", { evidence: ["OK"] });
+
+    const { state } = await rehydrateContract(env, "ctr_c1_134");
+    assert(state.current_execution !== undefined, "current_execution exists");
+    assert(state.current_execution !== null, "current_execution is not null");
+    assert(state.current_execution.execution_status === "success", "execution_status is success");
+    assert(state.current_execution.task_id === "task_001", "task_id persisted");
+    assert(state.current_execution.micro_pr_id === "micro_pr_001", "micro_pr_id persisted");
+    assert(state.current_execution.test_execution === true, "test_execution flag is true");
+    assert(state.current_execution.handoff_used !== null, "handoff_used persisted");
+    assert(typeof state.current_execution.execution_started_at === "string", "started_at persisted");
+    assert(typeof state.current_execution.execution_finished_at === "string", "finished_at persisted");
+    assert(Array.isArray(state.current_execution.execution_evidence), "evidence persisted");
+    assert(state.current_execution.execution_evidence[0] === "OK", "evidence content correct");
+    assert(state.current_execution.last_execution_result === "success", "last_execution_result is success");
+  }
+
+  // ---- Test 135: Rehydration preserves current_execution ----
+  {
+    console.log("Test 135: Rehydration preserves execution state");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_135" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_135");
+    await startTask(env, "ctr_c1_135", "task_001");
+    await executeCurrentMicroPr(env, "ctr_c1_135", { evidence: ["rehydration test"] });
+
+    // Rehydrate twice to prove persistence
+    const r1 = await rehydrateContract(env, "ctr_c1_135");
+    const r2 = await rehydrateContract(env, "ctr_c1_135");
+    assert(r1.state.current_execution.execution_status === "success", "1st rehydration OK");
+    assert(r2.state.current_execution.execution_status === "success", "2nd rehydration OK");
+    assert(r1.state.current_execution.task_id === r2.state.current_execution.task_id, "task_id stable across rehydrations");
+    assert(r1.state.current_execution.execution_started_at === r2.state.current_execution.execution_started_at, "started_at stable");
+  }
+
+  // ---- Test 136: Execution without current_task fails ----
+  {
+    console.log("Test 136: Execution without current_task fails");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_136" }));
+    await handleCreateContract(req, env);
+
+    // Contract just created, no task started → current_task is null
+    const result = await executeCurrentMicroPr(env, "ctr_c1_136");
+    assert(result.ok === false, "execution fails");
+    assert(result.error === "NO_CURRENT_TASK", "error is NO_CURRENT_TASK");
+  }
+
+  // ---- Test 137: Execution without valid handoff fails ----
+  {
+    console.log("Test 137: Execution without valid handoff fails (task completed)");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_137" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_137");
+    await startTask(env, "ctr_c1_137", "task_001");
+    await completeTask(env, "ctr_c1_137", "task_001");
+
+    // task_001 is now completed; next action resolves to something else
+    // but current_task advanced to task_002 (still queued, not started)
+    // Force a scenario where there's a current_task but handoff can't build
+    // We'll use a blocked contract scenario instead
+    const { state } = await rehydrateContract(env, "ctr_c1_137");
+    // After completing task_001, current_task points to next queued or null
+    // The key test: task that isn't in_progress should fail at Gate 2
+    if (state.current_task) {
+      const result = await executeCurrentMicroPr(env, "ctr_c1_137");
+      assert(result.ok === false, "execution fails for non-in_progress task");
+      assert(result.error === "TASK_NOT_IN_PROGRESS", "error is TASK_NOT_IN_PROGRESS");
+    } else {
+      const result = await executeCurrentMicroPr(env, "ctr_c1_137");
+      assert(result.ok === false, "execution fails with no current_task");
+      assert(result.error === "NO_CURRENT_TASK", "error is NO_CURRENT_TASK");
+    }
+  }
+
+  // ---- Test 138: Execution with simulated failure feeds error_loop ----
+  {
+    console.log("Test 138: Execution failure feeds error_loop");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_138" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_138");
+    await startTask(env, "ctr_c1_138", "task_001");
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_138", {
+      simulate_failure: {
+        code: "DEPLOY_TIMEOUT",
+        message: "Wrangler deploy exceeded 60s",
+        classification: "in_scope",
+      },
+    });
+
+    assert(result.ok === false, "execution reports failure");
+    assert(result.error === "EXECUTION_FAILED", "error is EXECUTION_FAILED");
+    assert(result.execution_status === "failed", "execution_status is failed");
+    assert(result.execution_error.code === "DEPLOY_TIMEOUT", "error code preserved");
+
+    // Verify error_loop was fed
+    const { state } = await rehydrateContract(env, "ctr_c1_138");
+    assert(state.error_loop !== undefined, "error_loop exists");
+    assert(state.error_loop.task_001 !== undefined, "error_loop entry for task_001 exists");
+    assert(state.error_loop.task_001.errors.length === 1, "1 error recorded");
+    assert(state.error_loop.task_001.errors[0].code === "DEPLOY_TIMEOUT", "error code in loop");
+    assert(state.error_loop.task_001.loop_status === "retrying", "loop_status is retrying");
+    assert(state.error_loop.task_001.retry_allowed === true, "retry is allowed");
+  }
+
+  // ---- Test 139: Failed execution persists current_execution with failure details ----
+  {
+    console.log("Test 139: Failed execution persists failure state");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_139" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_139");
+    await startTask(env, "ctr_c1_139", "task_001");
+
+    await executeCurrentMicroPr(env, "ctr_c1_139", {
+      simulate_failure: { code: "TEST_FAIL", message: "Smoke test failed", classification: "in_scope" },
+    });
+
+    const { state } = await rehydrateContract(env, "ctr_c1_139");
+    assert(state.current_execution.execution_status === "failed", "execution_status is failed");
+    assert(state.current_execution.execution_error !== null, "execution_error persisted");
+    assert(state.current_execution.execution_error.code === "TEST_FAIL", "error code persisted");
+    assert(state.current_execution.last_execution_result === "failed", "last_execution_result is failed");
+    assert(typeof state.current_execution.execution_finished_at === "string", "finished_at persisted");
+  }
+
+  // ---- Test 140: Successful execution does NOT close the contract ----
+  {
+    console.log("Test 140: Successful execution does NOT close contract");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_140" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_140");
+    await startTask(env, "ctr_c1_140", "task_001");
+
+    await executeCurrentMicroPr(env, "ctr_c1_140", { evidence: ["passed"] });
+
+    const { state } = await rehydrateContract(env, "ctr_c1_140");
+    assert(state.status_global !== "completed", "contract is NOT completed");
+    assert(state.current_phase !== "all_phases_complete", "phase is NOT all_phases_complete");
+    // Task should still be in_progress (execution doesn't auto-complete task)
+    const task = (await rehydrateContract(env, "ctr_c1_140")).decomposition.tasks[0];
+    assert(task.status === "in_progress", "task remains in_progress (not auto-completed)");
+  }
+
+  // ---- Test 141: Execution on non-existent contract fails ----
+  {
+    console.log("Test 141: Execution on non-existent contract fails");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const result = await executeCurrentMicroPr(env, "nonexistent_ctr");
+    assert(result.ok === false, "execution fails");
+    assert(result.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 142: Execution does NOT promote to PROD ----
+  {
+    console.log("Test 142: Execution scope is TEST-only — no PROD promotion");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_142" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_142");
+    await startTask(env, "ctr_c1_142", "task_001");
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_142", { evidence: ["test only"] });
+    assert(result.ok === true, "execution OK");
+    assert(result.handoff_used.scope.environment === "TEST", "handoff environment is TEST");
+
+    // Verify nothing changed in PROD-related state
+    const { state, decomposition } = await rehydrateContract(env, "ctr_c1_142");
+    const prodMpr = decomposition.micro_pr_candidates.find((m) => m.environment === "PROD");
+    assert(prodMpr.status === "queued", "PROD micro-PR remains queued");
+  }
+
+  // ---- Test 143: Summary reflects current_execution ----
+  {
+    console.log("Test 143: Summary/API reflects current_execution");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_143" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_143");
+    await startTask(env, "ctr_c1_143", "task_001");
+    await executeCurrentMicroPr(env, "ctr_c1_143", { evidence: ["summary test"] });
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_c1_143");
+    const summary = buildContractSummary(state, decomposition);
+    assert(summary.current_execution !== undefined, "summary has current_execution");
+    assert(summary.current_execution !== null, "summary current_execution not null");
+    assert(summary.current_execution.execution_status === "success", "summary shows success");
+    assert(summary.current_execution.task_id === "task_001", "summary shows task_id");
+  }
+
+  // ---- Test 144: Successful execution updates micro-PR to in_progress ----
+  {
+    console.log("Test 144: Successful execution updates micro-PR to in_progress");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_144" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_144");
+    await startTask(env, "ctr_c1_144", "task_001");
+
+    // Before execution, micro_pr_001 should be queued
+    let { decomposition: d1 } = await rehydrateContract(env, "ctr_c1_144");
+    const mprBefore = d1.micro_pr_candidates.find((m) => m.id === "micro_pr_001");
+    assert(mprBefore.status === "queued", "micro_pr_001 starts as queued");
+
+    await executeCurrentMicroPr(env, "ctr_c1_144", { evidence: ["ok"] });
+
+    let { decomposition: d2 } = await rehydrateContract(env, "ctr_c1_144");
+    const mprAfter = d2.micro_pr_candidates.find((m) => m.id === "micro_pr_001");
+    assert(mprAfter.status === "in_progress", "micro_pr_001 advanced to in_progress");
+  }
+
+  // ---- Test 145: Repeated failure exhausts retry and blocks via error_loop ----
+  {
+    console.log("Test 145: Repeated failures exhaust retry limit via error_loop");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_145" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_145");
+    await startTask(env, "ctr_c1_145", "task_001");
+
+    // Fail 3 times to exhaust retry limit
+    for (let i = 0; i < 3; i++) {
+      await executeCurrentMicroPr(env, "ctr_c1_145", {
+        simulate_failure: { code: `ERR_${i+1}`, message: `fail ${i+1}`, classification: "in_scope" },
+      });
+    }
+
+    const { state } = await rehydrateContract(env, "ctr_c1_145");
+    assert(state.error_loop.task_001.active_retry_count === 3, "3 retries counted");
+    assert(state.error_loop.task_001.loop_status === "blocked", "loop is blocked after 3 failures");
+    assert(state.error_loop.task_001.retry_allowed === false, "retry not allowed");
+  }
+
+  // ---- Test 146: Execution with infra failure escalates immediately ----
+  {
+    console.log("Test 146: Infra failure escalates to awaiting_human");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_146" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_146");
+    await startTask(env, "ctr_c1_146", "task_001");
+
+    await executeCurrentMicroPr(env, "ctr_c1_146", {
+      simulate_failure: { code: "MISSING_SECRET", message: "KV binding missing", classification: "infra" },
+    });
+
+    const { state } = await rehydrateContract(env, "ctr_c1_146");
+    assert(state.error_loop.task_001.loop_status === "awaiting_human", "infra escalates to awaiting_human");
+    assert(state.error_loop.task_001.retry_allowed === false, "no retry for infra");
+  }
+
+  // ---- Test 147: Execution does not skip phases or advance out of order ----
+  {
+    console.log("Test 147: Execution respects phase/task ordering");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_147" }));
+    await handleCreateContract(req, env);
+
+    // Try to execute without advancing from decomposition_complete
+    // First, manually set current_task to simulate a bad state
+    let { state, decomposition } = await rehydrateContract(env, "ctr_c1_147");
+    state.current_task = "task_001";
+    // task_001 is still queued — Gate 2 should block
+    await env.ENAVIA_BRAIN.put(`contract:ctr_c1_147:state`, JSON.stringify(state));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_147");
+    assert(result.ok === false, "execution blocked");
+    assert(result.error === "TASK_NOT_IN_PROGRESS", "error is TASK_NOT_IN_PROGRESS — cannot execute queued task");
+  }
+
+  // ---- Test 148: Default evidence is generated if none provided ----
+  {
+    console.log("Test 148: Default evidence generated when none provided");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_148" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_148");
+    await startTask(env, "ctr_c1_148", "task_001");
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_148");
+    assert(result.ok === true, "execution succeeded");
+    assert(result.evidence.length >= 1, "at least 1 evidence item generated");
+    assert(result.evidence[0].includes("task_001"), "default evidence references task_id");
+  }
+
+  // ---- Test 149: handleExecuteContract route handler works ----
+  {
+    console.log("Test 149: handleExecuteContract route handler");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const createReq = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_149" }));
+    await handleCreateContract(createReq, env);
+    await advanceContractPhase(env, "ctr_c1_149");
+    await startTask(env, "ctr_c1_149", "task_001");
+
+    const execReq = mockRequest({ contract_id: "ctr_c1_149", evidence: ["route test"] });
+    const result = await handleExecuteContract(execReq, env);
+    assert(result.status === 200, "HTTP 200");
+    assert(result.body.ok === true, "body.ok is true");
+    assert(result.body.execution_status === "success", "body.execution_status is success");
+    assert(result.body.task_id === "task_001", "body.task_id correct");
+  }
+
+  // ---- Test 150: handleExecuteContract fails without contract_id ----
+  {
+    console.log("Test 150: handleExecuteContract fails without contract_id");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const result = await handleExecuteContract(mockRequest({}), env);
+    assert(result.status === 400, "HTTP 400 for missing contract_id");
+    assert(result.body.error === "MISSING_PARAM", "error is MISSING_PARAM");
+  }
+
+  // ---- Test 151: handleExecuteContract with simulated failure returns correct status ----
+  {
+    console.log("Test 151: handleExecuteContract with failure");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const createReq = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_151" }));
+    await handleCreateContract(createReq, env);
+    await advanceContractPhase(env, "ctr_c1_151");
+    await startTask(env, "ctr_c1_151", "task_001");
+
+    const execReq = mockRequest({
+      contract_id: "ctr_c1_151",
+      simulate_failure: { code: "FAIL", message: "test fail", classification: "in_scope" },
+    });
+    const result = await handleExecuteContract(execReq, env);
+    assert(result.status === 200, "HTTP 200 for execution-ran-but-failed");
+    assert(result.body.ok === false, "body.ok is false");
+    assert(result.body.error === "EXECUTION_FAILED", "error is EXECUTION_FAILED");
+    assert(result.body.execution_status === "failed", "execution_status is failed");
+  }
+
+  // ---- Test 152: Task with TEST micro-PR executes with non-null micro_pr_id ----
+  {
+    console.log("Test 152: Execution requires real TEST micro-PR — micro_pr_id is never null");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_152" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_152");
+    await startTask(env, "ctr_c1_152", "task_001");
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_152", { evidence: ["real mpr"] });
+    assert(result.ok === true, "execution succeeded");
+    assert(result.micro_pr_id !== null, "micro_pr_id is NOT null");
+    assert(result.micro_pr_id === "micro_pr_001", "micro_pr_id is the real TEST micro-PR");
+
+    // Verify in persisted state too
+    const { state } = await rehydrateContract(env, "ctr_c1_152");
+    assert(state.current_execution.micro_pr_id !== null, "persisted micro_pr_id is NOT null");
+  }
+
+  // ---- Test 153: Task without TEST micro-PR fails with NO_ACTIVE_TEST_MICRO_PR ----
+  {
+    console.log("Test 153: Task without TEST micro-PR fails controlled");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_153" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_153");
+    await startTask(env, "ctr_c1_153", "task_001");
+
+    // Manually remove the TEST micro-PR for task_001 so there's none available
+    let { state, decomposition } = await rehydrateContract(env, "ctr_c1_153");
+    decomposition.micro_pr_candidates = decomposition.micro_pr_candidates.filter(
+      (m) => !(m.task_id === "task_001" && m.environment === "TEST")
+    );
+    await env.ENAVIA_BRAIN.put("contract:ctr_c1_153:decomposition", JSON.stringify(decomposition));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_153");
+    assert(result.ok === false, "execution fails");
+    assert(result.error === "NO_ACTIVE_TEST_MICRO_PR", "error is NO_ACTIVE_TEST_MICRO_PR");
+    assert(result.message.includes("task_001"), "message references the task");
+  }
+
+  // ---- Test 154: TEST + PROD micro-PRs for same task → selects TEST explicitly ----
+  {
+    console.log("Test 154: Simultaneous TEST + PROD micro-PRs — selects TEST");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_154" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_154");
+    await startTask(env, "ctr_c1_154", "task_001");
+
+    // Add a PROD micro-PR for the same task (before the TEST one in array order)
+    let { decomposition } = await rehydrateContract(env, "ctr_c1_154");
+    decomposition.micro_pr_candidates.unshift({
+      id: "micro_pr_prod_001",
+      task_id: "task_001",
+      title: "ctr_c1_154 — PROD duplicate",
+      status: "queued",
+      target_workers: ["nv-enavia"],
+      target_routes: ["/test-route"],
+      environment: "PROD",
+    });
+    await env.ENAVIA_BRAIN.put("contract:ctr_c1_154:decomposition", JSON.stringify(decomposition));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_154", { evidence: ["test+prod"] });
+    assert(result.ok === true, "execution succeeded");
+    assert(result.micro_pr_id === "micro_pr_001", "selected the TEST micro-PR, not the PROD one");
+    assert(result.handoff_used.scope.environment === "TEST", "handoff environment is TEST");
+  }
+
+  // ---- Test 155: Only PROD micro-PR for task → fails with NO_ACTIVE_TEST_MICRO_PR ----
+  {
+    console.log("Test 155: Only PROD micro-PR for task — fails controlled");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c1_155" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c1_155");
+    await startTask(env, "ctr_c1_155", "task_001");
+
+    // Replace the TEST micro-PR with a PROD-only one
+    let { decomposition } = await rehydrateContract(env, "ctr_c1_155");
+    decomposition.micro_pr_candidates = decomposition.micro_pr_candidates.map((m) => {
+      if (m.task_id === "task_001" && m.environment === "TEST") {
+        return Object.assign({}, m, { environment: "PROD" });
+      }
+      return m;
+    });
+    await env.ENAVIA_BRAIN.put("contract:ctr_c1_155:decomposition", JSON.stringify(decomposition));
+
+    const result = await executeCurrentMicroPr(env, "ctr_c1_155");
+    assert(result.ok === false, "execution fails");
+    assert(result.error === "NO_ACTIVE_TEST_MICRO_PR", "error is NO_ACTIVE_TEST_MICRO_PR");
   }
 
   // ---- Summary ----
