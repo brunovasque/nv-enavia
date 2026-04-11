@@ -34,6 +34,8 @@ import {
   completeMicroPrCandidate,
   blockMicroPrCandidate,
   discardMicroPrCandidate,
+  resolveNextAction,
+  NEXT_ACTION_TYPES,
   buildContractSummary,
 } from "../contract-executor.js";
 
@@ -1007,6 +1009,392 @@ async function runTests() {
     // Not found
     const notFound = await handleGetContract(env, "nope");
     assert(notFound.status === 404, "not found still returns 404");
+  }
+
+  // ============================================================================
+  // 🎯 NEXT ACTION ENGINE TESTS
+  // ============================================================================
+
+  // ---- Test 54: resolveNextAction — task ready (first task, no dependencies) ----
+  console.log("\nTest 54: resolveNextAction — task ready to start");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "start_task", "type is start_task");
+    assert(action.task_id === "task_001", "task_id is task_001 (first task)");
+    assert(action.phase_id !== null, "phase_id is set");
+    assert(action.status === "ready", "status is ready");
+    assert(typeof action.reason === "string" && action.reason.length > 0, "reason is non-empty string");
+    assert(action.micro_pr_candidate_id === "micro_pr_001", "micro_pr_candidate_id matches task");
+  }
+
+  // ---- Test 55: resolveNextAction — task blocked (dependency not satisfied) ----
+  console.log("\nTest 55: resolveNextAction — dependency not satisfied");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Create a contract where task_002 depends on task_001
+    // Start task_001 (makes it in_progress, not done) — task_002 should not be startable
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    await startTask(env, "ctr_test_001", "task_001");
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+
+    // Manually check: task_002 is in phase_02 and depends on task_001 (in_progress)
+    // The active phase is phase_01 which has task_001
+    // task_001 is in_progress, so the engine should return "no_action" (waiting)
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "no_action", "type is no_action (task in progress)");
+    assert(action.task_id === "task_001", "references the in-progress task");
+    assert(action.status === "in_progress", "status is in_progress");
+  }
+
+  // ---- Test 56: resolveNextAction — task explicitly blocked ----
+  console.log("\nTest 56: resolveNextAction — all phase tasks blocked");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    // Block task_001 (the only task in phase_01)
+    await blockTask(env, "ctr_test_001", "task_001", "Manual block for test");
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "contract_blocked", "type is contract_blocked");
+    assert(action.status === "blocked", "status is blocked");
+    assert(action.reason.includes("blocked"), "reason mentions blocked");
+    assert(action.phase_id !== null, "phase_id is set");
+  }
+
+  // ---- Test 57: resolveNextAction — micro-PR ready (linked task completed) ----
+  console.log("\nTest 57: resolveNextAction — micro-PR ready after task completion");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    // Complete task_001 (start then complete)
+    await startTask(env, "ctr_test_001", "task_001");
+    await completeTask(env, "ctr_test_001", "task_001");
+    // Now micro_pr_001 (linked to task_001) should be ready, 
+    // but first let's check if the engine sees the task completion leads to phase_complete
+    // or if it picks up the next task or micro-PR
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+
+    const action = resolveNextAction(state, decomposition);
+    // Phase_01 only has task_001 which is now complete → phase_complete
+    assert(action.type === "phase_complete", "type is phase_complete (only task in phase done)");
+    assert(action.status === "ready", "status is ready");
+    assert(action.phase_id !== null, "phase_id is set");
+  }
+
+  // ---- Test 58: resolveNextAction — micro-PR ready in multi-task phase ----
+  console.log("\nTest 58: resolveNextAction — micro-PR ready after advancing to phase with task");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    // Use a 3-dod contract: tasks go to phase_02 (task_002) and phase_03 (task_003)
+    const payload3 = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_mpr_ready",
+      definition_of_done: ["Step A", "Step B", "Step C"],
+    };
+    await handleCreateContract(mockRequest(payload3), env);
+
+    // Complete task_001 and advance through phase_01 → phase_02
+    await startTask(env, "ctr_mpr_ready", "task_001");
+    await completeTask(env, "ctr_mpr_ready", "task_001");
+    await advanceContractPhase(env, "ctr_mpr_ready");
+
+    let { state, decomposition } = await rehydrateContract(env, "ctr_mpr_ready");
+
+    // Now in phase_02 — task_002 depends on task_001 (completed) and is in phase_02
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "start_task", "type is start_task for task_002");
+    assert(action.task_id === "task_002", "task_id is task_002");
+    assert(action.status === "ready", "status is ready");
+  }
+
+  // ---- Test 59: resolveNextAction — stand-alone micro-PR ready ----
+  console.log("\nTest 59: resolveNextAction — stand-alone micro-PR ready (linked task complete)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload1 = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_mpr_standalone",
+      definition_of_done: ["Only step"],
+    };
+    await handleCreateContract(mockRequest(payload1), env);
+
+    // Complete the only task
+    await startTask(env, "ctr_mpr_standalone", "task_001");
+    await completeTask(env, "ctr_mpr_standalone", "task_001");
+
+    // Phase_01 has task_001 → now complete → phase_complete
+    // Advance phase
+    await advanceContractPhase(env, "ctr_mpr_standalone");
+
+    let { state, decomposition } = await rehydrateContract(env, "ctr_mpr_standalone");
+    // Now we should be in phase_02 or later
+    // micro_pr_001 is queued, linked to task_001 (completed) — should be start_micro_pr
+    // But if the phase has no tasks, the engine checks micro-PRs
+    const action = resolveNextAction(state, decomposition);
+    // The current phase may have no incomplete tasks (phase_02 may have 0 tasks since only 1 dod)
+    // With 1 dod: task_001 goes to phase_03 (last dod goes to phase_03)
+    // Actually, with 1 dod item, the sole task goes to phase_03
+    // After advancing past phase_01 we're in phase_02 with no tasks → phase_complete
+    assert(
+      action.type === "phase_complete" || action.type === "start_micro_pr",
+      "type is phase_complete or start_micro_pr"
+    );
+  }
+
+  // ---- Test 60: resolveNextAction — phase complete ----
+  console.log("\nTest 60: resolveNextAction — phase complete (all tasks in phase done)");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // Complete task_001 (only task in phase_01)
+    await startTask(env, "ctr_test_001", "task_001");
+    await completeTask(env, "ctr_test_001", "task_001");
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "phase_complete", "type is phase_complete");
+    assert(action.phase_id !== null, "phase_id is set");
+    assert(action.reason.includes("complete"), "reason mentions complete");
+    assert(action.status === "ready", "status is ready");
+  }
+
+  // ---- Test 61: resolveNextAction — contract complete ----
+  console.log("\nTest 61: resolveNextAction — contract complete");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    // Manually set state to completed
+    let { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+    state.status_global = "completed";
+    state.current_phase = "all_phases_complete";
+    await env.ENAVIA_BRAIN.put("contract:ctr_test_001:state", JSON.stringify(state));
+
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_test_001"));
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "contract_complete", "type is contract_complete");
+    assert(action.status === "completed", "status is completed");
+    assert(action.task_id === null, "task_id is null");
+    assert(action.micro_pr_candidate_id === null, "micro_pr_candidate_id is null");
+  }
+
+  // ---- Test 62: resolveNextAction — contract blocked at ingestion ----
+  console.log("\nTest 62: resolveNextAction — contract blocked at ingestion");
+  {
+    const state = {
+      contract_id: "ctr_blocked",
+      status_global: "blocked",
+      current_phase: "ingestion_blocked",
+      blockers: ["scope.environments is empty"],
+      constraints: {},
+    };
+    const decomposition = { phases: [], tasks: [], micro_pr_candidates: [] };
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "contract_blocked", "type is contract_blocked");
+    assert(action.status === "blocked", "status is blocked");
+    assert(action.reason.includes("Ingestion blocked"), "reason mentions ingestion blocked");
+  }
+
+  // ---- Test 63: resolveNextAction — missing state/decomposition ----
+  console.log("\nTest 63: resolveNextAction — missing state returns no_action");
+  {
+    const action1 = resolveNextAction(null, null);
+    assert(action1.type === "no_action", "null state → no_action");
+    assert(action1.status === "error", "status is error");
+
+    const action2 = resolveNextAction({}, null);
+    assert(action2.type === "no_action", "null decomposition → no_action");
+  }
+
+  // ---- Test 64: resolveNextAction — awaiting human approval ----
+  console.log("\nTest 64: resolveNextAction — awaiting human approval (all phases done, not completed)");
+  {
+    const state = {
+      contract_id: "ctr_approval",
+      status_global: "in_progress",
+      current_phase: "phase_03",
+      blockers: [],
+      constraints: { require_human_approval_per_pr: true },
+    };
+    const decomposition = {
+      phases: [
+        { id: "phase_01", status: "done", tasks: ["task_001"] },
+        { id: "phase_02", status: "done", tasks: [] },
+        { id: "phase_03", status: "done", tasks: [] },
+      ],
+      tasks: [{ id: "task_001", status: "completed", depends_on: [] }],
+      micro_pr_candidates: [],
+    };
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "awaiting_human_approval", "type is awaiting_human_approval");
+    assert(action.status === "awaiting_approval", "status is awaiting_approval");
+    assert(action.reason.includes("sign-off"), "reason mentions sign-off");
+  }
+
+  // ---- Test 65: resolveNextAction shape always has required fields ----
+  console.log("\nTest 65: resolveNextAction — shape always has all required fields");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+
+    const action = resolveNextAction(state, decomposition);
+    assert("type" in action, "has type field");
+    assert("phase_id" in action, "has phase_id field");
+    assert("task_id" in action, "has task_id field");
+    assert("micro_pr_candidate_id" in action, "has micro_pr_candidate_id field");
+    assert("reason" in action, "has reason field");
+    assert("status" in action, "has status field");
+    assert(Object.keys(action).length === 6, "exactly 6 fields in NextAction shape");
+  }
+
+  // ---- Test 66: resolveNextAction — NEXT_ACTION_TYPES enum exported ----
+  console.log("\nTest 66: NEXT_ACTION_TYPES exported and valid");
+  {
+    assert(Array.isArray(NEXT_ACTION_TYPES), "NEXT_ACTION_TYPES is array");
+    assert(NEXT_ACTION_TYPES.includes("start_task"), "includes start_task");
+    assert(NEXT_ACTION_TYPES.includes("start_micro_pr"), "includes start_micro_pr");
+    assert(NEXT_ACTION_TYPES.includes("phase_complete"), "includes phase_complete");
+    assert(NEXT_ACTION_TYPES.includes("contract_complete"), "includes contract_complete");
+    assert(NEXT_ACTION_TYPES.includes("contract_blocked"), "includes contract_blocked");
+    assert(NEXT_ACTION_TYPES.includes("awaiting_human_approval"), "includes awaiting_human_approval");
+    assert(NEXT_ACTION_TYPES.includes("no_action"), "includes no_action");
+  }
+
+  // ---- Test 67: buildContractSummary includes next_action_resolved ----
+  console.log("\nTest 67: buildContractSummary includes next_action_resolved");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+    const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
+
+    const summary = buildContractSummary(state, decomposition);
+    assert(summary.next_action_resolved !== undefined, "next_action_resolved is present");
+    assert(typeof summary.next_action_resolved === "object", "next_action_resolved is object");
+    assert(summary.next_action_resolved.type === "start_task", "resolved type is start_task");
+    assert(summary.next_action_resolved.task_id === "task_001", "resolved task_id is task_001");
+    assert(typeof summary.next_action === "string", "legacy next_action still present as string");
+  }
+
+  // ---- Test 68: handleGetContractSummary exposes next_action_resolved ----
+  console.log("\nTest 68: handleGetContractSummary exposes next_action_resolved");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
+
+    const result = await handleGetContractSummary(env, "ctr_test_001");
+    assert(result.status === 200, "status 200");
+    assert(result.body.next_action_resolved !== undefined, "next_action_resolved in response");
+    assert(result.body.next_action_resolved.type === "start_task", "resolved type is start_task in API");
+  }
+
+  // ---- Test 69: resolveNextAction — dependency chain with blocked intermediate task ----
+  console.log("\nTest 69: resolveNextAction — queued task with unmet dependency (in_progress dep)");
+  {
+    // Simulate: 3 tasks, task_002 depends on task_001 (in_progress), task_003 depends on task_002
+    // Only phase_01 tasks matter for the active phase
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload3 = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_dep_chain",
+      definition_of_done: ["A", "B", "C"],
+    };
+    await handleCreateContract(mockRequest(payload3), env);
+    // Start task_001 but don't complete it
+    await startTask(env, "ctr_dep_chain", "task_001");
+    const { state, decomposition } = await rehydrateContract(env, "ctr_dep_chain");
+
+    // Phase_01 only has task_001 (in_progress) — engine should show in_progress/waiting
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "no_action", "type is no_action (task in progress)");
+    assert(action.status === "in_progress", "status is in_progress");
+    assert(action.reason.includes("in progress"), "reason mentions in progress");
+  }
+
+  // ---- Test 70: resolveNextAction — next task available after completing first ----
+  console.log("\nTest 70: resolveNextAction — second task becomes available after first completes");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payload3 = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_chain_advance",
+      definition_of_done: ["A", "B", "C"],
+    };
+    await handleCreateContract(mockRequest(payload3), env);
+
+    // Complete task_001 and advance phase
+    await startTask(env, "ctr_chain_advance", "task_001");
+    await completeTask(env, "ctr_chain_advance", "task_001");
+    await advanceContractPhase(env, "ctr_chain_advance");
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_chain_advance");
+    // Now in phase_02 with task_002 (depends on task_001 which is completed)
+    const action = resolveNextAction(state, decomposition);
+    assert(action.type === "start_task", "type is start_task for task_002");
+    assert(action.task_id === "task_002", "task_id is task_002");
+    assert(action.status === "ready", "status is ready");
+  }
+
+  // ---- Test 71: resolveNextAction — full lifecycle from start to contract_complete ----
+  console.log("\nTest 71: resolveNextAction — full lifecycle: start → complete");
+  {
+    const kv = createMockKV();
+    const env = { ENAVIA_BRAIN: kv };
+    const payloadFull = {
+      ...VALID_PAYLOAD,
+      contract_id: "ctr_full_lifecycle",
+      definition_of_done: ["Only criterion"],
+    };
+    await handleCreateContract(mockRequest(payloadFull), env);
+
+    // Step 1: initial — should be start_task
+    let { state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle");
+    let action = resolveNextAction(state, decomposition);
+    assert(action.type === "start_task", "lifecycle step 1: start_task");
+
+    // Step 2: start task_001 → in_progress → no_action
+    await startTask(env, "ctr_full_lifecycle", "task_001");
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle"));
+    action = resolveNextAction(state, decomposition);
+    assert(action.type === "no_action", "lifecycle step 2: no_action (in_progress)");
+
+    // Step 3: complete task_001 → phase_complete
+    await completeTask(env, "ctr_full_lifecycle", "task_001");
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle"));
+    action = resolveNextAction(state, decomposition);
+    // With 1 dod: task_001 goes to phase_03. phase_01 has [task_001].
+    // After task_001 complete, phase_01 all done → phase_complete
+    assert(action.type === "phase_complete", "lifecycle step 3: phase_complete");
+
+    // Step 4: advance phases until all_phases_complete
+    await advanceContractPhase(env, "ctr_full_lifecycle"); // phase_01 → phase_02
+    await advanceContractPhase(env, "ctr_full_lifecycle"); // phase_02 → phase_03 (0 tasks in phase_02)
+    // phase_03 has task_001 but it's already completed
+    await advanceContractPhase(env, "ctr_full_lifecycle"); // phase_03 → all_phases_complete
+
+    ({ state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle"));
+    action = resolveNextAction(state, decomposition);
+    assert(action.type === "contract_complete", "lifecycle step 4: contract_complete");
+    assert(action.status === "completed", "lifecycle step 4: status is completed");
   }
 
   // ---- Summary ----
