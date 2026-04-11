@@ -52,6 +52,9 @@ import {
   executeCurrentMicroPr,
   EXECUTION_STATUSES,
   handleExecuteContract,
+  closeContractInTest,
+  CONTRACT_CLOSURE_STATUSES,
+  handleCloseContractInTest,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -3409,6 +3412,428 @@ async function runTests() {
     const result = await executeCurrentMicroPr(env, "ctr_c1_155");
     assert(result.ok === false, "execution fails");
     assert(result.error === "NO_ACTIVE_TEST_MICRO_PR", "error is NO_ACTIVE_TEST_MICRO_PR");
+  }
+
+  // ============================================================================
+  // 🔒 C2 — Automatic Contract Closure in TEST
+  // ============================================================================
+  console.log("\n--- C2: Automatic Contract Closure in TEST ---");
+
+  // Helper: single-DoD payload generates a simpler contract (fewer tasks/phases)
+  const SINGLE_DOD_PAYLOAD = Object.assign({}, VALID_PAYLOAD, {
+    definition_of_done: ["Single criterion passes"],
+  });
+
+  // Helper: run full lifecycle to make a contract eligible for closure
+  async function makeEligibleForClosure(env, contractId) {
+    const req = mockRequest(Object.assign({}, SINGLE_DOD_PAYLOAD, { contract_id: contractId }));
+    await handleCreateContract(req, env);
+    // Advance from decomposition_complete to first phase
+    await advanceContractPhase(env, contractId);
+    await startTask(env, contractId, "task_001");
+    await executeCurrentMicroPr(env, contractId, { evidence: ["test passed in TEST"] });
+    // Complete the task — this clears the task acceptance criteria
+    await completeTask(env, contractId, "task_001");
+    // Advance phases until all_phases_complete
+    // After completing task_001 in phase_01, advance phase_01 → phase_02 (or all_phases_complete)
+    let advResult = await advanceContractPhase(env, contractId);
+    // Keep advancing if there are more phases
+    while (advResult.ok) {
+      const { state: s } = await rehydrateContract(env, contractId);
+      if (s.current_phase === "all_phases_complete" || s.status_global === "completed") break;
+      // Start next task if available
+      const { decomposition: d } = await rehydrateContract(env, contractId);
+      const nextTask = (d.tasks || []).find((t) => t.status === "queued");
+      if (nextTask) {
+        await startTask(env, contractId, nextTask.id);
+        await executeCurrentMicroPr(env, contractId, { evidence: ["auto advance"] });
+        await completeTask(env, contractId, nextTask.id);
+      }
+      advResult = await advanceContractPhase(env, contractId);
+    }
+  }
+
+  // ---- Test 156: CONTRACT_CLOSURE_STATUSES export is correct ----
+  {
+    console.log("Test 156: CONTRACT_CLOSURE_STATUSES export is correct");
+    assert(Array.isArray(CONTRACT_CLOSURE_STATUSES), "is array");
+    assert(CONTRACT_CLOSURE_STATUSES.includes("open"), "includes open");
+    assert(CONTRACT_CLOSURE_STATUSES.includes("closed_in_test"), "includes closed_in_test");
+    assert(CONTRACT_CLOSURE_STATUSES.includes("closure_rejected"), "includes closure_rejected");
+    assert(CONTRACT_CLOSURE_STATUSES.length === 3, "exactly 3 statuses");
+  }
+
+  // ---- Test 157: Eligible contract closes automatically in TEST ----
+  {
+    console.log("Test 157: Eligible contract closes automatically in TEST");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_157");
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_157");
+    assert(closeResult.ok === true, "closure succeeded");
+    assert(closeResult.already_closed === false, "not already closed");
+    assert(closeResult.contract_closure.closure_status === "closed_in_test", "closure_status is closed_in_test");
+    assert(closeResult.contract_closure.closed_in_test === true, "closed_in_test is true");
+    assert(typeof closeResult.contract_closure.closed_at === "string", "closed_at is a timestamp");
+    assert(Array.isArray(closeResult.contract_closure.closure_evidence), "closure_evidence is array");
+    assert(closeResult.contract_closure.closure_evidence.length >= 1, "at least 1 evidence");
+    assert(closeResult.contract_closure.closure_reason.includes("satisfied"), "closure_reason mentions satisfied");
+    assert(closeResult.contract_closure.environment === "TEST", "environment is TEST");
+    assert(closeResult.contract_closure.closed_by === "automatic", "closed_by is automatic");
+    // RISCO 2: status_global must be synchronized with closure
+    assert(closeResult.state.status_global === "completed", "status_global synchronized to completed");
+  }
+
+  // ---- Test 158: Contract with failed execution does NOT close ----
+  {
+    console.log("Test 158: Contract with failed execution does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, SINGLE_DOD_PAYLOAD, { contract_id: "ctr_c2_158" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c2_158");
+    await startTask(env, "ctr_c2_158", "task_001");
+
+    // Execute with failure
+    await executeCurrentMicroPr(env, "ctr_c2_158", {
+      simulate_failure: { code: "BUILD_FAIL", message: "Build failed", classification: "in_scope" },
+    });
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_158");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "EXECUTION_NOT_SUCCESSFUL", "error is EXECUTION_NOT_SUCCESSFUL");
+  }
+
+  // ---- Test 159: Contract with blocked error_loop does NOT close ----
+  {
+    console.log("Test 159: Contract with blocked error_loop does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_159");
+
+    // Inject blocked error_loop for the execution's task
+    let { state } = await rehydrateContract(env, "ctr_c2_159");
+    const execTaskId = state.current_execution.task_id;
+    state.error_loop = {};
+    state.error_loop[execTaskId] = {
+      errors: [{ code: "ERR", classification: "in_scope", retryable: true }],
+      active_retry_count: 3,
+      loop_status: "blocked",
+      retry_count: 3,
+      last_error: { code: "ERR", classification: "in_scope", retryable: true },
+      retry_allowed: false,
+      escalation_reason: "Retry limit reached",
+    };
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_159:state", JSON.stringify(state));
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_159");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "ERROR_LOOP_BLOCKED", "error is ERROR_LOOP_BLOCKED");
+  }
+
+  // ---- Test 160: Contract with pending acceptance criteria does NOT close ----
+  {
+    console.log("Test 160: Contract with pending acceptance criteria does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    // Use multi-DoD payload: completing task_001 still leaves task_002/task_003 pending
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c2_160" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c2_160");
+    await startTask(env, "ctr_c2_160", "task_001");
+
+    // Execute successfully in TEST
+    await executeCurrentMicroPr(env, "ctr_c2_160", { evidence: ["test passed"] });
+    // Complete task but don't complete all tasks — phase still has pending work
+    await completeTask(env, "ctr_c2_160", "task_001");
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_160");
+    assert(closeResult.ok === false, "closure rejected");
+    // After completing task_001 with remaining tasks, the phase gate blocks advancement
+    // and sets contract to blocked — so ACTIVE_BLOCKERS fires before ACCEPTANCE_PENDING
+    assert(closeResult.error === "ACTIVE_BLOCKERS", "error is ACTIVE_BLOCKERS (incomplete tasks in phase)");
+  }
+
+  // ---- Test 161: Closure persists and survives rehydration ----
+  {
+    console.log("Test 161: Closure persists and survives rehydration");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_161");
+    await closeContractInTest(env, "ctr_c2_161");
+
+    // Rehydrate and verify closure persisted
+    const { state } = await rehydrateContract(env, "ctr_c2_161");
+    assert(state.contract_closure !== null, "contract_closure exists after rehydration");
+    assert(state.contract_closure.closure_status === "closed_in_test", "closure_status survives rehydration");
+    assert(state.contract_closure.closed_in_test === true, "closed_in_test survives rehydration");
+    assert(typeof state.contract_closure.closed_at === "string", "closed_at survives rehydration");
+    assert(Array.isArray(state.contract_closure.closure_evidence), "closure_evidence survives rehydration");
+    assert(state.contract_closure.environment === "TEST", "environment survives rehydration");
+    // RISCO 2: status_global synchronized with closure survives rehydration
+    assert(state.status_global === "completed", "status_global=completed survives rehydration");
+  }
+
+  // ---- Test 162: Summary/API reflects closure state ----
+  {
+    console.log("Test 162: Summary/API reflects closure state");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_162");
+    await closeContractInTest(env, "ctr_c2_162");
+
+    // Check summary
+    const { state, decomposition } = await rehydrateContract(env, "ctr_c2_162");
+    const summary = buildContractSummary(state, decomposition);
+    assert(summary.contract_closure !== null, "summary includes contract_closure");
+    assert(summary.contract_closure.closure_status === "closed_in_test", "summary closure_status correct");
+
+    // Check GET summary handler
+    const summaryResult = await handleGetContractSummary(env, "ctr_c2_162");
+    assert(summaryResult.status === 200, "summary HTTP 200");
+    assert(summaryResult.body.contract_closure !== null, "handler exposes contract_closure");
+    assert(summaryResult.body.contract_closure.closure_status === "closed_in_test", "handler closure_status correct");
+    // RISCO 2: status_global reflected in summary
+    assert(summary.status_global === "completed", "summary status_global is completed after closure");
+    assert(summaryResult.body.status_global === "completed", "handler status_global is completed after closure");
+  }
+
+  // ---- Test 163: Already-closed contract returns ok with already_closed flag ----
+  {
+    console.log("Test 163: Already-closed contract returns ok with already_closed flag");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_163");
+
+    // Close first time
+    const first = await closeContractInTest(env, "ctr_c2_163");
+    assert(first.ok === true, "first closure ok");
+    assert(first.already_closed === false, "first closure is not already_closed");
+
+    // Close second time (idempotent)
+    const second = await closeContractInTest(env, "ctr_c2_163");
+    assert(second.ok === true, "second closure ok");
+    assert(second.already_closed === true, "second closure is already_closed");
+    assert(second.contract_closure.closure_status === "closed_in_test", "still closed_in_test");
+  }
+
+  // ---- Test 164: No execution at all → closure rejected ----
+  {
+    console.log("Test 164: No execution at all — closure rejected");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c2_164" }));
+    await handleCreateContract(req, env);
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_164");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "NO_EXECUTION", "error is NO_EXECUTION");
+  }
+
+  // ---- Test 165: Contract not found → closure rejected ----
+  {
+    console.log("Test 165: Non-existent contract — closure rejected");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const closeResult = await closeContractInTest(env, "nonexistent_contract");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "CONTRACT_NOT_FOUND", "error is CONTRACT_NOT_FOUND");
+  }
+
+  // ---- Test 166: Contract with active blockers does NOT close ----
+  {
+    console.log("Test 166: Contract with active blockers does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_166");
+
+    // Inject blockers after making eligible
+    let { state } = await rehydrateContract(env, "ctr_c2_166");
+    state.blockers = ["External dependency unavailable"];
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_166:state", JSON.stringify(state));
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_166");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "ACTIVE_BLOCKERS", "error is ACTIVE_BLOCKERS");
+  }
+
+  // ---- Test 167: awaiting_human error loop does NOT close ----
+  {
+    console.log("Test 167: awaiting_human error loop does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_167");
+
+    // Set error_loop to awaiting_human for the executed task
+    let { state } = await rehydrateContract(env, "ctr_c2_167");
+    const execTaskId = state.current_execution.task_id;
+    state.error_loop = {};
+    state.error_loop[execTaskId] = {
+      errors: [{ code: "INFRA", classification: "infra", retryable: false }],
+      active_retry_count: 1,
+      loop_status: "awaiting_human",
+      retry_count: 1,
+      last_error: { code: "INFRA", classification: "infra", retryable: false },
+      retry_allowed: false,
+      escalation_reason: "Infrastructure error",
+    };
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_167:state", JSON.stringify(state));
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_167");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "ERROR_LOOP_BLOCKED", "error is ERROR_LOOP_BLOCKED");
+  }
+
+  // ---- Test 168: No PROD promotion — closure is TEST-only ----
+  {
+    console.log("Test 168: No PROD promotion — closure is TEST-only");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_168");
+    await closeContractInTest(env, "ctr_c2_168");
+
+    const { state } = await rehydrateContract(env, "ctr_c2_168");
+    assert(state.contract_closure.environment === "TEST", "closure environment is TEST, not PROD");
+    assert(state.contract_closure.closed_in_test === true, "closed_in_test flag is true");
+    // Verify status_global is synchronized but NOT promoted to PROD
+    assert(state.status_global === "completed", "status_global is completed (TEST closure)");
+    assert(state.status_global !== "promoted", "status_global is not promoted");
+    assert(state.status_global !== "prod", "status_global is not prod");
+    assert(state.contract_closure.environment === "TEST", "closure stays in TEST");
+  }
+
+  // ---- Test 169: handleCloseContractInTest route handler ----
+  {
+    console.log("Test 169: handleCloseContractInTest route handler");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_169");
+
+    const closeReq = mockRequest({ contract_id: "ctr_c2_169" });
+    const result = await handleCloseContractInTest(closeReq, env);
+    assert(result.status === 200, "HTTP 200");
+    assert(result.body.ok === true, "body.ok is true");
+    assert(result.body.contract_closure.closure_status === "closed_in_test", "body.contract_closure.closure_status correct");
+  }
+
+  // ---- Test 170: handleCloseContractInTest fails without contract_id ----
+  {
+    console.log("Test 170: handleCloseContractInTest fails without contract_id");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const closeReq = mockRequest({});
+    const result = await handleCloseContractInTest(closeReq, env);
+    assert(result.status === 400, "HTTP 400");
+    assert(result.body.error === "MISSING_CONTRACT_ID", "error is MISSING_CONTRACT_ID");
+  }
+
+  // ---- Test 171: handleCloseContractInTest returns 400 on rejection ----
+  {
+    console.log("Test 171: handleCloseContractInTest returns 400 on rejection");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const createReq = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c2_171" }));
+    await handleCreateContract(createReq, env);
+
+    const closeReq = mockRequest({ contract_id: "ctr_c2_171" });
+    const result = await handleCloseContractInTest(closeReq, env);
+    assert(result.status === 400, "HTTP 400");
+    assert(result.body.ok === false, "body.ok is false");
+    assert(result.body.error === "NO_EXECUTION", "error is NO_EXECUTION");
+  }
+
+  // ---- Test 172: Closure with non-TEST execution is rejected ----
+  {
+    console.log("Test 172: Closure with non-TEST execution is rejected");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c2_172" }));
+    await handleCreateContract(req, env);
+
+    // Manually set a non-TEST execution
+    let { state } = await rehydrateContract(env, "ctr_c2_172");
+    state.current_execution = {
+      contract_id: "ctr_c2_172",
+      task_id: "task_001",
+      micro_pr_id: "micro_pr_001",
+      execution_status: "success",
+      test_execution: false,
+      execution_finished_at: new Date().toISOString(),
+      execution_evidence: ["non-test evidence"],
+    };
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_172:state", JSON.stringify(state));
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_172");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "NOT_TEST_EXECUTION", "error is NOT_TEST_EXECUTION");
+  }
+
+  // ---- Test 173: Blocked task status does NOT close ----
+  {
+    console.log("Test 173: Blocked task status does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, SINGLE_DOD_PAYLOAD, { contract_id: "ctr_c2_173" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c2_173");
+    await startTask(env, "ctr_c2_173", "task_001");
+    await executeCurrentMicroPr(env, "ctr_c2_173", { evidence: ["blocked test"] });
+
+    // Block the task
+    await blockTask(env, "ctr_c2_173", "task_001");
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_173");
+    assert(closeResult.ok === false, "closure rejected");
+    // When a task is blocked, the phase gate sets contract.blockers — so ACTIVE_BLOCKERS fires first
+    assert(closeResult.error === "ACTIVE_BLOCKERS", "error is ACTIVE_BLOCKERS (blocked task causes phase-level blocker)");
+  }
+
+  // ---- Test 174: Summary without closure shows null contract_closure ----
+  {
+    console.log("Test 174: Summary without closure shows null contract_closure");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_c2_174" }));
+    await handleCreateContract(req, env);
+
+    const { state, decomposition } = await rehydrateContract(env, "ctr_c2_174");
+    const summary = buildContractSummary(state, decomposition);
+    assert(summary.contract_closure === null, "contract_closure is null before closure");
+  }
+
+  // ---- Test 175: TASK_NOT_CLOSEABLE when task is queued (manually injected) ----
+  {
+    console.log("Test 175: TASK_NOT_CLOSEABLE when execution task is queued");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    await makeEligibleForClosure(env, "ctr_c2_175");
+
+    // Manually set the executed task back to "queued" to trigger TASK_NOT_CLOSEABLE
+    let { state, decomposition } = await rehydrateContract(env, "ctr_c2_175");
+    const execTaskId = state.current_execution.task_id;
+    const task = decomposition.tasks.find((t) => t.id === execTaskId);
+    if (task) task.status = "queued";
+    // Clear blockers to ensure we reach the task gate
+    state.blockers = [];
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_175:state", JSON.stringify(state));
+    await env.ENAVIA_BRAIN.put("contract:ctr_c2_175:decomposition", JSON.stringify(decomposition));
+
+    const closeResult = await closeContractInTest(env, "ctr_c2_175");
+    assert(closeResult.ok === false, "closure rejected");
+    assert(closeResult.error === "TASK_NOT_CLOSEABLE" || closeResult.error === "ACCEPTANCE_PENDING", "error is TASK_NOT_CLOSEABLE or ACCEPTANCE_PENDING");
+  }
+
+  // ---- Test 176: task in_progress with successful execution does NOT close ----
+  {
+    console.log("Test 176: task in_progress with successful execution does NOT close");
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const req = mockRequest(Object.assign({}, SINGLE_DOD_PAYLOAD, { contract_id: "ctr_c2_176" }));
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, "ctr_c2_176");
+    await startTask(env, "ctr_c2_176", "task_001");
+
+    // Execute successfully — but do NOT completeTask (task stays in_progress)
+    const execResult = await executeCurrentMicroPr(env, "ctr_c2_176", { evidence: ["test ok"] });
+    assert(execResult.ok === true, "execution succeeded");
+
+    // Verify task is still in_progress
+    const { decomposition } = await rehydrateContract(env, "ctr_c2_176");
+    const task = decomposition.tasks.find((t) => t.id === "task_001");
+    assert(task.status === "in_progress", "task is still in_progress");
+
+    // Attempt closure — must be rejected (RISCO 1)
+    const closeResult = await closeContractInTest(env, "ctr_c2_176");
+    assert(closeResult.ok === false, "closure rejected for in_progress task");
+    // With in_progress task, the contract has active blockers from phase gate,
+    // or acceptance criteria are pending — any of these gates reject closure
+    assert(
+      closeResult.error === "TASK_NOT_CLOSEABLE" ||
+      closeResult.error === "ACCEPTANCE_PENDING" ||
+      closeResult.error === "ACTIVE_BLOCKERS",
+      "error blocks in_progress closure: " + closeResult.error
+    );
   }
 
   // ---- Summary ----
