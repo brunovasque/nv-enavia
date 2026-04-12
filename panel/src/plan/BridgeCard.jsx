@@ -112,6 +112,102 @@ function BridgeSendStatus({ sendStatus, sendResult, sendError }) {
   );
 }
 
+// ── P13 — Dispatch Outcome ────────────────────────────────────────────────
+// After bridge is sent, interpret executor_response to show a clear post-dispatch
+// status: accepted, immediate error, or missing response.
+// Scope: P13 only — immediate executor return. No P14+ features.
+
+export const DISPATCH_STATUS = {
+  ACCEPTED: "dispatch_accepted",
+  ERROR:    "dispatch_error",
+  MISSING:  "dispatch_missing",
+};
+
+const DISPATCH_META = {
+  [DISPATCH_STATUS.ACCEPTED]: {
+    label: "Execução aceita pelo executor",
+    color: "#10B981",
+    bg: "rgba(16,185,129,0.08)",
+    border: "rgba(16,185,129,0.25)",
+    icon: "▷",
+  },
+  [DISPATCH_STATUS.ERROR]: {
+    label: "Erro imediato do executor",
+    color: "#EF4444",
+    bg: "rgba(239,68,68,0.08)",
+    border: "rgba(239,68,68,0.25)",
+    icon: "✕",
+  },
+  [DISPATCH_STATUS.MISSING]: {
+    label: "Resposta do executor ausente",
+    color: "#F59E0B",
+    bg: "rgba(245,158,11,0.08)",
+    border: "rgba(245,158,11,0.25)",
+    icon: "?",
+  },
+};
+
+/**
+ * Derive a dispatch status from the executor_response returned by bridge.
+ * Pure function — no side effects, no network calls.
+ *
+ * @param {object|null|undefined} executorResponse — raw executor_response from sendBridge result
+ * @returns {{ status: string, detail: string|null }}
+ */
+export function deriveDispatchOutcome(executorResponse) {
+  if (!executorResponse || typeof executorResponse !== "object") {
+    return { status: DISPATCH_STATUS.MISSING, detail: null };
+  }
+  if (executorResponse.ok === true) {
+    const detail = typeof executorResponse.execution_status === "string"
+      ? executorResponse.execution_status
+      : null;
+    return { status: DISPATCH_STATUS.ACCEPTED, detail };
+  }
+  // executor responded but ok !== true → immediate error
+  const errMsg = typeof executorResponse.error === "string"
+    ? executorResponse.error
+    : (typeof executorResponse.message === "string"
+      ? executorResponse.message
+      : null);
+  return { status: DISPATCH_STATUS.ERROR, detail: errMsg };
+}
+
+function DispatchOutcome({ sendStatus, sendResult }) {
+  // Only render after bridge has been successfully sent
+  if (sendStatus !== "sent" || !sendResult) return null;
+
+  const { status, detail } = deriveDispatchOutcome(sendResult.executor_response);
+  const meta = DISPATCH_META[status];
+  if (!meta) return null;
+
+  return (
+    <div
+      style={{
+        ...s.sendBlock,
+        background: meta.bg,
+        borderColor: meta.border,
+        marginTop: "6px",
+      }}
+      role="status"
+      aria-live="polite"
+      aria-label={`Resultado do executor: ${meta.label}`}
+    >
+      <span style={{ ...s.sendIcon, color: meta.color }} aria-hidden="true">
+        {meta.icon}
+      </span>
+      <div style={s.sendContent}>
+        <p style={{ ...s.sendText, color: meta.color }}>
+          {meta.label}
+        </p>
+        {detail && (
+          <p style={s.sendDetail}>{detail}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function BridgeCard({ bridge, bridgeSendStatus, bridgeSendResult, bridgeSendError }) {
   if (!bridge) return null;
   const { module: mod, payload, state, description } = bridge;
@@ -148,6 +244,12 @@ export default function BridgeCard({ bridge, bridgeSendStatus, bridgeSendResult,
         sendStatus={bridgeSendStatus}
         sendResult={bridgeSendResult}
         sendError={bridgeSendError}
+      />
+
+      {/* P13: estado pós-disparo — resultado imediato do executor */}
+      <DispatchOutcome
+        sendStatus={bridgeSendStatus}
+        sendResult={bridgeSendResult}
       />
     </div>
   );
