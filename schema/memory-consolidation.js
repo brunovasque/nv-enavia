@@ -56,6 +56,8 @@ import {
   MEMORY_PRIORITY,
   MEMORY_CONFIDENCE,
 } from "./memory-schema.js";
+import { GATE_STATUS } from "./planner-approval-gate.js";
+import { BRIDGE_STATUS } from "./planner-executor-bridge.js";
 
 // ---------------------------------------------------------------------------
 // CONSOLIDATION_VERSION — versão canônica da PM9
@@ -66,8 +68,8 @@ const CONSOLIDATION_VERSION = "1.0";
 // Gate statuses that allow consolidation (approved in any form)
 // ---------------------------------------------------------------------------
 const _CONSOLIDABLE_GATE_STATUSES = new Set([
-  "approved_not_required",
-  "approved",
+  GATE_STATUS.APPROVED_NOT_REQUIRED,
+  GATE_STATUS.APPROVED,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -115,7 +117,7 @@ function _validateInputs({ plan, gate, bridge }, fnName) {
 // ---------------------------------------------------------------------------
 function _qualifiesForCanonical(plan, gate, bridge) {
   if (!_CONSOLIDABLE_GATE_STATUSES.has(gate.gate_status)) return false;
-  if (bridge.bridge_status !== "ready_for_executor") return false;
+  if (bridge.bridge_status !== BRIDGE_STATUS.READY) return false;
 
   const level = plan.complexity_level.toUpperCase();
   if (level !== "B" && level !== "C") return false;
@@ -232,7 +234,7 @@ function consolidateMemoryLearning({ plan, gate, bridge } = {}) {
 
   // ---- Rejeição: nunca consolidar ----
   // Rejeição não deve virar memória canônica. Evitar poluir memória com falha.
-  if (gateStatus === "rejected") {
+  if (gateStatus === GATE_STATUS.REJECTED) {
     const gateReason = typeof gate.reason === "string" && gate.reason.length > 0
       ? ` Gate reason: ${gate.reason}`
       : "";
@@ -246,7 +248,7 @@ function consolidateMemoryLearning({ plan, gate, bridge } = {}) {
 
   // ---- Estado transitório: aguardando aprovação ----
   // Não consolidar enquanto a decisão humana não foi tomada — seria prematuro.
-  if (gateStatus === "approval_required") {
+  if (gateStatus === GATE_STATUS.APPROVAL_REQUIRED) {
     return {
       should_consolidate: false,
       memory_candidates:  [],
