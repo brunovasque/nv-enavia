@@ -75,6 +75,12 @@ const CONTRACT_FINAL_STATUS = {
 // Espelha TASK_DONE_STATUSES de contract-executor.js.
 // Definido localmente para evitar importação circular.
 // Manter sincronizado com TASK_DONE_STATUSES se aquele for alterado.
+//
+// Design intencional: "skipped", "done" e "merged" estão incluídos pois
+// indicam que a task foi finalizada — mas NÃO passaram pelo gate formal
+// da PR 1 (evaluateAdherence). Por isso, tasks com esses statuses são
+// classificadas como `partial_microsteps` (não como `adherent_microsteps`),
+// impedindo o fechamento do contrato. Este comportamento é testado em S2b.
 // ---------------------------------------------------------------------------
 const FINAL_TASK_DONE_STATUSES = ["done", "merged", "completed", "skipped"];
 
@@ -296,7 +302,11 @@ function auditFinalContract({ state, decomposition } = {}) {
   );
   let evidence_sufficiency;
   if (dod.length === 0) {
-    // Contrato sem DoD: sem itens esperados, sem evidência exigível
+    // Edge case: contrato sem DoD. Sem itens esperados, sem evidência exigível.
+    // NOTA: Um contrato sem DoD que possui tasks concluídas terá todas elas
+    // classificadas como `out_of_contract_microsteps` (pois nenhuma mapeia o DoD
+    // vazio), bloqueando o fechamento por essa via. A ausência de DoD não é
+    // um atalho para fechar um contrato com entregas não autorizadas.
     evidence_sufficiency = true;
   } else if (dodMatchedDoneTasks.length === 0) {
     // Existem itens de DoD mas nenhuma task concluída os cobre → sem evidência

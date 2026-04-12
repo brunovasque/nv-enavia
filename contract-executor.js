@@ -2729,6 +2729,10 @@ async function handleCloseContractInTest(request, env) {
 // The final gate validates the actual contract state — accepting any
 // non-terminal, non-cancelled status ensures the gate is the enforcement
 // point rather than a status-machine guard.
+//
+// NOTE: Keep in sync with VALID_GLOBAL_TRANSITIONS above. Any new status
+// added to the lifecycle that should allow final closure must also appear
+// here. The set intentionally excludes terminal/cancelled/failed states.
 // ---------------------------------------------------------------------------
 const FINAL_CLOSURE_SOURCE_STATUSES = [
   "decomposed",
@@ -2817,17 +2821,23 @@ async function closeFinalContract(env, contractId) {
 
   // Transition to canonical terminal "completed" status.
   // Some source statuses (e.g. "decomposed", "blocked") cannot transition directly
-  // to "completed" — advance through intermediate states as needed.
+  // to "completed" — advance through "executing" first.
+  // Rollback: both transitions are validated before any persist; if the final
+  // transition fails, the original status is restored so in-memory state remains
+  // consistent with KV (which is only written after both transitions succeed).
+  const originalStatus = state.status_global;
   const DIRECT_TO_COMPLETED = ["executing", "validating", "test-complete", "prod-pending"];
   if (!DIRECT_TO_COMPLETED.includes(state.status_global)) {
-    // Advance to "executing" first (all pre-execution states allow this transition)
+    // Advance to "executing" first (all FINAL_CLOSURE_SOURCE_STATUSES allow this)
     const intermediateTransition = transitionStatusGlobal(state, "executing", "closeFinalContract:intermediate");
     if (!intermediateTransition.ok) {
+      state.status_global = originalStatus; // rollback
       return { ok: false, error: intermediateTransition.error, message: intermediateTransition.message };
     }
   }
   const transition = transitionStatusGlobal(state, "completed", "closeFinalContract");
   if (!transition.ok) {
+    state.status_global = originalStatus; // rollback
     return { ok: false, error: transition.error, message: transition.message };
   }
 
