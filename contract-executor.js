@@ -15,6 +15,7 @@
 // ============================================================================
 
 import { evaluateAdherence } from "./schema/contract-adherence-gate.js";
+import { auditExecution, EXECUTION_ADHERENCE_STATUS } from "./schema/execution-audit.js";
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -3052,6 +3053,12 @@ async function handleCompleteTask(request, env) {
     };
   }
 
+  // ── AUDITORIA DE EXECUÇÃO CONTRA CONTRATO (PR 2) ─────────────────────────
+  // Snapshot canônico da aderência de toda a execução ao contrato.
+  // Determinístico, sem I/O adicional (state e decomposition já carregados).
+  const executionAudit = auditExecution({ state: result.state, decomposition: result.decomposition });
+  // ── FIM DA AUDITORIA ─────────────────────────────────────────────────────
+
   return {
     status: 200,
     body: {
@@ -3062,7 +3069,59 @@ async function handleCompleteTask(request, env) {
       honest_status:      adherenceAudit.honest_status,
       can_mark_concluded: true,
       campos_falhos:      adherenceAudit.campos_falhos,
+      execution_audit:    executionAudit,
     },
+  };
+}
+
+// ============================================================================
+// 🛡️ BLINDAGEM CONTRATUAL — handleGetExecutionAudit (PR 2)
+//
+// GET /contracts/execution-audit?contract_id=<id>
+//
+// Handler HTTP que retorna a auditoria canônica de execução vs. contrato.
+// Pode ser chamado a qualquer momento durante o fluxo operacional para
+// obter um snapshot auditável do estado de aderência.
+//
+// Query params:
+//   contract_id {string} — ID do contrato
+//
+// Retorna ExecutionAudit:
+//   {
+//     contract_id,           — string
+//     contract_reference,    — { goal, contracted_items }
+//     implemented_reference, — string[]
+//     missing_items,         — string[]
+//     unauthorized_items,    — string[]
+//     adherence_status,      — "aderente_ao_contrato" | "parcial_desviado" | "fora_do_contrato"
+//     reason,                — string auditável
+//     next_action,           — string coerente
+//   }
+// ============================================================================
+async function handleGetExecutionAudit(request, env) {
+  const url = new URL(request.url);
+  const contractId = url.searchParams.get("contract_id");
+
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_PARAM", message: '"contract_id" query param is required.' },
+    };
+  }
+
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return {
+      status: 404,
+      body: { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` },
+    };
+  }
+
+  const executionAudit = auditExecution({ state, decomposition });
+
+  return {
+    status: 200,
+    body: Object.assign({ ok: true }, executionAudit),
   };
 }
 
@@ -3141,4 +3200,8 @@ export {
   handleResolvePlanRevision,
   // 🛡️ Blindagem Contratual — gate obrigatório por task
   handleCompleteTask,
+  // 🛡️ Blindagem Contratual PR 2 — auditoria de execução contra contrato
+  auditExecution,
+  EXECUTION_ADHERENCE_STATUS,
+  handleGetExecutionAudit,
 };
