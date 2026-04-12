@@ -3069,16 +3069,18 @@ async function handleCompleteTask(request, env) {
   //   execution_cycles registra o histórico de tentativas desta microetapa.
   //
   // Determinístico, sem I/O adicional (state e decomposition já carregados).
+  // Inclui o current_execution se pertencer a esta task — evidência operacional
+  const currentExec = result.state.current_execution;
+  const executionCycles = (currentExec && currentExec.task_id === taskId)
+    ? [currentExec]
+    : [];
+
   const executionAudit = auditExecution({
     state:              result.state,
     decomposition:      result.decomposition,
     microstep_id:       taskId,
     executor_artifacts,
-    // Inclui o current_execution se pertencer a esta task — evidência operacional
-    execution_cycles:   (result.state.current_execution &&
-                         result.state.current_execution.task_id === taskId)
-      ? [result.state.current_execution]
-      : [],
+    execution_cycles:   executionCycles,
   });
   // ── FIM DA AUDITORIA ─────────────────────────────────────────────────────
 

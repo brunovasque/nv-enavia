@@ -196,8 +196,12 @@ function _collectExecutionIds({ executor_artifacts, execution_cycles }) {
   }
 
   for (const cycle of (Array.isArray(execution_cycles) ? execution_cycles : [])) {
-    const id = (typeof cycle.execution_id === "string" ? cycle.execution_id : null)
-      || (typeof cycle.micro_pr_id === "string" ? cycle.micro_pr_id : null);
+    let id = null;
+    if (typeof cycle.execution_id === "string") {
+      id = cycle.execution_id;
+    } else if (typeof cycle.micro_pr_id === "string") {
+      id = cycle.micro_pr_id;
+    }
     if (id && !ids.includes(id)) {
       ids.push(id);
     }
@@ -235,10 +239,10 @@ function _buildContractMicrostepReference(state, decomposition, task) {
     ? linkedMpr.target_workers
     : (state.scope && Array.isArray(state.scope.workers) ? state.scope.workers : []);
 
-  // Posição desta task no Definition of Done
-  const dodIndex = state.definition_of_done.findIndex(
-    (item) => _normalize(item) === _normalize(task.description)
-  );
+  // Posição desta task no Definition of Done (pre-normalize once for efficiency)
+  const dodNormalizedList = state.definition_of_done.map(_normalize);
+  const taskDescNorm      = _normalize(task.description);
+  const dodIndex          = dodNormalizedList.indexOf(taskDescNorm);
 
   return {
     task_id:                  task.id,
