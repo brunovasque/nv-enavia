@@ -1,114 +1,122 @@
+import { useState } from "react";
+import {
+  EXECUTION_STATUS,
+  MOCK_EXECUTIONS,
+} from "../execution/mockExecution";
+import ExecutionHeader from "../execution/ExecutionHeader";
+import ExecutionStatusCard from "../execution/ExecutionStatusCard";
+import CurrentStepBlock from "../execution/CurrentStepBlock";
+import ExecutionTimeline from "../execution/ExecutionTimeline";
+import ResultBlock from "../execution/ResultBlock";
+import ErrorBlock from "../execution/ErrorBlock";
+import IdleState from "../execution/IdleState";
+
 export default function ExecutionPage() {
+  const [currentState, setCurrentState] = useState(EXECUTION_STATUS.RUNNING);
+  const execution = MOCK_EXECUTIONS[currentState];
+
+  const isIdle = currentState === EXECUTION_STATUS.IDLE;
+  const isRunning = currentState === EXECUTION_STATUS.RUNNING;
+  const isCompleted = currentState === EXECUTION_STATUS.COMPLETED;
+  const hasError =
+    currentState === EXECUTION_STATUS.BLOCKED ||
+    currentState === EXECUTION_STATUS.FAILED;
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.iconWrap}>⚡</div>
-        <h2 style={styles.heading}>Execução</h2>
-        <p style={styles.description}>
-          Monitore execuções ativas. Acompanhe micro-PRs, deploys, validações e o
-          estado do pipeline de contratos em tempo real.
-        </p>
-        <div style={styles.placeholder}>
-          <div style={styles.execItem}>
-            <span style={styles.execDot} />
-            <span style={styles.execLabel}>contract:NV-042</span>
-            <span style={styles.execStatus}>executing</span>
+    <div style={s.page}>
+      {/* Header — always visible */}
+      <ExecutionHeader
+        execution={execution}
+        currentState={currentState}
+        onStateChange={setCurrentState}
+      />
+
+      {/* Idle state fills the rest */}
+      {isIdle && <IdleState />}
+
+      {/* Active execution body */}
+      {!isIdle && (
+        <>
+          {/* Error/blocked banner */}
+          {hasError && execution?.error && (
+            <ErrorBlock error={execution.error} status={currentState} />
+          )}
+
+          {/* Running: current step indicator */}
+          {isRunning && execution?.currentStep && (
+            <CurrentStepBlock step={execution.currentStep} />
+          )}
+
+          {/* Body: main (timeline) + sidebar */}
+          <div style={s.body}>
+            {/* ── Main column ─────────────────────────────────────── */}
+            <div
+              style={{
+                ...s.main,
+                ...(isCompleted ? s.mainCompleted : {}),
+              }}
+            >
+              {/* Completed: result hero comes first */}
+              {isCompleted && execution?.result && (
+                <ResultBlock result={execution.result} />
+              )}
+
+              {/* Timeline — dominant in running, history in completed */}
+              <ExecutionTimeline
+                events={execution?.events ?? []}
+                isHistory={isCompleted}
+              />
+            </div>
+
+            {/* ── Sidebar ─────────────────────────────────────────── */}
+            <div style={s.sidebar}>
+              <ExecutionStatusCard execution={execution} />
+            </div>
           </div>
-          <div style={styles.execItem}>
-            <span style={{ ...styles.execDot, background: "#10B981" }} />
-            <span style={styles.execLabel}>contract:NV-041</span>
-            <span style={{ ...styles.execStatus, color: "#10B981" }}>completed</span>
-          </div>
-          <div style={styles.execItem}>
-            <span style={{ ...styles.execDot, background: "var(--text-muted)" }} />
-            <span style={styles.execLabel}>contract:NV-040</span>
-            <span style={{ ...styles.execStatus, color: "var(--text-muted)" }}>cancelled</span>
-          </div>
-        </div>
-        <span style={styles.badge}>Em breve</span>
-      </div>
+        </>
+      )}
     </div>
   );
 }
 
-const styles = {
-  container: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-    padding: "24px",
-  },
-  card: {
-    background: "var(--bg-surface)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius-lg)",
-    padding: "40px",
-    maxWidth: "520px",
-    width: "100%",
-    textAlign: "center",
-  },
-  iconWrap: {
-    fontSize: "40px",
-    marginBottom: "16px",
-  },
-  heading: {
-    fontSize: "20px",
-    fontWeight: 600,
-    color: "var(--text-primary)",
-    marginBottom: "8px",
-  },
-  description: {
-    fontSize: "14px",
-    color: "var(--text-secondary)",
-    lineHeight: 1.6,
-    marginBottom: "24px",
-  },
-  placeholder: {
-    background: "var(--bg-base)",
-    borderRadius: "var(--radius-md)",
-    padding: "16px",
-    marginBottom: "20px",
+const s = {
+  page: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
-    textAlign: "left",
+    gap: "12px",
+    height: "100%",
+    overflow: "hidden",
+    padding: "4px 0 0",
   },
-  execItem: {
+  body: {
     display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "8px 12px",
-    background: "var(--bg-surface)",
-    borderRadius: "var(--radius-sm)",
-    fontSize: "13px",
-    fontFamily: "var(--font-mono)",
-  },
-  execDot: {
-    width: "8px",
-    height: "8px",
-    borderRadius: "50%",
-    background: "var(--color-primary)",
-    flexShrink: 0,
-  },
-  execLabel: {
-    color: "var(--text-secondary)",
+    gap: "16px",
     flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
   },
-  execStatus: {
-    fontSize: "11px",
-    fontWeight: 600,
-    color: "var(--color-primary)",
+  // Running: main fills height, timeline scrolls internally
+  main: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    overflow: "hidden",
   },
-  badge: {
-    display: "inline-block",
-    fontSize: "11px",
-    fontWeight: 600,
-    color: "var(--color-primary)",
-    background: "var(--color-primary-glow)",
-    border: "1px solid var(--color-primary-border)",
-    padding: "4px 12px",
-    borderRadius: "20px",
-    letterSpacing: "0.5px",
+  // Completed: main column scrolls, result hero + full timeline
+  mainCompleted: {
+    overflowY: "auto",
+    overflowX: "hidden",
+    paddingBottom: "24px",
+  },
+  sidebar: {
+    width: "256px",
+    minWidth: "256px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    flexShrink: 0,
+    overflowY: "auto",
   },
 };
