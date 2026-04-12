@@ -2899,12 +2899,14 @@ async function handleExecuteContract(request, env) {
 // Deriva um MicrostepContract mínimo a partir da estrutura de task existente.
 // Usado quando o caller não fornece um contract_microstep explícito.
 //
-// escopo_permitido vazio = escopo aberto (qualquer entrega é válida).
+// escopo_permitido vazio = escopo aberto: qualquer entrega é válida nesta dimensão
+// (nenhum item será considerado fora_do_permitido). Ver regra em
+// schema/contract-adherence-gate.js → _checkScopeViolations.
 // ---------------------------------------------------------------------------
 function _buildContractMicrostepFromTask(task) {
   return {
     objetivo_contratual_exato:  task.description || "",
-    escopo_permitido:           [],   // escopo aberto — derivado sem restrição explícita
+    escopo_permitido:           [],   // escopo aberto — sem restrição explícita de escopo
     escopo_proibido:            [],
     criterio_de_aceite_literal: task.description || "",
   };
