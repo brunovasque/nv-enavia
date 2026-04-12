@@ -3,10 +3,12 @@ import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 
 const BROWSER_PATH = "/browser";
+const CHAT_PATH = "/chat";
 
 export default function Layout() {
   const { pathname } = useLocation();
   const isBrowser = pathname === BROWSER_PATH;
+  const isChat = pathname === CHAT_PATH;
 
   return (
     <div style={styles.shell}>
@@ -19,6 +21,7 @@ export default function Layout() {
           style={{
             ...styles.content,
             ...(isBrowser ? styles.contentBrowser : {}),
+            ...(isChat ? styles.contentChat : {}),
           }}
         >
           <Outlet />
@@ -50,6 +53,10 @@ const styles = {
     background: "var(--bg-content)",
   },
   contentBrowser: {
+    padding: 0,
+    overflow: "hidden",
+  },
+  contentChat: {
     padding: 0,
     overflow: "hidden",
   },
