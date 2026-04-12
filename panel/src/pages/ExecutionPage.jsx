@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchExecution, EXECUTION_STATUS } from "../api";
+import { fetchExecution } from "../api";
+import { useExecutionStore, setExecutionState } from "../store/executionStore";
 import ExecutionHeader from "../execution/ExecutionHeader";
 import ExecutionStatusCard from "../execution/ExecutionStatusCard";
 import CurrentStepBlock from "../execution/CurrentStepBlock";
@@ -9,7 +10,7 @@ import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
 
 export default function ExecutionPage() {
-  const [currentState, setCurrentState] = useState(EXECUTION_STATUS.RUNNING);
+  const { currentState } = useExecutionStore();
   const [execution, setExecution] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -57,7 +58,7 @@ export default function ExecutionPage() {
       <ExecutionHeader
         execution={execution}
         currentState={currentState}
-        onStateChange={setCurrentState}
+        onStateChange={setExecutionState}
       />
 
       {/* Idle state fills the rest */}
