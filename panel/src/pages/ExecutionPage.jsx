@@ -1,8 +1,5 @@
-import { useState } from "react";
-import {
-  EXECUTION_STATUS,
-  MOCK_EXECUTIONS,
-} from "../execution/mockExecution";
+import { useState, useEffect } from "react";
+import { fetchExecution, EXECUTION_STATUS } from "../api";
 import ExecutionHeader from "../execution/ExecutionHeader";
 import ExecutionStatusCard from "../execution/ExecutionStatusCard";
 import CurrentStepBlock from "../execution/CurrentStepBlock";
@@ -13,7 +10,24 @@ import IdleState from "../execution/IdleState";
 
 export default function ExecutionPage() {
   const [currentState, setCurrentState] = useState(EXECUTION_STATUS.RUNNING);
-  const execution = MOCK_EXECUTIONS[currentState];
+  const [execution, setExecution] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchExecution({ _mockState: currentState }).then((r) => {
+      setExecution(r.ok ? r.data.execution : null);
+      setLoading(false);
+    });
+  }, [currentState]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: "40px 24px", color: "var(--text-muted)", fontSize: "13px" }}>
+        Carregando...
+      </div>
+    );
+  }
 
   const isIdle = currentState === EXECUTION_STATUS.IDLE;
   const isRunning = currentState === EXECUTION_STATUS.RUNNING;

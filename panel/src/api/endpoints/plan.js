@@ -1,0 +1,41 @@
+// ============================================================================
+// ENAVIA Panel — plan endpoint (internal implementation, public via index.js)
+//
+// Re-exports PLAN_STATUS so pages import it from "../api" without touching
+// the mock file directly.
+// ============================================================================
+
+import { apiClient }             from "../client.js";
+import { normalizeError, ERROR_CODES } from "../errors.js";
+import { mapPlanResponse }       from "../mappers/plan.js";
+
+// Re-export status constants — pages import these from ../api, not from the mock.
+export { PLAN_STATUS } from "../../plan/mockPlan.js";
+
+/**
+ * Fetch the current plan.
+ * @param {object} [opts]
+ * @param {string} [opts._mockState] - mock state key (e.g. PLAN_STATUS.READY)
+ * @returns {Promise<SuccessEnvelope|ErrorEnvelope>}
+ */
+export async function fetchPlan(opts = {}) {
+  const t0 = Date.now();
+  try {
+    const res = await apiClient.request("/plan", {
+      _resource:   "plan",
+      _mockState:  opts._mockState,
+    });
+
+    if (!res.ok) {
+      return normalizeError(
+        { code: ERROR_CODES.PLAN_NOT_FOUND, message: "Plano não encontrado." },
+        "plan",
+      );
+    }
+
+    const data = mapPlanResponse(res.data);
+    return { ok: true, data, meta: { durationMs: Date.now() - t0 } };
+  } catch (err) {
+    return normalizeError(err, "plan");
+  }
+}

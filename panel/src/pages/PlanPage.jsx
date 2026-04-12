@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { MOCK_PLANS, PLAN_STATUS } from "../plan/mockPlan";
+import { useState, useEffect } from "react";
+import { fetchPlan, PLAN_STATUS } from "../api";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
 import OutputModeCard from "../plan/OutputModeCard";
@@ -68,7 +68,20 @@ function BlockedBanner({ gate }) {
 // ── PlanPage ───────────────────────────────────────────────────────────────
 export default function PlanPage() {
   const [currentState, setCurrentState] = useState(PLAN_STATUS.READY);
-  const plan = MOCK_PLANS[currentState];
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchPlan({ _mockState: currentState }).then((r) => {
+      setPlan(r.ok ? r.data.plan : null);
+      setLoading(false);
+    });
+  }, [currentState]);
+
+  if (loading) {
+    return <div style={s.loading}>Carregando...</div>;
+  }
 
   return (
     <div style={s.page}>
@@ -108,6 +121,11 @@ export default function PlanPage() {
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const s = {
+  loading: {
+    padding: "40px 24px",
+    color: "var(--text-muted)",
+    fontSize: "13px",
+  },
   page: {
     display: "flex",
     flexDirection: "column",
