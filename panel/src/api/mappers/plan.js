@@ -61,9 +61,17 @@ const _MEMORY_PRIORITY_MAP = {
  * Validates that a raw planner snapshot has the minimum structure required
  * for mapping. Used both at render-time and at rehydration.
  *
- * Minimum contract: non-null object with at least one of the canonical
- * sub-objects present (classification, canonicalPlan, gate, bridge,
- * memoryConsolidation, outputMode).
+ * Hard contract (ALL fields required):
+ *   - classification       — non-null object
+ *   - canonicalPlan        — non-null object
+ *   - gate                 — non-null object
+ *   - bridge               — non-null object
+ *   - memoryConsolidation  — non-null object
+ *   - outputMode           — non-empty string (backend emits it as a string)
+ *
+ * Rationale: in mode=real this snapshot is the ONLY authoritative data source.
+ * A partial snapshot would silently hide missing pipeline stages. Rejecting it
+ * forces the UI to show EmptyState rather than rendering incomplete cards.
  *
  * @param {unknown} raw
  * @returns {boolean}
@@ -71,15 +79,13 @@ const _MEMORY_PRIORITY_MAP = {
 export function isValidPlannerSnapshot(raw) {
   if (typeof raw !== "object" || raw === null) return false;
   const r = /** @type {Record<string, unknown>} */ (raw);
-  // At least one canonical sub-object must be a non-null object,
-  // or outputMode must be a non-empty string (backend returns it as a string).
   return (
-    (typeof r.classification === "object" && r.classification !== null) ||
-    (typeof r.canonicalPlan === "object" && r.canonicalPlan !== null) ||
-    (typeof r.gate === "object" && r.gate !== null) ||
-    (typeof r.bridge === "object" && r.bridge !== null) ||
-    (typeof r.memoryConsolidation === "object" && r.memoryConsolidation !== null) ||
-    (typeof r.outputMode === "string" && r.outputMode.length > 0)
+    typeof r.classification === "object" && r.classification !== null &&
+    typeof r.canonicalPlan === "object" && r.canonicalPlan !== null &&
+    typeof r.gate === "object" && r.gate !== null &&
+    typeof r.bridge === "object" && r.bridge !== null &&
+    typeof r.memoryConsolidation === "object" && r.memoryConsolidation !== null &&
+    typeof r.outputMode === "string" && r.outputMode.length > 0
   );
 }
 
@@ -87,11 +93,16 @@ export function isValidPlannerSnapshot(raw) {
  * Converts raw backend planner payload (response.planner from POST /planner/run)
  * into the plan shape consumed by PlanPage cards.
  *
- * TRANSPARENCY:
+ * TRANSPARENCY — every non-trivial derivation declared:
  * - classification.confidence: backend does NOT return this → null.
- * - classification.tags: derived from backend signals[] if present.
+ * - classification.tags: derived from backend signals[] if present, else tags[].
  * - gate.approver, gate.timeout: backend does NOT return these → null.
- * - bridge.module: derived from executor_payload.source if present, else "enavia-executor".
+ * - bridge.module: LOCAL FALLBACK — derived from b.executor_payload.source if
+ *   the backend includes it; falls back to literal "enavia-executor" otherwise.
+ *   This is NOT a field emitted by the current backend pipeline. It is a
+ *   declared temporary derivation, intentionally named, not a silent default.
+ * - outputMode: backend emits this as a plain string (e.g. "quick_reply").
+ *   Structured card shape (type/format/channel/streaming) is derived locally.
  *
  * @param {object} raw - raw response.planner from backend (stored as-is in plannerStore)
  * @returns {object|null} - plan shape for cards, or null if raw is unusable
@@ -151,6 +162,9 @@ export function mapPlannerSnapshot(raw) {
 
   // ── Bridge card shape ──────────────────────────────────────────────────
   const bridge = b ? {
+    // DECLARED LOCAL FALLBACK: bridge.module is not emitted by the current backend
+    // pipeline. Derived from b.executor_payload.source when available; otherwise
+    // resolves to the literal "enavia-executor" as a named temporary default.
     module:      b.executor_payload?.source ?? b.module ?? "enavia-executor",
     payload:     b.executor_action ?? b.payload ?? null,
     state:       _BRIDGE_STATUS_MAP[b.bridge_status] ?? b.state ?? "idle",

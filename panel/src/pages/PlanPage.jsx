@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig } from "../api";
-import { mapPlannerSnapshot } from "../api/mappers/plan.js";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";

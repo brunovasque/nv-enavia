@@ -27,3 +27,7 @@ export { chatSend }                          from "./endpoints/chat.js";
 export { fetchPlan,      PLAN_STATUS }       from "./endpoints/plan.js";
 export { fetchExecution, EXECUTION_STATUS }  from "./endpoints/execution.js";
 export { fetchMemory,    MEMORY_STATES, MEMORY_FILTERS } from "./endpoints/memory.js";
+
+// ── Plan mapper — public surface for page-level snapshot translation ─────────
+// Pages must import mapPlannerSnapshot from here, NOT from api/mappers/plan.js.
+export { mapPlannerSnapshot } from "./mappers/plan.js";

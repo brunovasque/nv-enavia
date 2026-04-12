@@ -66,7 +66,18 @@ const RealTransport = {
       }
 
       const res = await fetch(`${baseUrl}${path}`, fetchOpts);
-      const data = await res.json();
+
+      // Guard: res.json() throws a SyntaxError on non-JSON bodies (HTML error pages,
+      // empty 204, etc.). Surface as TypeError so callers hit the NETWORK_ERROR
+      // branch in normalizeError() rather than crashing with an unhandled rejection.
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new TypeError(
+          `Non-JSON response from ${path} (HTTP ${res.status} ${res.statusText || ""})`
+        );
+      }
 
       return { ok: res.ok, data, durationMs: Date.now() - t0 };
     } finally {
