@@ -14,6 +14,8 @@
 //   - Painel/front
 // ============================================================================
 
+import { evaluateAdherence } from "./schema/contract-adherence-gate.js";
+
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
 // ---------------------------------------------------------------------------
@@ -1045,7 +1047,18 @@ async function startTask(env, contractId, taskId) {
   return { ok: true, state, decomposition, task };
 }
 
-async function completeTask(env, contractId, taskId) {
+// ---------------------------------------------------------------------------
+// _completeTaskCore(env, contractId, taskId)
+//
+// Core logic for completing a task. Private — not exported directly.
+//
+// GUARDRAIL: Do not call this function without first running the adherence
+// gate (evaluateAdherence). Callers that bypass the gate must use
+// completeTaskInternal, which stamps _gate_bypassed: true in the result.
+//
+// The public, gate-enforced path is handleCompleteTask (POST /contracts/complete-task).
+// ---------------------------------------------------------------------------
+async function _completeTaskCore(env, contractId, taskId) {
   const { state, decomposition } = await rehydrateContract(env, contractId);
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
@@ -1071,6 +1084,24 @@ async function completeTask(env, contractId, taskId) {
 
   await persistContract(env, state, decomposition);
   return { ok: true, state, decomposition, task };
+}
+
+// ---------------------------------------------------------------------------
+// completeTaskInternal(env, contractId, taskId)
+//
+// @internal — For use by existing internal tests and flows that intentionally
+// bypass the adherence gate. Stamps `_gate_bypassed: true` in the result
+// so that any bypass is explicit and auditable.
+//
+// For the gate-enforced public path, use handleCompleteTask
+// (POST /contracts/complete-task).
+// ---------------------------------------------------------------------------
+async function completeTaskInternal(env, contractId, taskId) {
+  const result = await _completeTaskCore(env, contractId, taskId);
+  if (result.ok) {
+    result._gate_bypassed = true;
+  }
+  return result;
 }
 
 async function blockTask(env, contractId, taskId, reason) {
@@ -2856,6 +2887,186 @@ async function handleExecuteContract(request, env) {
 }
 
 // ============================================================================
+// 🛡️ BLINDAGEM CONTRATUAL — handleCompleteTask (Gate Obrigatório)
+//
+// POST /contracts/complete-task
+//
+// Handler HTTP que impõe obrigatoriamente o gate de aderência contratual
+// antes de marcar uma task como concluída.
+//
+// Corpo obrigatório:
+//   contract_id      {string}   — ID do contrato
+//   task_id          {string}   — ID da task a concluir
+//   resultado        {object}   — MicrostepResultado (obrigatório):
+//     objetivo_atendido         {boolean}
+//     criterio_aceite_atendido  {boolean}
+//     escopo_efetivo            {string[]}
+//     is_simulado               {boolean}
+//     is_mockado                {boolean}
+//     is_local                  {boolean}
+//     is_parcial                {boolean}
+//   contract_microstep {object} — MicrostepContract (opcional; derivado da task se ausente):
+//     objetivo_contratual_exato  {string}
+//     escopo_permitido           {string[]}
+//     escopo_proibido            {string[]}
+//     criterio_de_aceite_literal {string}
+//
+// Fluxo obrigatório:
+//   1. Valida campos requeridos
+//   2. Carrega a task do contrato
+//   3. Deriva MicrostepContract da task (ou usa o fornecido)
+//   4. Executa evaluateAdherence — GATE OBRIGATÓRIO
+//   5. Se aderente_ao_contrato → prossegue com completeTask
+//   6. Se parcial_desviado ou fora_do_contrato → bloqueia, retorna auditoria
+//
+// A task NÃO pode ser marcada como concluída sem passar pelo gate.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// _buildContractMicrostepFromTask(task)
+//
+// Deriva um MicrostepContract mínimo a partir da estrutura de task existente.
+// Usado quando o caller não fornece um contract_microstep explícito.
+//
+// escopo_permitido vazio = escopo aberto: qualquer entrega é válida nesta dimensão
+// (nenhum item será considerado fora_do_permitido). Ver regra em
+// schema/contract-adherence-gate.js → _checkScopeViolations.
+// ---------------------------------------------------------------------------
+function _buildContractMicrostepFromTask(task) {
+  return {
+    objetivo_contratual_exato:  task.description || "",
+    escopo_permitido:           [],   // escopo aberto — sem restrição explícita de escopo
+    escopo_proibido:            [],
+    criterio_de_aceite_literal: task.description || "",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleCompleteTask(request, env)
+//
+// Gate obrigatório HTTP para conclusão de task.
+// Rejeita conclusão indevida via evaluateAdherence antes de persistir.
+// ---------------------------------------------------------------------------
+async function handleCompleteTask(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return {
+      status: 400,
+      body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." },
+    };
+  }
+
+  const contractId = body && body.contract_id;
+  const taskId     = body && body.task_id;
+  const resultado  = body && body.resultado;
+
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_PARAM", message: '"contract_id" is required.' },
+    };
+  }
+  if (!taskId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_PARAM", message: '"task_id" is required.' },
+    };
+  }
+  if (!resultado || typeof resultado !== "object") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "ADHERENCE_GATE_REQUIRED",
+        message: '"resultado" (MicrostepResultado) is required — the adherence gate cannot be bypassed.',
+      },
+    };
+  }
+
+  // Carregar a task para derivar o contrato da microetapa
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+  if (!state || !decomposition) {
+    return {
+      status: 404,
+      body: { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` },
+    };
+  }
+
+  const task = (decomposition.tasks || []).find((t) => t.id === taskId);
+  if (!task) {
+    return {
+      status: 404,
+      body: { ok: false, error: "TASK_NOT_FOUND", message: `Task "${taskId}" not found in contract "${contractId}".` },
+    };
+  }
+
+  // Derivar ou usar o MicrostepContract fornecido
+  const contract_microstep = (body.contract_microstep && typeof body.contract_microstep === "object")
+    ? body.contract_microstep
+    : _buildContractMicrostepFromTask(task);
+
+  // ── GATE OBRIGATÓRIO ────────────────────────────────────────────────────
+  let adherenceAudit;
+  try {
+    adherenceAudit = evaluateAdherence({ contract: contract_microstep, resultado });
+  } catch (err) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "ADHERENCE_GATE_ERROR",
+        message: `Gate de aderência rejeitou os dados fornecidos: ${err.message}`,
+      },
+    };
+  }
+
+  // Gate bloqueia conclusão indevida
+  if (!adherenceAudit.can_mark_concluded) {
+    return {
+      status: 422,
+      body: {
+        ok: false,
+        error: "ADHERENCE_GATE_REJECTED",
+        message: `Task "${taskId}" não pode ser marcada como concluída — ${adherenceAudit.reason}`,
+        adherence_status:   adherenceAudit.adherence_status,
+        honest_status:      adherenceAudit.honest_status,
+        can_mark_concluded: false,
+        campos_falhos:      adherenceAudit.campos_falhos,
+        next_action:        adherenceAudit.next_action,
+      },
+    };
+  }
+  // ── FIM DO GATE ─────────────────────────────────────────────────────────
+
+  // Gate autoriza → marcar como concluída via core (sem bypass marker)
+  const result = await _completeTaskCore(env, contractId, taskId);
+
+  if (!result.ok) {
+    const notFoundErrors = ["CONTRACT_NOT_FOUND", "TASK_NOT_FOUND"];
+    const httpStatus = notFoundErrors.includes(result.error) ? 404 : 409;
+    return {
+      status: httpStatus,
+      body: { ok: false, error: result.error, message: result.message },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      task_id:            taskId,
+      task_status:        result.task.status,
+      adherence_status:   adherenceAudit.adherence_status,
+      honest_status:      adherenceAudit.honest_status,
+      can_mark_concluded: true,
+      campos_falhos:      adherenceAudit.campos_falhos,
+    },
+  };
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 export {
@@ -2880,7 +3091,7 @@ export {
   VALID_MICRO_PR_STATUSES,
   // Canonical status change functions — single path
   startTask,
-  completeTask,
+  completeTaskInternal,   // @internal — use handleCompleteTask for gate-enforced public path
   blockTask,
   startMicroPrCandidate,
   completeMicroPrCandidate,
@@ -2928,4 +3139,6 @@ export {
   handleCancelContract,
   handleRejectDecompositionPlan,
   handleResolvePlanRevision,
+  // 🛡️ Blindagem Contratual — gate obrigatório por task
+  handleCompleteTask,
 };

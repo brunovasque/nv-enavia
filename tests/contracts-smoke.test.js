@@ -31,7 +31,7 @@ import {
   VALID_TASK_STATUSES,
   VALID_MICRO_PR_STATUSES,
   startTask,
-  completeTask,
+  completeTaskInternal,
   blockTask,
   startMicroPrCandidate,
   completeMicroPrCandidate,
@@ -672,15 +672,15 @@ async function runTests() {
     assert(result.error === "TASK_NOT_FOUND", "error is TASK_NOT_FOUND");
   }
 
-  // ---- Test 32: completeTask — success ----
-  console.log("\nTest 32: completeTask transitions task to completed");
+  // ---- Test 32: completeTaskInternal — success ----
+  console.log("\nTest 32: completeTaskInternal transitions task to completed");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     await startTask(env, "ctr_test_001", "task_001");
-    const result = await completeTask(env, "ctr_test_001", "task_001");
-    assert(result.ok === true, "completeTask returns ok=true");
+    const result = await completeTaskInternal(env, "ctr_test_001", "task_001");
+    assert(result.ok === true, "completeTaskInternal returns ok=true");
     assert(result.task.status === "completed", "task status is completed");
 
     // current_task should advance to next queued task
@@ -692,15 +692,15 @@ async function runTests() {
     assert(task.status === "completed", "persisted task status is completed");
   }
 
-  // ---- Test 33: completeTask — invalid transition ----
-  console.log("\nTest 33: completeTask rejects non-in_progress task");
+  // ---- Test 33: completeTaskInternal — invalid transition ----
+  console.log("\nTest 33: completeTaskInternal rejects non-in_progress task");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     // task_001 is queued, not in_progress
-    const result = await completeTask(env, "ctr_test_001", "task_001");
-    assert(result.ok === false, "completeTask returns ok=false for queued task");
+    const result = await completeTaskInternal(env, "ctr_test_001", "task_001");
+    assert(result.ok === false, "completeTaskInternal returns ok=false for queued task");
     assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
   }
 
@@ -741,7 +741,7 @@ async function runTests() {
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     await startTask(env, "ctr_test_001", "task_001");
-    await completeTask(env, "ctr_test_001", "task_001");
+    await completeTaskInternal(env, "ctr_test_001", "task_001");
     const result = await blockTask(env, "ctr_test_001", "task_001", "Too late");
     assert(result.ok === false, "blockTask returns ok=false for completed task");
     assert(result.error === "INVALID_TRANSITION", "error is INVALID_TRANSITION");
@@ -927,7 +927,7 @@ async function runTests() {
     assert(state.current_task === "task_001", "current_task is task_001 after start");
 
     // Complete task_001 → current_task should advance to task_002 (next queued)
-    await completeTask(env, "ctr_test_001", "task_001");
+    await completeTaskInternal(env, "ctr_test_001", "task_001");
     ({ state } = await rehydrateContract(env, "ctr_test_001"));
     assert(state.current_task === "task_002", "current_task advanced to task_002");
 
@@ -943,7 +943,7 @@ async function runTests() {
 
     // Start and complete task_003 → current_task should be null (no more queued)
     await startTask(env, "ctr_test_001", "task_003");
-    await completeTask(env, "ctr_test_001", "task_003");
+    await completeTaskInternal(env, "ctr_test_001", "task_003");
     ({ state } = await rehydrateContract(env, "ctr_test_001"));
     assert(state.current_task === null, "current_task is null when no more queued tasks");
   }
@@ -977,7 +977,7 @@ async function runTests() {
     assert(summary.current_task === "task_001", "summary current_task is task_001");
 
     // Complete task_001 and micro_pr_001
-    await completeTask(env, "ctr_test_001", "task_001");
+    await completeTaskInternal(env, "ctr_test_001", "task_001");
     await completeMicroPrCandidate(env, "ctr_test_001", "micro_pr_001");
     ({ state, decomposition } = await rehydrateContract(env, "ctr_test_001"));
     summary = buildContractSummary(state, decomposition);
@@ -1106,7 +1106,7 @@ async function runTests() {
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     // Complete task_001 (start then complete)
     await startTask(env, "ctr_test_001", "task_001");
-    await completeTask(env, "ctr_test_001", "task_001");
+    await completeTaskInternal(env, "ctr_test_001", "task_001");
     // Now micro_pr_001 (linked to task_001) should be ready, 
     // but first let's check if the engine sees the task completion leads to phase_complete
     // or if it picks up the next task or micro-PR
@@ -1134,7 +1134,7 @@ async function runTests() {
 
     // Complete task_001 and advance through phase_01 → phase_02
     await startTask(env, "ctr_mpr_ready", "task_001");
-    await completeTask(env, "ctr_mpr_ready", "task_001");
+    await completeTaskInternal(env, "ctr_mpr_ready", "task_001");
     await advanceContractPhase(env, "ctr_mpr_ready");
 
     let { state, decomposition } = await rehydrateContract(env, "ctr_mpr_ready");
@@ -1160,7 +1160,7 @@ async function runTests() {
 
     // Complete the only task
     await startTask(env, "ctr_mpr_standalone", "task_001");
-    await completeTask(env, "ctr_mpr_standalone", "task_001");
+    await completeTaskInternal(env, "ctr_mpr_standalone", "task_001");
 
     // Phase_01 has task_001 → now complete → phase_complete
     // Advance phase
@@ -1190,7 +1190,7 @@ async function runTests() {
 
     // Complete task_001 (only task in phase_01)
     await startTask(env, "ctr_test_001", "task_001");
-    await completeTask(env, "ctr_test_001", "task_001");
+    await completeTaskInternal(env, "ctr_test_001", "task_001");
 
     const { state, decomposition } = await rehydrateContract(env, "ctr_test_001");
     const action = resolveNextAction(state, decomposition);
@@ -1372,7 +1372,7 @@ async function runTests() {
 
     // Complete task_001 and advance phase
     await startTask(env, "ctr_chain_advance", "task_001");
-    await completeTask(env, "ctr_chain_advance", "task_001");
+    await completeTaskInternal(env, "ctr_chain_advance", "task_001");
     await advanceContractPhase(env, "ctr_chain_advance");
 
     const { state, decomposition } = await rehydrateContract(env, "ctr_chain_advance");
@@ -1407,7 +1407,7 @@ async function runTests() {
     assert(action.type === "no_action", "lifecycle step 2: no_action (in_progress)");
 
     // Step 3: complete task_001 → phase_complete
-    await completeTask(env, "ctr_full_lifecycle", "task_001");
+    await completeTaskInternal(env, "ctr_full_lifecycle", "task_001");
     ({ state, decomposition } = await rehydrateContract(env, "ctr_full_lifecycle"));
     action = resolveNextAction(state, decomposition);
     // With 1 dod: task_001 goes to phase_03. phase_01 has [task_001].
@@ -1502,7 +1502,7 @@ async function runTests() {
 
     // Complete the contract fully
     await startTask(env, "ctr_handoff_done", "task_001");
-    await completeTask(env, "ctr_handoff_done", "task_001");
+    await completeTaskInternal(env, "ctr_handoff_done", "task_001");
     await advanceContractPhase(env, "ctr_handoff_done"); // phase_01 done
     await advanceContractPhase(env, "ctr_handoff_done"); // phase_02 done (no tasks)
     await advanceContractPhase(env, "ctr_handoff_done"); // phase_03 → all_phases_complete
@@ -1575,7 +1575,7 @@ async function runTests() {
 
     // Complete task_001 and advance phase
     await startTask(env, "ctr_handoff_order", "task_001");
-    await completeTask(env, "ctr_handoff_order", "task_001");
+    await completeTaskInternal(env, "ctr_handoff_order", "task_001");
     await advanceContractPhase(env, "ctr_handoff_order");
 
     // Now handoff should point to task_002 in phase_02
@@ -1929,7 +1929,7 @@ async function runTests() {
     await handleCreateContract(mockRequest(payload), env);
 
     await startTask(env, "ctr_ac_done", "task_001");
-    await completeTask(env, "ctr_ac_done", "task_001");
+    await completeTaskInternal(env, "ctr_ac_done", "task_001");
     await advanceContractPhase(env, "ctr_ac_done");
     await advanceContractPhase(env, "ctr_ac_done");
     await advanceContractPhase(env, "ctr_ac_done");
@@ -2055,7 +2055,7 @@ async function runTests() {
 
     // Complete task_001 and advance
     await startTask(env, "ctr_ac_advance", "task_001");
-    await completeTask(env, "ctr_ac_advance", "task_001");
+    await completeTaskInternal(env, "ctr_ac_advance", "task_001");
     await advanceContractPhase(env, "ctr_ac_advance");
 
     // Binding after advance — should target phase_02
@@ -2438,7 +2438,7 @@ async function runTests() {
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(VALID_PAYLOAD), env);
     await startTask(env, "ctr_test_001", "task_001");
-    await completeTask(env, "ctr_test_001", "task_001");
+    await completeTaskInternal(env, "ctr_test_001", "task_001");
 
     const result = await recordError(env, "ctr_test_001", "task_001", {
       code: "LATE_ERROR",
@@ -3054,7 +3054,7 @@ async function runTests() {
     await handleCreateContract(req, env);
     await advanceContractPhase(env, "ctr_c1_137");
     await startTask(env, "ctr_c1_137", "task_001");
-    await completeTask(env, "ctr_c1_137", "task_001");
+    await completeTaskInternal(env, "ctr_c1_137", "task_001");
 
     // task_001 is now completed; next action resolves to something else
     // but current_task advanced to task_002 (still queued, not started)
@@ -3445,7 +3445,7 @@ async function runTests() {
     await startTask(env, contractId, "task_001");
     await executeCurrentMicroPr(env, contractId, { evidence: ["test passed in TEST"] });
     // Complete the task — this clears the task acceptance criteria
-    await completeTask(env, contractId, "task_001");
+    await completeTaskInternal(env, contractId, "task_001");
     // Advance phases until all_phases_complete
     // After completing task_001 in phase_01, advance phase_01 → phase_02 (or all_phases_complete)
     let advResult = await advanceContractPhase(env, contractId);
@@ -3459,7 +3459,7 @@ async function runTests() {
       if (nextTask) {
         await startTask(env, contractId, nextTask.id);
         await executeCurrentMicroPr(env, contractId, { evidence: ["auto advance"] });
-        await completeTask(env, contractId, nextTask.id);
+        await completeTaskInternal(env, contractId, nextTask.id);
       }
       advResult = await advanceContractPhase(env, contractId);
     }
@@ -3554,7 +3554,7 @@ async function runTests() {
     // Execute successfully in TEST
     await executeCurrentMicroPr(env, "ctr_c2_160", { evidence: ["test passed"] });
     // Complete task but don't complete all tasks — phase still has pending work
-    await completeTask(env, "ctr_c2_160", "task_001");
+    await completeTaskInternal(env, "ctr_c2_160", "task_001");
 
     const closeResult = await closeContractInTest(env, "ctr_c2_160");
     assert(closeResult.ok === false, "closure rejected");
@@ -3826,7 +3826,7 @@ async function runTests() {
     await advanceContractPhase(env, "ctr_c2_176");
     await startTask(env, "ctr_c2_176", "task_001");
 
-    // Execute successfully — but do NOT completeTask (task stays in_progress)
+    // Execute successfully — but do NOT completeTaskInternal (task stays in_progress)
     const execResult = await executeCurrentMicroPr(env, "ctr_c2_176", { evidence: ["test ok"] });
     assert(execResult.ok === true, "execution succeeded");
 
@@ -3999,10 +3999,10 @@ async function runTests() {
     // Start task first, then cancel, then try to complete
     await advanceContractPhase(env, "ctr_f1_185");
     await startTask(env, "ctr_f1_185", "task_001");
-    await cancelContract(env, "ctr_f1_185", { reason: "Block completeTask" });
+    await cancelContract(env, "ctr_f1_185", { reason: "Block completeTaskInternal" });
 
-    const result = await completeTask(env, "ctr_f1_185", "task_001");
-    assert(result.ok === false, "completeTask rejected");
+    const result = await completeTaskInternal(env, "ctr_f1_185", "task_001");
+    assert(result.ok === false, "completeTaskInternal rejected");
     assert(result.error === "CONTRACT_CANCELLED", "error is CONTRACT_CANCELLED");
   }
 
@@ -4193,8 +4193,8 @@ async function runTests() {
     assert(st.ok === true, "startTask works on non-cancelled contract");
 
     // Complete task
-    const ct = await completeTask(env, "ctr_f1_198", "task_001");
-    assert(ct.ok === true, "completeTask works on non-cancelled contract");
+    const ct = await completeTaskInternal(env, "ctr_f1_198", "task_001");
+    assert(ct.ok === true, "completeTaskInternal works on non-cancelled contract");
 
     // isCancelledContract returns false for normal contract
     const { state } = await rehydrateContract(env, "ctr_f1_198");
@@ -4961,16 +4961,16 @@ async function runTests() {
     assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
   }
 
-  // ---- Test 240: Plan rejected blocks completeTask ----
-  console.log("\nTest 240: Plan rejected blocks completeTask");
+  // ---- Test 240: Plan rejected blocks completeTaskInternal ----
+  console.log("\nTest 240: Plan rejected blocks completeTaskInternal");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
     await handleCreateContract(mockRequest(Object.assign({}, VALID_PAYLOAD, { contract_id: "ctr_r1_240" })), env);
-    await rejectDecompositionPlan(env, "ctr_r1_240", { reason: "Block completeTask test" });
+    await rejectDecompositionPlan(env, "ctr_r1_240", { reason: "Block completeTaskInternal test" });
 
-    const result = await completeTask(env, "ctr_r1_240", "task_001");
-    assert(result.ok === false, "completeTask blocked");
+    const result = await completeTaskInternal(env, "ctr_r1_240", "task_001");
+    assert(result.ok === false, "completeTaskInternal blocked");
     assert(result.error === "PLAN_REJECTED", "error is PLAN_REJECTED");
   }
 
