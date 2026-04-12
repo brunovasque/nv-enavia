@@ -4,7 +4,7 @@ import MessageBubble from "../chat/MessageBubble";
 import ChatComposer from "../chat/ChatComposer";
 
 // ── Empty State — cara forte de produto ────────────────────────────
-function EmptyState({ onSend, onInputChange }) {
+function EmptyState({ onSend, onInputChange, onSeed }) {
   const CAPS = [
     {
       icon: "📋",
@@ -62,6 +62,10 @@ function EmptyState({ onSend, onInputChange }) {
           </button>
         ))}
       </div>
+
+      <button style={styles.seedBtn} onClick={onSeed} title="Carrega conversa de exemplo">
+        Carregar conversa demo
+      </button>
     </div>
   );
 }
@@ -124,6 +128,8 @@ export default function ChatPage() {
     inputValue,
     setInputValue,
     sendMessage,
+    seedMessages,
+    dismissError,
   } = useChatState();
 
   const bottomRef = useRef(null);
@@ -174,7 +180,7 @@ export default function ChatPage() {
         {/* Messages / Empty */}
         <div style={styles.messagesArea}>
           {isEmpty ? (
-            <EmptyState onSend={handleSend} onInputChange={setInputValue} />
+            <EmptyState onSend={handleSend} onInputChange={setInputValue} onSeed={seedMessages} />
           ) : (
             <div style={styles.messagesList}>
               {messages.map((msg) => (
@@ -189,7 +195,8 @@ export default function ChatPage() {
         {/* Error bar */}
         {error && (
           <div style={styles.errorBar} role="alert">
-            ⚠ {error}
+            <span>⚠ {error}</span>
+            <button style={styles.errorDismiss} onClick={dismissError} aria-label="Fechar erro">×</button>
           </div>
         )}
 
@@ -297,6 +304,20 @@ const styles = {
     borderTop: "1px solid rgba(239,68,68,0.25)",
     fontSize: "13px",
     color: "#EF4444",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+  },
+  errorDismiss: {
+    background: "transparent",
+    border: "none",
+    color: "#EF4444",
+    fontSize: "16px",
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: "0 2px",
     flexShrink: 0,
   },
 
@@ -420,6 +441,19 @@ const styles = {
     cursor: "pointer",
     transition: "border-color 0.15s, color 0.15s",
     fontFamily: "var(--font-body)",
+  },
+  seedBtn: {
+    marginTop: "20px",
+    background: "transparent",
+    border: "none",
+    color: "var(--text-muted)",
+    fontSize: "11px",
+    cursor: "pointer",
+    textDecoration: "underline",
+    textDecorationStyle: "dotted",
+    textUnderlineOffset: "3px",
+    fontFamily: "var(--font-body)",
+    padding: 0,
   },
 
   // Aux panel

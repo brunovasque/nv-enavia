@@ -9,9 +9,25 @@ const MOCK_RESPONSES = [
   "Recebido. Posso estruturar isso como um objetivo tático se você confirmar o contexto.",
 ];
 
+// Trigger de erro: qualquer mensagem contendo "erro" (case-insensitive) simula falha de módulo.
+const ERROR_TRIGGER = /\berro\b/i;
+const MOCK_ERROR = "Falha na conexão com o módulo de execução. Tente novamente.";
+
+// Seed de conversa para validação do estado "conversa" sem depender do usuário.
+const SEED = [
+  { role: "enavia", content: "Sessão iniciada. Módulos de planejamento e memória em standby. Como posso ajudar?" },
+  { role: "user",   content: "Preciso mapear as pendências do contrato anterior antes de avançar." },
+  { role: "enavia", content: "Entendido. Iniciando consolidação do histórico do contrato anterior. Assim que o módulo de memória for ativado, o mapeamento será automático. Por ora posso estruturar o escopo manualmente se você detalhar os pontos críticos." },
+];
+
 let _counter = 0;
 function uid() {
   return `msg-${++_counter}-${Date.now()}`;
+}
+
+function makeMsg(role, content, offsetMs = 0) {
+  const ts = new Date(Date.now() - offsetMs);
+  return { id: uid(), role, content, timestamp: ts };
 }
 
 export function useChatState() {
@@ -30,32 +46,38 @@ export function useChatState() {
 
       setError(null);
 
-      const userMsg = {
-        id: uid(),
-        role: "user",
-        content: trimmed,
-        timestamp: new Date(),
-      };
-
+      const userMsg = makeMsg("user", trimmed);
       setMessages((prev) => [...prev, userMsg]);
       setThinking(true);
 
       const delay = 1200 + Math.random() * 900;
       timerRef.current = setTimeout(() => {
+        if (ERROR_TRIGGER.test(trimmed)) {
+          setError(MOCK_ERROR);
+          setThinking(false);
+          return;
+        }
         const reply =
           MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)];
-        const enaMsg = {
-          id: uid(),
-          role: "enavia",
-          content: reply,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, enaMsg]);
+        setMessages((prev) => [...prev, makeMsg("enavia", reply)]);
         setThinking(false);
       }, delay);
     },
     [thinking],
   );
+
+  // Carrega conversa seed para validar o estado "conversa" sem digitar do zero.
+  const seedMessages = useCallback(() => {
+    clearTimeout(timerRef.current);
+    const seeded = SEED.map((m, i) =>
+      makeMsg(m.role, m.content, (SEED.length - i) * 90000),
+    );
+    setMessages(seeded);
+    setThinking(false);
+    setError(null);
+  }, []);
+
+  const dismissError = useCallback(() => setError(null), []);
 
   const clearMessages = useCallback(() => {
     clearTimeout(timerRef.current);
@@ -71,6 +93,8 @@ export function useChatState() {
     inputValue,
     setInputValue,
     sendMessage,
+    seedMessages,
+    dismissError,
     clearMessages,
   };
 }
