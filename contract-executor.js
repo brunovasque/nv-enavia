@@ -2118,7 +2118,7 @@ function _appendExecutionCycle(state, cycle) {
   if (!Array.isArray(state.task_execution_log[taskId])) {
     state.task_execution_log[taskId] = [];
   }
-  state.task_execution_log[taskId].push(Object.assign({}, cycle, { executor_artifacts: null }));
+  state.task_execution_log[taskId].push({ ...cycle, executor_artifacts: null });
 }
 
 // ---------------------------------------------------------------------------
@@ -3157,6 +3157,8 @@ async function handleCompleteTask(request, env) {
 
   // Record executor_artifacts into the canonical task_execution_log (KV-persisted)
   // so future audits can resolve them natively without manual body injection.
+  // One extra persist here is justified: executor_artifacts arrive exactly once
+  // per completeTask call (this endpoint is invoked once per task, not in hot loops).
   if (executor_artifacts) {
     _recordExecutorArtifacts(result.state, taskId, executor_artifacts);
     result.state.updated_at = new Date().toISOString();
