@@ -15,7 +15,7 @@
 // ============================================================================
 
 import { evaluateAdherence } from "./schema/contract-adherence-gate.js";
-import { auditExecution, EXECUTION_ADHERENCE_STATUS } from "./schema/execution-audit.js";
+import { auditExecution } from "./schema/execution-audit.js";
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -3200,8 +3200,6 @@ export {
   handleResolvePlanRevision,
   // 🛡️ Blindagem Contratual — gate obrigatório por task
   handleCompleteTask,
-  // 🛡️ Blindagem Contratual PR 2 — auditoria de execução contra contrato
-  auditExecution,
-  EXECUTION_ADHERENCE_STATUS,
+  // 🛡️ Blindagem Contratual PR 2 — endpoint de auditoria de execução contra contrato
   handleGetExecutionAudit,
 };

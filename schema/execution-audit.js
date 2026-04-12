@@ -62,7 +62,11 @@ const EXECUTION_ADHERENCE_STATUS = {
 
 // ---------------------------------------------------------------------------
 // TASK_DONE_STATUSES — statuses que indicam conclusão de task
+//
 // Espelha TASK_DONE_STATUSES de contract-executor.js.
+// Definido localmente para evitar importação circular:
+//   contract-executor.js → execution-audit.js → contract-executor.js (inválido).
+// Manter sincronizado com TASK_DONE_STATUSES se aquele for alterado.
 // ---------------------------------------------------------------------------
 const AUDIT_TASK_DONE_STATUSES = ["completed"];
 

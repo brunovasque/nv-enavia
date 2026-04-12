@@ -36,9 +36,7 @@ import {
   startTask,
   rehydrateContract,
   handleGetExecutionAudit,
-} from "../contract-executor.js";
-
-let passed = 0;
+} from "../contract-executor.js";let passed = 0;
 let failed = 0;
 
 function assert(condition, name) {
