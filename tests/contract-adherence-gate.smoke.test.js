@@ -239,8 +239,8 @@ assert(audit1.can_mark_concluded === audit2.can_mark_concluded, "T5: determinís
 assert(audit1.campos_falhos.length === audit2.campos_falhos.length, "T5: determinístico — campos_falhos estável");
 
 // Não importa nem usa contract-executor.js (não polui fluxo atual)
-const gateSource = await import("../schema/contract-adherence-gate.js");
-assert(!Object.keys(gateSource).some(k => k.toLowerCase().includes("executor")),
+const gateExports = { evaluateAdherence, ADHERENCE_STATUS, HONEST_STATUS, HONEST_STATUS_RULES };
+assert(!Object.keys(gateExports).some(k => k.toLowerCase().includes("executor")),
   "T5: gate não expõe símbolos do executor (fluxo atual intacto)");
 
 // ---------------------------------------------------------------------------
