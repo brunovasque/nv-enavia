@@ -3039,8 +3039,31 @@ async function handlePlannerRun(request, env) {
       ...(memReadRaw.ok ? {} : { error: memReadRaw.error }),
     };
 
-    // PM4 — Classificação
-    const classification = classifyRequest({ text: message, context });
+    // P16 — Construção do contexto enriquecido pré-plano
+    // O memory_context encapsula um resumo mínimo e estrutural das memórias lidas.
+    // É injetado no plannerContext e flui explicitamente para PM4 e adiante.
+    // Os itens são limitados a 5 para evitar vazamento excessivo de conteúdo.
+    const memory_context = {
+      applied:  memReadRaw.ok && memReadRaw.count > 0,
+      count:    memoryReadAudit.count,
+      types:    memoryReadAudit.types,
+      items:    memReadRaw.ok
+        ? memReadRaw.results.slice(0, 5).map((m) => ({
+            memory_id:    m.memory_id,
+            title:        m.title,
+            memory_type:  m.memory_type,
+            is_canonical: m.is_canonical,
+            priority:     m.priority,
+          }))
+        : [],
+    };
+
+    // plannerContext = contexto original enriquecido com resumo de memória.
+    // PM4 recebe este contexto; sinais de memória estão estruturalmente presentes.
+    const plannerContext = { ...context, memory_context };
+
+    // PM4 — Classificação (recebe plannerContext enriquecido)
+    const classification = classifyRequest({ text: message, context: plannerContext });
 
     // PM5 — Output Envelope
     const envelope = buildOutputEnvelope(classification, { text: message });
@@ -3121,6 +3144,7 @@ async function handlePlannerRun(request, env) {
       timestamp: Date.now(),
       input: message,
       planner: {
+        memoryContext: memory_context,
         classification,
         canonicalPlan,
         gate,

@@ -4,13 +4,14 @@
 // Run: node tests/p16-memory-read-pre-plan.smoke.test.js
 //
 // Valida que /planner/run (handlePlannerRun) consulta memória útil antes
-// de montar o plano, com evidência auditável no telemetry.
+// de montar o plano, injeta memory_context no plannerContext (PM4+) e
+// expõe evidência auditável em planner.memoryContext e telemetry.memory_read.
 //
 // Tests:
-//   Group 1: sem memória → /planner/run segue 200 e telemetry.memory_read presente
-//   Group 2: com memória canônica relevante → telemetry mostra leitura
-//   Group 3: com memória operacional relevante → telemetry mostra leitura
-//   Group 4: ENAVIA_BRAIN indisponível → /planner/run não quebra
+//   Group 1: sem memória → 200, telemetry.memory_read e planner.memoryContext com applied=false
+//   Group 2: com memória canônica → applied=true, items populados, tipos visíveis
+//   Group 3: com memória operacional → applied=true, items populados, tipos visíveis
+//   Group 4: ENAVIA_BRAIN indisponível → /planner/run não quebra, applied=false
 //   Group 5: não regressão de gate, bridge, memoryConsolidation e P15
 //   Group 6: pipeline string inclui PM3
 // ============================================================================
@@ -108,9 +109,9 @@ async function runTests() {
   console.log("\n=== P16 — Leitura de memória antes do plano — Smoke Tests ===\n");
 
   // -------------------------------------------------------------------------
-  // Group 1: sem memória → /planner/run retorna 200 com telemetry.memory_read
+  // Group 1: sem memória → 200, telemetry.memory_read e planner.memoryContext
   // -------------------------------------------------------------------------
-  console.log("Group 1: sem memória → /planner/run segue 200 e telemetry.memory_read presente");
+  console.log("Group 1: sem memória → 200, telemetry.memory_read e planner.memoryContext");
 
   const env1 = makeKVMock();
   const r1 = await plannerRun({ message: "Listar contratos ativos" }, env1);
@@ -125,14 +126,23 @@ async function runTests() {
     "memory_read.count é number");
   assert(Array.isArray(r1.json.telemetry.memory_read.types),
     "memory_read.types é array");
-  assert(r1.json.telemetry.memory_read.count === 0,     "count === 0 sem memória");
+  assert(r1.json.telemetry.memory_read.count === 0,     "memory_read.count === 0 sem memória");
   assert(r1.json.telemetry.memory_read.types.length === 0,
-    "types vazio sem memória");
+    "memory_read.types vazio sem memória");
+  // Prova de uso real: planner.memoryContext presente e coerente
+  assert(r1.json.planner.memoryContext !== undefined,   "planner.memoryContext presente");
+  assert(r1.json.planner.memoryContext.applied === false,
+    "memoryContext.applied === false sem memória");
+  assert(r1.json.planner.memoryContext.count === 0,     "memoryContext.count === 0 sem memória");
+  assert(Array.isArray(r1.json.planner.memoryContext.items),
+    "memoryContext.items é array");
+  assert(r1.json.planner.memoryContext.items.length === 0,
+    "memoryContext.items vazio sem memória");
 
   // -------------------------------------------------------------------------
-  // Group 2: com memória canônica → telemetry mostra leitura
+  // Group 2: com memória canônica → applied=true, items e types populados
   // -------------------------------------------------------------------------
-  console.log("\nGroup 2: com memória canônica → telemetry mostra leitura");
+  console.log("\nGroup 2: com memória canônica → applied=true, items e types populados");
 
   const env2 = makeKVMock();
   await writeTestMemory({
@@ -151,17 +161,34 @@ async function runTests() {
 
   assert(r2.status === 200,                              "status 200 com memória canônica");
   assert(r2.json.ok === true,                            "ok === true com memória canônica");
+  // telemetry
   assert(r2.json.telemetry.memory_read.consulted === true,
     "memory_read.consulted === true com memória canônica");
   assert(r2.json.telemetry.memory_read.count >= 1,
     "memory_read.count >= 1 com memória canônica");
   assert(r2.json.telemetry.memory_read.types.includes("canonical_rules"),
     "memory_read.types inclui canonical_rules");
+  // Prova de uso real: planner.memoryContext aplicado ao pipeline
+  assert(r2.json.planner.memoryContext.applied === true,
+    "memoryContext.applied === true com memória canônica");
+  assert(r2.json.planner.memoryContext.count >= 1,
+    "memoryContext.count >= 1 com memória canônica");
+  assert(r2.json.planner.memoryContext.types.includes("canonical_rules"),
+    "memoryContext.types inclui canonical_rules");
+  assert(Array.isArray(r2.json.planner.memoryContext.items) &&
+    r2.json.planner.memoryContext.items.length >= 1,
+    "memoryContext.items populado com memória canônica");
+  assert(r2.json.planner.memoryContext.items[0].memory_type === "canonical_rules",
+    "memoryContext.items[0].memory_type === canonical_rules");
+  assert(typeof r2.json.planner.memoryContext.items[0].title === "string",
+    "memoryContext.items[0].title é string");
+  assert(r2.json.planner.memoryContext.items[0].is_canonical === true,
+    "memoryContext.items[0].is_canonical === true");
 
   // -------------------------------------------------------------------------
-  // Group 3: com memória operacional → telemetry mostra leitura
+  // Group 3: com memória operacional → applied=true, items populados
   // -------------------------------------------------------------------------
-  console.log("\nGroup 3: com memória operacional → telemetry mostra leitura");
+  console.log("\nGroup 3: com memória operacional → applied=true, items populados");
 
   const env3 = makeKVMock();
   await writeTestMemory({
@@ -186,6 +213,15 @@ async function runTests() {
     "memory_read.count >= 1 com memória operacional");
   assert(r3.json.telemetry.memory_read.types.includes("operational_history"),
     "memory_read.types inclui operational_history");
+  // Prova de uso real
+  assert(r3.json.planner.memoryContext.applied === true,
+    "memoryContext.applied === true com memória operacional");
+  assert(r3.json.planner.memoryContext.types.includes("operational_history"),
+    "memoryContext.types inclui operational_history");
+  assert(r3.json.planner.memoryContext.items.length >= 1,
+    "memoryContext.items populado com memória operacional");
+  assert(r3.json.planner.memoryContext.items[0].memory_type === "operational_history",
+    "memoryContext.items[0].memory_type === operational_history");
 
   // -------------------------------------------------------------------------
   // Group 4: ENAVIA_BRAIN indisponível → /planner/run não quebra
@@ -199,6 +235,10 @@ async function runTests() {
   assert(r4a.json.telemetry.memory_read.consulted === false,
     "consulted === false sem ENAVIA_BRAIN");
   assert(r4a.json.telemetry.memory_read.count === 0,     "count === 0 sem ENAVIA_BRAIN");
+  assert(r4a.json.planner.memoryContext.applied === false,
+    "memoryContext.applied === false sem ENAVIA_BRAIN");
+  assert(r4a.json.planner.memoryContext.items.length === 0,
+    "memoryContext.items vazio sem ENAVIA_BRAIN");
 
   // Case 4b: KV que lança na leitura
   const env4b = makeKVErrorMock();
@@ -209,6 +249,8 @@ async function runTests() {
     "consulted === false com KV error");
   assert(typeof r4b.json.telemetry.memory_read.error === "string",
     "error registrado no memory_read quando KV lança");
+  assert(r4b.json.planner.memoryContext.applied === false,
+    "memoryContext.applied === false com KV error");
 
   // -------------------------------------------------------------------------
   // Group 5: não regressão — gate, bridge, memoryConsolidation, P15
@@ -216,7 +258,6 @@ async function runTests() {
   console.log("\nGroup 5: não regressão de gate, bridge, memoryConsolidation e P15");
 
   const env5 = makeKVMock();
-  // Memória canônica pré-existente
   await writeTestMemory({
     memory_type:        "canonical_rules",
     entity_type:        "rule",
@@ -245,8 +286,9 @@ async function runTests() {
     "memoryConsolidation presente");
   assert(Array.isArray(r5.json.telemetry.consolidation_persisted),
     "consolidation_persisted é array (P15 intacto)");
-  assert(r5.json.telemetry.memory_read.consulted === true,
-    "memory_read.consulted === true não regressão");
+  // planner.memoryContext prova uso real
+  assert(r5.json.planner.memoryContext.applied === true,
+    "memoryContext.applied === true não regressão");
 
   // -------------------------------------------------------------------------
   // Group 6: pipeline string inclui PM3
@@ -279,3 +321,5 @@ runTests().catch((err) => {
   console.error("Fatal error in P16 smoke tests:", err);
   process.exit(1);
 });
+
+
