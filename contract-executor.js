@@ -226,6 +226,10 @@ function buildInitialState(body) {
     ),
     definition_of_done: body.definition_of_done,
     context: body.context || {},
+    // Canonical execution cycle history per microstep (task_id → cycle[]).
+    // Populated by executeCurrentMicroPr and handleCompleteTask.
+    // Survives KV round-trips — single source of truth for execution_cycles.
+    task_execution_log: {},
     created_at: body.created_at || now,
     updated_at: now,
   };
@@ -2094,7 +2098,82 @@ async function recordError(env, contractId, taskId, errorParams) {
 //
 // Execution state is stored in `state.current_execution` and survives KV
 // rehydration. Each execution is deterministic and traceable.
+// Completed cycles are also appended to `state.task_execution_log[task_id]`
+// so the full history (1..N) is persisted and available for audit.
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// _appendExecutionCycle(state, cycle)
+//
+// Appends a finished execution cycle snapshot to state.task_execution_log.
+// Creates the per-task array if it doesn't exist yet.
+// Safe for old contracts that don't have task_execution_log (initialised here).
+// ---------------------------------------------------------------------------
+function _appendExecutionCycle(state, cycle) {
+  if (!state.task_execution_log || typeof state.task_execution_log !== "object") {
+    state.task_execution_log = {};
+  }
+  const taskId = cycle.task_id;
+  if (!taskId) return;
+  if (!Array.isArray(state.task_execution_log[taskId])) {
+    state.task_execution_log[taskId] = [];
+  }
+  state.task_execution_log[taskId].push(Object.assign({}, cycle, { executor_artifacts: null }));
+}
+
+// ---------------------------------------------------------------------------
+// _recordExecutorArtifacts(state, taskId, executor_artifacts)
+//
+// Attaches executor_artifacts (from external /audit+/propose calls) to the
+// last execution cycle for the given task in task_execution_log.
+// If no cycle exists yet for this task, creates a standalone audit entry.
+// This makes executor_artifacts a durable part of the KV-persisted state,
+// so subsequent audits don't need manual body injection.
+// ---------------------------------------------------------------------------
+function _recordExecutorArtifacts(state, taskId, executor_artifacts) {
+  if (!state.task_execution_log || typeof state.task_execution_log !== "object") {
+    state.task_execution_log = {};
+  }
+  if (!Array.isArray(state.task_execution_log[taskId])) {
+    state.task_execution_log[taskId] = [];
+  }
+  const log = state.task_execution_log[taskId];
+
+  // Prefer attaching to the last cycle that has no executor_artifacts yet
+  const lastCycle = log.length > 0 ? log[log.length - 1] : null;
+  if (lastCycle && lastCycle.executor_artifacts === null) {
+    lastCycle.executor_artifacts = executor_artifacts;
+  } else {
+    // No existing cycle or last cycle already has artifacts — append standalone
+    log.push({
+      task_id:               taskId,
+      micro_pr_id:           null,
+      execution_status:      "audit_only",
+      execution_started_at:  null,
+      execution_finished_at: null,
+      execution_evidence:    [],
+      executor_artifacts,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _resolveExecutorArtifactsFromLog(cycles)
+//
+// Extracts executor_artifacts from the canonical task_execution_log.
+// Returns the executor_artifacts from the LAST cycle that has them, or null.
+// This allows handleGetExecutionAudit to perform a full microstep audit
+// without requiring executor_artifacts in the request body.
+// ---------------------------------------------------------------------------
+function _resolveExecutorArtifactsFromLog(cycles) {
+  if (!Array.isArray(cycles)) return null;
+  for (let i = cycles.length - 1; i >= 0; i--) {
+    if (cycles[i] && cycles[i].executor_artifacts) {
+      return cycles[i].executor_artifacts;
+    }
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Valid execution statuses
@@ -2296,6 +2375,9 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     // DO NOT advance phase — that is done via advanceContractPhase()
     // DO NOT close contract — governance rule
 
+    // Append this cycle to the canonical task_execution_log for audit
+    _appendExecutionCycle(state, state.current_execution);
+
     state.updated_at = executionFinishedAt;
     await persistContract(env, state, decomposition);
 
@@ -2318,6 +2400,9 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     state.current_execution.execution_error = executionError;
     state.current_execution.last_execution_result = "failed";
     state.current_execution.execution_evidence = evidence;
+
+    // Append this cycle to the canonical task_execution_log for audit
+    _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
     await persistContract(env, state, decomposition);
@@ -3065,22 +3150,35 @@ async function handleCompleteTask(request, env) {
   // MODO PRINCIPAL (microstep_anchored):
   //   Âncora a auditoria no microstep_id (= taskId — identidade canônica).
   //   execution_ids são prova operacional subordinada (1..N ciclos).
-  //   executor_artifacts fornecem a prova formal de /audit e /propose.
-  //   execution_cycles registra o histórico de tentativas desta microetapa.
+  //   executor_artifacts persistidos em state.task_execution_log — não requerem
+  //   payload manual em chamadas subsequentes.
   //
   // Determinístico, sem I/O adicional (state e decomposition já carregados).
-  // Inclui o current_execution se pertencer a esta task — evidência operacional
-  const currentExec = result.state.current_execution;
-  const executionCycles = (currentExec && currentExec.task_id === taskId)
-    ? [currentExec]
+
+  // Record executor_artifacts into the canonical task_execution_log (KV-persisted)
+  // so future audits can resolve them natively without manual body injection.
+  if (executor_artifacts) {
+    _recordExecutorArtifacts(result.state, taskId, executor_artifacts);
+    result.state.updated_at = new Date().toISOString();
+    await persistContract(env, result.state, result.decomposition);
+  }
+
+  // Resolve execution_cycles from the canonical persisted log (not just current_execution)
+  const persistedCycles = (result.state.task_execution_log &&
+    Array.isArray(result.state.task_execution_log[taskId]))
+    ? result.state.task_execution_log[taskId]
     : [];
+
+  // Extract executor_artifacts from log for the audit (last entry with artifacts, or param)
+  const resolvedArtifacts = executor_artifacts
+    || _resolveExecutorArtifactsFromLog(persistedCycles);
 
   const executionAudit = auditExecution({
     state:              result.state,
     decomposition:      result.decomposition,
     microstep_id:       taskId,
-    executor_artifacts,
-    execution_cycles:   executionCycles,
+    executor_artifacts: resolvedArtifacts,
+    execution_cycles:   persistedCycles,
   });
   // ── FIM DA AUDITORIA ─────────────────────────────────────────────────────
 
@@ -3156,35 +3254,45 @@ async function handleGetExecutionAudit(request, env) {
     };
   }
 
-  // Accept optional executor_artifacts and execution_cycles from request body
-  let executor_artifacts;
-  let execution_cycles;
+  // ── Resolve microstep_id ──────────────────────────────────────────────────
+  // Body can also specify microstep_id (query param takes precedence).
+  // executor_artifacts and execution_cycles from body are OPTIONAL overrides —
+  // the primary source is now state.task_execution_log (KV-persisted).
+  let body_executor_artifacts;
+  let body_execution_cycles;
   let microstep_id = microstepIdParam;
   try {
     const bodyText = request._body_text || null;
     if (bodyText) {
       const parsed = JSON.parse(bodyText);
       if (parsed && typeof parsed.executor_artifacts === "object") {
-        executor_artifacts = parsed.executor_artifacts;
+        body_executor_artifacts = parsed.executor_artifacts;
       }
       if (parsed && Array.isArray(parsed.execution_cycles)) {
-        execution_cycles = parsed.execution_cycles;
+        body_execution_cycles = parsed.execution_cycles;
       }
-      // body can also specify microstep_id (query param takes precedence)
       if (!microstep_id && parsed && typeof parsed.microstep_id === "string") {
         microstep_id = parsed.microstep_id;
       }
     }
   } catch (_) {
-    // body absent or not JSON — proceed without artifacts
+    // body absent or not JSON — use persisted log below
   }
 
-  // Include state.current_execution as a cycle if it matches microstep_id
-  if (microstep_id && state.current_execution &&
-      state.current_execution.task_id === microstep_id &&
-      !execution_cycles) {
-    execution_cycles = [state.current_execution];
+  // ── Resolve execution_cycles natively from state.task_execution_log ────────
+  // body_execution_cycles override wins if provided; otherwise load from KV state.
+  let execution_cycles = body_execution_cycles;
+  if (!execution_cycles && microstep_id) {
+    const taskLog = state.task_execution_log;
+    execution_cycles = (taskLog && Array.isArray(taskLog[microstep_id]))
+      ? taskLog[microstep_id]
+      : undefined;
   }
+
+  // ── Resolve executor_artifacts natively from task_execution_log ────────────
+  // Body override wins; otherwise extract from last cycle with artifacts.
+  const executor_artifacts = body_executor_artifacts
+    || _resolveExecutorArtifactsFromLog(execution_cycles);
 
   const executionAudit = auditExecution({
     state,

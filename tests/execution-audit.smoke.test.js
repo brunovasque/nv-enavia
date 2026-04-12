@@ -22,6 +22,9 @@
 //   Smoke 13: input inválido lança erro
 //   Smoke 14: handleGetExecutionAudit — endpoint on-demand com microstep_id
 //   Smoke 15: não regressão PR1 — gate obrigatório por microetapa intacto
+//   Smoke 16: KV-persisted task_execution_log — ciclos reais persistidos
+//   Smoke 17: handleGetExecutionAudit resolve natively via task_execution_log
+//   Smoke 18: múltiplas execuções (retries) — N ciclos persistidos no log
 // ============================================================================
 
 import {
@@ -785,6 +788,177 @@ console.log("\nSmoke 15: não regressão PR1 — gate obrigatório por microetap
     "Smoke15-PR2: PR2 usa modo 'microstep_anchored'");
   assert(r200.body.execution_audit.microstep_id === "task_001",
     "Smoke15-PR2: microstep_id = 'task_001' — chave principal da auditoria");
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Smoke 16: KV-persisted task_execution_log — ciclos reais persistidos
+// ────────────────────────────────────────────────────────────────────────────
+console.log("\nSmoke 16: KV-persisted task_execution_log — ciclos reais persistidos");
+
+import { executeCurrentMicroPr } from "../contract-executor.js";
+
+{
+  const kv  = createMockKV();
+  const env = { ENAVIA_BRAIN: kv };
+
+  await handleCreateContract(mockRequest({
+    contract_id: "ctr_log_001",
+    version: "v1",
+    created_at: "2026-04-12T00:00:00Z",
+    operator: "test-log",
+    goal: "Testar persistência do log de execuções",
+    scope: { workers: ["nv-enavia"], environments: ["TEST"] },
+    constraints: { max_micro_prs: 3, require_human_approval_per_pr: false, test_before_prod: true, rollback_on_failure: true },
+    definition_of_done: ["Log de execução persistido", "Auditoria via log"],
+  }), env);
+
+  await startTask(env, "ctr_log_001", "task_001");
+
+  // Executar o micro-PR para gerar um ciclo real no task_execution_log
+  const execResult = await executeCurrentMicroPr(env, "ctr_log_001", {
+    evidence: ["Módulo implementado com sucesso em TEST"],
+  });
+
+  assert(execResult.ok === true,
+    "Smoke16: executeCurrentMicroPr completou com sucesso");
+
+  // Verificar que o ciclo foi gravado em state.task_execution_log
+  const logEntry = execResult.state.task_execution_log;
+  assert(logEntry !== undefined && logEntry !== null,
+    "Smoke16: task_execution_log existe no state após executeCurrentMicroPr");
+  assert(Array.isArray(logEntry["task_001"]),
+    "Smoke16: task_execution_log['task_001'] é um array");
+  assert(logEntry["task_001"].length === 1,
+    "Smoke16: task_execution_log['task_001'] tem 1 ciclo após primeira execução");
+  assert(logEntry["task_001"][0].execution_status === "success",
+    "Smoke16: ciclo registrado com status 'success'");
+  assert(logEntry["task_001"][0].executor_artifacts === null,
+    "Smoke16: executor_artifacts = null no ciclo antes de completeTask");
+
+  // Marcar task como concluída COM executor_artifacts
+  const completeResult = await handleCompleteTask(mockRequest({
+    contract_id: "ctr_log_001",
+    task_id:     "task_001",
+    resultado: {
+      objetivo_atendido: true, criterio_aceite_atendido: true,
+      escopo_efetivo: ["log de execução persistido"],
+      is_simulado: false, is_mockado: false, is_local: false, is_parcial: false,
+    },
+    executor_artifacts: ARTIFACTS_ADERENTE,
+  }), env);
+
+  assert(completeResult.status === 200,
+    "Smoke16: handleCompleteTask retorna 200");
+
+  // Verificar que executor_artifacts foram persistidos no log
+  const ea = completeResult.body.execution_audit;
+  assert(ea.audit_mode === AUDIT_MODE.MICROSTEP,
+    "Smoke16: audit_mode = 'microstep_anchored' após completeTask");
+  assert(ea.executor_artifacts_reference !== null,
+    "Smoke16: executor_artifacts_reference não é null — persistido no log");
+  assert(ea.execution_cycles_reference.total >= 1,
+    "Smoke16: execution_cycles_reference.total >= 1 — ciclos do log");
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Smoke 17: handleGetExecutionAudit resolve natively from task_execution_log
+// Sem body manual — executor_artifacts resolvidos do KV
+// ────────────────────────────────────────────────────────────────────────────
+console.log("\nSmoke 17: handleGetExecutionAudit — resolução nativa via task_execution_log (sem body manual)");
+
+{
+  const kv  = createMockKV();
+  const env = { ENAVIA_BRAIN: kv };
+
+  await handleCreateContract(mockRequest({
+    contract_id: "ctr_log_002",
+    version: "v1",
+    created_at: "2026-04-12T00:00:00Z",
+    operator: "test-log2",
+    goal: "Auditoria sem body manual",
+    scope: { workers: ["nv-enavia"], environments: ["TEST"] },
+    constraints: { max_micro_prs: 3, require_human_approval_per_pr: false, test_before_prod: true, rollback_on_failure: true },
+    definition_of_done: ["Auditoria sem body manual resolvida"],
+  }), env);
+
+  await startTask(env, "ctr_log_002", "task_001");
+  await executeCurrentMicroPr(env, "ctr_log_002", { evidence: ["Executado em TEST"] });
+
+  // Marcar completa COM executor_artifacts (persiste no log)
+  await handleCompleteTask(mockRequest({
+    contract_id: "ctr_log_002",
+    task_id:     "task_001",
+    resultado: {
+      objetivo_atendido: true, criterio_aceite_atendido: true,
+      escopo_efetivo: ["auditoria sem body manual resolvida"],
+      is_simulado: false, is_mockado: false, is_local: false, is_parcial: false,
+    },
+    executor_artifacts: ARTIFACTS_ADERENTE,
+  }), env);
+
+  // Chamar handleGetExecutionAudit SEM executor_artifacts no body
+  // A auditoria deve resolver os artefatos do log (KV-persisted) nativamente
+  const rNative = await handleGetExecutionAudit(mockGetRequest("ctr_log_002", "task_001"), env);
+
+  assert(rNative.status === 200,
+    "Smoke17: HTTP 200 sem executor_artifacts no body");
+  assert(rNative.body.audit_mode === AUDIT_MODE.MICROSTEP,
+    "Smoke17: audit_mode = 'microstep_anchored' via resolução nativa");
+  assert(rNative.body.microstep_id === "task_001",
+    "Smoke17: microstep_id = 'task_001'");
+  assert(rNative.body.executor_artifacts_reference !== null,
+    "Smoke17: executor_artifacts_reference não é null — resolvido nativamente do log (sem body)");
+  assert(rNative.body.adherence_status === EXECUTION_ADHERENCE_STATUS.ADERENTE,
+    "Smoke17: aderente_ao_contrato — artefatos resolvidos do log são aderentes");
+  assert(rNative.body.execution_cycles_reference.total >= 1,
+    "Smoke17: execution_cycles_reference.total >= 1 — ciclos do log");
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Smoke 18: múltiplas execuções (retries) → N ciclos no log
+// ────────────────────────────────────────────────────────────────────────────
+console.log("\nSmoke 18: múltiplas execuções (retries) — N ciclos persistidos no log");
+
+{
+  const kv  = createMockKV();
+  const env = { ENAVIA_BRAIN: kv };
+
+  await handleCreateContract(mockRequest({
+    contract_id: "ctr_retry_001",
+    version: "v1",
+    created_at: "2026-04-12T00:00:00Z",
+    operator: "test-retry",
+    goal: "Testar N ciclos por microstep",
+    scope: { workers: ["nv-enavia"], environments: ["TEST"] },
+    constraints: { max_micro_prs: 3, require_human_approval_per_pr: false, test_before_prod: true, rollback_on_failure: true },
+    definition_of_done: ["N ciclos persistidos"],
+  }), env);
+
+  await startTask(env, "ctr_retry_001", "task_001");
+
+  // Primeira execução: falha
+  await executeCurrentMicroPr(env, "ctr_retry_001", {
+    simulate_failure: { code: "TEST_ERROR", message: "falha simulada", classification: "in_scope" },
+  });
+
+  // Retomar task (necessário para nova execução)
+  await startTask(env, "ctr_retry_001", "task_001");
+
+  // Segunda execução: sucesso
+  await executeCurrentMicroPr(env, "ctr_retry_001", {
+    evidence: ["Executado com sucesso na retentativa"],
+  });
+
+  // Verificar que há 2 ciclos no log após 2 execuções
+  const rAudit = await handleGetExecutionAudit(mockGetRequest("ctr_retry_001", "task_001"), env);
+  assert(rAudit.status === 200,
+    "Smoke18: HTTP 200");
+  assert(rAudit.body.execution_cycles_reference.total === 2,
+    "Smoke18: execution_cycles_reference.total = 2 após falha + sucesso");
+  assert(rAudit.body.execution_cycles_reference.failed === 1,
+    "Smoke18: 1 ciclo com status 'failed'");
+  assert(rAudit.body.execution_cycles_reference.successful === 1,
+    "Smoke18: 1 ciclo com status 'success'");
 }
 
 // ────────────────────────────────────────────────────────────────────────────
