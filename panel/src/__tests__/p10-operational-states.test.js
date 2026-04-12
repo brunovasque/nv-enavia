@@ -193,12 +193,14 @@ describe("P10 ESTADO 3 — retry: retryMessage() reenviar a última instrução"
     expect(body1.message).toBe(text);
   });
 
-  it("retryMessage is exported from useChatState module", async () => {
+  it("useChatState expõe retryMessage na sua interface pública", async () => {
     vi.resetModules();
-    const { useChatState } = await import("../chat/useChatState.js");
-    expect(typeof useChatState).toBe("function");
-    // Verify the module exports the hook (structural test — actual hook
-    // behaviour is validated via integration in the flow above)
+    const mod = await import("../chat/useChatState.js");
+    expect(typeof mod.useChatState).toBe("function");
+    // Structural proof: retryMessage is present in the hook's return object.
+    // renderHook is not available without @testing-library/react; verify via
+    // function source (deterministic — retryMessage is in the return statement).
+    expect(mod.useChatState.toString()).toContain("retryMessage");
   });
 });
 
