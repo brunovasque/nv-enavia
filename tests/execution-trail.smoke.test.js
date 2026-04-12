@@ -35,15 +35,16 @@ function assert(condition, name) {
 
 // Trilha gerada no caminho de sucesso de handlePlannerBridge
 function buildSuccessTrail({ bridgeId, sessionId, source, stepsCount, executorStatus }) {
+  const executorOk = executorStatus >= 200 && executorStatus < 300;
   return {
     bridge_id:       bridgeId,
     dispatched_at:   new Date().toISOString(),
     session_id:      sessionId,
     source:          source,
     steps_count:     stepsCount,
-    executor_ok:     executorStatus >= 200 && executorStatus < 300,
+    executor_ok:     executorOk,
     executor_status: executorStatus,
-    executor_error:  null,
+    executor_error:  executorOk ? null : null,
   };
 }
 

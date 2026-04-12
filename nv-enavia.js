@@ -3189,9 +3189,9 @@ async function handlePlannerBridge(request, env) {
       session_id: sessionId,
       source: ep.source,
       steps_count: ep.steps.length,
-      executor_ok: !!executorJson?.ok,
+      executor_ok: executorRes.status >= 200 && executorRes.status < 300,
       executor_status: executorRes.status,
-      executor_error: executorJson?.ok ? null : (executorJson?.error ?? null),
+      executor_error: (executorRes.status >= 200 && executorRes.status < 300) ? null : (executorJson?.error ?? null),
     };
     if (env.ENAVIA_BRAIN) {
       try {
