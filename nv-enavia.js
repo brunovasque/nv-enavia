@@ -1988,6 +1988,10 @@ if (!body.patch || typeof body.patch !== "string") {
     logNV("🔁 /engineer → ação direta:", body.action);
 
     const minimalPayload = { action: body.action };
+    // Preserve contextual fields so status queries can be traced by bridge_id / session_id.
+    // These fields are forwarded as-is; the executor decides whether to use them.
+    if (body.bridge_id !== undefined) minimalPayload.bridge_id = body.bridge_id;
+    if (body.session_id !== undefined) minimalPayload.session_id = body.session_id;
 
     // 🚀 LOG 2A — payload enviado ao EXECUTOR (ação direta)
     logNV("🚀 [ENGINEER→EXECUTOR] payload (ação direta)", {
