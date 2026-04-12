@@ -42,7 +42,14 @@ export function useChatState() {
       setMessages((prev) => [...prev, userMsg]);
       setThinking(true);
 
-      const result = await chatSend(trimmed);
+      let result;
+      try {
+        result = await chatSend(trimmed);
+      } catch (err) {
+        setError("Erro inesperado ao contatar o módulo de chat. Tente novamente.");
+        setThinking(false);
+        return;
+      }
 
       if (!result.ok) {
         setError(result.error.message);
