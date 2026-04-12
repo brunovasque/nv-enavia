@@ -9,6 +9,13 @@ import {
   handleResolvePlanRevision,
 } from "./contract-executor.js";
 
+import { classifyRequest } from "./schema/planner-classifier.js";
+import { buildOutputEnvelope } from "./schema/planner-output-modes.js";
+import { buildCanonicalPlan } from "./schema/planner-canonical-plan.js";
+import { evaluateApprovalGate } from "./schema/planner-approval-gate.js";
+import { buildExecutorBridgePayload } from "./schema/planner-executor-bridge.js";
+import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
+
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
 // Arquitetura modular com carregamento sob demanda, fila inteligente,
@@ -2969,6 +2976,105 @@ async function loadDirectorBrain(env) {
 //   GET  /         → Ping/saúde do Worker
 // ============================================================================
 
+// ============================================================================
+// 🧠 PLANNER RUN — Pipeline estruturado PM4→PM5→PM6→PM7→PM8→PM9
+// POST /planner/run
+//
+// Aceita instrução do usuário e retorna payload estruturado com:
+//   classification, canonicalPlan, gate, bridge, memoryConsolidation, outputMode
+//
+// Este endpoint destrava P7/P8 ao fornecer retorno real e auditável
+// que o painel pode consumir sem mock.
+// ============================================================================
+async function handlePlannerRun(request) {
+  const startedAt = Date.now();
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return jsonResponse(
+      { ok: false, error: "JSON inválido em /planner/run.", detail: String(err) },
+      400
+    );
+  }
+
+  if (!body || typeof body !== "object") body = {};
+
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!message) {
+    return jsonResponse(
+      { ok: false, error: "'message' é obrigatório e deve ser string não vazia." },
+      400
+    );
+  }
+
+  const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
+  const context = body.context && typeof body.context === "object" ? body.context : {};
+
+  try {
+    // PM4 — Classificação
+    const classification = classifyRequest({ text: message, context });
+
+    // PM5 — Output Envelope
+    const envelope = buildOutputEnvelope(classification, { text: message });
+
+    // PM6 — Plano Canônico
+    const canonicalPlan = buildCanonicalPlan({
+      classification,
+      envelope,
+      input: { text: message },
+    });
+
+    // PM7 — Gate de Aprovação
+    const gate = evaluateApprovalGate(canonicalPlan);
+
+    // PM8 — Bridge com Executor
+    const bridge = buildExecutorBridgePayload({ plan: canonicalPlan, gate });
+
+    // PM9 — Consolidação de Memória
+    const memoryConsolidation = consolidateMemoryLearning({
+      plan: canonicalPlan,
+      gate,
+      bridge,
+    });
+
+    return jsonResponse({
+      ok: true,
+      system: "ENAVIA-NV-FIRST",
+      timestamp: Date.now(),
+      input: message,
+      planner: {
+        classification,
+        canonicalPlan,
+        gate,
+        bridge,
+        memoryConsolidation,
+        outputMode: envelope.output_mode,
+      },
+      telemetry: {
+        duration_ms: Date.now() - startedAt,
+        session_id: session_id || null,
+        pipeline: "PM4→PM5→PM6→PM7→PM8→PM9",
+      },
+    });
+  } catch (err) {
+    return jsonResponse(
+      {
+        ok: false,
+        system: "ENAVIA-NV-FIRST",
+        timestamp: Date.now(),
+        error: "Falha no pipeline do planner.",
+        detail: String(err),
+        telemetry: {
+          duration_ms: Date.now() - startedAt,
+        },
+      },
+      500
+    );
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -2992,6 +3098,56 @@ if (request.method === "POST") {
   if (url.pathname === "/director/cognitive") {
     const response = await handleDirectorCognitiveProxy(request, env);
     return withCORS(response);
+  }
+}
+
+// ============================================================
+// 🧠 PLANNER RUN — POST /planner/run
+// Pipeline estruturado PM4→PM9 (classificação → plano → gate → bridge → memória)
+// ============================================================
+if (request.method === "POST") {
+  const url = new URL(request.url);
+  if (url.pathname === "/planner/run") {
+    const response = await handlePlannerRun(request);
+    return withCORS(response);
+  }
+}
+
+// GET /planner/run → Schema/contrato da rota (smoke de conectividade)
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/planner/run") {
+    return withCORS(jsonResponse({
+      ok: true,
+      route: "POST /planner/run",
+      description: "Planner endpoint canônico — executa pipeline PM4→PM9 e retorna payload estruturado.",
+      schema: {
+        request: {
+          message: "string (obrigatório) — texto do usuário",
+          session_id: "string (opcional) — ID de sessão",
+          context: "object (opcional) — contexto estrutural: { known_dependencies, mentions_prod, is_urgent }",
+        },
+        response: {
+          ok: "boolean",
+          system: "string — 'ENAVIA-NV-FIRST'",
+          timestamp: "number — epoch ms",
+          input: "string — texto do usuário (echo)",
+          planner: {
+            classification: "PM4 — classifyRequest output",
+            canonicalPlan: "PM6 — buildCanonicalPlan output",
+            gate: "PM7 — evaluateApprovalGate output",
+            bridge: "PM8 — buildExecutorBridgePayload output",
+            memoryConsolidation: "PM9 — consolidateMemoryLearning output",
+            outputMode: "string — quick_reply | tactical_plan | formal_contract",
+          },
+          telemetry: {
+            duration_ms: "number",
+            session_id: "string | null",
+            pipeline: "string — 'PM4→PM5→PM6→PM7→PM8→PM9'",
+          },
+        },
+      },
+    }));
   }
 }
 
@@ -4588,6 +4744,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /debug-load     → Carregar módulos via FILA",
             "  • POST /brain-query    → Buscar módulos no cérebro",
             "  • POST /brain/get-module → Ler conteúdo de módulo",
+            "  • POST /planner/run    → Planner estruturado PM4→PM9 (classificação→plano→gate→bridge→memória)",
             "  • POST /contracts      → Criar contrato (Contract Executor v1)",
             "  • POST /contracts/execute → Executar micro-PR corrente em TEST (C1)",
             "  • POST /contracts/close-test → Fechamento automático de contrato em TEST (C2)",
@@ -4600,7 +4757,8 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • GET  /engineer       → Testar rota do executor",
             "  • GET  /audit          → Schema/contrato da rota POST /audit",
             "  • GET  /brain/read     → Ler System Prompt + estado",
-            "  • GET  /brain/index    → INDEX completo do cérebro"
+            "  • GET  /brain/index    → INDEX completo do cérebro",
+            "  • GET  /planner/run    → Schema/contrato da rota POST /planner/run"
           ].join("\n"),
           { status: 200 }
         ));
