@@ -11,14 +11,14 @@
 //   Smoke 2: parcial_desviado     → bloqueia conclusão (ADHERENCE_GATE_REJECTED)
 //   Smoke 3: fora_do_contrato     → bloqueia conclusão (ADHERENCE_GATE_REJECTED)
 //   Smoke 4: resultado ausente    → gate não pode ser ignorado (ADHERENCE_GATE_REQUIRED)
-//   Smoke 5: regressão do fluxo existente — completeTask direto ainda funciona
+//   Smoke 5: regressão do fluxo existente — completeTaskInternal direto ainda funciona
 // ============================================================================
 
 import {
   handleCompleteTask,
   handleCreateContract,
   startTask,
-  completeTask,
+  completeTaskInternal,
   rehydrateContract,
 } from "../contract-executor.js";
 
@@ -309,10 +309,11 @@ async function runTests() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Smoke 5: regressão — completeTask direto (API interna) ainda funciona
-  // Garante que o fluxo existente de testes internos não foi quebrado
+  // Smoke 5: _gate_bypassed distinction — completeTaskInternal marks bypass;
+  //          handleCompleteTask does NOT mark bypass (gate was enforced)
+  // Garante que qualquer bypass é explícito e auditável
   // ─────────────────────────────────────────────────────────────────────────
-  console.log("\nSmoke 5: regressão — completeTask direto ainda funciona (fluxo interno)");
+  console.log("\nSmoke 5: _gate_bypassed distingue bypass interno de caminho oficial");
   {
     const kv = createMockKV();
     const env = { ENAVIA_BRAIN: kv };
@@ -320,25 +321,47 @@ async function runTests() {
     await handleCreateContract(mockRequest({ ...VALID_PAYLOAD, contract_id: "ctr_gate_regression_001" }), env);
     await startTask(env, "ctr_gate_regression_001", "task_001");
 
-    // completeTask sem resultado — API interna, sem gate
-    const result = await completeTask(env, "ctr_gate_regression_001", "task_001");
-    assert(result.ok === true,
-      "Smoke5: completeTask direto retorna ok=true (sem gate — API interna)");
-    assert(result.task.status === "completed",
-      "Smoke5: task_status = 'completed' via API interna");
+    // completeTaskInternal — bypass explícito, deve marcar _gate_bypassed: true
+    const resultInternal = await completeTaskInternal(env, "ctr_gate_regression_001", "task_001");
+    assert(resultInternal.ok === true,
+      "Smoke5: completeTaskInternal retorna ok=true");
+    assert(resultInternal.task.status === "completed",
+      "Smoke5: task_status = 'completed' via completeTaskInternal");
+    assert(resultInternal._gate_bypassed === true,
+      "Smoke5: _gate_bypassed = true — bypass via API interna é explícito e auditável");
 
     // Confirmar persistência
     const { decomposition } = await rehydrateContract(env, "ctr_gate_regression_001");
     const task = decomposition.tasks.find(t => t.id === "task_001");
     assert(task.status === "completed",
       "Smoke5: task persiste como completed via API interna");
+  }
+  {
+    // handleCompleteTask (caminho oficial) NÃO deve ter _gate_bypassed
+    const kv2 = createMockKV();
+    const env2 = { ENAVIA_BRAIN: kv2 };
 
-    // Provar que handleCompleteTask (gate obrigatório) é a rota pública
-    // enquanto completeTask é a API interna — ambas coexistem sem conflito
+    await handleCreateContract(mockRequest({ ...VALID_PAYLOAD, contract_id: "ctr_gate_official_001" }), env2);
+    await startTask(env2, "ctr_gate_official_001", "task_001");
+
+    const resultOfficial = await handleCompleteTask(mockRequest({
+      contract_id: "ctr_gate_official_001",
+      task_id:     "task_001",
+      resultado:   resultadoAderente,
+    }), env2);
+
+    assert(resultOfficial.body.ok === true,
+      "Smoke5: handleCompleteTask retorna ok=true no caminho oficial");
+    assert(resultOfficial.body._gate_bypassed !== true,
+      "Smoke5: handleCompleteTask NÃO marca _gate_bypassed — gate foi executado, não bypassado");
+    assert(resultOfficial.body.adherence_status === "aderente_ao_contrato",
+      "Smoke5: adherence_status = 'aderente_ao_contrato' no caminho oficial");
+
+    // Provar coexistência e distinção explícita
     assert(typeof handleCompleteTask === "function",
       "Smoke5: handleCompleteTask (gate obrigatório) é exportado");
-    assert(typeof completeTask === "function",
-      "Smoke5: completeTask (API interna) também exportado — sem conflito");
+    assert(typeof completeTaskInternal === "function",
+      "Smoke5: completeTaskInternal (@internal, bypass explícito) também exportado");
   }
 
   // ─────────────────────────────────────────────────────────────────────────

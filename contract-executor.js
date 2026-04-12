@@ -1047,7 +1047,18 @@ async function startTask(env, contractId, taskId) {
   return { ok: true, state, decomposition, task };
 }
 
-async function completeTask(env, contractId, taskId) {
+// ---------------------------------------------------------------------------
+// _completeTaskCore(env, contractId, taskId)
+//
+// Core logic for completing a task. Private — not exported directly.
+//
+// GUARDRAIL: Do not call this function without first running the adherence
+// gate (evaluateAdherence). Callers that bypass the gate must use
+// completeTaskInternal, which stamps _gate_bypassed: true in the result.
+//
+// The public, gate-enforced path is handleCompleteTask (POST /contracts/complete-task).
+// ---------------------------------------------------------------------------
+async function _completeTaskCore(env, contractId, taskId) {
   const { state, decomposition } = await rehydrateContract(env, contractId);
   if (!state || !decomposition) {
     return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
@@ -1073,6 +1084,24 @@ async function completeTask(env, contractId, taskId) {
 
   await persistContract(env, state, decomposition);
   return { ok: true, state, decomposition, task };
+}
+
+// ---------------------------------------------------------------------------
+// completeTaskInternal(env, contractId, taskId)
+//
+// @internal — For use by existing internal tests and flows that intentionally
+// bypass the adherence gate. Stamps `_gate_bypassed: true` in the result
+// so that any bypass is explicit and auditable.
+//
+// For the gate-enforced public path, use handleCompleteTask
+// (POST /contracts/complete-task).
+// ---------------------------------------------------------------------------
+async function completeTaskInternal(env, contractId, taskId) {
+  const result = await _completeTaskCore(env, contractId, taskId);
+  if (result.ok) {
+    result._gate_bypassed = true;
+  }
+  return result;
 }
 
 async function blockTask(env, contractId, taskId, reason) {
@@ -3011,8 +3040,8 @@ async function handleCompleteTask(request, env) {
   }
   // ── FIM DO GATE ─────────────────────────────────────────────────────────
 
-  // Gate autoriza → marcar como concluída
-  const result = await completeTask(env, contractId, taskId);
+  // Gate autoriza → marcar como concluída via core (sem bypass marker)
+  const result = await _completeTaskCore(env, contractId, taskId);
 
   if (!result.ok) {
     const notFoundErrors = ["CONTRACT_NOT_FOUND", "TASK_NOT_FOUND"];
@@ -3062,7 +3091,7 @@ export {
   VALID_MICRO_PR_STATUSES,
   // Canonical status change functions — single path
   startTask,
-  completeTask,
+  completeTaskInternal,   // @internal — use handleCompleteTask for gate-enforced public path
   blockTask,
   startMicroPrCandidate,
   completeMicroPrCandidate,
