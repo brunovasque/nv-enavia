@@ -3075,6 +3075,139 @@ async function handlePlannerRun(request) {
   }
 }
 
+// ============================================================================
+// 🌉 PLANNER BRIDGE — POST /planner/bridge (P12)
+//
+// Recebe o bridge payload canônico (PM8) do painel após aprovação humana (P11)
+// e encaminha ao executor via service binding. NÃO executa lógica de planner
+// nem expande para execução operacional — apenas a ponte.
+//
+// Payload esperado:
+//   { executor_payload: { version, source, plan_summary, ... }, session_id? }
+//
+// Retorno:
+//   { ok, bridge_accepted, executor_response?, error?, timestamp, telemetry }
+// ============================================================================
+async function handlePlannerBridge(request, env) {
+  const startedAt = Date.now();
+
+  // 1) Validate EXECUTOR binding
+  if (!env.EXECUTOR || typeof env.EXECUTOR.fetch !== "function") {
+    logNV("🔴 [PLANNER/BRIDGE] EXECUTOR binding ausente");
+    return jsonResponse({
+      ok: false,
+      bridge_accepted: false,
+      error: "Service Binding EXECUTOR não configurado.",
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 503);
+  }
+
+  // 2) Parse body
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return jsonResponse({
+      ok: false,
+      bridge_accepted: false,
+      error: "JSON inválido em /planner/bridge.",
+      detail: String(err),
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 400);
+  }
+
+  if (!body || typeof body !== "object") body = {};
+
+  // 3) Validate executor_payload
+  const ep = body.executor_payload;
+  if (
+    !ep ||
+    typeof ep !== "object" ||
+    typeof ep.version !== "string" ||
+    typeof ep.source !== "string" ||
+    !Array.isArray(ep.steps)
+  ) {
+    return jsonResponse({
+      ok: false,
+      bridge_accepted: false,
+      error: "executor_payload inválido ou ausente. Campos obrigatórios: version, source, steps.",
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 400);
+  }
+
+  const sessionId = typeof body.session_id === "string" ? body.session_id : null;
+  const reqId = safeId("bridge");
+
+  logNV("🌉 [PLANNER/BRIDGE] Recebendo bridge payload", {
+    reqId,
+    sessionId,
+    source: ep.source,
+    version: ep.version,
+    steps_count: ep.steps.length,
+  });
+
+  // 4) Forward to executor via service binding
+  try {
+    const executorPayload = {
+      action: "execute_plan",
+      source: "planner_bridge",
+      bridge_id: reqId,
+      session_id: sessionId,
+      executor_payload: ep,
+    };
+
+    const executorRes = await env.EXECUTOR.fetch("https://internal/engineer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(executorPayload),
+    });
+
+    let executorJson;
+    try {
+      executorJson = await executorRes.json();
+    } catch {
+      executorJson = { ok: false, error: "EXECUTOR_INVALID_JSON" };
+    }
+
+    logNV("🌉 [PLANNER/BRIDGE] Resposta do executor", {
+      reqId,
+      executor_ok: !!executorJson?.ok,
+      status: executorRes.status,
+    });
+
+    return jsonResponse({
+      ok: true,
+      bridge_accepted: true,
+      executor_response: executorJson,
+      bridge_id: reqId,
+      timestamp: Date.now(),
+      telemetry: {
+        duration_ms: Date.now() - startedAt,
+        session_id: sessionId,
+        executor_status: executorRes.status,
+      },
+    });
+  } catch (networkErr) {
+    logNV("🔴 [PLANNER/BRIDGE] Falha de rede com executor", {
+      reqId,
+      error: String(networkErr),
+    });
+
+    return jsonResponse({
+      ok: false,
+      bridge_accepted: false,
+      error: "Falha de rede ao encaminhar bridge payload ao executor.",
+      detail: String(networkErr),
+      bridge_id: reqId,
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 502);
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -3109,6 +3242,18 @@ if (request.method === "POST") {
   const url = new URL(request.url);
   if (url.pathname === "/planner/run") {
     const response = await handlePlannerRun(request);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// 🌉 PLANNER BRIDGE — POST /planner/bridge (P12)
+// Ponte real: painel envia bridge payload após aprovação do gate
+// ============================================================
+if (request.method === "POST") {
+  const url = new URL(request.url);
+  if (url.pathname === "/planner/bridge") {
+    const response = await handlePlannerBridge(request, env);
     return withCORS(response);
   }
 }
