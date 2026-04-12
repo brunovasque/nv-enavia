@@ -3060,16 +3060,25 @@ async function handleCompleteTask(request, env) {
   }
 
   // ── AUDITORIA DE EXECUÇÃO CONTRA CONTRATO (PR 2) ─────────────────────────
-  // Snapshot canônico da aderência da execução ao contrato.
-  // CAMADA 1: quando executor_artifacts presentes (artefatos reais de /audit e /propose)
-  //           → compara verdict/risk_level/context_proof/constraints contra contrato
-  // CAMADA 2: quando executor_artifacts ausentes (fallback estrutural)
-  //           → compara tasks concluídas contra definition_of_done
+  // Snapshot canônico da aderência da microetapa ao contrato.
+  //
+  // MODO PRINCIPAL (microstep_anchored):
+  //   Âncora a auditoria no microstep_id (= taskId — identidade canônica).
+  //   execution_ids são prova operacional subordinada (1..N ciclos).
+  //   executor_artifacts fornecem a prova formal de /audit e /propose.
+  //   execution_cycles registra o histórico de tentativas desta microetapa.
+  //
   // Determinístico, sem I/O adicional (state e decomposition já carregados).
   const executionAudit = auditExecution({
     state:              result.state,
     decomposition:      result.decomposition,
+    microstep_id:       taskId,
     executor_artifacts,
+    // Inclui o current_execution se pertencer a esta task — evidência operacional
+    execution_cycles:   (result.state.current_execution &&
+                         result.state.current_execution.task_id === taskId)
+      ? [result.state.current_execution]
+      : [],
   });
   // ── FIM DA AUDITORIA ─────────────────────────────────────────────────────
 
@@ -3091,26 +3100,32 @@ async function handleCompleteTask(request, env) {
 // ============================================================================
 // 🛡️ BLINDAGEM CONTRATUAL — handleGetExecutionAudit (PR 2)
 //
-// GET /contracts/execution-audit?contract_id=<id>
+// GET /contracts/execution-audit?contract_id=<id>[&microstep_id=<task_id>]
 //
 // Handler HTTP que retorna a auditoria canônica de execução vs. contrato.
 // Pode ser chamado a qualquer momento durante o fluxo operacional para
 // obter um snapshot auditável do estado de aderência.
 //
 // Query params:
-//   contract_id {string} — ID do contrato
+//   contract_id  {string} — ID do contrato (obrigatório)
+//   microstep_id {string} — task_id da microetapa a auditar (opcional).
+//     Quando presente → modo "microstep_anchored": auditoria ancorada no
+//     microstep contratual. execution_ids são prova operacional subordinada.
+//     Quando ausente  → modo "executor_artifacts" ou "task_decomposition".
 //
 // Body (opcional, JSON):
 //   executor_artifacts {object} — artefatos reais de /audit e /propose.
-//     Quando presente → CAMADA 1: compara artefatos reais vs. contrato.
-//     Quando ausente  → CAMADA 2: compara tasks vs. definition_of_done.
+//   execution_cycles   {object[]} — ciclos operacionais da microetapa (1..N).
 //
 // Retorna ExecutionAudit:
 //   {
 //     contract_id,
-//     audit_mode,            — "executor_artifacts" | "task_decomposition"
-//     contract_reference,
-//     implemented_reference,
+//     audit_mode,            — "microstep_anchored" | "executor_artifacts" | "task_decomposition"
+//     microstep_id,          — task_id auditado (null se modo global)
+//     execution_ids,         — [...] IDs das tentativas operacionais (1..N)
+//     contract_microstep_reference | contract_reference,
+//     executor_artifacts_reference | implemented_reference,
+//     execution_cycles_reference,
 //     missing_items,
 //     unauthorized_items,
 //     adherence_status,      — "aderente_ao_contrato" | "parcial_desviado" | "fora_do_contrato"
@@ -3119,8 +3134,10 @@ async function handleCompleteTask(request, env) {
 //   }
 // ============================================================================
 async function handleGetExecutionAudit(request, env) {
-  const url = new URL(request.url);
+  const url        = new URL(request.url);
   const contractId = url.searchParams.get("contract_id");
+  // microstep_id pode vir como query param — ancora a auditoria na microetapa
+  const microstepIdParam = url.searchParams.get("microstep_id") || null;
 
   if (!contractId) {
     return {
@@ -3137,8 +3154,10 @@ async function handleGetExecutionAudit(request, env) {
     };
   }
 
-  // Accept optional executor_artifacts from request body (GET with JSON body or POST)
+  // Accept optional executor_artifacts and execution_cycles from request body
   let executor_artifacts;
+  let execution_cycles;
+  let microstep_id = microstepIdParam;
   try {
     const bodyText = request._body_text || null;
     if (bodyText) {
@@ -3146,12 +3165,32 @@ async function handleGetExecutionAudit(request, env) {
       if (parsed && typeof parsed.executor_artifacts === "object") {
         executor_artifacts = parsed.executor_artifacts;
       }
+      if (parsed && Array.isArray(parsed.execution_cycles)) {
+        execution_cycles = parsed.execution_cycles;
+      }
+      // body can also specify microstep_id (query param takes precedence)
+      if (!microstep_id && parsed && typeof parsed.microstep_id === "string") {
+        microstep_id = parsed.microstep_id;
+      }
     }
   } catch (_) {
-    // body absent or not JSON — use CAMADA 2 (task-based fallback)
+    // body absent or not JSON — proceed without artifacts
   }
 
-  const executionAudit = auditExecution({ state, decomposition, executor_artifacts });
+  // Include state.current_execution as a cycle if it matches microstep_id
+  if (microstep_id && state.current_execution &&
+      state.current_execution.task_id === microstep_id &&
+      !execution_cycles) {
+    execution_cycles = [state.current_execution];
+  }
+
+  const executionAudit = auditExecution({
+    state,
+    decomposition,
+    microstep_id:    microstep_id || undefined,
+    executor_artifacts,
+    execution_cycles,
+  });
 
   return {
     status: 200,
