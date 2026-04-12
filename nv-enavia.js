@@ -3275,6 +3275,173 @@ async function handleGetExecution(env) {
   }
 }
 
+// ============================================================================
+// 📝 P14 — POST /execution/decision (handler canônico)
+//
+// Registra uma decisão humana (approved / rejected) vinculada a uma execução.
+// Persiste no KV com shape mínimo e rastreável por bridge_id.
+//
+// KV keys:
+//   decision:{decision_id}                — registro individual
+//   decision:by_bridge:{bridge_id}        — lista de decisões por bridge_id
+//   decision:latest                       — última decisão registrada
+//
+// Shape da decisão:
+//   { decision_id, decision, bridge_id, decided_at, decided_by, context }
+//
+// NÃO é P13 (trail de execução) — P14 é exclusivamente histórico de decisões.
+// ============================================================================
+async function handlePostDecision(request, env) {
+  const startedAt = Date.now();
+
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({
+      ok: false,
+      error: "KV não disponível — impossível persistir decisão.",
+      timestamp: Date.now(),
+    }, 503);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return jsonResponse({
+      ok: false,
+      error: "JSON inválido em /execution/decision.",
+      detail: String(err),
+      timestamp: Date.now(),
+    }, 400);
+  }
+
+  if (!body || typeof body !== "object") body = {};
+
+  // Validate required fields
+  const decision = body.decision;
+  if (decision !== "approved" && decision !== "rejected") {
+    return jsonResponse({
+      ok: false,
+      error: "Campo 'decision' obrigatório — valores aceitos: 'approved', 'rejected'.",
+      timestamp: Date.now(),
+    }, 400);
+  }
+
+  const bridgeId = typeof body.bridge_id === "string" && body.bridge_id.length > 0
+    ? body.bridge_id
+    : null;
+
+  const decisionId = safeId("decision");
+  const now = new Date().toISOString();
+
+  const record = {
+    decision_id: decisionId,
+    decision: decision,
+    bridge_id: bridgeId,
+    decided_at: now,
+    decided_by: typeof body.decided_by === "string" && body.decided_by.length > 0
+      ? body.decided_by
+      : "human",
+    context: typeof body.context === "string" && body.context.length > 0
+      ? body.context
+      : null,
+  };
+
+  logNV("📝 [P14/DECISION] Registrando decisão", {
+    decisionId,
+    decision,
+    bridgeId,
+  });
+
+  try {
+    // 1) Persist individual record
+    await env.ENAVIA_BRAIN.put(`decision:${decisionId}`, JSON.stringify(record));
+
+    // 2) Persist as latest
+    await env.ENAVIA_BRAIN.put("decision:latest", JSON.stringify(record));
+
+    // 3) Append to bridge-specific list (if bridge_id present)
+    if (bridgeId) {
+      const listKey = `decision:by_bridge:${bridgeId}`;
+      let existing = [];
+      try {
+        const raw = await env.ENAVIA_BRAIN.get(listKey, "json");
+        if (Array.isArray(raw)) existing = raw;
+      } catch (readErr) {
+        logNV("⚠️ [P14/DECISION] Falha ao ler lista existente (não crítico, tratando como vazia)", {
+          bridgeId, error: String(readErr),
+        });
+      }
+      existing.push(record);
+      await env.ENAVIA_BRAIN.put(listKey, JSON.stringify(existing));
+    }
+
+    logNV("✅ [P14/DECISION] Decisão persistida", { decisionId, bridgeId });
+
+    return jsonResponse({
+      ok: true,
+      decision: record,
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    });
+  } catch (err) {
+    logNV("🔴 [P14/DECISION] Falha ao persistir decisão no KV", {
+      decisionId,
+      error: String(err),
+    });
+    return jsonResponse({
+      ok: false,
+      error: "Falha ao persistir decisão no KV.",
+      detail: String(err),
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 500);
+  }
+}
+
+// ============================================================================
+// 📖 P14 — GET /execution/decisions (handler canônico)
+//
+// Leitura do histórico de decisões persistidas.
+//
+// Query params:
+//   ?bridge_id=xxx  — filtra decisões por bridge_id
+//   (sem params)    — retorna a última decisão registrada
+//
+// NÃO é P13 (trail de execução) — P14 é exclusivamente histórico de decisões.
+// ============================================================================
+async function handleGetDecisions(env, request) {
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({ ok: true, decisions: [], note: "KV não disponível neste ambiente." });
+  }
+
+  const url = new URL(request.url);
+  const bridgeId = url.searchParams.get("bridge_id");
+
+  try {
+    if (bridgeId) {
+      // Return all decisions for a specific bridge_id
+      const listKey = `decision:by_bridge:${bridgeId}`;
+      const decisions = await env.ENAVIA_BRAIN.get(listKey, "json");
+      return jsonResponse({
+        ok: true,
+        bridge_id: bridgeId,
+        decisions: Array.isArray(decisions) ? decisions : [],
+      });
+    }
+
+    // No bridge_id — return latest decision
+    const latest = await env.ENAVIA_BRAIN.get("decision:latest", "json");
+    return jsonResponse({
+      ok: true,
+      decisions: latest ? [latest] : [],
+      note: "Retornando última decisão. Use ?bridge_id=xxx para filtrar por execução.",
+    });
+  } catch (err) {
+    logNV("🔴 [GET /execution/decisions] Falha ao ler decisões do KV", { error: String(err) });
+    return jsonResponse({ ok: false, decisions: [], error: "Falha ao ler histórico de decisões." }, 500);
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -3335,6 +3502,32 @@ if (request.method === "GET") {
   const url = new URL(request.url);
   if (url.pathname === "/execution") {
     const response = await handleGetExecution(env);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// 📝 P14 — POST /execution/decision
+// Registra decisão humana (approved/rejected) vinculada a
+// uma execução (bridge_id). Persistência real no KV.
+// ============================================================
+if (request.method === "POST") {
+  const url = new URL(request.url);
+  if (url.pathname === "/execution/decision") {
+    const response = await handlePostDecision(request, env);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// 📖 P14 — GET /execution/decisions
+// Leitura canônica do histórico de decisões por execução.
+// Aceita ?bridge_id=xxx para filtrar por execução específica.
+// ============================================================
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/execution/decisions") {
+    const response = await handleGetDecisions(env, request);
     return withCORS(response);
   }
 }

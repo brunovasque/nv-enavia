@@ -267,11 +267,12 @@ describe("P12 PROVA 10 — Escopo fechado: sem desvio para P13+ ou execução am
     expect(BRIDGE_ENDPOINT_SRC).not.toContain("fetchExecution");
   });
 
-  it("sendBridge is the original P12 export; fetchBridgeStatus is P14 addition", () => {
-    // P12 introduced sendBridge; P14 adds fetchBridgeStatus — both are legitimate
+  it("sendBridge is the original P12 export; fetchBridgeStatus is P14 tracking; postDecision is P14 decision", () => {
+    // P12 introduced sendBridge; P14 adds fetchBridgeStatus + postDecision
     expect(BRIDGE_ENDPOINT_SRC).toContain("export async function sendBridge");
     expect(BRIDGE_ENDPOINT_SRC).toContain("export async function fetchBridgeStatus");
+    expect(BRIDGE_ENDPOINT_SRC).toContain("export async function postDecision");
     const exports = BRIDGE_ENDPOINT_SRC.match(/export\s+(async\s+)?function\s+\w+/g) || [];
-    expect(exports.length).toBe(2);
+    expect(exports.length).toBe(3);
   });
 });
