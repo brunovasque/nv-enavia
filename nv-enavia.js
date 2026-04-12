@@ -8,6 +8,7 @@ import {
   handleRejectDecompositionPlan,
   handleResolvePlanRevision,
   handleCompleteTask,
+  handleCloseFinalContract,
 } from "./contract-executor.js";
 
 import { classifyRequest } from "./schema/planner-classifier.js";
@@ -5324,6 +5325,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/close-final → 🛡️ Gate final pesado do contrato inteiro (PR 3)
+      if (method === "POST" && path === "/contracts/close-final") {
+        const result = await handleCloseFinalContract(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -5347,6 +5354,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /contracts/reject-plan → Rejeição formal do plano de decomposição (F2)",
             "  • POST /contracts/resolve-plan-revision → Resolução de revisão do plano (F2b)",
             "  • POST /contracts/complete-task → 🛡️ Concluir task com gate obrigatório de aderência contratual",
+            "  • POST /contracts/close-final → 🛡️ Fechamento final pesado do contrato inteiro (gate PR 3)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",

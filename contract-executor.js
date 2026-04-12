@@ -16,6 +16,7 @@
 
 import { evaluateAdherence } from "./schema/contract-adherence-gate.js";
 import { auditExecution } from "./schema/execution-audit.js";
+import { auditFinalContract, CONTRACT_FINAL_STATUS } from "./schema/contract-final-audit.js";
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -2587,6 +2588,29 @@ async function closeContractInTest(env, contractId) {
     }
   }
 
+  // ── Gate 6: 🛡️ BLINDAGEM CONTRATUAL PR 3 — Auditoria final pesada do contrato inteiro ──
+  // Impede fechamento quando o conjunto final não representa fielmente o contrato:
+  //   • faltantes do definition_of_done
+  //   • microetapas parciais/desviadas (sem gate formal ou sem evidência)
+  //   • microetapas fora do contrato (entrega não autorizada)
+  //   • evidência operacional insuficiente
+  const finalAudit = auditFinalContract({ state, decomposition });
+  if (!finalAudit.can_close_contract) {
+    return {
+      ok: false,
+      error: "FINAL_AUDIT_REJECTED",
+      message: `Fechamento do contrato bloqueado pelo gate final: ${finalAudit.final_reason}`,
+      final_adherence_status:     finalAudit.final_adherence_status,
+      missing_items:              finalAudit.missing_items,
+      partial_microsteps:         finalAudit.partial_microsteps,
+      out_of_contract_microsteps: finalAudit.out_of_contract_microsteps,
+      unauthorized_items:         finalAudit.unauthorized_items,
+      evidence_sufficiency:       finalAudit.evidence_sufficiency,
+      final_audit_snapshot:       finalAudit,
+      final_next_action:          finalAudit.final_next_action,
+    };
+  }
+
   // ── All gates passed — persist closure ──
   const closedAt = new Date().toISOString();
 
@@ -2667,13 +2691,216 @@ async function handleCloseContractInTest(request, env) {
       contract_closure: result.contract_closure || null,
       error: result.error || null,
       message: result.message,
+      // 🛡️ PR3 — expõe snapshot auditável quando gate final bloqueia
+      final_adherence_status:     result.final_adherence_status     || null,
+      final_audit_snapshot:       result.final_audit_snapshot       || null,
+      final_next_action:          result.final_next_action          || null,
+      missing_items:              result.missing_items              || null,
+      partial_microsteps:         result.partial_microsteps         || null,
+      out_of_contract_microsteps: result.out_of_contract_microsteps || null,
+      unauthorized_items:         result.unauthorized_items         || null,
+      evidence_sufficiency:       result.evidence_sufficiency       != null ? result.evidence_sufficiency : null,
     },
   };
 }
 
+// ============================================================================
+// 🛡️ BLINDAGEM CONTRATUAL PR 3 — closeFinalContract / handleCloseFinalContract
+//
+// POST /contracts/close-final
+//
+// Gate final pesado de fechamento do contrato inteiro.
+// Impõe auditFinalContract() antes de marcar o contrato como "completed".
+//
+// Fluxo:
+//   1. Rehydrate from KV
+//   2. Guards: cancellation, plan-rejection, already-completed
+//   3. 🛡️ Gate Final — auditFinalContract() — gate pesado do conjunto inteiro
+//   4. Transition status_global → "completed"
+//   5. Persist canonical closure state
+//   6. Return deterministic snapshot auditável
+//
+// Válido a partir de: "test-complete" ou "prod-pending"
+// (também permitido de "executing" para contratos sem promoção de PROD separada)
+// ============================================================================
+
 // ---------------------------------------------------------------------------
-// Build enhanced contract summary with real progress
+// Valid source statuses for final closure
+// The final gate validates the actual contract state — accepting any
+// non-terminal, non-cancelled status ensures the gate is the enforcement
+// point rather than a status-machine guard.
 // ---------------------------------------------------------------------------
+const FINAL_CLOSURE_SOURCE_STATUSES = [
+  "decomposed",
+  "executing",
+  "validating",
+  "blocked",
+  "awaiting-human",
+  "test-complete",
+  "prod-pending",
+];
+
+// ---------------------------------------------------------------------------
+// closeFinalContract(env, contractId) → result
+// ---------------------------------------------------------------------------
+async function closeFinalContract(env, contractId) {
+  // ── INVARIANT 1+3: Rehydrate from KV ──
+  const { state, decomposition } = await rehydrateContract(env, contractId);
+
+  if (!state) {
+    return { ok: false, error: "CONTRACT_NOT_FOUND", message: `Contract "${contractId}" not found.` };
+  }
+  if (!decomposition) {
+    return { ok: false, error: "DECOMPOSITION_NOT_FOUND", message: `Decomposition for "${contractId}" not found.` };
+  }
+
+  // F1 — Cancellation guard
+  if (isCancelledContract(state)) { return cancelledResult(contractId); }
+
+  // F2 — Plan-rejection guard
+  if (isPlanRejected(state)) { return planRejectedResult(contractId); }
+
+  // Guard: already completed
+  if (state.status_global === "completed") {
+    return {
+      ok: true,
+      already_completed: true,
+      contract_closure: state.contract_closure || null,
+      message: "Contract already marked as completed.",
+      state,
+      decomposition,
+    };
+  }
+
+  // Guard: must be in a valid source status for final closure
+  if (!FINAL_CLOSURE_SOURCE_STATUSES.includes(state.status_global)) {
+    return {
+      ok: false,
+      error: "INVALID_STATUS_FOR_FINAL_CLOSURE",
+      message: `Contract "${contractId}" has status_global "${state.status_global}" — cannot close-final from this state. Expected one of: ${FINAL_CLOSURE_SOURCE_STATUSES.join(", ")}.`,
+    };
+  }
+
+  // ── 🛡️ Gate Final: Auditoria pesada do contrato inteiro (PR 3) ──
+  const finalAudit = auditFinalContract({ state, decomposition });
+  if (!finalAudit.can_close_contract) {
+    return {
+      ok: false,
+      error: "FINAL_AUDIT_REJECTED",
+      message: `Fechamento final bloqueado — ${finalAudit.final_reason}`,
+      final_adherence_status:     finalAudit.final_adherence_status,
+      missing_items:              finalAudit.missing_items,
+      partial_microsteps:         finalAudit.partial_microsteps,
+      out_of_contract_microsteps: finalAudit.out_of_contract_microsteps,
+      unauthorized_items:         finalAudit.unauthorized_items,
+      evidence_sufficiency:       finalAudit.evidence_sufficiency,
+      final_audit_snapshot:       finalAudit,
+      final_next_action:          finalAudit.final_next_action,
+    };
+  }
+
+  // ── All gates passed — persist final closure ──
+  const completedAt = new Date().toISOString();
+
+  state.contract_closure = Object.assign(state.contract_closure || {}, {
+    closure_status:        "completed",
+    final_completed:       true,
+    completed_at:          completedAt,
+    final_audit_snapshot:  finalAudit,
+    closure_reason:        "All final contractual closure criteria satisfied. Gate final aderente.",
+    closed_by:             "final_gate",
+    environment:           "FINAL",
+  });
+
+  state.updated_at = completedAt;
+  state.next_action = "Contrato concluído e auditado. Nenhuma ação adicional necessária.";
+
+  // Transition to canonical terminal "completed" status.
+  // Some source statuses (e.g. "decomposed", "blocked") cannot transition directly
+  // to "completed" — advance through intermediate states as needed.
+  const DIRECT_TO_COMPLETED = ["executing", "validating", "test-complete", "prod-pending"];
+  if (!DIRECT_TO_COMPLETED.includes(state.status_global)) {
+    // Advance to "executing" first (all pre-execution states allow this transition)
+    const intermediateTransition = transitionStatusGlobal(state, "executing", "closeFinalContract:intermediate");
+    if (!intermediateTransition.ok) {
+      return { ok: false, error: intermediateTransition.error, message: intermediateTransition.message };
+    }
+  }
+  const transition = transitionStatusGlobal(state, "completed", "closeFinalContract");
+  if (!transition.ok) {
+    return { ok: false, error: transition.error, message: transition.message };
+  }
+
+  // Persist to KV
+  await persistContract(env, state, decomposition);
+
+  return {
+    ok: true,
+    already_completed: false,
+    final_audit_snapshot: finalAudit,
+    contract_closure:     state.contract_closure,
+    message: "Contrato marcado como concluído após auditoria final aderente.",
+    state,
+    decomposition,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleCloseFinalContract(request, env) → { status, body }
+//
+// Route handler for POST /contracts/close-final
+// ---------------------------------------------------------------------------
+async function handleCloseFinalContract(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return { status: 400, body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." } };
+  }
+
+  const contractId = body && body.contract_id;
+  if (!contractId) {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_CONTRACT_ID", message: "contract_id is required." },
+    };
+  }
+
+  const result = await closeFinalContract(env, contractId);
+
+  if (!result.ok) {
+    const notFoundErrors = ["CONTRACT_NOT_FOUND", "DECOMPOSITION_NOT_FOUND"];
+    const httpStatus = notFoundErrors.includes(result.error) ? 404 : 422;
+    return {
+      status: httpStatus,
+      body: {
+        ok: false,
+        error: result.error || null,
+        message: result.message,
+        final_adherence_status:     result.final_adherence_status     || null,
+        final_audit_snapshot:       result.final_audit_snapshot       || null,
+        final_next_action:          result.final_next_action          || null,
+        missing_items:              result.missing_items              || null,
+        partial_microsteps:         result.partial_microsteps         || null,
+        out_of_contract_microsteps: result.out_of_contract_microsteps || null,
+        unauthorized_items:         result.unauthorized_items         || null,
+        evidence_sufficiency:       result.evidence_sufficiency       != null ? result.evidence_sufficiency : null,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      already_completed:    result.already_completed || false,
+      final_audit_snapshot: result.final_audit_snapshot || null,
+      contract_closure:     result.contract_closure || null,
+      message:              result.message,
+    },
+  };
+}
+
 function buildContractSummary(state, decomposition) {
   const tasks = (decomposition && decomposition.tasks) || [];
   const mprs = (decomposition && decomposition.micro_pr_candidates) || [];
@@ -3387,4 +3614,8 @@ export {
   handleCompleteTask,
   // 🛡️ Blindagem Contratual PR 2 — endpoint de auditoria de execução contra contrato
   handleGetExecutionAudit,
+  // 🛡️ Blindagem Contratual PR 3 — gate final pesado do contrato inteiro
+  closeFinalContract,
+  handleCloseFinalContract,
+  FINAL_CLOSURE_SOURCE_STATUSES,
 };
