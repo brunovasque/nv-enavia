@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge } from "../api";
+import { useState, useEffect } from "react";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
@@ -77,24 +77,15 @@ export default function PlanPage() {
   // null = nenhuma ação tomada; "approved" | "blocked" = ação do operador
   const [gateAction, setGateAction] = useState(null);
 
-  // P12 — bridge send state: tracks the real bridge send lifecycle
-  // "idle" | "sending" | "sent" | "error"
-  const [bridgeSendStatus, setBridgeSendStatus] = useState("idle");
-  const [bridgeSendResult, setBridgeSendResult] = useState(null);
-  const [bridgeSendError, setBridgeSendError] = useState(null);
-
   const { mode } = getApiConfig();
   const isRealMode = mode === "real";
 
   useEffect(() => {
-    // Reset gate action and bridge state when the plan changes (nova instrução = novo ciclo).
+    // Reset gate action when the plan changes (nova instrução = novo ciclo).
     // plannerSnapshot is a stable reference from useSyncExternalStore — it only
     // changes when onChatSuccess() is called (new chat round-trip), not on every
     // render. This dependency is intentional and safe.
     setGateAction(null);
-    setBridgeSendStatus("idle");
-    setBridgeSendResult(null);
-    setBridgeSendError(null);
   }, [visibleState, plannerSnapshot]);
 
   useEffect(() => {
@@ -131,33 +122,9 @@ export default function PlanPage() {
     return () => { stale = true; };
   }, [isRealMode, visibleState, plannerSnapshot]);
 
-  // P11 → P12 — handlers de ação humana; gate approval triggers bridge send
-  const handleBridgeSend = useCallback(async () => {
-    // Extract executor_payload from the raw plannerSnapshot bridge
-    const executorPayload = plannerSnapshot?.bridge?.executor_payload;
-    if (!executorPayload) {
-      setBridgeSendStatus("error");
-      setBridgeSendError("Bridge payload ausente no plano — não é possível enviar.");
-      return;
-    }
-
-    setBridgeSendStatus("sending");
-    setBridgeSendError(null);
-
-    const result = await sendBridge(executorPayload);
-    if (result.ok) {
-      setBridgeSendStatus("sent");
-      setBridgeSendResult(result.data);
-    } else {
-      setBridgeSendStatus("error");
-      setBridgeSendError(result.error?.message ?? "Falha ao enviar bridge payload.");
-    }
-  }, [plannerSnapshot]);
-
+  // P11 — handlers de ação humana; não disparam bridge nem execução real
   function handleGateApprove() {
     setGateAction("approved");
-    // P12: trigger real bridge send after gate approval
-    handleBridgeSend();
   }
   function handleGateReject() {
     setGateAction("blocked");
@@ -214,13 +181,7 @@ export default function PlanPage() {
               onApprove={handleGateApprove}
               onReject={handleGateReject}
             />
-            {/* P12: passa bridge + status de envio da ponte */}
-            <BridgeCard
-              bridge={plan.bridge}
-              bridgeSendStatus={bridgeSendStatus}
-              bridgeSendResult={bridgeSendResult}
-              bridgeSendError={bridgeSendError}
-            />
+            <BridgeCard bridge={plan.bridge} />
             <MemoryConsolidationCard memoryConsolidation={plan.memoryConsolidation} />
           </div>
         </div>
