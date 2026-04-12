@@ -239,7 +239,7 @@ describe("P11 PROVA 6 — PlanPage: gateAction local, handlers, effectiveGate", 
 // =============================================================================
 
 describe("P11 PROVA 7 — Nenhuma execução real: handleGateApprove/Reject não chama fetch", () => {
-  it("handleGateApprove não contém fetch, chatSend ou bridge (apenas setGateAction)", async () => {
+  it("handleGateApprove não contém fetch direto, chatSend ou sendBridge (apenas setGateAction + handleBridgeSend)", async () => {
     const mod = await import("../pages/PlanPage.jsx");
     const src = mod.default.toString();
 
@@ -249,15 +249,16 @@ describe("P11 PROVA 7 — Nenhuma execução real: handleGateApprove/Reject não
     const approveIdx = src.indexOf("handleGateApprove");
     const approveSection = src.slice(approveIdx, approveIdx + 300);
 
-    // Deve conter apenas setGateAction
+    // Deve conter setGateAction
     expect(approveSection).toContain("setGateAction");
-    // NÃO deve conter fetch, chatSend ou bridge
+    // NÃO deve conter fetch direto ou chatSend
     expect(approveSection).not.toContain("fetch(");
     expect(approveSection).not.toContain("chatSend");
-    expect(approveSection).not.toContain("bridge");
+    // NÃO deve chamar sendBridge diretamente (P12 delega via handleBridgeSend)
+    expect(approveSection).not.toContain("sendBridge(");
   });
 
-  it("handleGateReject não contém fetch, chatSend ou bridge (apenas setGateAction)", async () => {
+  it("handleGateReject não contém fetch direto, chatSend ou sendBridge (P14: postDecision só com bridge_id real)", async () => {
     const mod = await import("../pages/PlanPage.jsx");
     const src = mod.default.toString();
 
@@ -265,9 +266,11 @@ describe("P11 PROVA 7 — Nenhuma execução real: handleGateApprove/Reject não
     const rejectSection = src.slice(rejectIdx, rejectIdx + 300);
 
     expect(rejectSection).toContain("setGateAction");
+    // NÃO deve conter fetch direto ou chatSend
     expect(rejectSection).not.toContain("fetch(");
     expect(rejectSection).not.toContain("chatSend");
-    expect(rejectSection).not.toContain("bridge");
+    // NÃO deve chamar sendBridge diretamente
+    expect(rejectSection).not.toContain("sendBridge(");
   });
 });
 
