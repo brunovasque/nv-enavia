@@ -7,6 +7,7 @@ import {
   handleCancelContract,
   handleRejectDecompositionPlan,
   handleResolvePlanRevision,
+  handleCompleteTask,
 } from "./contract-executor.js";
 
 import { classifyRequest } from "./schema/planner-classifier.js";
@@ -5317,6 +5318,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/complete-task → 🛡️ Gate obrigatório de aderência contratual por microetapa
+      if (method === "POST" && path === "/contracts/complete-task") {
+        const result = await handleCompleteTask(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -5339,6 +5346,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /contracts/cancel → Cancelamento formal de contrato (F1)",
             "  • POST /contracts/reject-plan → Rejeição formal do plano de decomposição (F2)",
             "  • POST /contracts/resolve-plan-revision → Resolução de revisão do plano (F2b)",
+            "  • POST /contracts/complete-task → 🛡️ Concluir task com gate obrigatório de aderência contratual",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",

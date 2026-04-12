@@ -164,13 +164,21 @@ function _validateResultado(resultado, fnName) {
 //   proibidos_entregues — itens entregues que estão em escopo_proibido
 //   fora_do_permitido   — itens entregues que não estão em escopo_permitido
 //                         (mas também não estão em escopo_proibido)
+//
+// Regra de escopo aberto:
+//   Se escopo_permitido estiver vazio, o escopo é considerado aberto
+//   (qualquer entrega é permitida, a menos que esteja em escopo_proibido).
 // ---------------------------------------------------------------------------
 function _checkScopeViolations({ escopo_efetivo, escopo_permitido, escopo_proibido }) {
   const proibidos_entregues = escopo_efetivo.filter(item =>
     escopo_proibido.some(p => typeof p === "string" && p.trim().toLowerCase() === item.trim().toLowerCase())
   );
 
-  const fora_do_permitido = escopo_efetivo.filter(item => {
+  // Escopo aberto: se não há itens em escopo_permitido, qualquer entrega é válida
+  // (a não ser que esteja em escopo_proibido, já tratado acima).
+  const escopoAberto = escopo_permitido.length === 0;
+
+  const fora_do_permitido = escopoAberto ? [] : escopo_efetivo.filter(item => {
     const isProibido = escopo_proibido.some(p =>
       typeof p === "string" && p.trim().toLowerCase() === item.trim().toLowerCase()
     );
