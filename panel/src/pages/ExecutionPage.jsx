@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchExecution } from "../api";
+import { fetchExecution, EXECUTION_STATUS } from "../api";
 import { useExecutionStore, setExecutionState } from "../store/executionStore";
 import ExecutionHeader from "../execution/ExecutionHeader";
 import ExecutionStatusCard from "../execution/ExecutionStatusCard";
@@ -16,9 +16,14 @@ export default function ExecutionPage() {
   const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
+    // Stale-response guard: if currentState changes before the previous fetch
+    // resolves, the cleanup sets stale=true and the old .then() becomes a no-op.
+    let stale = false;
+
     setLoading(true);
     setFetchError(null);
     fetchExecution({ _mockState: currentState }).then((r) => {
+      if (stale) return;
       if (r.ok) {
         setExecution(r.data.execution);
       } else {
@@ -27,6 +32,8 @@ export default function ExecutionPage() {
       }
       setLoading(false);
     });
+
+    return () => { stale = true; };
   }, [currentState]);
 
   if (loading) {
