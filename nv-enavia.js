@@ -17,6 +17,7 @@ import { buildExecutorBridgePayload } from "./schema/planner-executor-bridge.js"
 import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
 import { writeMemory } from "./schema/memory-storage.js";
 import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
+import { searchRelevantMemory } from "./schema/memory-read.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -3019,6 +3020,25 @@ async function handlePlannerRun(request, env) {
   const context = body.context && typeof body.context === "object" ? body.context : {};
 
   try {
+    // P16 — Leitura de memória útil antes da montagem do plano (PM3)
+    // Fire-and-forget defensivo: erros não derrubam o pipeline.
+    let _memReadRaw = { ok: false, error: "ENAVIA_BRAIN unavailable" };
+    if (env && env.ENAVIA_BRAIN) {
+      try {
+        _memReadRaw = await searchRelevantMemory(context, env);
+      } catch (memErr) {
+        _memReadRaw = { ok: false, error: String(memErr) };
+      }
+    }
+    const memoryReadAudit = {
+      consulted: _memReadRaw.ok === true,
+      count:     _memReadRaw.ok ? _memReadRaw.count : 0,
+      types:     _memReadRaw.ok
+        ? [...new Set(_memReadRaw.results.map((m) => m.memory_type))]
+        : [],
+      error:     _memReadRaw.ok ? undefined : _memReadRaw.error,
+    };
+
     // PM4 — Classificação
     const classification = classifyRequest({ text: message, context });
 
@@ -3111,7 +3131,8 @@ async function handlePlannerRun(request, env) {
       telemetry: {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
-        pipeline: "PM4→PM5→PM6→PM7→PM8→PM9→P15",
+        pipeline: "PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15",
+        memory_read: memoryReadAudit,
         consolidation_persisted,
       },
     });
