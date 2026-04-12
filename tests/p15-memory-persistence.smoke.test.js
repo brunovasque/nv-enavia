@@ -87,7 +87,7 @@ async function runPipelineAndPersist(message, contextOverrides, envMock, session
     for (const candidate of memoryConsolidation.memory_candidates) {
       const memObj = buildMemoryObject({
         ...candidate,
-        memory_id:   safeId("mem"),
+        memory_id:   crypto.randomUUID(),
         entity_type: ENTITY_TYPES.OPERATION,
         entity_id:   cycleId,
         source:      "planner_run",
@@ -187,7 +187,7 @@ async function testPersistenceLevelA() {
 
   // Verifica que cada candidato tem os campos do contrato P15
   for (const p of persisted) {
-    assert(typeof p.memory_id === "string" && p.memory_id.startsWith("mem-"), `memory_id tem prefixo 'mem-': ${p.memory_id}`);
+    assert(typeof p.memory_id === "string" && p.memory_id.length > 0,         `memory_id presente: ${p.memory_id}`);
     assert(typeof p.memory_type === "string" && p.memory_type.length > 0,     `memory_type presente: ${p.memory_type}`);
     assert(typeof p.is_canonical === "boolean",                                `is_canonical é boolean: ${p.memory_id}`);
     assert(p.kv_key === `memory:${p.memory_id}`,                               `kv_key correto: ${p.kv_key}`);
@@ -245,7 +245,7 @@ async function testPersistenceLevelC() {
   for (const candidate of memoryConsolidation.memory_candidates) {
     const memObj = buildMemoryObject({
       ...candidate,
-      memory_id:   safeId("mem"),
+      memory_id:   crypto.randomUUID(),
       entity_type: ENTITY_TYPES.OPERATION,
       entity_id:   cycleId,
       source:      "planner_run",

@@ -3057,7 +3057,7 @@ async function handlePlannerRun(request, env) {
       for (const candidate of memoryConsolidation.memory_candidates) {
         const memObj = buildMemoryObject({
           ...candidate,
-          memory_id:  safeId("mem"),
+          memory_id:  crypto.randomUUID(),
           entity_type: ENTITY_TYPES.OPERATION,
           entity_id:   cycleId,
           source:      "planner_run",
