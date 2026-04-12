@@ -113,9 +113,12 @@ export async function chatSend(text, opts = {}) {
     });
 
     if (!res.ok || !res.data?.ok) {
-      const errMsg = res.data?.error ?? res.data?.detail ?? "Falha no pipeline do planner.";
+      // Extract error message from backend response — may be in .error or .detail.
+      // Validate it's a string before using; fall back to generic message.
+      const rawErr = res.data?.error ?? res.data?.detail;
+      const errMsg = typeof rawErr === "string" ? rawErr : "Falha no pipeline do planner.";
       return normalizeError(
-        { code: ERROR_CODES.PLANNER_UNAVAILABLE, message: typeof errMsg === "string" ? errMsg : "Falha no pipeline do planner." },
+        { code: ERROR_CODES.PLANNER_UNAVAILABLE, message: errMsg },
         "chat",
       );
     }

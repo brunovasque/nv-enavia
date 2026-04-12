@@ -71,14 +71,15 @@ const _MEMORY_PRIORITY_MAP = {
 export function isValidPlannerSnapshot(raw) {
   if (typeof raw !== "object" || raw === null) return false;
   const r = /** @type {Record<string, unknown>} */ (raw);
-  // At least one canonical sub-object must be a non-null object.
+  // At least one canonical sub-object must be a non-null object,
+  // or outputMode must be a non-empty string (backend returns it as a string).
   return (
     (typeof r.classification === "object" && r.classification !== null) ||
     (typeof r.canonicalPlan === "object" && r.canonicalPlan !== null) ||
     (typeof r.gate === "object" && r.gate !== null) ||
     (typeof r.bridge === "object" && r.bridge !== null) ||
     (typeof r.memoryConsolidation === "object" && r.memoryConsolidation !== null) ||
-    typeof r.outputMode === "string"
+    (typeof r.outputMode === "string" && r.outputMode.length > 0)
   );
 }
 
@@ -107,7 +108,7 @@ export function mapPlannerSnapshot(raw) {
 
   // ── Classification card shape ──────────────────────────────────────────
   const classification = c ? {
-    intent:     (c.request_type ?? c.intent ?? "").toUpperCase(),
+    intent:     (c.request_type ?? c.intent ?? "UNKNOWN").toUpperCase() || "UNKNOWN",
     domain:     c.category ?? c.domain ?? "",
     priority:   _RISK_TO_PRIORITY[c.risk_level] ?? c.priority ?? "MEDIUM",
     confidence: typeof c.confidence === "number" ? c.confidence : null,
