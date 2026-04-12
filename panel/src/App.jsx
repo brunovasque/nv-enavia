@@ -1,0 +1,22 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./Layout";
+import ChatPage from "./pages/ChatPage";
+import PlanPage from "./pages/PlanPage";
+import MemoryPage from "./pages/MemoryPage";
+import ExecutionPage from "./pages/ExecutionPage";
+import BrowserPage from "./pages/BrowserPage";
+
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<Navigate to="/chat" replace />} />
+        <Route path="/chat" element={<ChatPage />} />
+        <Route path="/plan" element={<PlanPage />} />
+        <Route path="/memory" element={<MemoryPage />} />
+        <Route path="/execution" element={<ExecutionPage />} />
+        <Route path="/browser" element={<BrowserPage />} />
+      </Route>
+    </Routes>
+  );
+}
