@@ -225,13 +225,13 @@ function _auditViaExecutorArtifacts(state, executor_artifacts) {
     goal:               state.goal || "",
     contracted_items:   state.definition_of_done,
     required_constraints: {
-      context_used:      true,
-      context_proof:     true,
-      read_only:         true,
-      no_auto_apply:     true,
-      verdict_required:  "approve",
-      risk_level_max:    "medium",
-      scope_workers:     scope_workers,
+      context_used:              true,
+      context_proof:             true,
+      read_only:                 true,
+      no_auto_apply:             true,
+      verdict_required:          "approve",
+      max_acceptable_risk_level: "medium",
+      scope_workers:             scope_workers,
     },
   };
 
