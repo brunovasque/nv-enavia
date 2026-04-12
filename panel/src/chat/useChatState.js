@@ -38,6 +38,37 @@ export function useChatState() {
   // Ref guard: set synchronously before the first await to block concurrent sends
   // even if re-render hasn't propagated `thinking=true` yet.
   const sendingRef = useRef(false);
+  // Tracks the last trimmed text successfully dispatched — used by retryMessage.
+  const lastSentRef = useRef(null);
+
+  // HTTP-only layer: calls chatSend(), handles response, updates state.
+  // Does NOT add a user message bubble — that is the caller's responsibility.
+  // Called by sendMessage (after adding the bubble) and by retryMessage (no new bubble).
+  const _doHttpSend = useCallback(async (trimmed) => {
+    let result;
+    try {
+      result = await chatSend(trimmed);
+    } catch (err) {
+      const envelope = normalizeError(err, "chat");
+      setError(envelope.error.message);
+      setThinking(false);
+      sendingRef.current = false;
+      return;
+    }
+
+    if (!result.ok) {
+      setError(result.error.message);
+      setThinking(false);
+      sendingRef.current = false;
+      return;
+    }
+
+    const { role, content, timestamp } = result.data;
+    setMessages((prev) => [...prev, makeMsg(role, content, timestamp)]);
+    onChatSuccess(trimmed, result.plannerSnapshot ?? null);
+    setThinking(false);
+    sendingRef.current = false;
+  }, []);
 
   const sendMessage = useCallback(
     async (text) => {
@@ -45,38 +76,29 @@ export function useChatState() {
       if (!trimmed || sendingRef.current) return;
 
       sendingRef.current = true;
+      lastSentRef.current = trimmed;
       setError(null);
 
       const userMsg = makeMsg("user", trimmed);
       setMessages((prev) => [...prev, userMsg]);
       setThinking(true);
 
-      let result;
-      try {
-        result = await chatSend(trimmed);
-      } catch (err) {
-        const envelope = normalizeError(err, "chat");
-        setError(envelope.error.message);
-        setThinking(false);
-        sendingRef.current = false;
-        return;
-      }
-
-      if (!result.ok) {
-        setError(result.error.message);
-        setThinking(false);
-        sendingRef.current = false;
-        return;
-      }
-
-      const { role, content, timestamp } = result.data;
-      setMessages((prev) => [...prev, makeMsg(role, content, timestamp)]);
-      onChatSuccess(trimmed, result.plannerSnapshot ?? null);
-      setThinking(false);
-      sendingRef.current = false;
+      await _doHttpSend(trimmed);
     },
-    [],
+    [_doHttpSend],
   );
+
+  // Retries the last failed send.
+  // Reuses the existing user message bubble — no duplicate is added to the chat history.
+  const retryMessage = useCallback(async () => {
+    if (!lastSentRef.current || sendingRef.current) return;
+    sendingRef.current = true;
+    setError(null);
+    setThinking(true);
+    await _doHttpSend(lastSentRef.current);
+  }, [_doHttpSend]);
+
+  const dismissError = useCallback(() => setError(null), []);
 
   // Loads a static conversation seed to validate the "conversation" state without typing.
   const seedMessages = useCallback(() => {
@@ -87,8 +109,6 @@ export function useChatState() {
     setThinking(false);
     setError(null);
   }, []);
-
-  const dismissError = useCallback(() => setError(null), []);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
@@ -103,6 +123,7 @@ export function useChatState() {
     inputValue,
     setInputValue,
     sendMessage,
+    retryMessage,
     seedMessages,
     dismissError,
     clearMessages,

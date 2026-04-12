@@ -128,6 +128,7 @@ export default function ChatPage() {
     inputValue,
     setInputValue,
     sendMessage,
+    retryMessage,
     seedMessages,
     dismissError,
   } = useChatState();
@@ -196,7 +197,12 @@ export default function ChatPage() {
         {error && (
           <div style={styles.errorBar} role="alert">
             <span>⚠ {error}</span>
-            <button style={styles.errorDismiss} onClick={dismissError} aria-label="Fechar erro">×</button>
+            <div style={styles.errorActions}>
+              <button style={styles.retryBtn} onClick={retryMessage} aria-label="Tentar novamente">
+                ↺ Tentar novamente
+              </button>
+              <button style={styles.errorDismiss} onClick={dismissError} aria-label="Fechar erro">×</button>
+            </div>
           </div>
         )}
 
@@ -309,6 +315,23 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "8px",
+  },
+  errorActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    flexShrink: 0,
+  },
+  retryBtn: {
+    background: "transparent",
+    border: "1px solid rgba(239,68,68,0.4)",
+    borderRadius: "4px",
+    color: "#EF4444",
+    fontSize: "12px",
+    cursor: "pointer",
+    padding: "2px 8px",
+    fontFamily: "var(--font-body)",
+    lineHeight: 1.4,
   },
   errorDismiss: {
     background: "transparent",
