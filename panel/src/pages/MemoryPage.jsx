@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { MOCK_MEMORY, MEMORY_STATES, MEMORY_FILTERS } from "../memory/mockMemory";
+import { useState, useEffect } from "react";
+import { fetchMemory, MEMORY_STATES, MEMORY_FILTERS } from "../api";
 import MemoryHeader from "../memory/MemoryHeader";
 import LiveContextBlock from "../memory/LiveContextBlock";
 import CanonicalMemoryCard from "../memory/CanonicalMemoryCard";
@@ -11,8 +11,40 @@ import EmptyMemoryState from "../memory/EmptyMemoryState";
 export default function MemoryPage() {
   const [currentState, setCurrentState] = useState(MEMORY_STATES.POPULATED);
   const [activeFilter, setActiveFilter] = useState(MEMORY_FILTERS.ALL);
+  const [memory, setMemory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
-  const memory = MOCK_MEMORY[currentState];
+  useEffect(() => {
+    setLoading(true);
+    setFetchError(null);
+    fetchMemory({ _mockState: currentState }).then((r) => {
+      if (r.ok) {
+        setMemory(r.data.memory);
+      } else {
+        setMemory(null);
+        setFetchError(r.error?.message ?? "Erro ao carregar memória.");
+      }
+      setLoading(false);
+    });
+  }, [currentState]);
+
+  if (fetchError) {
+    return (
+      <div style={{ padding: "40px 24px", color: "#EF4444", fontSize: "13px" }}>
+        ⚠ {fetchError}
+      </div>
+    );
+  }
+
+  if (loading || !memory) {
+    return (
+      <div style={{ padding: "40px 24px", color: "var(--text-muted)", fontSize: "13px" }}>
+        Carregando...
+      </div>
+    );
+  }
+
   const hasMemory = memory.summary.total > 0;
 
   return (
