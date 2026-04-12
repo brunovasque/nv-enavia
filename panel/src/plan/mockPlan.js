@@ -160,7 +160,7 @@ export const MOCK_PLANS = {
     canonicalPlan: {
       steps: BASE_PLAN.canonicalPlan.steps.map((s) => ({
         ...s,
-        status: s.id === "s5" ? STEP_STATUS.DONE : STEP_STATUS.DONE,
+        status: STEP_STATUS.DONE,
         durationMs: s.durationMs ?? 2800,
       })),
     },

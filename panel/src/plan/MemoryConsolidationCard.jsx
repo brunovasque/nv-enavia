@@ -73,7 +73,7 @@ const s = {
     gap: "8px",
   },
   cardTitle: {
-    fontSize: "9px",
+    fontSize: "10px",
     fontWeight: 700,
     color: "var(--text-muted)",
     letterSpacing: "1.2px",
@@ -112,7 +112,7 @@ const s = {
     whiteSpace: "nowrap",
   },
   priorityBadge: {
-    fontSize: "9px",
+    fontSize: "10px",
     fontWeight: 700,
     padding: "1px 6px",
     borderRadius: "3px",

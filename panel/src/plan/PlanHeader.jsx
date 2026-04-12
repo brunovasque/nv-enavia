@@ -202,7 +202,7 @@ const s = {
     borderLeft: "3px solid var(--color-primary-border)",
   },
   requestLabel: {
-    fontSize: "9px",
+    fontSize: "10px",
     fontWeight: 700,
     color: "var(--text-muted)",
     letterSpacing: "1.2px",
