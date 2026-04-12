@@ -7,16 +7,36 @@
 export const SESSION_STORAGE_KEY = "enavia_session_id";
 
 let _ephemeral = null;
+let _counter = 0;
 
 function generate() {
-  // Use crypto.randomUUID for a cryptographically random session ID.
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  // Tier 1: crypto.randomUUID — best, available in all modern browsers.
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return "sess-" + crypto.randomUUID();
   }
-  // Fallback for environments without crypto.randomUUID (e.g. old test runners).
-  const arr = new Uint32Array(2);
-  crypto.getRandomValues(arr);
-  return "sess-" + arr[0].toString(36) + arr[1].toString(36);
+
+  // Tier 2: crypto.getRandomValues — broad support, avoids Math.random.
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.getRandomValues === "function"
+  ) {
+    const arr = new Uint32Array(3);
+    crypto.getRandomValues(arr);
+    return "sess-" + arr[0].toString(36) + arr[1].toString(36) + arr[2].toString(36);
+  }
+
+  // Tier 3: pure JS fallback — no crypto available (e.g. old test runners,
+  // sandboxed environments). Uses timestamp + monotonic counter + Date drift.
+  // Adequate uniqueness for a panel session ID in this phase.
+  const ts = Date.now().toString(36);
+  const mono = (++_counter).toString(36);
+  const drift = Math.trunc(
+    (performance?.now?.() ?? (Date.now() % 1e9)) * 1000
+  ).toString(36);
+  return "sess-" + ts + "-" + mono + "-" + drift;
 }
 
 export function getSessionId() {

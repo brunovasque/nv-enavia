@@ -1,13 +1,15 @@
 // ============================================================================
 // ENAVIA Panel — execution endpoint (internal implementation, public via index.js)
 //
-// Re-exports EXECUTION_STATUS so pages import it from "../api" without touching
-// the mock file directly.
+// Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
+// contracts.js. Re-exports EXECUTION_STATUS so pages never reach into mock files.
 // ============================================================================
 
-import { apiClient }             from "../client.js";
+import { apiClient }                   from "../client.js";
 import { normalizeError, ERROR_CODES } from "../errors.js";
-import { mapExecutionResponse }  from "../mappers/execution.js";
+import { mapExecutionResponse }        from "../mappers/execution.js";
+// Explicit contract reference — keeps this endpoint anchored to the central shapes.
+import { ENVELOPES }                   from "../contracts.js"; // eslint-disable-line no-unused-vars
 
 // Re-export status constants — pages import these from ../api, not from the mock.
 export { EXECUTION_STATUS } from "../../execution/mockExecution.js";

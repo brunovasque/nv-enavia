@@ -70,17 +70,28 @@ export default function PlanPage() {
   const [currentState, setCurrentState] = useState(PLAN_STATUS.READY);
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
+    setFetchError(null);
     fetchPlan({ _mockState: currentState }).then((r) => {
-      setPlan(r.ok ? r.data.plan : null);
+      if (r.ok) {
+        setPlan(r.data.plan);
+      } else {
+        setPlan(null);
+        setFetchError(r.error?.message ?? "Erro ao carregar plano.");
+      }
       setLoading(false);
     });
   }, [currentState]);
 
   if (loading) {
     return <div style={s.loading}>Carregando...</div>;
+  }
+
+  if (fetchError) {
+    return <div style={s.fetchError}>⚠ {fetchError}</div>;
   }
 
   return (
@@ -124,6 +135,11 @@ const s = {
   loading: {
     padding: "40px 24px",
     color: "var(--text-muted)",
+    fontSize: "13px",
+  },
+  fetchError: {
+    padding: "40px 24px",
+    color: "#EF4444",
     fontSize: "13px",
   },
   page: {

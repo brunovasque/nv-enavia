@@ -1,13 +1,15 @@
 // ============================================================================
 // ENAVIA Panel — plan endpoint (internal implementation, public via index.js)
 //
-// Re-exports PLAN_STATUS so pages import it from "../api" without touching
-// the mock file directly.
+// Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
+// contracts.js. Re-exports PLAN_STATUS so pages never reach into mock files.
 // ============================================================================
 
-import { apiClient }             from "../client.js";
+import { apiClient }                   from "../client.js";
 import { normalizeError, ERROR_CODES } from "../errors.js";
-import { mapPlanResponse }       from "../mappers/plan.js";
+import { mapPlanResponse }             from "../mappers/plan.js";
+// Explicit contract reference — keeps this endpoint anchored to the central shapes.
+import { ENVELOPES }                   from "../contracts.js"; // eslint-disable-line no-unused-vars
 
 // Re-export status constants — pages import these from ../api, not from the mock.
 export { PLAN_STATUS } from "../../plan/mockPlan.js";

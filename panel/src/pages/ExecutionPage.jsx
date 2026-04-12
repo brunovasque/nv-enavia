@@ -12,11 +12,18 @@ export default function ExecutionPage() {
   const [currentState, setCurrentState] = useState(EXECUTION_STATUS.RUNNING);
   const [execution, setExecution] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
+    setFetchError(null);
     fetchExecution({ _mockState: currentState }).then((r) => {
-      setExecution(r.ok ? r.data.execution : null);
+      if (r.ok) {
+        setExecution(r.data.execution);
+      } else {
+        setExecution(null);
+        setFetchError(r.error?.message ?? "Erro ao carregar execução.");
+      }
       setLoading(false);
     });
   }, [currentState]);
@@ -25,6 +32,14 @@ export default function ExecutionPage() {
     return (
       <div style={{ padding: "40px 24px", color: "var(--text-muted)", fontSize: "13px" }}>
         Carregando...
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div style={{ padding: "40px 24px", color: "#EF4444", fontSize: "13px" }}>
+        ⚠ {fetchError}
       </div>
     );
   }

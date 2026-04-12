@@ -1,13 +1,16 @@
 // ============================================================================
 // ENAVIA Panel — memory endpoint (internal implementation, public via index.js)
 //
-// Re-exports MEMORY_STATES and MEMORY_FILTERS so pages import them from
-// "../api" without touching the mock file directly.
+// Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
+// contracts.js. Re-exports MEMORY_STATES/MEMORY_FILTERS so pages never reach
+// into mock files.
 // ============================================================================
 
-import { apiClient }             from "../client.js";
+import { apiClient }                   from "../client.js";
 import { normalizeError, ERROR_CODES } from "../errors.js";
-import { mapMemoryResponse }     from "../mappers/memory.js";
+import { mapMemoryResponse }           from "../mappers/memory.js";
+// Explicit contract reference — keeps this endpoint anchored to the central shapes.
+import { ENVELOPES }                   from "../contracts.js"; // eslint-disable-line no-unused-vars
 
 // Re-export status/filter constants — pages import these from ../api, not from the mock.
 export { MEMORY_STATES, MEMORY_FILTERS } from "../../memory/mockMemory.js";

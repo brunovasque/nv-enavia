@@ -2,15 +2,18 @@
 // ENAVIA Panel — chat endpoint (internal implementation, public via index.js)
 // chatSend() is the only public function for the chat module.
 //
-// Mock mode: handled inline — no external fixture file needed for chat.
+// Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
+// contracts.js. Mock mode handled inline — no external fixture file needed.
 // Real mode: posts to /chat/send via apiClient (RealTransport stub).
 // ============================================================================
 
-import { getApiConfig }          from "../config.js";
-import { getSessionId }          from "../session.js";
+import { getApiConfig }                from "../config.js";
+import { getSessionId }                from "../session.js";
 import { normalizeError, ERROR_CODES } from "../errors.js";
-import { apiClient }             from "../client.js";
-import { mapChatResponse }       from "../mappers/chat.js";
+import { apiClient }                   from "../client.js";
+import { mapChatResponse }             from "../mappers/chat.js";
+// Explicit contract reference — keeps this endpoint anchored to the central shapes.
+import { ENVELOPES }                   from "../contracts.js"; // eslint-disable-line no-unused-vars
 
 const MOCK_RESPONSES = [
   "Entendido. Processando o contexto fornecido. Me dê mais detalhes se quiser que eu elabore.",

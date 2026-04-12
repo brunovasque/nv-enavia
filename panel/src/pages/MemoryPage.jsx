@@ -13,14 +13,29 @@ export default function MemoryPage() {
   const [activeFilter, setActiveFilter] = useState(MEMORY_FILTERS.ALL);
   const [memory, setMemory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
+    setFetchError(null);
     fetchMemory({ _mockState: currentState }).then((r) => {
-      setMemory(r.ok ? r.data.memory : null);
+      if (r.ok) {
+        setMemory(r.data.memory);
+      } else {
+        setMemory(null);
+        setFetchError(r.error?.message ?? "Erro ao carregar memória.");
+      }
       setLoading(false);
     });
   }, [currentState]);
+
+  if (fetchError) {
+    return (
+      <div style={{ padding: "40px 24px", color: "#EF4444", fontSize: "13px" }}>
+        ⚠ {fetchError}
+      </div>
+    );
+  }
 
   if (loading || !memory) {
     return (
