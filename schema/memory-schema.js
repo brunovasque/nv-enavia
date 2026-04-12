@@ -25,7 +25,28 @@
 // ---------------------------------------------------------------------------
 // MEMORY_TYPES — tipos canônicos de memória
 //
-// Mapeados diretamente aos 5 blocos de memória da CONSTITUIÇÃO.
+// Mapeados diretamente aos 5 tipos implementados.
+//
+// NOTA — Absorção deliberada da "Memória 5" (conhecimento derivado):
+//   A CONSTITUIÇÃO descreve 6 blocos de memória permanente:
+//     Memória 1 — Identidade do usuário   → user_profile
+//     Memória 2 — Projetos                → project
+//     Memória 3 — Regras permanentes      → canonical_rules
+//     Memória 4 — Histórico operacional   → operational_history
+//     Memória 5 — Conhecimento derivado   → (sem tipo próprio — absorvido)
+//     Memória 6 — Estado vivo             → live_context
+//
+//   A implementação prática ficou com 5 tipos (PM1–PM10).
+//   A "Memória 5 — conhecimento derivado" (lições aprendidas, padrões
+//   recorrentes, atalhos confiáveis, riscos históricos) foi absorvida
+//   deliberadamente por:
+//     - canonical_rules      — lições que viram regras permanentes aprovadas
+//     - operational_history  — padrões e histórico rastreável de ciclos
+//
+//   Isso foi uma decisão de design intencional durante a PM1–PM10:
+//   evitar tipo extra com semântica redundante. Não há contrato paralelo.
+//   Se o conhecimento derivado precisar de tipo próprio no futuro, criar
+//   "learned_knowledge" como novo MEMORY_TYPE com revisão humana formal.
 // ---------------------------------------------------------------------------
 const MEMORY_TYPES = {
   USER_PROFILE:        "user_profile",

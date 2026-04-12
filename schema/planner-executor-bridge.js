@@ -48,6 +48,8 @@
 // PM8 APENAS — não misturar com PM9+.
 // ============================================================================
 
+import { GATE_STATUS } from "./planner-approval-gate.js";
+
 // ---------------------------------------------------------------------------
 // Constantes públicas
 // ---------------------------------------------------------------------------
@@ -132,9 +134,9 @@ function _reasonForBlock(gate) {
     : "";
 
   switch (gate.gate_status) {
-    case "approval_required":
+    case GATE_STATUS.APPROVAL_REQUIRED:
       return `Execução bloqueada: plano aguardando aprovação humana formal${gateReason}.`;
-    case "rejected":
+    case GATE_STATUS.REJECTED:
       return `Execução bloqueada: plano rejeitado pelo gate — revisar e gerar novo plano antes de prosseguir${gateReason}.`;
     default:
       return `Execução bloqueada pelo gate (${gate.gate_status})${gateReason}.`;
@@ -148,9 +150,9 @@ function _reasonForBlock(gate) {
 // ---------------------------------------------------------------------------
 function _nextActionForBlock(gate) {
   switch (gate.gate_status) {
-    case "approval_required":
+    case GATE_STATUS.APPROVAL_REQUIRED:
       return "Aguardar aprovação humana formal — execução suspensa até decisão explícita.";
-    case "rejected":
+    case GATE_STATUS.REJECTED:
       return "Revisar o plano e gerar nova versão antes de solicitar execução.";
     default:
       return "Verificar o estado do gate e resolver o bloqueio antes de prosseguir.";
