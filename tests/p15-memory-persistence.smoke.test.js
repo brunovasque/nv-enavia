@@ -108,7 +108,7 @@ async function testHandlerShape() {
 
   // telemetry P15
   assert(json.telemetry !== undefined,                             "json.telemetry presente");
-  assert(json.telemetry.pipeline === "PM4→PM5→PM6→PM7→PM8→PM9→P15",
+  assert(json.telemetry.pipeline === "PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15",
     "telemetry.pipeline reflete P15");
   assert(Array.isArray(json.telemetry.consolidation_persisted),    "telemetry.consolidation_persisted é array");
 }
