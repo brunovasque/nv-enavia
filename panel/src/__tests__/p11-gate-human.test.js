@@ -238,36 +238,34 @@ describe("P11 PROVA 6 — PlanPage: gateAction local, handlers, effectiveGate", 
 // PROVA 7 — Nenhuma execução real disparada
 // =============================================================================
 
-describe("P11 PROVA 7 — Nenhuma execução real: handleGateApprove/Reject não chama fetch", () => {
-  it("handleGateApprove não contém fetch, chatSend ou bridge (apenas setGateAction)", async () => {
+describe("P11 PROVA 7 — Gate handlers: setGateAction + P14 postDecision (sem fetch direto ou chatSend)", () => {
+  it("handleGateApprove contém setGateAction e postDecision (P14), sem fetch direto ou chatSend", async () => {
     const mod = await import("../pages/PlanPage.jsx");
     const src = mod.default.toString();
 
     // Extrair apenas a função handleGateApprove.
-    // 300 chars é suficiente para cobrir qualquer implementação razoável
-    // de uma função de 1-2 linhas com setGateAction.
     const approveIdx = src.indexOf("handleGateApprove");
-    const approveSection = src.slice(approveIdx, approveIdx + 300);
+    const approveSection = src.slice(approveIdx, approveIdx + 500);
 
-    // Deve conter apenas setGateAction
+    // Deve conter setGateAction (P11) e postDecision (P14)
     expect(approveSection).toContain("setGateAction");
-    // NÃO deve conter fetch, chatSend ou bridge
+    expect(approveSection).toContain("postDecision");
+    // NÃO deve conter fetch direto ou chatSend
     expect(approveSection).not.toContain("fetch(");
     expect(approveSection).not.toContain("chatSend");
-    expect(approveSection).not.toContain("bridge");
   });
 
-  it("handleGateReject não contém fetch, chatSend ou bridge (apenas setGateAction)", async () => {
+  it("handleGateReject contém setGateAction e postDecision (P14), sem fetch direto ou chatSend", async () => {
     const mod = await import("../pages/PlanPage.jsx");
     const src = mod.default.toString();
 
     const rejectIdx = src.indexOf("handleGateReject");
-    const rejectSection = src.slice(rejectIdx, rejectIdx + 300);
+    const rejectSection = src.slice(rejectIdx, rejectIdx + 500);
 
     expect(rejectSection).toContain("setGateAction");
+    expect(rejectSection).toContain("postDecision");
     expect(rejectSection).not.toContain("fetch(");
     expect(rejectSection).not.toContain("chatSend");
-    expect(rejectSection).not.toContain("bridge");
   });
 });
 

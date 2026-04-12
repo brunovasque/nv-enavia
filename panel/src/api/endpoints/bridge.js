@@ -114,6 +114,92 @@ export async function sendBridge(executorPayload) {
  * @param {string} bridgeId — bridge_id from the sendBridge result
  * @returns {Promise<import("../contracts.js").ResponseEnvelope>}
  */
+// ============================================================================
+// P14 — postDecision
+//
+// Persists a human decision (approved / rejected) linked to an execution
+// via bridge_id. Calls POST /execution/decision on the worker, which writes
+// the record to KV for durable, canonical decision history.
+//
+// Fire-and-forget from the caller's perspective — the UI should not block
+// on this; gate action is applied optimistically via local React state.
+// ============================================================================
+
+/**
+ * Persist a human gate decision to the worker's KV-backed decision history.
+ *
+ * @param {object} params
+ * @param {"approved"|"rejected"} params.decision — decision type
+ * @param {string|null}           params.bridge_id — bridge_id if available
+ * @param {string}                [params.decided_by] — actor (default: "human")
+ * @param {string|null}           [params.context] — optional human-readable context
+ * @returns {Promise<import("../contracts.js").ResponseEnvelope>}
+ */
+export async function postDecision({ decision, bridge_id, decided_by, context }) {
+  const t0 = Date.now();
+  const { mode } = getApiConfig();
+
+  if (mode !== "real") {
+    // Mock mode: simulate decision persistence
+    await new Promise((r) => setTimeout(r, 100 + Math.random() * 100));
+    return {
+      ok: true,
+      data: {
+        decision: {
+          decision_id: `mock-decision-${Date.now()}`,
+          decision,
+          bridge_id: bridge_id || null,
+          decided_at: new Date().toISOString(),
+          decided_by: decided_by || "human",
+          context: context || null,
+        },
+      },
+      meta: { durationMs: Date.now() - t0 },
+    };
+  }
+
+  if (decision !== "approved" && decision !== "rejected") {
+    return normalizeError(
+      {
+        code: ERROR_CODES.BRIDGE_SEND_FAILURE,
+        message: "decision inválido — valores aceitos: 'approved', 'rejected'.",
+      },
+      "bridge",
+    );
+  }
+
+  try {
+    const res = await apiClient.request("/execution/decision", {
+      method: "POST",
+      body: {
+        decision,
+        bridge_id: bridge_id || null,
+        decided_by: decided_by || "human",
+        context: context || null,
+      },
+    });
+
+    if (!res.ok || !res.data?.ok) {
+      const rawErr = res.data?.error ?? res.data?.detail;
+      const errMsg = typeof rawErr === "string"
+        ? rawErr
+        : "Falha ao persistir decisão.";
+      return normalizeError(
+        { code: ERROR_CODES.BRIDGE_SEND_FAILURE, message: errMsg },
+        "bridge",
+      );
+    }
+
+    return {
+      ok: true,
+      data: res.data.decision ?? null,
+      meta: { durationMs: Date.now() - t0 },
+    };
+  } catch (err) {
+    return normalizeError(err, "bridge");
+  }
+}
+
 export async function fetchBridgeStatus(bridgeId) {
   const t0 = Date.now();
   const { mode } = getApiConfig();

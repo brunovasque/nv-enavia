@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
@@ -147,7 +147,7 @@ export default function PlanPage() {
     if (!executorPayload) {
       setBridgeSendStatus("error");
       setBridgeSendError("Bridge payload ausente no plano — não é possível enviar.");
-      return;
+      return null;
     }
 
     setBridgeSendStatus("sending");
@@ -157,9 +157,11 @@ export default function PlanPage() {
     if (result.ok) {
       setBridgeSendStatus("sent");
       setBridgeSendResult(result.data);
+      return result.data;
     } else {
       setBridgeSendStatus("error");
       setBridgeSendError(result.error?.message ?? "Falha ao enviar bridge payload.");
+      return null;
     }
   }, [plannerSnapshot]);
 
@@ -183,11 +185,16 @@ export default function PlanPage() {
 
   function handleGateApprove() {
     setGateAction("approved");
-    // P12: trigger real bridge send after gate approval
-    handleBridgeSend();
+    // P12: trigger real bridge send, then P14: persist approval with bridge_id
+    handleBridgeSend().then((bridgeData) => {
+      const bridgeId = bridgeData?.bridge_id ?? null;
+      postDecision({ decision: "approved", bridge_id: bridgeId, context: "Gate aprovado pelo operador" });
+    });
   }
   function handleGateReject() {
     setGateAction("blocked");
+    // P14: persist rejection decision (fire-and-forget — no bridge_id since gate was blocked)
+    postDecision({ decision: "rejected", bridge_id: null, context: "Gate rejeitado pelo operador" });
   }
 
   // P11 — gate efetivo: sobrepõe state do gate com decisão local do operador
