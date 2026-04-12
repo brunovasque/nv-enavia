@@ -3043,10 +3043,48 @@ async function handlePlannerRun(request, env) {
     // O memory_context encapsula um resumo mínimo e estrutural das memórias lidas.
     // É injetado no plannerContext e flui explicitamente para PM4 e adiante.
     // Os itens são limitados a 5 para evitar vazamento excessivo de conteúdo.
+
+    // P17 — Prioridade de memória em runtime (canônica > estado vivo > operacional recente)
+    // Classifica os resultados já ordenados por PM3 nas 3 camadas canônicas do contrato.
+    // Expõe evidência auditável sem reescrever PM3 — apenas sela e explicita a regra.
+    const _P17_TIER_CANONICAL  = "canonical";  // canonical_rules + is_canonical=true
+    const _P17_TIER_LIVE       = "live";        // live_context
+    const _P17_TIER_OPERATIONAL = "operational"; // operational_history (recente)
+
+    function _p17Tier(mem) {
+      if (mem.is_canonical === true || mem.memory_type === "canonical_rules") return _P17_TIER_CANONICAL;
+      if (mem.memory_type === "live_context")        return _P17_TIER_LIVE;
+      if (mem.memory_type === "operational_history") return _P17_TIER_OPERATIONAL;
+      return null; // outros tipos não pertencem às 3 camadas P17
+    }
+
+    // Ordem de prioridade P17 (índice menor = maior prioridade)
+    const _P17_ORDER = [_P17_TIER_CANONICAL, _P17_TIER_LIVE, _P17_TIER_OPERATIONAL];
+
+    // Calcula priority_applied a partir dos resultados já ordenados de PM3
+    const _p17Results = memReadRaw.ok ? memReadRaw.results : [];
+    const _p17TypesByTier = { canonical: [], live: [], operational: [] };
+    for (const mem of _p17Results) {
+      const tier = _p17Tier(mem);
+      if (tier && _p17TypesByTier[tier] && !_p17TypesByTier[tier].includes(mem.memory_type)) {
+        _p17TypesByTier[tier].push(mem.memory_type);
+      }
+    }
+
+    // Winning tier: first tier (in P17 order) that has at least one memory
+    const _p17WinningTier = _P17_ORDER.find((t) => _p17TypesByTier[t].length > 0) || null;
+
+    const priority_applied = {
+      order:          _P17_ORDER,
+      types_by_tier:  _p17TypesByTier,
+      winning_tier:   _p17WinningTier,
+    };
+
     const memory_context = {
-      applied:  memReadRaw.ok && memReadRaw.count > 0,
-      count:    memoryReadAudit.count,
-      types:    memoryReadAudit.types,
+      applied:          memReadRaw.ok && memReadRaw.count > 0,
+      count:            memoryReadAudit.count,
+      types:            memoryReadAudit.types,
+      priority_applied, // P17 — prioridade canônica de runtime explícita e auditável
       items:    memReadRaw.ok
         ? memReadRaw.results.slice(0, 5).map((m) => ({
             memory_id:    m.memory_id,
