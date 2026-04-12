@@ -1,7 +1,7 @@
 // =============================================================================
-// ENAVIA Panel — P12 bridge real smoke tests
+// ENAVIA Panel — P12 bridge panel-only smoke tests
 //
-// Cobre o contrato P12:
+// Cobre o contrato P12 (escopo painel):
 //   1. sendBridge valida executor_payload — rejeita payload inválido
 //   2. sendBridge aceita payload válido em mock mode
 //   3. PlanPage handleGateApprove dispara bridge send (P12 lifecycle)
@@ -11,9 +11,10 @@
 //   7. PlanPage reseta bridge state em novo ciclo (visibleState/plannerSnapshot change)
 //   8. sendBridge retorna shape correto em mock mode
 //   9. ERROR_CODES inclui BRIDGE_SEND_FAILURE
-//  10. Worker handler handlePlannerBridge existe no nv-enavia.js
-//  11. Worker rota POST /planner/bridge registrada
-//  12. Nenhum desvio para execução mais ampla fora da ponte
+//  10. Nenhum desvio para P13+ no painel
+//
+// Escopo: apenas código de painel — sem leitura de nv-enavia.js.
+// Validação do worker fica reservada para a PR worker-only.
 //
 // Run with:
 //   npm test   (from panel/)
@@ -34,10 +35,6 @@ const PLAN_PAGE_SRC = readFileSync(
 );
 const BRIDGE_ENDPOINT_SRC = readFileSync(
   resolve(import.meta.dirname, "../api/endpoints/bridge.js"),
-  "utf8"
-);
-const WORKER_SRC = readFileSync(
-  resolve(import.meta.dirname, "../../../nv-enavia.js"),
   "utf8"
 );
 const API_INDEX_SRC = readFileSync(
@@ -257,54 +254,9 @@ describe("P12 PROVA 9 — ERROR_CODES inclui BRIDGE_SEND_FAILURE", () => {
 });
 
 // =============================================================================
-// PROVA 10 — Worker handlePlannerBridge existe
+// PROVA 10 — Nenhum desvio para P13+ no painel
 // =============================================================================
-describe("P12 PROVA 10 — Worker: handlePlannerBridge definido em nv-enavia.js", () => {
-  it("handlePlannerBridge existe como função async", () => {
-    expect(WORKER_SRC).toContain("async function handlePlannerBridge");
-  });
-
-  it("handlePlannerBridge valida EXECUTOR binding", () => {
-    expect(WORKER_SRC).toContain("env.EXECUTOR");
-    // Valida que o handler verifica o binding
-    const idx = WORKER_SRC.indexOf("async function handlePlannerBridge");
-    const section = WORKER_SRC.slice(idx, idx + 2000);
-    expect(section).toContain("EXECUTOR");
-  });
-
-  it("handlePlannerBridge valida executor_payload shape", () => {
-    const idx = WORKER_SRC.indexOf("async function handlePlannerBridge");
-    const section = WORKER_SRC.slice(idx, idx + 2000);
-    expect(section).toContain("executor_payload");
-    expect(section).toContain("version");
-    expect(section).toContain("source");
-    expect(section).toContain("steps");
-  });
-
-  it("handlePlannerBridge encaminha ao executor via service binding", () => {
-    const idx = WORKER_SRC.indexOf("async function handlePlannerBridge");
-    const section = WORKER_SRC.slice(idx, idx + 3000);
-    expect(section).toContain('env.EXECUTOR.fetch');
-  });
-});
-
-// =============================================================================
-// PROVA 11 — Worker rota POST /planner/bridge registrada
-// =============================================================================
-describe("P12 PROVA 11 — Worker: rota POST /planner/bridge registrada", () => {
-  it("rota /planner/bridge existe no worker", () => {
-    expect(WORKER_SRC).toContain('url.pathname === "/planner/bridge"');
-  });
-
-  it("rota chama handlePlannerBridge", () => {
-    expect(WORKER_SRC).toContain("handlePlannerBridge(request, env)");
-  });
-});
-
-// =============================================================================
-// PROVA 12 — Nenhum desvio para execução mais ampla
-// =============================================================================
-describe("P12 PROVA 12 — Escopo fechado: sem desvio para P13+ ou execução ampla", () => {
+describe("P12 PROVA 10 — Escopo fechado: sem desvio para P13+ ou execução ampla", () => {
   it("PlanPage NÃO importa fetchExecution", () => {
     expect(PLAN_PAGE_SRC).not.toContain("fetchExecution");
   });
@@ -313,17 +265,6 @@ describe("P12 PROVA 12 — Escopo fechado: sem desvio para P13+ ou execução am
     expect(BRIDGE_ENDPOINT_SRC).not.toContain("timeline");
     expect(BRIDGE_ENDPOINT_SRC).not.toContain("observability");
     expect(BRIDGE_ENDPOINT_SRC).not.toContain("fetchExecution");
-  });
-
-  it("handlePlannerBridge NÃO contém lógica de execução ampla (P13)", () => {
-    const idx = WORKER_SRC.indexOf("async function handlePlannerBridge");
-    const section = WORKER_SRC.slice(idx, idx + 3000);
-    // Should NOT contain execution timeline, status tracking beyond bridge
-    expect(section).not.toContain("timeline");
-    expect(section).not.toContain("observability");
-    // Should contain only bridge-scoped terms
-    expect(section).toContain("bridge");
-    expect(section).toContain("executor_payload");
   });
 
   it("sendBridge é a única função nova exportada em bridge.js", () => {
