@@ -177,7 +177,7 @@ export default function PlanPage() {
       setTrackingData(result.data);
     } else {
       setTrackingStatus(TRACKING_STATUS.ERROR);
-      setTrackingError(result.error?.message ?? "Falha ao consultar status do executor.");
+      setTrackingError(result.error?.message ?? "Não foi possível consultar o status do executor. Tente novamente.");
     }
   }, [bridgeSendResult]);
 

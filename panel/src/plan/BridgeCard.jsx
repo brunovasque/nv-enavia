@@ -343,7 +343,7 @@ function OperationalTracking({
           {derived?.detail && (
             <p style={s.sendDetail}>Status: {derived.detail}</p>
           )}
-          {derived?.queriedAt && (
+          {derived?.queriedAt && !isNaN(new Date(derived.queriedAt).getTime()) && (
             <p style={s.sendDetail}>
               Consultado: {new Date(derived.queriedAt).toLocaleTimeString("pt-BR")}
             </p>
