@@ -361,7 +361,7 @@ describe("ITEM 12 — P9 rehydration: snapshot survives reload via sessionStorag
     sessionStorage.setItem(
       PLANNER_STORAGE_KEY,
       JSON.stringify({
-        realState: "ready",          // matches PLAN_STATUS.READY
+        realState: "ready", // matches PLAN_STATUS.READY
         lastChatText: "Ativar pipeline tático",
         plannerSnapshot: SYNTHETIC_BACKEND_PLANNER,
       })
@@ -392,10 +392,7 @@ describe("ITEM 12 — P9 rehydration: snapshot survives reload via sessionStorag
     );
 
     vi.resetModules();
-    const [{ mapPlannerSnapshot }, { isValidPlannerSnapshot }] = await Promise.all([
-      import("../api/mappers/plan.js"),
-      import("../api/mappers/plan.js"),
-    ]);
+    const { mapPlannerSnapshot, isValidPlannerSnapshot } = await import("../api/mappers/plan.js");
 
     const parsed = JSON.parse(sessionStorage.getItem("enavia_planner_state"));
     const snapshot = parsed.plannerSnapshot;
