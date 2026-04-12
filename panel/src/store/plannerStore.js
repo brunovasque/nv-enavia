@@ -27,6 +27,9 @@
 import { useSyncExternalStore } from "react";
 import { PLAN_STATUS } from "../api";
 
+// ── Valid status set — used to guard setDemoOverride ─────────────────────────
+const _VALID_STATUSES = new Set(Object.values(PLAN_STATUS));
+
 // ── Singleton state ──────────────────────────────────────────────────────────
 
 let _realState    = PLAN_STATUS.EMPTY;
@@ -84,8 +87,15 @@ function _subscribe(listener) {
  * @param {string} text — texto enviado pelo usuário (fallback visual, não payload homologado)
  */
 export function onChatSuccess(text) {
-  _realState    = PLAN_STATUS.READY;
-  _lastChatText = typeof text === "string" ? text.trim() || null : null;
+  // Transition: any realState → READY after a successful chat round-trip.
+  // This is intentional even from COMPLETE: a new instruction starts a new cycle.
+  _realState = PLAN_STATUS.READY;
+
+  // Sanitize: keep only non-empty trimmed strings to avoid polluting the visual
+  // fallback with whitespace-only or non-string values.
+  const trimmed = typeof text === "string" ? text.trim() : "";
+  _lastChatText = trimmed.length > 0 ? trimmed : null;
+
   _rebuild();
   _notify();
 }
@@ -100,6 +110,9 @@ export function onChatSuccess(text) {
  * @param {string} status — um dos valores de PLAN_STATUS
  */
 export function setDemoOverride(status) {
+  // Guard: silently ignore any value that is not a known PLAN_STATUS.
+  // Prevents accidental string typos or external calls from corrupting visibleState.
+  if (!_VALID_STATUSES.has(status)) return;
   _demoOverride = status;
   _rebuild();
   _notify();

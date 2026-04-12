@@ -74,9 +74,14 @@ export default function PlanPage() {
   const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
+    // Stale-response guard: if visibleState changes before the previous fetch
+    // resolves, the cleanup sets stale=true and the old .then() becomes a no-op.
+    let stale = false;
+
     setLoading(true);
     setFetchError(null);
     fetchPlan({ _mockState: visibleState }).then((r) => {
+      if (stale) return;
       if (r.ok) {
         setPlan(r.data.plan);
       } else {
@@ -85,6 +90,8 @@ export default function PlanPage() {
       }
       setLoading(false);
     });
+
+    return () => { stale = true; };
   }, [visibleState]);
 
   if (loading) {
