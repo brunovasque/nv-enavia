@@ -4,7 +4,14 @@
 //
 // Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
 // contracts.js. Mock mode handled inline — no external fixture file needed.
-// Real mode: posts to /chat/send via apiClient (RealTransport stub).
+//
+// Real mode: posts to /planner/run. The backend returns a structured planner
+// payload, NOT a ready-made chat text. The chat content displayed to the user
+// is derived locally from response.planner.canonicalPlan.next_action — a real
+// field generated deterministically by PM6. This derivation is transparent:
+// the text was NOT returned as a chat message by the backend.
+// The raw response.planner is returned as plannerSnapshot so the caller can
+// pass it to plannerStore for persistence as-is.
 // ============================================================================
 
 import { getApiConfig }                from "../config.js";
@@ -51,11 +58,43 @@ async function mockChatSend(text, t0) {
     { role: "enavia", content, timestamp: new Date().toISOString(), sessionId },
     sessionId,
   );
-  return { ok: true, data, meta: { durationMs: Date.now() - t0 } };
+  return { ok: true, data, plannerSnapshot: null, meta: { durationMs: Date.now() - t0 } };
+}
+
+/**
+ * Derive a human-readable chat text from the structured planner response.
+ *
+ * TRANSPARENCY: the backend /planner/run does NOT return a chat-ready text.
+ * This function derives the chat bubble content from real backend fields:
+ *   1. canonicalPlan.next_action (PM6 deterministic output) — preferred
+ *   2. canonicalPlan.reason (PM6 reasoning summary) — fallback
+ *   3. Generic acknowledgement — last resort
+ *
+ * The returned string is displayed as Enavia's reply in the chat. It is NOT
+ * a fabricated response — it uses real data from the backend pipeline.
+ *
+ * @param {object} planner - raw response.planner from /planner/run
+ * @returns {string}
+ */
+function _deriveChatContent(planner) {
+  const cp = planner?.canonicalPlan;
+  if (typeof cp?.next_action === "string" && cp.next_action.length > 0) {
+    return cp.next_action;
+  }
+  if (typeof cp?.reason === "string" && cp.reason.length > 0) {
+    return cp.reason;
+  }
+  return "Instrução recebida e processada pelo planner. Consulte o plano gerado na aba Plano.";
 }
 
 /**
  * Send a chat message and receive an Enavia response.
+ *
+ * In real mode, posts to /planner/run. The response includes:
+ *   - data: ChatResponse shape (role, content, timestamp, sessionId)
+ *     where content is derived from planner.canonicalPlan.next_action
+ *   - plannerSnapshot: raw response.planner for storage in plannerStore
+ *
  * @param {string} text
  * @param {object} [opts]
  * @returns {Promise<SuccessEnvelope|ErrorEnvelope>}
@@ -67,19 +106,47 @@ export async function chatSend(text, opts = {}) {
   if (mode !== "real") return mockChatSend(text, t0);
 
   try {
-    const res = await apiClient.request("/chat/send", {
+    const res = await apiClient.request("/planner/run", {
       method: "POST",
-      body: { text },
+      body: { message: text, session_id: getSessionId() },
       ...opts,
     });
-    const data = mapChatResponse(res.data, getSessionId());
+
+    if (!res.ok || !res.data?.ok) {
+      // Extract error message from backend response — may be in .error or .detail.
+      // Validate it's a string before using; fall back to generic message.
+      const rawErr = res.data?.error ?? res.data?.detail;
+      const errMsg = typeof rawErr === "string" ? rawErr : "Falha no pipeline do planner.";
+      return normalizeError(
+        { code: ERROR_CODES.PLANNER_UNAVAILABLE, message: errMsg },
+        "chat",
+      );
+    }
+
+    const planner = res.data.planner;
+
+    // Derive chat content transparently from real backend fields.
+    const content = _deriveChatContent(planner);
+    const sessionId = getSessionId();
+
+    const data = mapChatResponse(
+      { role: "enavia", content, timestamp: new Date().toISOString(), sessionId },
+      sessionId,
+    );
+
     if (!data) {
       return normalizeError(
         { code: ERROR_CODES.INVALID_RESPONSE, message: "Resposta inválida do servidor." },
         "chat",
       );
     }
-    return { ok: true, data, meta: { durationMs: Date.now() - t0 } };
+
+    return {
+      ok: true,
+      data,
+      plannerSnapshot: planner ?? null,
+      meta: { durationMs: Date.now() - t0 },
+    };
   } catch (err) {
     return normalizeError(err, "chat");
   }

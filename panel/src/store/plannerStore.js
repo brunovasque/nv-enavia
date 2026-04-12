@@ -5,10 +5,11 @@
 //
 // Interface pública mínima — quem pode chamar cada função:
 //
-//   onChatSuccess(text)      → useChatState.js apenas, após chatSend OK
-//   setDemoOverride(status)  → PlanHeader.jsx apenas (via prop de PlanPage)
-//   clearDemoOverride()      → PlanHeader.jsx apenas (via prop de PlanPage)
-//   usePlannerStore()        → PlanPage.jsx apenas
+//   onChatSuccess(text, plannerSnapshot)
+//                                → useChatState.js apenas, após chatSend OK
+//   setDemoOverride(status)      → PlanHeader.jsx apenas (via prop de PlanPage)
+//   clearDemoOverride()          → PlanHeader.jsx apenas (via prop de PlanPage)
+//   usePlannerStore()            → PlanPage.jsx apenas
 //
 // Regras de visibilidade:
 //   - Componentes visuais (PlanHeader, PlanSteps, cards) não importam este módulo.
@@ -19,8 +20,15 @@
 //   visibleState = demoOverride ?? realState
 //   Estado real é soberano. Override é camada visual temporária, reversível.
 //
+// plannerSnapshot contract:
+//   - Armazena o payload BRUTO (response.planner) vindo do backend.
+//   - O store NÃO transforma, adapta ou enriquece o snapshot.
+//   - A adaptação para UI é feita por mapPlannerSnapshot() em mappers/plan.js,
+//     chamada exclusivamente no momento do render pela PlanPage.
+//   - O store é passante: guarda bruto, expõe bruto.
+//
 // Persistência — chave: "enavia_planner_state"
-//   Shape persistido: { realState, lastChatText }
+//   Shape persistido: { realState, lastChatText, plannerSnapshot }
 //   Campos NÃO persistidos: demoOverride (visual temporário), visibleState (derivado).
 //   demoOverride não reidrata. No reload, visibleState == realState reidratado.
 //
@@ -29,6 +37,9 @@
 //   - realState fora do enum → chave removida, fallback EMPTY.
 //   - estrutura parcial/incompleta → chave removida, fallback EMPTY.
 //   - lastChatText não-string → descartado silenciosamente (null), chave mantida.
+//   - plannerSnapshot inválido → descartado silenciosamente (null), chave mantida.
+//     Validação mínima: typeof === "object", !== null, pelo menos um sub-objeto
+//     canônico presente (classification|canonicalPlan|gate|bridge|memoryConsolidation|outputMode).
 //   - sessionStorage inacessível → capturado por try/catch, fallback EMPTY.
 //   Nunca crash. Nunca hidratação ambígua.
 //
@@ -41,6 +52,7 @@
 
 import { useSyncExternalStore } from "react";
 import { PLAN_STATUS } from "../api";
+import { isValidPlannerSnapshot } from "../api/mappers/plan.js";
 
 // ── Storage key — never hardcoded outside this file ──────────────────────────
 export const PLANNER_STORAGE_KEY = "enavia_planner_state";
@@ -70,6 +82,10 @@ function _readFromStorage() {
       lastChatText: typeof parsed.lastChatText === "string" && parsed.lastChatText.length > 0
         ? parsed.lastChatText
         : null,
+      // plannerSnapshot: validate minimum structure; discard if invalid.
+      plannerSnapshot: isValidPlannerSnapshot(parsed.plannerSnapshot)
+        ? parsed.plannerSnapshot
+        : null,
     };
   } catch {
     // JSON.parse error or sessionStorage unavailable — clean up if possible.
@@ -78,11 +94,11 @@ function _readFromStorage() {
   }
 }
 
-function _writeToStorage(realState, lastChatText) {
+function _writeToStorage(realState, lastChatText, plannerSnapshot) {
   try {
     sessionStorage.setItem(
       PLANNER_STORAGE_KEY,
-      JSON.stringify({ realState, lastChatText }),
+      JSON.stringify({ realState, lastChatText, plannerSnapshot }),
     );
   } catch { /* sessionStorage unavailable — silent, state is still in-memory */ }
 }
@@ -91,26 +107,29 @@ function _writeToStorage(realState, lastChatText) {
 
 const _hydrated = _readFromStorage();
 
-let _realState    = _hydrated ? _hydrated.realState    : PLAN_STATUS.EMPTY;
-let _demoOverride = null; // never persisted — always starts as null
-let _lastChatText = _hydrated ? _hydrated.lastChatText : null;
+let _realState         = _hydrated ? _hydrated.realState         : PLAN_STATUS.EMPTY;
+let _demoOverride      = null; // never persisted — always starts as null
+let _lastChatText      = _hydrated ? _hydrated.lastChatText      : null;
+let _plannerSnapshot   = _hydrated ? _hydrated.plannerSnapshot   : null;
 
 // ── Snapshot cache ───────────────────────────────────────────────────────────
 // useSyncExternalStore exige referência estável quando o estado não mudou.
 
 let _snapshot = {
-  realState:    _realState,
-  demoOverride: _demoOverride,
-  visibleState: _demoOverride ?? _realState,
-  lastChatText: _lastChatText,
+  realState:        _realState,
+  demoOverride:     _demoOverride,
+  visibleState:     _demoOverride ?? _realState,
+  lastChatText:     _lastChatText,
+  plannerSnapshot:  _plannerSnapshot,
 };
 
 function _rebuild() {
   _snapshot = {
-    realState:    _realState,
-    demoOverride: _demoOverride,
-    visibleState: _demoOverride ?? _realState,
-    lastChatText: _lastChatText,
+    realState:        _realState,
+    demoOverride:     _demoOverride,
+    visibleState:     _demoOverride ?? _realState,
+    lastChatText:     _lastChatText,
+    plannerSnapshot:  _plannerSnapshot,
   };
 }
 
@@ -144,8 +163,9 @@ function _subscribe(listener) {
  *     O visibleState continua sendo o override até clearDemoOverride() ser chamado.
  *
  * @param {string} text — texto enviado pelo usuário (fallback visual, não payload homologado)
+ * @param {object|null} [plannerSnapshot] — raw response.planner from backend (stored as-is, never adapted)
  */
-export function onChatSuccess(text) {
+export function onChatSuccess(text, plannerSnapshot) {
   // Transition: any realState → READY after a successful chat round-trip.
   // This is intentional even from COMPLETE: a new instruction starts a new cycle.
   _realState = PLAN_STATUS.READY;
@@ -155,9 +175,13 @@ export function onChatSuccess(text) {
   const trimmed = typeof text === "string" ? text.trim() : "";
   _lastChatText = trimmed.length > 0 ? trimmed : null;
 
+  // Store raw planner snapshot as-is. Validate minimum structure to avoid
+  // persisting garbage. The store does NOT transform/adapt the snapshot.
+  _plannerSnapshot = isValidPlannerSnapshot(plannerSnapshot) ? plannerSnapshot : null;
+
   // Persist real state. demoOverride is intentionally excluded — it is a
   // transient visual layer and must never survive a reload.
-  _writeToStorage(_realState, _lastChatText);
+  _writeToStorage(_realState, _lastChatText, _plannerSnapshot);
 
   _rebuild();
   _notify();
@@ -198,7 +222,7 @@ export function clearDemoOverride() {
  * Usado exclusivamente por PlanPage.jsx.
  *
  * Retorna:
- *   { visibleState, realState, demoOverride, lastChatText }
+ *   { visibleState, realState, demoOverride, lastChatText, plannerSnapshot }
  *
  * visibleState = demoOverride ?? realState  (soberano para a UI)
  * lastChatText = fallback visual temporário de apresentação.
@@ -206,6 +230,8 @@ export function clearDemoOverride() {
  *   - NÃO representa resultado real do planner.
  *   - Serve apenas para o usuário reconhecer a origem da instrução
  *     enquanto não há plano real com request.text próprio.
+ * plannerSnapshot = raw response.planner from backend (bruto, sem adaptação).
+ *   - NÃO é shape de UI. Adaptação é feita por mapPlannerSnapshot() em mappers/plan.js.
  */
 export function usePlannerStore() {
   return useSyncExternalStore(_subscribe, _getSnapshot);
