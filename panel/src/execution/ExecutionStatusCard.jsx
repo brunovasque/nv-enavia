@@ -32,7 +32,7 @@ function MetricRow({ label, value, mono, valueColor }) {
 export default function ExecutionStatusCard({ execution }) {
   if (!execution) return null;
 
-  const { metrics, status, planId } = execution;
+  const { metrics, status, planId, id } = execution;
   const progressPct =
     metrics.stepsTotal > 0
       ? Math.round((metrics.stepsDone / metrics.stepsTotal) * 100)
@@ -97,8 +97,8 @@ export default function ExecutionStatusCard({ execution }) {
             mono
           />
         )}
-        <MetricRow label="Plano" value={execution.planId} mono />
-        <MetricRow label="Execução" value={execution.id} mono />
+        <MetricRow label="Plano" value={planId} mono />
+        <MetricRow label="Execução" value={id} mono />
       </div>
     </div>
   );
