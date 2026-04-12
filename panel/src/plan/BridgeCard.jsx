@@ -1,5 +1,6 @@
 // ============================================================================
 // BridgeCard — handoff entre módulos: estado da ponte, destino, payload
+// P12: reflete status de envio real da bridge (sending/sent/error)
 // ============================================================================
 
 const BRIDGE_META = {
@@ -40,6 +41,31 @@ const BRIDGE_META = {
   },
 };
 
+// P12 — send status visual metadata
+const BRIDGE_SEND_META = {
+  sending: {
+    label: "Enviando bridge…",
+    color: "#F59E0B",
+    bg: "rgba(245,158,11,0.08)",
+    border: "rgba(245,158,11,0.25)",
+    icon: "⟳",
+  },
+  sent: {
+    label: "Bridge enviada ✓",
+    color: "#10B981",
+    bg: "rgba(16,185,129,0.08)",
+    border: "rgba(16,185,129,0.25)",
+    icon: "✓",
+  },
+  error: {
+    label: "Falha no envio",
+    color: "#EF4444",
+    bg: "rgba(239,68,68,0.08)",
+    border: "rgba(239,68,68,0.25)",
+    icon: "✕",
+  },
+};
+
 function Row({ label, value, mono = false }) {
   return (
     <div style={s.row}>
@@ -51,7 +77,42 @@ function Row({ label, value, mono = false }) {
   );
 }
 
-export default function BridgeCard({ bridge }) {
+// P12 — BridgeSendStatus: feedback visual do envio real da bridge
+function BridgeSendStatus({ sendStatus, sendResult, sendError }) {
+  if (!sendStatus || sendStatus === "idle") return null;
+  const meta = BRIDGE_SEND_META[sendStatus];
+  if (!meta) return null;
+
+  return (
+    <div
+      style={{
+        ...s.sendBlock,
+        background: meta.bg,
+        borderColor: meta.border,
+      }}
+      role="status"
+      aria-live="polite"
+      aria-label={`Status da bridge: ${meta.label}`}
+    >
+      <span style={{ ...s.sendIcon, color: meta.color }} aria-hidden="true">
+        {meta.icon}
+      </span>
+      <div style={s.sendContent}>
+        <p style={{ ...s.sendText, color: meta.color }}>
+          {meta.label}
+        </p>
+        {sendStatus === "sent" && sendResult?.bridge_id && (
+          <p style={s.sendDetail}>ID: {sendResult.bridge_id}</p>
+        )}
+        {sendStatus === "error" && sendError && (
+          <p style={s.sendDetail}>{sendError}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function BridgeCard({ bridge, bridgeSendStatus, bridgeSendResult, bridgeSendError }) {
   if (!bridge) return null;
   const { module: mod, payload, state, description } = bridge;
   const meta = BRIDGE_META[state] ?? BRIDGE_META.idle;
@@ -81,6 +142,13 @@ export default function BridgeCard({ bridge }) {
       {description && (
         <p style={s.desc}>{description}</p>
       )}
+
+      {/* P12: feedback de envio real da bridge */}
+      <BridgeSendStatus
+        sendStatus={bridgeSendStatus}
+        sendResult={bridgeSendResult}
+        sendError={bridgeSendError}
+      />
     </div>
   );
 }
@@ -144,5 +212,38 @@ const s = {
     lineHeight: 1.5,
     paddingTop: "10px",
     borderTop: "1px solid var(--border)",
+  },
+  // P12 — send status block
+  sendBlock: {
+    marginTop: "12px",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "8px",
+    padding: "8px 10px",
+    borderRadius: "var(--radius-sm)",
+    border: "1px solid",
+  },
+  sendIcon: {
+    fontSize: "14px",
+    flexShrink: 0,
+    fontWeight: 700,
+    marginTop: "1px",
+  },
+  sendContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sendText: {
+    fontSize: "11px",
+    fontWeight: 600,
+    lineHeight: 1.4,
+  },
+  sendDetail: {
+    fontSize: "10px",
+    color: "var(--text-muted)",
+    lineHeight: 1.4,
+    marginTop: "2px",
+    fontFamily: "var(--font-mono)",
+    wordBreak: "break-all",
   },
 };
