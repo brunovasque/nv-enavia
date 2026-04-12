@@ -92,6 +92,16 @@ a:hover {
   background: var(--text-muted);
 }
 
+/* ── Execution — pulse animations ── */
+@keyframes execDotPulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    box-shadow: 0 0 0 0   rgba(0, 180, 216, 0.5); }
+  50%       { opacity: 0.7; transform: scale(1.15); box-shadow: 0 0 0 5px rgba(0, 180, 216, 0); }
+}
+
+.exec-dot-pulse {
+  animation: execDotPulse 1.5s ease-in-out infinite;
+}
+
 /* ── Chat — thinking dots animation ── */
 @keyframes chatDotPulse {
   0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
