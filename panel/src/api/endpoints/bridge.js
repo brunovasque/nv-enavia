@@ -73,7 +73,11 @@ export async function sendBridge(executorPayload) {
 
     if (!res.ok || !res.data?.ok) {
       const rawErr = res.data?.error ?? res.data?.detail;
-      const errMsg = typeof rawErr === "string" ? rawErr : "Falha ao enviar bridge payload.";
+      const errMsg = typeof rawErr === "string"
+        ? rawErr
+        : (rawErr && typeof rawErr === "object" && typeof rawErr.message === "string"
+          ? rawErr.message
+          : "Falha ao enviar bridge payload.");
       return normalizeError(
         { code: ERROR_CODES.BRIDGE_SEND_FAILURE, message: errMsg },
         "bridge",
