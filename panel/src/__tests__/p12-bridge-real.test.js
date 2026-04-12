@@ -267,11 +267,11 @@ describe("P12 PROVA 10 — Escopo fechado: sem desvio para P13+ ou execução am
     expect(BRIDGE_ENDPOINT_SRC).not.toContain("fetchExecution");
   });
 
-  it("sendBridge é a única função nova exportada em bridge.js", () => {
-    // Only sendBridge should be exported
+  it("sendBridge is the original P12 export; fetchBridgeStatus is P14 addition", () => {
+    // P12 introduced sendBridge; P14 adds fetchBridgeStatus — both are legitimate
     expect(BRIDGE_ENDPOINT_SRC).toContain("export async function sendBridge");
-    // No other exports
+    expect(BRIDGE_ENDPOINT_SRC).toContain("export async function fetchBridgeStatus");
     const exports = BRIDGE_ENDPOINT_SRC.match(/export\s+(async\s+)?function\s+\w+/g) || [];
-    expect(exports.length).toBe(1);
+    expect(exports.length).toBe(2);
   });
 });
