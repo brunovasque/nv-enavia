@@ -3066,7 +3066,7 @@ async function handlePlannerRun(request, env) {
     const _p17TypesByTier = { canonical: [], live: [], operational: [] };
     for (const mem of _p17Results) {
       const tier = _p17Tier(mem);
-      if (tier && _p17TypesByTier[tier] && !_p17TypesByTier[tier].includes(mem.memory_type)) {
+      if (tier && !_p17TypesByTier[tier].includes(mem.memory_type)) {
         _p17TypesByTier[tier].push(mem.memory_type);
       }
     }
