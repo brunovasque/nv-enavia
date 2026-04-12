@@ -1,33 +1,25 @@
 // ============================================================================
-// 🧪 Smoke Tests — P15: Persistência real pós-ciclo (memoryConsolidation → KV)
+// 🧪 Smoke Tests — P15: Persistência real pós-ciclo via handler real do worker
 //
 // Run: node tests/p15-memory-persistence.smoke.test.js
 //
-// Prova que:
-//   1. O pipeline PM4→PM9 continua funcionando (P11–P14 não regrediu)
-//   2. memoryConsolidation.should_consolidate=true → candidatos persistidos via PM2
-//   3. memoryConsolidation.should_consolidate=false → nada persistido no KV
-//   4. Cada candidato escrito contém os campos obrigatórios do PM1 (memory_id,
-//      entity_type, entity_id, source, created_at, updated_at, etc.)
-//   5. A chave KV usada é "memory:<memory_id>" (padrão canônico PM2)
-//   6. memory:index é atualizado com os IDs persistidos
-//   7. response telemetry.consolidation_persisted reflete os resultados reais
+// Prova que o caminho real /planner/run do worker persiste memoryConsolidation:
+//   1. Invoca worker.fetch(Request, env) com Request real para POST /planner/run
+//   2. env mockado com ENAVIA_BRAIN em memória (mesmo padrão dos outros testes)
+//   3. Valida status 200 e shape canônico do response
+//   4. Valida presença de planner.memoryConsolidation no response
+//   5. Valida presença e conteúdo de telemetry.consolidation_persisted
+//   6. Confirma que memory:<id> foi realmente gravado no KV mockado
+//   7. Confirma que memory:index foi realmente atualizado no KV mockado
+//   8. Leitura de volta dos registros via readMemoryById (PM2)
+//   9. Prova que nada é persistido quando should_consolidate=false
+//  10. Não regressão de planner.gate e planner.bridge
 //
-// Usa um mock KV em memória — sem Cloudflare deploy necessário.
+// Usa o handler real do worker (export default) — sem réplica local da lógica.
 // ============================================================================
 
-import { classifyRequest }          from "../schema/planner-classifier.js";
-import { buildOutputEnvelope }      from "../schema/planner-output-modes.js";
-import { buildCanonicalPlan }       from "../schema/planner-canonical-plan.js";
-import { evaluateApprovalGate,
-         approvePlan }              from "../schema/planner-approval-gate.js";
-import { buildExecutorBridgePayload,
-         BRIDGE_STATUS }            from "../schema/planner-executor-bridge.js";
-import { consolidateMemoryLearning } from "../schema/memory-consolidation.js";
-import { writeMemory,
-         readMemoryById }           from "../schema/memory-storage.js";
-import { buildMemoryObject,
-         ENTITY_TYPES }             from "../schema/memory-schema.js";
+import worker          from "../nv-enavia.js";
+import { readMemoryById } from "../schema/memory-storage.js";
 
 // ---------------------------------------------------------------------------
 // In-memory KV mock — idêntico ao usado em memory-storage.smoke.test.js
@@ -49,82 +41,17 @@ function makeKVMock() {
 }
 
 // ---------------------------------------------------------------------------
-// safeId — replica do worker (sem import direto do worker principal)
+// plannerRun — invoca o handler real do worker para POST /planner/run
 // ---------------------------------------------------------------------------
-function safeId(prefix = "id") {
-  return (
-    prefix +
-    "-" +
-    Date.now().toString(36) +
-    "-" +
-    Math.random().toString(36).slice(2, 8)
-  );
-}
-
-// ---------------------------------------------------------------------------
-// runPipelineAndPersist — replica o fluxo de handlePlannerRun(request, env)
-//
-// Simula o pipeline real PM4→PM9→P15 com um env de mock KV.
-// ---------------------------------------------------------------------------
-async function runPipelineAndPersist(message, contextOverrides, envMock, sessionId) {
-  const context = contextOverrides || {};
-  const session_id = sessionId || "";
-
-  // PM4 → PM5 → PM6 → PM7 → PM8 → PM9
-  const classification = classifyRequest({ text: message, context });
-  const envelope       = buildOutputEnvelope(classification, { text: message });
-  const canonicalPlan  = buildCanonicalPlan({ classification, envelope, input: { text: message } });
-  const gate           = evaluateApprovalGate(canonicalPlan);
-  const bridge         = buildExecutorBridgePayload({ plan: canonicalPlan, gate });
-  const memoryConsolidation = consolidateMemoryLearning({ plan: canonicalPlan, gate, bridge });
-
-  // P15 — Persistência pós-ciclo (réplica exata do patch no worker)
-  const consolidation_persisted = [];
-  if (memoryConsolidation.should_consolidate && envMock && envMock.ENAVIA_BRAIN) {
-    const cycleId = session_id || safeId("cycle");
-    const nowIso  = new Date().toISOString();
-
-    for (const candidate of memoryConsolidation.memory_candidates) {
-      const memObj = buildMemoryObject({
-        ...candidate,
-        memory_id:   crypto.randomUUID(),
-        entity_type: ENTITY_TYPES.OPERATION,
-        entity_id:   cycleId,
-        source:      "planner_run",
-        created_at:  nowIso,
-        updated_at:  nowIso,
-        expires_at:  null,
-        flags:       [],
-      });
-
-      let writeResult;
-      try {
-        writeResult = await writeMemory(memObj, envMock);
-      } catch (kvErr) {
-        writeResult = { ok: false, error: String(kvErr) };
-      }
-
-      consolidation_persisted.push({
-        memory_id:    memObj.memory_id,
-        memory_type:  memObj.memory_type,
-        is_canonical: memObj.is_canonical,
-        kv_key:       `memory:${memObj.memory_id}`,
-        write_ok:     writeResult.ok === true,
-        error:        writeResult.ok ? undefined : writeResult.error,
-      });
-    }
-  }
-
-  return {
-    ok: true,
-    planner: { classification, canonicalPlan, gate, bridge, memoryConsolidation },
-    telemetry: {
-      pipeline: "PM4→PM5→PM6→PM7→PM8→PM9→P15",
-      session_id: session_id || null,
-      consolidation_persisted,
-    },
-    _envMock: envMock,
-  };
+async function plannerRun(body, envMock) {
+  const req = new Request("https://worker.test/planner/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const res = await worker.fetch(req, envMock, {});
+  const json = await res.json();
+  return { status: res.status, json };
 }
 
 // ---------------------------------------------------------------------------
@@ -144,213 +71,192 @@ function assert(condition, name) {
 }
 
 // ===========================================================================
-// Group 1 — Pipeline continua funcionando (regressão P11–P14)
-// Smoke rápido: os shapes PM4→PM9 ainda conversam corretamente
+// Group 1 — Handler real retorna 200 com shape canônico completo
+// Prova que P11–P14 não regrediram (gate, bridge, memoryConsolidation presentes)
 // ===========================================================================
-async function testPipelineIntegrity() {
-  console.log("\nGroup 1: Pipeline PM4→PM9 não regrediu (P11–P14 intactos)");
+async function testHandlerShape() {
+  console.log("\nGroup 1: Handler real POST /planner/run — shape canônico e não-regressão P11–P14");
 
   const env = makeKVMock();
-  const r = await runPipelineAndPersist("Ver os logs do worker de produção.", {}, env);
+  const { status, json } = await plannerRun(
+    { message: "Quero ver os logs do worker.", session_id: "test-shape-001" },
+    env
+  );
 
-  assert(r.ok === true,                                            "ok === true");
-  assert(r.planner.classification !== undefined,                   "classification presente");
-  assert(typeof r.planner.classification.complexity_level === "string", "complexity_level é string");
-  assert(r.planner.canonicalPlan !== undefined,                    "canonicalPlan presente");
-  assert(r.planner.gate !== undefined,                             "gate presente");
-  assert(r.planner.bridge !== undefined,                           "bridge presente");
-  assert(r.planner.memoryConsolidation !== undefined,              "memoryConsolidation presente");
-  assert(typeof r.planner.memoryConsolidation.should_consolidate === "boolean",
-    "memoryConsolidation.should_consolidate é boolean");
-  assert(Array.isArray(r.planner.memoryConsolidation.memory_candidates),
-    "memoryConsolidation.memory_candidates é array");
-  assert(r.telemetry.pipeline === "PM4→PM5→PM6→PM7→PM8→PM9→P15", "pipeline string inclui P15");
-  assert(Array.isArray(r.telemetry.consolidation_persisted),       "consolidation_persisted é array");
+  assert(status === 200,                                           "status HTTP === 200");
+  assert(json.ok === true,                                         "json.ok === true");
+  assert(json.system === "ENAVIA-NV-FIRST",                        "json.system === 'ENAVIA-NV-FIRST'");
+  assert(typeof json.timestamp === "number",                       "json.timestamp é number");
+  assert(typeof json.input === "string",                           "json.input é string");
+
+  // planner sub-fields (P11–P14 non-regression)
+  assert(json.planner !== undefined,                               "json.planner presente");
+  assert(json.planner.classification !== undefined,                "planner.classification presente");
+  assert(typeof json.planner.classification.complexity_level === "string",
+    "planner.classification.complexity_level é string");
+  assert(json.planner.canonicalPlan !== undefined,                 "planner.canonicalPlan presente");
+  assert(json.planner.gate !== undefined,                          "planner.gate presente");
+  assert(typeof json.planner.gate.gate_status === "string",        "planner.gate.gate_status é string");
+  assert(typeof json.planner.gate.can_proceed === "boolean",       "planner.gate.can_proceed é boolean");
+  assert(json.planner.bridge !== undefined,                        "planner.bridge presente");
+  assert(typeof json.planner.bridge.bridge_status === "string",    "planner.bridge.bridge_status é string");
+  assert(json.planner.memoryConsolidation !== undefined,           "planner.memoryConsolidation presente");
+  assert(typeof json.planner.memoryConsolidation.should_consolidate === "boolean",
+    "planner.memoryConsolidation.should_consolidate é boolean");
+  assert(Array.isArray(json.planner.memoryConsolidation.memory_candidates),
+    "planner.memoryConsolidation.memory_candidates é array");
+
+  // telemetry P15
+  assert(json.telemetry !== undefined,                             "json.telemetry presente");
+  assert(json.telemetry.pipeline === "PM4→PM5→PM6→PM7→PM8→PM9→P15",
+    "telemetry.pipeline reflete P15");
+  assert(Array.isArray(json.telemetry.consolidation_persisted),    "telemetry.consolidation_persisted é array");
 }
 
 // ===========================================================================
-// Group 2 — Persistência real: nível A (should_consolidate=true, sem canônica)
+// Group 2 — Persistência real no KV: nível A (operacional)
+// Invoca o handler real e verifica gravação real no KV mockado
 // ===========================================================================
-async function testPersistenceLevelA() {
-  console.log("\nGroup 2: Persistência real — nível A (operacional)");
+async function testKVPersistenceLevelA() {
+  console.log("\nGroup 2: Persistência real no KV — nível A via handler real");
 
   const env = makeKVMock();
-  const r   = await runPipelineAndPersist("Quero ver os logs do worker.", {}, env);
+  const { status, json } = await plannerRun(
+    { message: "Quero ver os logs do worker.", session_id: "session-kv-a" },
+    env
+  );
 
-  // Nível A: gate aprovado automaticamente → should_consolidate=true, apenas operacional
-  assert(r.planner.gate.can_proceed === true, "gate aprova nível A automaticamente");
-  assert(r.planner.memoryConsolidation.should_consolidate === true, "should_consolidate=true para nível A aprovado");
+  assert(status === 200,                                    "status HTTP === 200");
+  assert(json.planner.gate.can_proceed === true,            "gate aprova nível A automaticamente");
+  assert(json.planner.memoryConsolidation.should_consolidate === true,
+    "should_consolidate=true para nível A aprovado");
 
-  const persisted = r.telemetry.consolidation_persisted;
-  assert(persisted.length >= 1, "ao menos 1 candidato persistido");
-  assert(persisted.every((p) => p.write_ok === true), "todos os candidatos escritos com write_ok=true");
+  const persisted = json.telemetry.consolidation_persisted;
+  assert(persisted.length >= 1,                             "ao menos 1 candidato persistido no response");
+  assert(persisted.every((p) => p.write_ok === true),       "todos os candidatos com write_ok=true");
 
-  // Verifica que cada candidato tem os campos do contrato P15
+  // Verifica campos de auditoria no response
   for (const p of persisted) {
-    assert(typeof p.memory_id === "string" && p.memory_id.length > 0,         `memory_id presente: ${p.memory_id}`);
-    assert(typeof p.memory_type === "string" && p.memory_type.length > 0,     `memory_type presente: ${p.memory_type}`);
-    assert(typeof p.is_canonical === "boolean",                                `is_canonical é boolean: ${p.memory_id}`);
-    assert(p.kv_key === `memory:${p.memory_id}`,                               `kv_key correto: ${p.kv_key}`);
+    assert(typeof p.memory_id    === "string" && p.memory_id.length > 0,  `memory_id presente: ${p.memory_id}`);
+    assert(typeof p.memory_type  === "string" && p.memory_type.length > 0, `memory_type presente: ${p.memory_type}`);
+    assert(typeof p.is_canonical === "boolean",                             `is_canonical é boolean`);
+    assert(p.kv_key === `memory:${p.memory_id}`,                            `kv_key correto: ${p.kv_key}`);
   }
 
-  // Verifica que os objetos foram realmente gravados no KV (leitura de volta via PM2)
+  // Verifica que os objetos foram REALMENTE gravados no KV (leitura direta do store mock)
   for (const p of persisted) {
     const stored = await readMemoryById(p.memory_id, env);
-    assert(stored !== null,                                                  `KV contém ${p.memory_id}`);
-    assert(stored.memory_id   === p.memory_id,                               `memory_id persisted corretamente`);
-    assert(stored.entity_type === "operation",                               `entity_type=operation`);
-    assert(stored.source      === "planner_run",                             `source=planner_run`);
-    assert(typeof stored.created_at === "string" && stored.created_at.length > 0, `created_at gravado`);
-    assert(typeof stored.updated_at === "string" && stored.updated_at.length > 0, `updated_at gravado`);
-    assert(Array.isArray(stored.flags),                                      `flags é array`);
+    assert(stored !== null,                                                       `KV contém ${p.memory_id}`);
+    assert(stored.memory_id   === p.memory_id,                                    `memory_id correto no KV`);
+    assert(stored.entity_type === "operation",                                    `entity_type=operation no KV`);
+    assert(stored.source      === "planner_run",                                  `source=planner_run no KV`);
+    assert(stored.entity_id   === "session-kv-a",                                 `entity_id=session_id no KV`);
+    assert(typeof stored.created_at === "string" && stored.created_at.length > 0, `created_at gravado no KV`);
+    assert(typeof stored.updated_at === "string" && stored.updated_at.length > 0, `updated_at gravado no KV`);
+    assert(Array.isArray(stored.flags),                                           `flags é array no KV`);
+    assert(stored.memory_type === "operational_history",                          `memory_type=operational_history`);
+    assert(stored.is_canonical === false,                                         `is_canonical=false para operacional`);
   }
 
-  // Verifica que memory:index foi atualizado
-  const index = JSON.parse(await env.ENAVIA_BRAIN.get("memory:index") || "[]");
-  assert(Array.isArray(index), "memory:index é array");
+  // Verifica que memory:index foi atualizado no KV real
+  const rawIndex = await env.ENAVIA_BRAIN.get("memory:index");
+  assert(rawIndex !== null, "memory:index existe no KV");
+  const index = JSON.parse(rawIndex);
+  assert(Array.isArray(index), "memory:index é array JSON");
   for (const p of persisted) {
     assert(index.includes(p.memory_id), `memory:index inclui ${p.memory_id}`);
   }
 }
 
 // ===========================================================================
-// Group 3 — Persistência real: nível C após aprovação humana (operacional + canônica)
+// Group 3 — Sem persistência quando gate bloqueia (nível C sem aprovação)
+// Invoca o handler real e confirma KV vazio
 // ===========================================================================
-async function testPersistenceLevelC() {
-  console.log("\nGroup 3: Persistência real — nível C após approvePlan (operacional + canônica)");
+async function testNoPersistenceWhenGateBlocks() {
+  console.log("\nGroup 3: Nenhuma persistência quando gate=approval_required (nível C)");
 
   const env = makeKVMock();
-
-  // Simula pipeline com aprovação humana explícita (approvePlan)
-  const message = "Migrar a arquitetura do banco de dados para cluster novo em produção, CI/CD e rollback.";
-  const context = { mentions_prod: true };
-
-  const classification = classifyRequest({ text: message, context });
-  const envelope       = buildOutputEnvelope(classification, { text: message });
-  const canonicalPlan  = buildCanonicalPlan({ classification, envelope, input: { text: message } });
-
-  // Forçar aprovação humana para testar candidato canônico
-  const gateApproved = approvePlan(canonicalPlan);
-  const bridge       = buildExecutorBridgePayload({ plan: canonicalPlan, gate: gateApproved });
-  const memoryConsolidation = consolidateMemoryLearning({ plan: canonicalPlan, gate: gateApproved, bridge });
-
-  assert(memoryConsolidation.should_consolidate === true, "should_consolidate=true após aprovação humana");
-  assert(memoryConsolidation.memory_candidates.length >= 2, "ao menos 2 candidatos (operacional + canônica)");
-
-  // P15 — persistir
-  const cycleId = "test-session-p15-c";
-  const nowIso  = new Date().toISOString();
-  const consolidation_persisted = [];
-
-  for (const candidate of memoryConsolidation.memory_candidates) {
-    const memObj = buildMemoryObject({
-      ...candidate,
-      memory_id:   crypto.randomUUID(),
-      entity_type: ENTITY_TYPES.OPERATION,
-      entity_id:   cycleId,
-      source:      "planner_run",
-      created_at:  nowIso,
-      updated_at:  nowIso,
-      expires_at:  null,
-      flags:       [],
-    });
-
-    const writeResult = await writeMemory(memObj, env);
-    consolidation_persisted.push({
-      memory_id:    memObj.memory_id,
-      memory_type:  memObj.memory_type,
-      is_canonical: memObj.is_canonical,
-      kv_key:       `memory:${memObj.memory_id}`,
-      write_ok:     writeResult.ok === true,
-    });
-  }
-
-  assert(consolidation_persisted.length >= 2, "ao menos 2 candidatos persistidos");
-  assert(consolidation_persisted.every((p) => p.write_ok === true), "todos escritos com sucesso");
-
-  const opPersisted  = consolidation_persisted.find((p) => p.memory_type === "operational_history");
-  const canPersisted = consolidation_persisted.find((p) => p.memory_type === "canonical_rules");
-  assert(opPersisted  !== undefined, "candidato operational_history persistido");
-  assert(canPersisted !== undefined, "candidato canonical_rules persistido");
-  assert(canPersisted.is_canonical === true, "candidato canônico tem is_canonical=true");
-  assert(opPersisted.is_canonical  === false, "candidato operacional tem is_canonical=false");
-
-  // Leitura de volta do KV
-  const storedOp  = await readMemoryById(opPersisted.memory_id,  env);
-  const storedCan = await readMemoryById(canPersisted.memory_id, env);
-  assert(storedOp  !== null, "KV contém registro operacional");
-  assert(storedCan !== null, "KV contém registro canônico");
-  assert(storedCan.status      === "canonical", "status canônico = 'canonical'");
-  assert(storedCan.is_canonical === true,       "is_canonical=true no KV para canônica");
-  assert(storedOp.entity_id    === cycleId,     "entity_id = cycleId no operacional");
-  assert(storedCan.entity_id   === cycleId,     "entity_id = cycleId no canônico");
-}
-
-// ===========================================================================
-// Group 4 — Sem persistência quando should_consolidate=false (nível C inicial)
-// ===========================================================================
-async function testNoPersistenceWhenNotConsolidating() {
-  console.log("\nGroup 4: Nenhuma persistência quando should_consolidate=false");
-
-  const env = makeKVMock();
-  const r   = await runPipelineAndPersist(
-    "Redesenhar toda a arquitetura, migrar banco em fases, múltiplos pipelines e compliance.",
-    { mentions_prod: true, known_dependencies: ["supabase"] },
+  const { status, json } = await plannerRun(
+    {
+      message: "Redesenhar toda a arquitetura, migrar banco em fases, múltiplos pipelines e compliance.",
+      context: { mentions_prod: true, known_dependencies: ["supabase"] },
+    },
     env
   );
 
-  // Nível C sem aprovação humana: gate=approval_required → should_consolidate=false
-  assert(r.planner.gate.gate_status === "approval_required", "gate=approval_required para nível C");
-  assert(r.planner.memoryConsolidation.should_consolidate === false, "should_consolidate=false enquanto transitório");
-  assert(r.telemetry.consolidation_persisted.length === 0, "nenhum candidato persistido");
+  assert(status === 200,                                                      "status HTTP === 200");
+  assert(json.planner.gate.gate_status === "approval_required",               "gate=approval_required para nível C");
+  assert(json.planner.gate.can_proceed === false,                             "gate.can_proceed=false");
+  assert(json.planner.bridge.bridge_status === "blocked_by_gate",             "bridge bloqueada");
+  assert(json.planner.memoryConsolidation.should_consolidate === false,       "should_consolidate=false enquanto transitório");
+  assert(json.telemetry.consolidation_persisted.length === 0,                 "consolidation_persisted vazio");
 
-  // KV deve estar vazio (exceto memory:index que nem deve existir)
-  const index = await env.ENAVIA_BRAIN.get("memory:index");
-  assert(index === null, "memory:index não criado quando não há persistência");
+  // KV não deve conter nenhum registro de memória
+  const rawIndex = await env.ENAVIA_BRAIN.get("memory:index");
+  assert(rawIndex === null,                                                    "memory:index não existe no KV");
 }
 
 // ===========================================================================
-// Group 5 — Formato de auditoria do response
+// Group 4 — Session ID propaga corretamente como entity_id no KV
 // ===========================================================================
-async function testAuditFormat() {
-  console.log("\nGroup 5: Formato de auditoria do response (consolidation_persisted)");
+async function testSessionIdPropagation() {
+  console.log("\nGroup 4: session_id propaga como entity_id no KV");
 
   const env = makeKVMock();
-  const r   = await runPipelineAndPersist("Quero ver os logs do worker.", {}, env, "session-audit-001");
+  const sessionId = "my-canonical-session-xyz";
+  const { status, json } = await plannerRun(
+    { message: "Quero ver os logs do worker.", session_id: sessionId },
+    env
+  );
 
-  assert(Array.isArray(r.telemetry.consolidation_persisted), "consolidation_persisted é array");
-  assert(r.telemetry.session_id === "session-audit-001",     "session_id ecoado no telemetry");
+  assert(status === 200,                                     "status HTTP === 200");
+  assert(json.telemetry.session_id === sessionId,            "telemetry.session_id ecoado corretamente");
 
-  if (r.planner.memoryConsolidation.should_consolidate) {
-    const first = r.telemetry.consolidation_persisted[0];
-    assert(first !== undefined,                                          "ao menos 1 registro de auditoria");
-    assert(typeof first.memory_id    === "string",                       "auditoria.memory_id é string");
-    assert(typeof first.memory_type  === "string",                       "auditoria.memory_type é string");
-    assert(typeof first.is_canonical === "boolean",                      "auditoria.is_canonical é boolean");
-    assert(typeof first.kv_key       === "string" && first.kv_key.startsWith("memory:"), "auditoria.kv_key começa com 'memory:'");
-    assert(first.write_ok            === true,                           "auditoria.write_ok=true");
+  const persisted = json.telemetry.consolidation_persisted;
+  if (persisted.length > 0) {
+    const stored = await readMemoryById(persisted[0].memory_id, env);
+    assert(stored !== null,                                  "registro presente no KV");
+    assert(stored.entity_id === sessionId,                   "entity_id = session_id no registro KV");
   }
+}
 
-  assert(r.telemetry.pipeline === "PM4→PM5→PM6→PM7→PM8→PM9→P15", "pipeline reflete P15");
+// ===========================================================================
+// Group 5 — Response sem ENAVIA_BRAIN não quebra (degradação limpa)
+// ===========================================================================
+async function testDegradationWithoutKV() {
+  console.log("\nGroup 5: Degradação limpa sem ENAVIA_BRAIN");
+
+  // env sem KV binding — handler não deve quebrar
+  const emptyEnv = {};
+  const { status, json } = await plannerRun(
+    { message: "Quero ver os logs do worker." },
+    emptyEnv
+  );
+
+  assert(status === 200,                                                    "status HTTP === 200 mesmo sem KV");
+  assert(json.ok === true,                                                  "ok=true mesmo sem KV");
+  assert(json.planner.memoryConsolidation !== undefined,                    "memoryConsolidation presente no response");
+  assert(Array.isArray(json.telemetry.consolidation_persisted),             "consolidation_persisted é array");
+  assert(json.telemetry.consolidation_persisted.length === 0,               "consolidation_persisted vazio sem KV");
 }
 
 // ===========================================================================
 // Runner
 // ===========================================================================
 async function runAll() {
-  console.log("╔══════════════════════════════════════════════════════════════╗");
-  console.log("║  P15 — Smoke Tests: Persistência real pós-ciclo (PM9→KV)    ║");
-  console.log("╚══════════════════════════════════════════════════════════════╝");
+  console.log("╔═══════════════════════════════════════════════════════════════════╗");
+  console.log("║  P15 — Smoke Tests: handler real POST /planner/run → KV persist  ║");
+  console.log("╚═══════════════════════════════════════════════════════════════════╝");
 
-  await testPipelineIntegrity();
-  await testPersistenceLevelA();
-  await testPersistenceLevelC();
-  await testNoPersistenceWhenNotConsolidating();
-  await testAuditFormat();
+  await testHandlerShape();
+  await testKVPersistenceLevelA();
+  await testNoPersistenceWhenGateBlocks();
+  await testSessionIdPropagation();
+  await testDegradationWithoutKV();
 
-  console.log(`\n${"=".repeat(62)}`);
+  console.log(`\n${"=".repeat(65)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
-  console.log(`${"=".repeat(62)}\n`);
+  console.log(`${"=".repeat(65)}\n`);
 
   if (failed > 0) {
     process.exit(1);
