@@ -3275,6 +3275,201 @@ async function handleGetExecution(env) {
   }
 }
 
+// ============================================================================
+// 📝 P14 — POST /execution/decision (handler canônico, Worker-only)
+//
+// Registra uma decisão humana (approved / rejected) vinculada a uma execução
+// COMPROVADA pelo bridge_id retornado de POST /planner/bridge.
+//
+// CONTRATO ESTRITO:
+//   - bridge_id é OBRIGATÓRIO e deve ser string não-vazia.
+//   - Rejeição pré-bridge (antes do disparo ao executor) NÃO possui bridge_id
+//     canônico → esta rota retorna 422 explicando a ausência; o registro NÃO
+//     é persistido como P14 válida.
+//   - Somente decisões com vínculo real de execução são gravadas no KV.
+//
+// KV keys:
+//   decision:{decision_id}             — registro individual
+//   decision:by_bridge:{bridge_id}     — lista de decisões por execução
+//   decision:latest                    — última decisão registrada (com bridge)
+//
+// Shape da decisão:
+//   { decision_id, decision, bridge_id, decided_at, decided_by, context }
+// ============================================================================
+async function handlePostDecision(request, env) {
+  const startedAt = Date.now();
+
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({
+      ok: false,
+      error: "KV não disponível — impossível persistir decisão.",
+      timestamp: Date.now(),
+    }, 503);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return jsonResponse({
+      ok: false,
+      error: "JSON inválido em /execution/decision.",
+      detail: String(err),
+      timestamp: Date.now(),
+    }, 400);
+  }
+
+  if (!body || typeof body !== "object") body = {};
+
+  // Validate decision field
+  const decision = body.decision;
+  if (decision !== "approved" && decision !== "rejected") {
+    return jsonResponse({
+      ok: false,
+      error: "Campo 'decision' obrigatório — valores aceitos: 'approved', 'rejected'.",
+      timestamp: Date.now(),
+    }, 400);
+  }
+
+  // REGRA DURA: bridge_id canônico é OBRIGATÓRIO.
+  // Rejeições pré-bridge não possuem bridge_id → não são P14 válidas.
+  const bridgeId = typeof body.bridge_id === "string" && body.bridge_id.trim().length > 0
+    ? body.bridge_id.trim()
+    : null;
+
+  if (!bridgeId) {
+    logNV("⚠️ [P14/DECISION] bridge_id ausente — decisão NÃO persistida (sem vínculo canônico de execução)", {
+      decision,
+    });
+    return jsonResponse({
+      ok: false,
+      p14_valid: false,
+      error: "bridge_id ausente ou nulo — esta decisão não pode ser vinculada a uma execução canônica.",
+      diagnostic: [
+        "bridge_id é o identificador canônico de execução neste worker.",
+        "Ele só existe após POST /planner/bridge disparar o plano ao executor.",
+        "Rejeições pré-bridge (antes do disparo) não possuem bridge_id.",
+        "Por contrato, P14 só registra decisões com vínculo canônico de execução comprovado.",
+        "Esta rejeição pré-bridge NÃO é persistida como registro P14 válido.",
+      ],
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 422);
+  }
+
+  const decisionId = safeId("decision");
+  const now = new Date().toISOString();
+
+  const record = {
+    decision_id: decisionId,
+    decision: decision,
+    bridge_id: bridgeId,
+    decided_at: now,
+    decided_by: typeof body.decided_by === "string" && body.decided_by.trim().length > 0
+      ? body.decided_by.trim()
+      : "human",
+    context: typeof body.context === "string" && body.context.trim().length > 0
+      ? body.context.trim()
+      : null,
+  };
+
+  logNV("📝 [P14/DECISION] Registrando decisão com vínculo canônico", {
+    decisionId,
+    decision,
+    bridgeId,
+  });
+
+  try {
+    // 1) Registro individual
+    await env.ENAVIA_BRAIN.put(`decision:${decisionId}`, JSON.stringify(record));
+
+    // 2) Última decisão vinculada a execução canônica
+    await env.ENAVIA_BRAIN.put("decision:latest", JSON.stringify(record));
+
+    // 3) Lista por bridge_id (identificador canônico de execução)
+    const listKey = `decision:by_bridge:${bridgeId}`;
+    let existing = [];
+    try {
+      const raw = await env.ENAVIA_BRAIN.get(listKey, "json");
+      if (Array.isArray(raw)) existing = raw;
+    } catch (readErr) {
+      logNV("⚠️ [P14/DECISION] Falha ao ler lista existente (não crítico, tratando como vazia)", {
+        bridgeId, error: String(readErr),
+      });
+    }
+    existing.push(record);
+    await env.ENAVIA_BRAIN.put(listKey, JSON.stringify(existing));
+
+    logNV("✅ [P14/DECISION] Decisão persistida com vínculo canônico", { decisionId, bridgeId });
+
+    return jsonResponse({
+      ok: true,
+      p14_valid: true,
+      decision: record,
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    });
+  } catch (err) {
+    logNV("🔴 [P14/DECISION] Falha ao persistir decisão no KV", {
+      decisionId,
+      error: String(err),
+    });
+    return jsonResponse({
+      ok: false,
+      error: "Falha ao persistir decisão no KV.",
+      detail: String(err),
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt },
+    }, 500);
+  }
+}
+
+// ============================================================================
+// 📖 P14 — GET /execution/decisions (handler canônico, Worker-only)
+//
+// Leitura do histórico de decisões persistidas com vínculo canônico.
+//
+// Query params:
+//   ?bridge_id=xxx  — obrigatório para filtrar decisões de uma execução real
+//
+// Sem bridge_id: retorna 400 com diagnóstico explicando que este parâmetro é
+// o identificador canônico de execução neste worker.
+// ============================================================================
+async function handleGetDecisions(env, request) {
+  const url = new URL(request.url);
+  const bridgeId = url.searchParams.get("bridge_id");
+
+  if (!bridgeId || bridgeId.trim().length === 0) {
+    return jsonResponse({
+      ok: false,
+      error: "Parâmetro ?bridge_id=xxx é obrigatório.",
+      diagnostic: [
+        "bridge_id é o identificador canônico de execução neste worker.",
+        "Ele é gerado por POST /planner/bridge e retornado no campo bridge_id da resposta.",
+        "Use ?bridge_id=<valor> para consultar o histórico de decisões de uma execução específica.",
+      ],
+      timestamp: Date.now(),
+    }, 400);
+  }
+
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({ ok: true, bridge_id: bridgeId, decisions: [], note: "KV não disponível neste ambiente." });
+  }
+
+  try {
+    const listKey = `decision:by_bridge:${bridgeId.trim()}`;
+    const decisions = await env.ENAVIA_BRAIN.get(listKey, "json");
+    return jsonResponse({
+      ok: true,
+      bridge_id: bridgeId.trim(),
+      decisions: Array.isArray(decisions) ? decisions : [],
+    });
+  } catch (err) {
+    logNV("🔴 [GET /execution/decisions] Falha ao ler decisões do KV", { error: String(err) });
+    return jsonResponse({ ok: false, decisions: [], error: "Falha ao ler histórico de decisões." }, 500);
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -3335,6 +3530,32 @@ if (request.method === "GET") {
   const url = new URL(request.url);
   if (url.pathname === "/execution") {
     const response = await handleGetExecution(env);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// 📝 P14 — POST /execution/decision
+// Registra decisão humana vinculada a execução canônica (bridge_id).
+// bridge_id obrigatório; rejeições pré-bridge retornam 422.
+// ============================================================
+if (request.method === "POST") {
+  const url = new URL(request.url);
+  if (url.pathname === "/execution/decision") {
+    const response = await handlePostDecision(request, env);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// 📖 P14 — GET /execution/decisions
+// Leitura canônica do histórico de decisões por execução.
+// Requer ?bridge_id=xxx (identificador canônico do disparo).
+// ============================================================
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/execution/decisions") {
+    const response = await handleGetDecisions(env, request);
     return withCORS(response);
   }
 }
