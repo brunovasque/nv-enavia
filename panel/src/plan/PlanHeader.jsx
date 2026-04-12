@@ -50,6 +50,14 @@ function formatTs(iso) {
 export default function PlanHeader({ plan, currentState, lastChatText, hasDemoOverride, onDemoOverride, onClearDemoOverride }) {
   const meta = STATUS_META[currentState];
 
+  function handleSwitcherClick(st, active) {
+    if (active && hasDemoOverride) {
+      onClearDemoOverride();
+    } else {
+      onDemoOverride(st);
+    }
+  }
+
   return (
     <div style={s.wrap}>
       {/* Top row: identity + status badge */}
@@ -128,7 +136,7 @@ export default function PlanHeader({ plan, currentState, lastChatText, hasDemoOv
                   ? { color: m.color, background: m.bg, borderColor: m.border }
                   : {}),
               }}
-              onClick={() => (active && hasDemoOverride ? onClearDemoOverride() : onDemoOverride(st))}
+              onClick={() => handleSwitcherClick(st, active)}
               aria-pressed={active}
             >
               {m.label}
