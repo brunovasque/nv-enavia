@@ -15,6 +15,8 @@ import { buildCanonicalPlan } from "./schema/planner-canonical-plan.js";
 import { evaluateApprovalGate } from "./schema/planner-approval-gate.js";
 import { buildExecutorBridgePayload } from "./schema/planner-executor-bridge.js";
 import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
+import { writeMemory } from "./schema/memory-storage.js";
+import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -2990,7 +2992,7 @@ async function loadDirectorBrain(env) {
 // Este endpoint destrava P7/P8 ao fornecer retorno real e auditável
 // que o painel pode consumir sem mock.
 // ============================================================================
-async function handlePlannerRun(request) {
+async function handlePlannerRun(request, env) {
   const startedAt = Date.now();
 
   let body;
@@ -3043,6 +3045,56 @@ async function handlePlannerRun(request) {
       bridge,
     });
 
+    // P15 — Persistência real pós-ciclo: persiste cada candidato PM9 no KV via PM2 (writeMemory)
+    // Acionado apenas quando should_consolidate === true e env.ENAVIA_BRAIN disponível.
+    // Falhas de persistência são registradas no log e no campo consolidation_persisted,
+    // mas não quebram o response do pipeline (fire-and-forget defensivo).
+    const consolidation_persisted = [];
+    if (memoryConsolidation.should_consolidate && env && env.ENAVIA_BRAIN) {
+      const cycleId = session_id || safeId("cycle");
+      const nowIso = new Date().toISOString();
+
+      for (const candidate of memoryConsolidation.memory_candidates) {
+        const memObj = buildMemoryObject({
+          ...candidate,
+          memory_id:  crypto.randomUUID(),
+          entity_type: ENTITY_TYPES.OPERATION,
+          entity_id:   cycleId,
+          source:      "planner_run",
+          created_at:  nowIso,
+          updated_at:  nowIso,
+          expires_at:  null,
+          flags:       [],
+        });
+
+        let writeResult;
+        try {
+          writeResult = await writeMemory(memObj, env);
+        } catch (kvErr) {
+          logNV("⚠️ [P15] Falha ao persistir candidato PM9 (não crítico)", {
+            memory_type: candidate.memory_type,
+            error: String(kvErr),
+          });
+          writeResult = { ok: false, error: String(kvErr) };
+        }
+
+        consolidation_persisted.push({
+          memory_id:   memObj.memory_id,
+          memory_type: memObj.memory_type,
+          is_canonical: memObj.is_canonical,
+          kv_key:      `memory:${memObj.memory_id}`,
+          write_ok:    writeResult.ok === true,
+          error:       writeResult.ok ? undefined : writeResult.error,
+        });
+      }
+
+      logNV("🧠 [P15] Consolidação de memória persistida pós-ciclo", {
+        candidates: consolidation_persisted.length,
+        cycle_id: cycleId,
+        results: consolidation_persisted,
+      });
+    }
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
@@ -3059,7 +3111,8 @@ async function handlePlannerRun(request) {
       telemetry: {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
-        pipeline: "PM4→PM5→PM6→PM7→PM8→PM9",
+        pipeline: "PM4→PM5→PM6→PM7→PM8→PM9→P15",
+        consolidation_persisted,
       },
     });
   } catch (err) {
@@ -3507,7 +3560,7 @@ if (request.method === "POST") {
 if (request.method === "POST") {
   const url = new URL(request.url);
   if (url.pathname === "/planner/run") {
-    const response = await handlePlannerRun(request);
+    const response = await handlePlannerRun(request, env);
     return withCORS(response);
   }
 }
@@ -3594,7 +3647,8 @@ if (request.method === "GET") {
           telemetry: {
             duration_ms: "number",
             session_id: "string | null",
-            pipeline: "string — 'PM4→PM5→PM6→PM7→PM8→PM9'",
+            pipeline: "string — 'PM4→PM5→PM6→PM7→PM8→PM9→P15'",
+            consolidation_persisted: "array — [{memory_id, memory_type, is_canonical, kv_key, write_ok, error?}]",
           },
         },
       },
