@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { chatSend } from "../api";
+import { useState, useCallback, useRef } from "react";
+import { chatSend, normalizeError } from "../api";
 
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
@@ -18,10 +18,14 @@ function uid() {
 
 function makeMsg(role, content, timestampOrOffsetMs = 0) {
   // String → ISO timestamp from the API; number → negative offset from now (seed mode).
-  const ts =
-    typeof timestampOrOffsetMs === "string"
-      ? new Date(timestampOrOffsetMs)
-      : new Date(Date.now() - timestampOrOffsetMs);
+  // Guard: fall back to now if the string produces an invalid date.
+  let ts;
+  if (typeof timestampOrOffsetMs === "string") {
+    ts = new Date(timestampOrOffsetMs);
+    if (isNaN(ts.getTime())) ts = new Date();
+  } else {
+    ts = new Date(Date.now() - timestampOrOffsetMs);
+  }
   return { id: uid(), role, content, timestamp: ts };
 }
 
@@ -30,12 +34,16 @@ export function useChatState() {
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState(null);
   const [inputValue, setInputValue] = useState("");
+  // Ref guard: set synchronously before the first await to block concurrent sends
+  // even if re-render hasn't propagated `thinking=true` yet.
+  const sendingRef = useRef(false);
 
   const sendMessage = useCallback(
     async (text) => {
       const trimmed = text.trim();
-      if (!trimmed || thinking) return;
+      if (!trimmed || sendingRef.current) return;
 
+      sendingRef.current = true;
       setError(null);
 
       const userMsg = makeMsg("user", trimmed);
@@ -46,22 +54,26 @@ export function useChatState() {
       try {
         result = await chatSend(trimmed);
       } catch (err) {
-        setError("Erro inesperado ao contatar o módulo de chat. Tente novamente.");
+        const envelope = normalizeError(err, "chat");
+        setError(envelope.error.message);
         setThinking(false);
+        sendingRef.current = false;
         return;
       }
 
       if (!result.ok) {
         setError(result.error.message);
         setThinking(false);
+        sendingRef.current = false;
         return;
       }
 
       const { role, content, timestamp } = result.data;
       setMessages((prev) => [...prev, makeMsg(role, content, timestamp)]);
       setThinking(false);
+      sendingRef.current = false;
     },
-    [thinking],
+    [],
   );
 
   // Loads a static conversation seed to validate the "conversation" state without typing.
