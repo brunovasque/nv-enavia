@@ -81,7 +81,10 @@ export default function PlanPage() {
   const isRealMode = mode === "real";
 
   useEffect(() => {
-    // Reset gate action when the plan changes (nova instrução = novo ciclo)
+    // Reset gate action when the plan changes (nova instrução = novo ciclo).
+    // plannerSnapshot is a stable reference from useSyncExternalStore — it only
+    // changes when onChatSuccess() is called (new chat round-trip), not on every
+    // render. This dependency is intentional and safe.
     setGateAction(null);
   }, [visibleState, plannerSnapshot]);
 
