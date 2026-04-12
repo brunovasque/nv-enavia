@@ -9,16 +9,19 @@ const MOCK_RESPONSES = [
   "Recebido. Posso estruturar isso como um objetivo tático se você confirmar o contexto.",
 ];
 
-// Trigger de erro: qualquer mensagem contendo "erro" (case-insensitive) simula falha de módulo.
+// Error trigger: any message containing "erro" (case-insensitive) simulates a module failure.
 const ERROR_TRIGGER = /\berro\b/i;
 const MOCK_ERROR = "Falha na conexão com o módulo de execução. Tente novamente.";
 
-// Seed de conversa para validação do estado "conversa" sem depender do usuário.
-const SEED = [
+// Seed conversation for validating the "conversation" state without typing from scratch.
+const SEED_MESSAGES = [
   { role: "enavia", content: "Sessão iniciada. Módulos de planejamento e memória em standby. Como posso ajudar?" },
   { role: "user",   content: "Preciso mapear as pendências do contrato anterior antes de avançar." },
   { role: "enavia", content: "Entendido. Iniciando consolidação do histórico do contrato anterior. Assim que o módulo de memória for ativado, o mapeamento será automático. Por ora posso estruturar o escopo manualmente se você detalhar os pontos críticos." },
 ];
+
+// Gap between seeded messages to simulate a past conversation (1.5 minutes apart).
+const SEED_INTERVAL_MS = 90000;
 
 let _counter = 0;
 function uid() {
@@ -66,11 +69,11 @@ export function useChatState() {
     [thinking],
   );
 
-  // Carrega conversa seed para validar o estado "conversa" sem digitar do zero.
+  // Loads a static conversation seed to validate the "conversation" state without typing.
   const seedMessages = useCallback(() => {
     clearTimeout(timerRef.current);
-    const seeded = SEED.map((m, i) =>
-      makeMsg(m.role, m.content, (SEED.length - i) * 90000),
+    const seeded = SEED_MESSAGES.map((m, i) =>
+      makeMsg(m.role, m.content, (SEED_MESSAGES.length - i) * SEED_INTERVAL_MS),
     );
     setMessages(seeded);
     setThinking(false);
