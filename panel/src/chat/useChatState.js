@@ -38,6 +38,8 @@ export function useChatState() {
   // Ref guard: set synchronously before the first await to block concurrent sends
   // even if re-render hasn't propagated `thinking=true` yet.
   const sendingRef = useRef(false);
+  // Tracks the last trimmed text successfully dispatched — used by retryMessage.
+  const lastSentRef = useRef(null);
 
   const sendMessage = useCallback(
     async (text) => {
@@ -45,6 +47,7 @@ export function useChatState() {
       if (!trimmed || sendingRef.current) return;
 
       sendingRef.current = true;
+      lastSentRef.current = trimmed;
       setError(null);
 
       const userMsg = makeMsg("user", trimmed);
@@ -88,6 +91,12 @@ export function useChatState() {
     setError(null);
   }, []);
 
+  // Retries the last sent message. No-op if no message has been sent yet.
+  const retryMessage = useCallback(() => {
+    if (!lastSentRef.current) return;
+    sendMessage(lastSentRef.current);
+  }, [sendMessage]);
+
   const dismissError = useCallback(() => setError(null), []);
 
   const clearMessages = useCallback(() => {
@@ -103,6 +112,7 @@ export function useChatState() {
     inputValue,
     setInputValue,
     sendMessage,
+    retryMessage,
     seedMessages,
     dismissError,
     clearMessages,
