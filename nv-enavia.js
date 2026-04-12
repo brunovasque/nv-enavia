@@ -3182,6 +3182,29 @@ async function handlePlannerBridge(request, env) {
       status: executorRes.status,
     });
 
+    // 5) P13 — persist execution trail to KV for safe, durable observability
+    const trail = {
+      bridge_id: reqId,
+      dispatched_at: new Date().toISOString(),
+      session_id: sessionId,
+      source: ep.source,
+      steps_count: ep.steps.length,
+      executor_ok: executorRes.status >= 200 && executorRes.status < 300,
+      executor_status: executorRes.status,
+      executor_error: (executorRes.status >= 200 && executorRes.status < 300) ? null : (executorJson?.error ?? null),
+    };
+    if (env.ENAVIA_BRAIN) {
+      try {
+        await env.ENAVIA_BRAIN.put("execution:trail:latest", JSON.stringify(trail));
+        await env.ENAVIA_BRAIN.put(`execution:trail:${reqId}`, JSON.stringify(trail));
+      } catch (kvErr) {
+        logNV("⚠️ [PLANNER/BRIDGE] Falha ao persistir trilha no KV (não crítico)", {
+          reqId,
+          error: String(kvErr),
+        });
+      }
+    }
+
     return jsonResponse({
       ok: true,
       bridge_accepted: true,
@@ -3200,6 +3223,24 @@ async function handlePlannerBridge(request, env) {
       error: String(networkErr),
     });
 
+    // P13 — persist failure trail so even network errors are observable
+    const errorTrail = {
+      bridge_id: reqId,
+      dispatched_at: new Date().toISOString(),
+      session_id: sessionId,
+      source: ep.source,
+      steps_count: ep.steps.length,
+      executor_ok: false,
+      executor_status: null,
+      executor_error: "NETWORK_ERROR",
+    };
+    if (env.ENAVIA_BRAIN) {
+      try {
+        await env.ENAVIA_BRAIN.put("execution:trail:latest", JSON.stringify(errorTrail));
+        await env.ENAVIA_BRAIN.put(`execution:trail:${reqId}`, JSON.stringify(errorTrail));
+      } catch (_) { /* silent — already in error path */ }
+    }
+
     return jsonResponse({
       ok: false,
       bridge_accepted: false,
@@ -3209,6 +3250,28 @@ async function handlePlannerBridge(request, env) {
       timestamp: Date.now(),
       telemetry: { duration_ms: Date.now() - startedAt },
     }, 502);
+  }
+}
+
+// ============================================================================
+// 📋 P13 — GET /execution (handler canônico)
+//
+// Retorna a trilha de execução mais recente persistida no KV após o disparo
+// do executor via /planner/bridge. Permite observabilidade durável do estado
+// da execução sem depender de logs efêmeros do Worker.
+//
+// NÃO é P14 — não registra aprovações/rejeições, apenas o estado do disparo.
+// ============================================================================
+async function handleGetExecution(env) {
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({ ok: true, execution: null, note: "KV não disponível neste ambiente." });
+  }
+  try {
+    const trail = await env.ENAVIA_BRAIN.get("execution:trail:latest", "json");
+    return jsonResponse({ ok: true, execution: trail });
+  } catch (err) {
+    logNV("🔴 [GET /execution] Falha ao ler trilha do KV", { error: String(err) });
+    return jsonResponse({ ok: false, execution: null, error: "Falha ao ler trilha de execução." }, 500);
   }
 }
 
@@ -3258,6 +3321,20 @@ if (request.method === "POST") {
   const url = new URL(request.url);
   if (url.pathname === "/planner/bridge") {
     const response = await handlePlannerBridge(request, env);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// 📋 P13 — GET /execution
+// Retorna trilha de execução mais recente persistida no KV.
+// Usado pelo painel (ExecutionPage) em modo real para observar
+// o estado do disparo ao executor sem depender de logs efêmeros.
+// ============================================================
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/execution") {
+    const response = await handleGetExecution(env);
     return withCORS(response);
   }
 }
