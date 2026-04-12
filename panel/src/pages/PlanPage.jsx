@@ -73,8 +73,20 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
+  // P11 — gate action: local override da decisão humana (sem bridge real)
+  // null = nenhuma ação tomada; "approved" | "blocked" = ação do operador
+  const [gateAction, setGateAction] = useState(null);
+
   const { mode } = getApiConfig();
   const isRealMode = mode === "real";
+
+  useEffect(() => {
+    // Reset gate action when the plan changes (nova instrução = novo ciclo).
+    // plannerSnapshot is a stable reference from useSyncExternalStore — it only
+    // changes when onChatSuccess() is called (new chat round-trip), not on every
+    // render. This dependency is intentional and safe.
+    setGateAction(null);
+  }, [visibleState, plannerSnapshot]);
 
   useEffect(() => {
     // ── Real mode: plan comes from plannerSnapshot in store (raw → mapper) ──
@@ -110,6 +122,20 @@ export default function PlanPage() {
     return () => { stale = true; };
   }, [isRealMode, visibleState, plannerSnapshot]);
 
+  // P11 — handlers de ação humana; não disparam bridge nem execução real
+  function handleGateApprove() {
+    setGateAction("approved");
+  }
+  function handleGateReject() {
+    setGateAction("blocked");
+  }
+
+  // P11 — gate efetivo: sobrepõe state do gate com decisão local do operador
+  function getEffectiveGate(gate) {
+    if (!gate || !gateAction) return gate;
+    return { ...gate, state: gateAction };
+  }
+
   if (loading) {
     return <div style={s.loading}>Carregando...</div>;
   }
@@ -117,6 +143,8 @@ export default function PlanPage() {
   if (fetchError) {
     return <div style={s.fetchError}>⚠ {fetchError}</div>;
   }
+
+  const effectiveGate = getEffectiveGate(plan?.gate ?? null);
 
   return (
     <div style={s.page}>
@@ -130,8 +158,8 @@ export default function PlanPage() {
         onClearDemoOverride={clearDemoOverride}
       />
 
-      {/* Blocked banner */}
-      {plan && <BlockedBanner gate={plan.gate} />}
+      {/* Blocked banner — reage ao gate efetivo (inclui ação humana local) */}
+      {plan && <BlockedBanner gate={effectiveGate} />}
 
       {/* Content */}
       {!plan ? (
@@ -147,7 +175,12 @@ export default function PlanPage() {
           <div style={s.sidebar}>
             <ClassificationCard classification={plan.classification} />
             <OutputModeCard outputMode={plan.outputMode} />
-            <GateCard gate={plan.gate} />
+            {/* P11: passa gate efetivo + callbacks de ação humana */}
+            <GateCard
+              gate={effectiveGate}
+              onApprove={handleGateApprove}
+              onReject={handleGateReject}
+            />
             <BridgeCard bridge={plan.bridge} />
             <MemoryConsolidationCard memoryConsolidation={plan.memoryConsolidation} />
           </div>
