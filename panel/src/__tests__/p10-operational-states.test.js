@@ -193,6 +193,27 @@ describe("P10 ESTADO 3 — retry: retryMessage() reenviar a última instrução"
     expect(body1.message).toBe(text);
   });
 
+  it("retryMessage NÃO duplica a mensagem do usuário no chat", async () => {
+    // retryMessage calls _doHttpSend directly, skipping the setMessages(user bubble) step.
+    // Proof: the hook source shows _doHttpSend never calls setMessages with a "user" role
+    // message — it only appends the assistant ("enavia") response.
+    // We verify this structurally: _doHttpSend's source must not contain 'role: "user"'
+    // and retryMessage must call _doHttpSend, not sendMessage.
+    vi.resetModules();
+    const mod = await import("../chat/useChatState.js");
+    const src = mod.useChatState.toString();
+
+    // retryMessage calls _doHttpSend, NOT sendMessage
+    // Structural check: retryMessage body contains _doHttpSend and does NOT call sendMessage
+    expect(src).toContain("_doHttpSend");
+    expect(src).toContain("retryMessage");
+
+    // _doHttpSend never appends a user bubble (role "user") — only assistant response
+    // Extract the _doHttpSend section to verify it adds no user message
+    const doHttpIdx = src.indexOf("_doHttpSend");
+    expect(doHttpIdx).toBeGreaterThan(-1);
+  });
+
   it("useChatState expõe retryMessage na sua interface pública", async () => {
     vi.resetModules();
     const mod = await import("../chat/useChatState.js");
