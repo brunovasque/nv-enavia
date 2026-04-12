@@ -47,11 +47,31 @@ const MockTransport = {
 
 // ── RealTransport ─────────────────────────────────────────────────────────────
 const RealTransport = {
-  request(_path, _opts = {}) {
-    // Architectural stub — real HTTP not implemented in this phase.
-    return Promise.reject(
-      new Error("RealTransport: not implemented in this phase.")
-    );
+  async request(path, opts = {}) {
+    const { baseUrl, timeoutMs } = getApiConfig();
+    const { method = "GET", body, headers = {} } = opts;
+    const t0 = Date.now();
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const fetchOpts = {
+        method,
+        headers: { "Content-Type": "application/json", ...headers },
+        signal: controller.signal,
+      };
+      if (body !== undefined) {
+        fetchOpts.body = JSON.stringify(body);
+      }
+
+      const res = await fetch(`${baseUrl}${path}`, fetchOpts);
+      const data = await res.json();
+
+      return { ok: res.ok, data, durationMs: Date.now() - t0 };
+    } finally {
+      clearTimeout(timer);
+    }
   },
 };
 

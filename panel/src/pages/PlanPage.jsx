@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchPlan, PLAN_STATUS } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig } from "../api";
+import { mapPlannerSnapshot } from "../api/mappers/plan.js";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
@@ -68,14 +69,30 @@ function BlockedBanner({ gate }) {
 
 // ── PlanPage ───────────────────────────────────────────────────────────────
 export default function PlanPage() {
-  const { visibleState, demoOverride, lastChatText } = usePlannerStore();
+  const { visibleState, demoOverride, lastChatText, plannerSnapshot } = usePlannerStore();
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
+  const { mode } = getApiConfig();
+  const isRealMode = mode === "real";
+
   useEffect(() => {
-    // Stale-response guard: if visibleState changes before the previous fetch
-    // resolves, the cleanup sets stale=true and the old .then() becomes a no-op.
+    // ── Real mode: plan comes from plannerSnapshot in store (raw → mapper) ──
+    if (isRealMode) {
+      if (plannerSnapshot) {
+        const mapped = mapPlannerSnapshot(plannerSnapshot);
+        setPlan(mapped);
+      } else {
+        // No snapshot yet — show EmptyState. Never fall back to MOCK_PLANS.
+        setPlan(null);
+      }
+      setFetchError(null);
+      setLoading(false);
+      return;
+    }
+
+    // ── Mock mode: fetch from MockTransport via fetchPlan() as before ────────
     let stale = false;
 
     setLoading(true);
@@ -92,7 +109,7 @@ export default function PlanPage() {
     });
 
     return () => { stale = true; };
-  }, [visibleState]);
+  }, [isRealMode, visibleState, plannerSnapshot]);
 
   if (loading) {
     return <div style={s.loading}>Carregando...</div>;

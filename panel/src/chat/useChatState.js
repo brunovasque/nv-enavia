@@ -71,7 +71,7 @@ export function useChatState() {
 
       const { role, content, timestamp } = result.data;
       setMessages((prev) => [...prev, makeMsg(role, content, timestamp)]);
-      onChatSuccess(trimmed);
+      onChatSuccess(trimmed, result.plannerSnapshot ?? null);
       setThinking(false);
       sendingRef.current = false;
     },
