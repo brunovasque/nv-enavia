@@ -9,4 +9,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
   },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    // Expose import.meta.env overrides for tests that need mode=real.
+    // Each test file can use vi.stubEnv() to override per-test.
+  },
 });
