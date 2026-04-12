@@ -3387,6 +3387,10 @@ async function handlePostDecision(request, env) {
     await env.ENAVIA_BRAIN.put("decision:latest", JSON.stringify(record));
 
     // 3) Lista por bridge_id (identificador canônico de execução)
+    // Nota: Cloudflare KV não suporta operações atômicas. Em caso de escrita
+    // concorrente com o mesmo bridge_id, a última operação prevalece (last-write-wins).
+    // Para P14, o padrão aceitável é fire-and-forget do caller — a concorrência de
+    // decisões sobre a mesma execução é improvável no fluxo de gate humano.
     const listKey = `decision:by_bridge:${bridgeId}`;
     let existing = [];
     try {
