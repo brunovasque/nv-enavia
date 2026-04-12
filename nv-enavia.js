@@ -3022,21 +3022,21 @@ async function handlePlannerRun(request, env) {
   try {
     // P16 — Leitura de memória útil antes da montagem do plano (PM3)
     // Fire-and-forget defensivo: erros não derrubam o pipeline.
-    let _memReadRaw = { ok: false, error: "ENAVIA_BRAIN unavailable" };
+    let memReadRaw = { ok: false, error: "ENAVIA_BRAIN unavailable" };
     if (env && env.ENAVIA_BRAIN) {
       try {
-        _memReadRaw = await searchRelevantMemory(context, env);
+        memReadRaw = await searchRelevantMemory(context, env);
       } catch (memErr) {
-        _memReadRaw = { ok: false, error: String(memErr) };
+        memReadRaw = { ok: false, error: String(memErr) };
       }
     }
     const memoryReadAudit = {
-      consulted: _memReadRaw.ok === true,
-      count:     _memReadRaw.ok ? _memReadRaw.count : 0,
-      types:     _memReadRaw.ok
-        ? [...new Set(_memReadRaw.results.map((m) => m.memory_type))]
+      consulted: memReadRaw.ok === true,
+      count:     memReadRaw.ok ? memReadRaw.count : 0,
+      types:     memReadRaw.ok
+        ? [...new Set(memReadRaw.results.map((m) => m.memory_type))]
         : [],
-      error:     _memReadRaw.ok ? undefined : _memReadRaw.error,
+      ...(memReadRaw.ok ? {} : { error: memReadRaw.error }),
     };
 
     // PM4 — Classificação
