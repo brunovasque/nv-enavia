@@ -40,6 +40,7 @@ function assert(condition, name) {
 // runPlannerPipeline — replica o pipeline do handler para teste unitário
 // ---------------------------------------------------------------------------
 function runPlannerPipeline(message, context) {
+  const startedAt = Date.now();
   const classification = classifyRequest({ text: message, context });
   const envelope = buildOutputEnvelope(classification, { text: message });
   const canonicalPlan = buildCanonicalPlan({
@@ -57,12 +58,22 @@ function runPlannerPipeline(message, context) {
 
   return {
     ok: true,
-    classification,
-    canonicalPlan,
-    gate,
-    bridge,
-    memoryConsolidation,
-    outputMode: envelope.output_mode,
+    system: "ENAVIA-NV-FIRST",
+    timestamp: Date.now(),
+    input: message,
+    planner: {
+      classification,
+      canonicalPlan,
+      gate,
+      bridge,
+      memoryConsolidation,
+      outputMode: envelope.output_mode,
+    },
+    telemetry: {
+      duration_ms: Date.now() - startedAt,
+      session_id: null,
+      pipeline: "PM4→PM5→PM6→PM7→PM8→PM9",
+    },
   };
 }
 
@@ -79,18 +90,23 @@ async function runTests() {
 
   const a = runPlannerPipeline("Quero ver os logs do worker");
   assert(a.ok === true, "ok === true");
-  assert(a.classification !== undefined, "classification presente");
-  assert(a.classification.complexity_level === "A", "classificação nível A");
-  assert(a.canonicalPlan !== undefined, "canonicalPlan presente");
-  assert(a.canonicalPlan.plan_version === "1.0", "plan_version === 1.0");
-  assert(a.canonicalPlan.complexity_level === "A", "canonicalPlan nível A");
-  assert(a.gate !== undefined, "gate presente");
-  assert(a.gate.can_proceed === true, "gate libera nível A");
-  assert(a.gate.gate_status === "approved_not_required", "gate_status correto para A");
-  assert(a.bridge !== undefined, "bridge presente");
-  assert(a.memoryConsolidation !== undefined, "memoryConsolidation presente");
-  assert(typeof a.outputMode === "string", "outputMode é string");
-  assert(a.outputMode === "quick_reply", "outputMode === quick_reply para A");
+  assert(a.system === "ENAVIA-NV-FIRST", "system === ENAVIA-NV-FIRST");
+  assert(typeof a.timestamp === "number", "timestamp é number");
+  assert(a.input === "Quero ver os logs do worker", "input ecoa mensagem");
+  assert(a.planner !== undefined, "planner presente");
+  assert(a.telemetry !== undefined, "telemetry presente");
+  assert(a.planner.classification !== undefined, "planner.classification presente");
+  assert(a.planner.classification.complexity_level === "A", "classificação nível A");
+  assert(a.planner.canonicalPlan !== undefined, "planner.canonicalPlan presente");
+  assert(a.planner.canonicalPlan.plan_version === "1.0", "plan_version === 1.0");
+  assert(a.planner.canonicalPlan.complexity_level === "A", "canonicalPlan nível A");
+  assert(a.planner.gate !== undefined, "planner.gate presente");
+  assert(a.planner.gate.can_proceed === true, "gate libera nível A");
+  assert(a.planner.gate.gate_status === "approved_not_required", "gate_status correto para A");
+  assert(a.planner.bridge !== undefined, "planner.bridge presente");
+  assert(a.planner.memoryConsolidation !== undefined, "planner.memoryConsolidation presente");
+  assert(typeof a.planner.outputMode === "string", "planner.outputMode é string");
+  assert(a.planner.outputMode === "quick_reply", "outputMode === quick_reply para A");
 
   // -------------------------------------------------------------------------
   // Group 2: Pipeline tático (nível B)
@@ -102,18 +118,18 @@ async function runTests() {
   );
   assert(b.ok === true, "ok === true");
   assert(
-    b.classification.complexity_level === "B" || b.classification.complexity_level === "C",
+    b.planner.classification.complexity_level === "B" || b.planner.classification.complexity_level === "C",
     "classificação nível B ou C (texto tático/complexo)"
   );
 
-  if (b.classification.complexity_level === "B") {
-    assert(b.canonicalPlan.complexity_level === "B", "canonicalPlan nível B");
-    assert(b.outputMode === "tactical_plan", "outputMode === tactical_plan");
+  if (b.planner.classification.complexity_level === "B") {
+    assert(b.planner.canonicalPlan.complexity_level === "B", "canonicalPlan nível B");
+    assert(b.planner.outputMode === "tactical_plan", "outputMode === tactical_plan");
   }
 
-  assert(b.gate !== undefined, "gate presente");
-  assert(b.bridge !== undefined, "bridge presente");
-  assert(b.memoryConsolidation !== undefined, "memoryConsolidation presente");
+  assert(b.planner.gate !== undefined, "planner.gate presente");
+  assert(b.planner.bridge !== undefined, "planner.bridge presente");
+  assert(b.planner.memoryConsolidation !== undefined, "planner.memoryConsolidation presente");
 
   // -------------------------------------------------------------------------
   // Group 3: Pipeline complexo (nível C)
@@ -125,60 +141,74 @@ async function runTests() {
     { known_dependencies: ["supabase", "cloudflare"], mentions_prod: true }
   );
   assert(c.ok === true, "ok === true");
-  assert(c.classification.complexity_level === "C", "classificação nível C");
-  assert(c.canonicalPlan.complexity_level === "C", "canonicalPlan nível C");
-  assert(c.canonicalPlan.needs_human_approval === true, "needs_human_approval === true");
-  assert(c.gate.gate_status === "approval_required", "gate bloqueia para nível C");
-  assert(c.gate.can_proceed === false, "can_proceed === false para C");
-  assert(c.bridge.bridge_status === "blocked_by_gate", "bridge blocked_by_gate");
-  assert(c.outputMode === "formal_contract", "outputMode === formal_contract");
+  assert(c.planner.classification.complexity_level === "C", "classificação nível C");
+  assert(c.planner.canonicalPlan.complexity_level === "C", "canonicalPlan nível C");
+  assert(c.planner.canonicalPlan.needs_human_approval === true, "needs_human_approval === true");
+  assert(c.planner.gate.gate_status === "approval_required", "gate bloqueia para nível C");
+  assert(c.planner.gate.can_proceed === false, "can_proceed === false para C");
+  assert(c.planner.bridge.bridge_status === "blocked_by_gate", "bridge blocked_by_gate");
+  assert(c.planner.outputMode === "formal_contract", "outputMode === formal_contract");
 
   // -------------------------------------------------------------------------
   // Group 4: Campos obrigatórios no response
   // -------------------------------------------------------------------------
   console.log("\nGroup 4: Campos obrigatórios no response");
 
-  const requiredFields = [
-    "ok", "classification", "canonicalPlan", "gate",
-    "bridge", "memoryConsolidation", "outputMode"
+  const requiredTopFields = [
+    "ok", "system", "timestamp", "input", "planner", "telemetry"
   ];
   const sample = runPlannerPipeline("Listar contratos ativos");
-  for (const field of requiredFields) {
-    assert(field in sample, `campo '${field}' presente no response`);
+  for (const field of requiredTopFields) {
+    assert(field in sample, `campo top-level '${field}' presente no response`);
   }
 
+  const requiredPlannerFields = [
+    "classification", "canonicalPlan", "gate",
+    "bridge", "memoryConsolidation", "outputMode"
+  ];
+  for (const field of requiredPlannerFields) {
+    assert(field in sample.planner, `campo planner.'${field}' presente`);
+  }
+
+  // top-level fields
+  assert(sample.system === "ENAVIA-NV-FIRST", "system === ENAVIA-NV-FIRST");
+  assert(typeof sample.timestamp === "number", "timestamp é number");
+  assert(typeof sample.input === "string", "input é string");
+  assert(typeof sample.telemetry === "object", "telemetry é object");
+  assert(typeof sample.telemetry.duration_ms === "number", "telemetry.duration_ms é number");
+
   // classification fields
-  assert(typeof sample.classification.request_type === "string", "classification.request_type é string");
-  assert(typeof sample.classification.complexity_level === "string", "classification.complexity_level é string");
-  assert(typeof sample.classification.category === "string", "classification.category é string");
-  assert(typeof sample.classification.risk_level === "string", "classification.risk_level é string");
-  assert(typeof sample.classification.needs_human_approval === "boolean", "classification.needs_human_approval é boolean");
-  assert(Array.isArray(sample.classification.signals), "classification.signals é array");
-  assert(typeof sample.classification.reason === "string", "classification.reason é string");
+  assert(typeof sample.planner.classification.request_type === "string", "classification.request_type é string");
+  assert(typeof sample.planner.classification.complexity_level === "string", "classification.complexity_level é string");
+  assert(typeof sample.planner.classification.category === "string", "classification.category é string");
+  assert(typeof sample.planner.classification.risk_level === "string", "classification.risk_level é string");
+  assert(typeof sample.planner.classification.needs_human_approval === "boolean", "classification.needs_human_approval é boolean");
+  assert(Array.isArray(sample.planner.classification.signals), "classification.signals é array");
+  assert(typeof sample.planner.classification.reason === "string", "classification.reason é string");
 
   // canonicalPlan fields
-  assert(typeof sample.canonicalPlan.plan_version === "string", "canonicalPlan.plan_version é string");
-  assert(typeof sample.canonicalPlan.plan_type === "string", "canonicalPlan.plan_type é string");
-  assert(typeof sample.canonicalPlan.objective === "string", "canonicalPlan.objective é string");
-  assert(Array.isArray(sample.canonicalPlan.steps), "canonicalPlan.steps é array");
-  assert(Array.isArray(sample.canonicalPlan.risks), "canonicalPlan.risks é array");
-  assert(typeof sample.canonicalPlan.next_action === "string", "canonicalPlan.next_action é string");
+  assert(typeof sample.planner.canonicalPlan.plan_version === "string", "canonicalPlan.plan_version é string");
+  assert(typeof sample.planner.canonicalPlan.plan_type === "string", "canonicalPlan.plan_type é string");
+  assert(typeof sample.planner.canonicalPlan.objective === "string", "canonicalPlan.objective é string");
+  assert(Array.isArray(sample.planner.canonicalPlan.steps), "canonicalPlan.steps é array");
+  assert(Array.isArray(sample.planner.canonicalPlan.risks), "canonicalPlan.risks é array");
+  assert(typeof sample.planner.canonicalPlan.next_action === "string", "canonicalPlan.next_action é string");
 
   // gate fields
-  assert(typeof sample.gate.gate_status === "string", "gate.gate_status é string");
-  assert(typeof sample.gate.needs_human_approval === "boolean", "gate.needs_human_approval é boolean");
-  assert(typeof sample.gate.can_proceed === "boolean", "gate.can_proceed é boolean");
-  assert(typeof sample.gate.reason === "string", "gate.reason é string");
-  assert(typeof sample.gate.next_action === "string", "gate.next_action é string");
+  assert(typeof sample.planner.gate.gate_status === "string", "gate.gate_status é string");
+  assert(typeof sample.planner.gate.needs_human_approval === "boolean", "gate.needs_human_approval é boolean");
+  assert(typeof sample.planner.gate.can_proceed === "boolean", "gate.can_proceed é boolean");
+  assert(typeof sample.planner.gate.reason === "string", "gate.reason é string");
+  assert(typeof sample.planner.gate.next_action === "string", "gate.next_action é string");
 
   // bridge fields
-  assert(typeof sample.bridge.bridge_status === "string", "bridge.bridge_status é string");
+  assert(typeof sample.planner.bridge.bridge_status === "string", "bridge.bridge_status é string");
 
   // memoryConsolidation fields
-  assert(typeof sample.memoryConsolidation === "object", "memoryConsolidation é object");
+  assert(typeof sample.planner.memoryConsolidation === "object", "memoryConsolidation é object");
 
   // outputMode
-  assert(["quick_reply", "tactical_plan", "formal_contract"].includes(sample.outputMode),
+  assert(["quick_reply", "tactical_plan", "formal_contract"].includes(sample.planner.outputMode),
     "outputMode é um dos 3 modos válidos");
 
   // -------------------------------------------------------------------------
@@ -189,18 +219,18 @@ async function runTests() {
   const d1 = runPlannerPipeline("Verificar status dos workers");
   const d2 = runPlannerPipeline("Verificar status dos workers");
   assert(
-    JSON.stringify(d1.classification) === JSON.stringify(d2.classification),
+    JSON.stringify(d1.planner.classification) === JSON.stringify(d2.planner.classification),
     "classification determinístico"
   );
   assert(
-    JSON.stringify(d1.canonicalPlan) === JSON.stringify(d2.canonicalPlan),
+    JSON.stringify(d1.planner.canonicalPlan) === JSON.stringify(d2.planner.canonicalPlan),
     "canonicalPlan determinístico"
   );
   assert(
-    JSON.stringify(d1.gate) === JSON.stringify(d2.gate),
+    JSON.stringify(d1.planner.gate) === JSON.stringify(d2.planner.gate),
     "gate determinístico"
   );
-  assert(d1.outputMode === d2.outputMode, "outputMode determinístico");
+  assert(d1.planner.outputMode === d2.planner.outputMode, "outputMode determinístico");
 
   // -------------------------------------------------------------------------
   // Group 6: Context passthru
@@ -210,7 +240,7 @@ async function runTests() {
   const noCtx = runPlannerPipeline("Criar novo endpoint");
   const withProd = runPlannerPipeline("Criar novo endpoint", { mentions_prod: true });
   assert(
-    withProd.classification.needs_human_approval === true,
+    withProd.planner.classification.needs_human_approval === true,
     "mentions_prod → needs_human_approval = true"
   );
 
@@ -223,14 +253,19 @@ async function runTests() {
   const serialized = JSON.stringify(original);
   const deserialized = JSON.parse(serialized);
   assert(deserialized.ok === true, "JSON roundtrip preserva ok");
-  assert(deserialized.classification.complexity_level === original.classification.complexity_level,
+  assert(deserialized.system === "ENAVIA-NV-FIRST", "JSON roundtrip preserva system");
+  assert(typeof deserialized.timestamp === "number", "JSON roundtrip preserva timestamp");
+  assert(deserialized.input === original.input, "JSON roundtrip preserva input");
+  assert(deserialized.planner.classification.complexity_level === original.planner.classification.complexity_level,
     "JSON roundtrip preserva classification");
-  assert(deserialized.canonicalPlan.plan_version === original.canonicalPlan.plan_version,
+  assert(deserialized.planner.canonicalPlan.plan_version === original.planner.canonicalPlan.plan_version,
     "JSON roundtrip preserva canonicalPlan");
-  assert(deserialized.gate.gate_status === original.gate.gate_status,
+  assert(deserialized.planner.gate.gate_status === original.planner.gate.gate_status,
     "JSON roundtrip preserva gate");
-  assert(deserialized.outputMode === original.outputMode,
+  assert(deserialized.planner.outputMode === original.planner.outputMode,
     "JSON roundtrip preserva outputMode");
+  assert(typeof deserialized.telemetry === "object",
+    "JSON roundtrip preserva telemetry");
 
   // ---- Summary ----
   console.log(`\n${"=".repeat(60)}`);

@@ -3041,22 +3041,34 @@ async function handlePlannerRun(request) {
 
     return jsonResponse({
       ok: true,
-      session_id: session_id || null,
-      duration_ms: Date.now() - startedAt,
-      classification,
-      canonicalPlan,
-      gate,
-      bridge,
-      memoryConsolidation,
-      outputMode: envelope.output_mode,
+      system: "ENAVIA-NV-FIRST",
+      timestamp: Date.now(),
+      input: message,
+      planner: {
+        classification,
+        canonicalPlan,
+        gate,
+        bridge,
+        memoryConsolidation,
+        outputMode: envelope.output_mode,
+      },
+      telemetry: {
+        duration_ms: Date.now() - startedAt,
+        session_id: session_id || null,
+        pipeline: "PM4→PM5→PM6→PM7→PM8→PM9",
+      },
     });
   } catch (err) {
     return jsonResponse(
       {
         ok: false,
+        system: "ENAVIA-NV-FIRST",
+        timestamp: Date.now(),
         error: "Falha no pipeline do planner.",
         detail: String(err),
-        duration_ms: Date.now() - startedAt,
+        telemetry: {
+          duration_ms: Date.now() - startedAt,
+        },
       },
       500
     );
@@ -3117,14 +3129,22 @@ if (request.method === "GET") {
         },
         response: {
           ok: "boolean",
-          session_id: "string | null",
-          duration_ms: "number",
-          classification: "PM4 — classifyRequest output",
-          canonicalPlan: "PM6 — buildCanonicalPlan output",
-          gate: "PM7 — evaluateApprovalGate output",
-          bridge: "PM8 — buildExecutorBridgePayload output",
-          memoryConsolidation: "PM9 — consolidateMemoryLearning output",
-          outputMode: "string — quick_reply | tactical_plan | formal_contract",
+          system: "string — 'ENAVIA-NV-FIRST'",
+          timestamp: "number — epoch ms",
+          input: "string — texto do usuário (echo)",
+          planner: {
+            classification: "PM4 — classifyRequest output",
+            canonicalPlan: "PM6 — buildCanonicalPlan output",
+            gate: "PM7 — evaluateApprovalGate output",
+            bridge: "PM8 — buildExecutorBridgePayload output",
+            memoryConsolidation: "PM9 — consolidateMemoryLearning output",
+            outputMode: "string — quick_reply | tactical_plan | formal_contract",
+          },
+          telemetry: {
+            duration_ms: "number",
+            session_id: "string | null",
+            pipeline: "string — 'PM4→PM5→PM6→PM7→PM8→PM9'",
+          },
         },
       },
     }));
