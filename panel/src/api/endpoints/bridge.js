@@ -1,16 +1,14 @@
 // ============================================================================
-// ENAVIA Panel — bridge endpoint (P12)
+// ENAVIA Panel — bridge endpoint (P12 + P14)
 //
-// sendBridge() is the only public function for the bridge module.
-// Sends the approved bridge payload to the worker's /planner/bridge endpoint.
+// sendBridge()        — P12: Sends the approved bridge payload to the worker.
+// fetchBridgeStatus() — P14: Queries executor operational status post-dispatch.
 //
 // Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
 // contracts.js.
 //
-// Real mode: posts to /planner/bridge with the executor_payload from the
-// planner snapshot. The worker validates and forwards to the executor.
-//
-// Mock mode: simulates a successful bridge send with a short delay.
+// Real mode: posts to /planner/bridge (P12) or /engineer (P14) on the worker.
+// Mock mode: simulates responses with a short delay.
 // ============================================================================
 
 import { getApiConfig }                from "../config.js";
@@ -91,6 +89,82 @@ export async function sendBridge(executorPayload) {
         bridge_id: res.data.bridge_id ?? null,
         executor_response: res.data.executor_response ?? null,
         timestamp: res.data.timestamp ?? Date.now(),
+      },
+      meta: { durationMs: Date.now() - t0 },
+    };
+  } catch (err) {
+    return normalizeError(err, "bridge");
+  }
+}
+
+// ============================================================================
+// P14 — fetchBridgeStatus
+//
+// Queries the executor for current operational status after bridge dispatch.
+// Uses the existing /engineer route on the worker, which proxies { action: "status" }
+// to the executor via service binding.
+//
+// This is NOT polling. It is a one-shot query triggered manually by the operator.
+// The source of truth is the executor's response — no fabrication.
+// ============================================================================
+
+/**
+ * Query the executor for operational status after bridge dispatch.
+ *
+ * @param {string} bridgeId — bridge_id from the sendBridge result
+ * @returns {Promise<import("../contracts.js").ResponseEnvelope>}
+ */
+export async function fetchBridgeStatus(bridgeId) {
+  const t0 = Date.now();
+  const { mode } = getApiConfig();
+
+  if (mode !== "real") {
+    // Mock mode: simulate executor operational status response
+    await new Promise((r) => setTimeout(r, MOCK_DELAY()));
+    return {
+      ok: true,
+      data: {
+        executor_reachable: true,
+        bridge_id: bridgeId || null,
+        executor_status: {
+          ok: true,
+          status: "operational",
+        },
+        queried_at: new Date().toISOString(),
+      },
+      meta: { durationMs: Date.now() - t0 },
+    };
+  }
+
+  if (!bridgeId || typeof bridgeId !== "string") {
+    return normalizeError(
+      {
+        code: ERROR_CODES.BRIDGE_SEND_FAILURE,
+        message: "bridge_id ausente — não é possível consultar status.",
+      },
+      "bridge",
+    );
+  }
+
+  try {
+    const res = await apiClient.request("/engineer", {
+      method: "POST",
+      body: {
+        action: "status",
+        bridge_id: bridgeId,
+        session_id: getSessionId(),
+      },
+    });
+
+    const reachable = res.ok && res.data != null;
+
+    return {
+      ok: true,
+      data: {
+        executor_reachable: reachable,
+        bridge_id: bridgeId,
+        executor_status: reachable ? res.data : null,
+        queried_at: new Date().toISOString(),
       },
       meta: { durationMs: Date.now() - t0 },
     };

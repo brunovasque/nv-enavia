@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
 import OutputModeCard from "../plan/OutputModeCard";
 import PlanSteps from "../plan/PlanSteps";
 import GateCard from "../plan/GateCard";
-import BridgeCard from "../plan/BridgeCard";
+import BridgeCard, { TRACKING_STATUS } from "../plan/BridgeCard";
 import MemoryConsolidationCard from "../plan/MemoryConsolidationCard";
 
 // ── Empty state — cara de produto, não de placeholder ─────────────────────
@@ -83,6 +83,11 @@ export default function PlanPage() {
   const [bridgeSendResult, setBridgeSendResult] = useState(null);
   const [bridgeSendError, setBridgeSendError] = useState(null);
 
+  // P14 — operational tracking state: post-dispatch status query
+  const [trackingStatus, setTrackingStatus] = useState(TRACKING_STATUS.IDLE);
+  const [trackingData, setTrackingData] = useState(null);
+  const [trackingError, setTrackingError] = useState(null);
+
   const { mode } = getApiConfig();
   const isRealMode = mode === "real";
 
@@ -95,6 +100,10 @@ export default function PlanPage() {
     setBridgeSendStatus("idle");
     setBridgeSendResult(null);
     setBridgeSendError(null);
+    // P14 — reset tracking state on new cycle
+    setTrackingStatus(TRACKING_STATUS.IDLE);
+    setTrackingData(null);
+    setTrackingError(null);
   }, [visibleState, plannerSnapshot]);
 
   useEffect(() => {
@@ -153,6 +162,24 @@ export default function PlanPage() {
       setBridgeSendError(result.error?.message ?? "Falha ao enviar bridge payload.");
     }
   }, [plannerSnapshot]);
+
+  // P14 — manual status query after bridge dispatch
+  const handleRefreshTracking = useCallback(async () => {
+    const bridgeId = bridgeSendResult?.bridge_id;
+    if (!bridgeId) return;
+
+    setTrackingStatus(TRACKING_STATUS.QUERYING);
+    setTrackingError(null);
+
+    const result = await fetchBridgeStatus(bridgeId);
+    if (result.ok) {
+      setTrackingStatus(TRACKING_STATUS.REACHABLE);
+      setTrackingData(result.data);
+    } else {
+      setTrackingStatus(TRACKING_STATUS.ERROR);
+      setTrackingError(result.error?.message ?? "Falha ao consultar status do executor.");
+    }
+  }, [bridgeSendResult]);
 
   function handleGateApprove() {
     setGateAction("approved");
@@ -215,11 +242,16 @@ export default function PlanPage() {
               onReject={handleGateReject}
             />
             {/* P12: passa bridge + status de envio da ponte */}
+            {/* P14: passa tracking props para acompanhamento operacional */}
             <BridgeCard
               bridge={plan.bridge}
               bridgeSendStatus={bridgeSendStatus}
               bridgeSendResult={bridgeSendResult}
               bridgeSendError={bridgeSendError}
+              trackingStatus={trackingStatus}
+              trackingData={trackingData}
+              trackingError={trackingError}
+              onRefreshTracking={handleRefreshTracking}
             />
             <MemoryConsolidationCard memoryConsolidation={plan.memoryConsolidation} />
           </div>

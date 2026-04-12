@@ -208,10 +208,184 @@ function DispatchOutcome({ sendStatus, sendResult }) {
   );
 }
 
-export default function BridgeCard({ bridge, bridgeSendStatus, bridgeSendResult, bridgeSendError }) {
+// ── P14 — Operational Tracking ────────────────────────────────────────────
+// After dispatch is accepted (P13), the operator can manually query the executor
+// for ongoing operational status. This is NOT automatic refresh — it uses the
+// existing /engineer → { action: "status" } path, which is a documented and
+// proven route in the operational contract.
+//
+// Scope: P14 only — post-dispatch operational tracking. No engine, no auto-cycle,
+// no P15+ features. One-shot manual query by the operator.
+
+export const TRACKING_STATUS = {
+  IDLE:        "tracking_idle",
+  QUERYING:    "tracking_querying",
+  REACHABLE:   "tracking_reachable",
+  UNREACHABLE: "tracking_unreachable",
+  ERROR:       "tracking_error",
+};
+
+const TRACKING_META = {
+  [TRACKING_STATUS.IDLE]: {
+    label: "Acompanhamento disponível",
+    color: "var(--text-muted)",
+    bg: "transparent",
+    border: "var(--border)",
+    icon: "◎",
+  },
+  [TRACKING_STATUS.QUERYING]: {
+    label: "Consultando executor…",
+    color: "#F59E0B",
+    bg: "rgba(245,158,11,0.06)",
+    border: "rgba(245,158,11,0.2)",
+    icon: "⟳",
+  },
+  [TRACKING_STATUS.REACHABLE]: {
+    label: "Executor operacional",
+    color: "#10B981",
+    bg: "rgba(16,185,129,0.06)",
+    border: "rgba(16,185,129,0.2)",
+    icon: "●",
+  },
+  [TRACKING_STATUS.UNREACHABLE]: {
+    label: "Executor indisponível",
+    color: "#EF4444",
+    bg: "rgba(239,68,68,0.06)",
+    border: "rgba(239,68,68,0.2)",
+    icon: "○",
+  },
+  [TRACKING_STATUS.ERROR]: {
+    label: "Falha na consulta",
+    color: "#EF4444",
+    bg: "rgba(239,68,68,0.06)",
+    border: "rgba(239,68,68,0.2)",
+    icon: "✕",
+  },
+};
+
+/**
+ * Derive a tracking status from the fetchBridgeStatus response.
+ * Pure function — no side effects, no network calls.
+ *
+ * @param {object|null|undefined} statusResponse — data from fetchBridgeStatus result
+ * @returns {{ status: string, detail: string|null, queriedAt: string|null }}
+ */
+export function deriveTrackingStatus(statusResponse) {
+  if (!statusResponse || typeof statusResponse !== "object") {
+    return { status: TRACKING_STATUS.IDLE, detail: null, queriedAt: null };
+  }
+
+  const queriedAt = typeof statusResponse.queried_at === "string"
+    ? statusResponse.queried_at
+    : null;
+
+  if (!statusResponse.executor_reachable) {
+    return { status: TRACKING_STATUS.UNREACHABLE, detail: null, queriedAt };
+  }
+
+  const execStatus = statusResponse.executor_status;
+  if (!execStatus || typeof execStatus !== "object") {
+    return { status: TRACKING_STATUS.REACHABLE, detail: null, queriedAt };
+  }
+
+  // Extract meaningful detail from executor response
+  const detail = typeof execStatus.status === "string"
+    ? execStatus.status
+    : (typeof execStatus.execution_status === "string"
+      ? execStatus.execution_status
+      : null);
+
+  return { status: TRACKING_STATUS.REACHABLE, detail, queriedAt };
+}
+
+function OperationalTracking({
+  dispatchStatus,
+  trackingStatus,
+  trackingData,
+  trackingError,
+  onRefresh,
+}) {
+  // Only render after dispatch is accepted (P13 → P14 boundary)
+  if (dispatchStatus !== DISPATCH_STATUS.ACCEPTED) return null;
+
+  const isQuerying = trackingStatus === TRACKING_STATUS.QUERYING;
+  const hasQueried = trackingData != null;
+  const derived = hasQueried ? deriveTrackingStatus(trackingData) : null;
+  const activeMeta = isQuerying
+    ? TRACKING_META[TRACKING_STATUS.QUERYING]
+    : (trackingError
+      ? TRACKING_META[TRACKING_STATUS.ERROR]
+      : (derived
+        ? (TRACKING_META[derived.status] || TRACKING_META[TRACKING_STATUS.IDLE])
+        : TRACKING_META[TRACKING_STATUS.IDLE]));
+
+  return (
+    <div
+      style={{
+        ...s.sendBlock,
+        background: activeMeta.bg,
+        borderColor: activeMeta.border,
+        marginTop: "6px",
+        flexDirection: "column",
+        gap: "6px",
+      }}
+      role="region"
+      aria-label="Acompanhamento operacional pós-disparo"
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+        <span style={{ ...s.sendIcon, color: activeMeta.color }} aria-hidden="true">
+          {activeMeta.icon}
+        </span>
+        <div style={{ ...s.sendContent, flex: 1 }}>
+          <p style={{ ...s.sendText, color: activeMeta.color }}>
+            {activeMeta.label}
+          </p>
+          {derived?.detail && (
+            <p style={s.sendDetail}>Status: {derived.detail}</p>
+          )}
+          {derived?.queriedAt && (
+            <p style={s.sendDetail}>
+              Consultado: {new Date(derived.queriedAt).toLocaleTimeString("pt-BR")}
+            </p>
+          )}
+          {trackingError && (
+            <p style={s.sendDetail}>{trackingError}</p>
+          )}
+        </div>
+      </div>
+      {typeof onRefresh === "function" && (
+        <button
+          style={s.refreshBtn}
+          onClick={onRefresh}
+          disabled={isQuerying}
+          aria-label="Consultar status do executor"
+        >
+          {isQuerying ? "Consultando…" : "⟳ Consultar status"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function BridgeCard({
+  bridge,
+  bridgeSendStatus,
+  bridgeSendResult,
+  bridgeSendError,
+  // P14 — operational tracking props
+  trackingStatus,
+  trackingData,
+  trackingError,
+  onRefreshTracking,
+}) {
   if (!bridge) return null;
   const { module: mod, payload, state, description } = bridge;
   const meta = BRIDGE_META[state] ?? BRIDGE_META.idle;
+
+  // P14 — derive dispatch status to gate OperationalTracking visibility
+  const dispatchOutcome = bridgeSendStatus === "sent" && bridgeSendResult
+    ? deriveDispatchOutcome(bridgeSendResult.executor_response)
+    : null;
 
   return (
     <div style={s.card}>
@@ -250,6 +424,15 @@ export default function BridgeCard({ bridge, bridgeSendStatus, bridgeSendResult,
       <DispatchOutcome
         sendStatus={bridgeSendStatus}
         sendResult={bridgeSendResult}
+      />
+
+      {/* P14: acompanhamento operacional pós-disparo — consulta manual */}
+      <OperationalTracking
+        dispatchStatus={dispatchOutcome?.status ?? null}
+        trackingStatus={trackingStatus}
+        trackingData={trackingData}
+        trackingError={trackingError}
+        onRefresh={onRefreshTracking}
       />
     </div>
   );
@@ -347,5 +530,20 @@ const s = {
     marginTop: "2px",
     fontFamily: "var(--font-mono)",
     wordBreak: "break-all",
+  },
+  // P14 — manual refresh button
+  refreshBtn: {
+    width: "100%",
+    padding: "5px 8px",
+    fontSize: "11px",
+    fontWeight: 600,
+    fontFamily: "var(--font-body)",
+    color: "var(--text-secondary)",
+    background: "var(--bg-base)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-sm)",
+    cursor: "pointer",
+    letterSpacing: "0.2px",
+    transition: "opacity 0.15s ease",
   },
 };
