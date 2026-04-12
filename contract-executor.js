@@ -2959,9 +2959,15 @@ async function handleCompleteTask(request, env) {
     };
   }
 
-  const contractId = body && body.contract_id;
-  const taskId     = body && body.task_id;
-  const resultado  = body && body.resultado;
+  const contractId         = body && body.contract_id;
+  const taskId             = body && body.task_id;
+  const resultado          = body && body.resultado;
+  // executor_artifacts: artefatos reais de /audit e /propose (opcional).
+  // Quando presente, auditExecution usa a CAMADA 1 (comparação real contra contrato).
+  // Quando ausente, auditExecution usa a CAMADA 2 (fallback por tasks).
+  const executor_artifacts = (body && body.executor_artifacts && typeof body.executor_artifacts === "object")
+    ? body.executor_artifacts
+    : undefined;
 
   if (!contractId) {
     return {
@@ -3054,9 +3060,17 @@ async function handleCompleteTask(request, env) {
   }
 
   // ── AUDITORIA DE EXECUÇÃO CONTRA CONTRATO (PR 2) ─────────────────────────
-  // Snapshot canônico da aderência de toda a execução ao contrato.
+  // Snapshot canônico da aderência da execução ao contrato.
+  // CAMADA 1: quando executor_artifacts presentes (artefatos reais de /audit e /propose)
+  //           → compara verdict/risk_level/context_proof/constraints contra contrato
+  // CAMADA 2: quando executor_artifacts ausentes (fallback estrutural)
+  //           → compara tasks concluídas contra definition_of_done
   // Determinístico, sem I/O adicional (state e decomposition já carregados).
-  const executionAudit = auditExecution({ state: result.state, decomposition: result.decomposition });
+  const executionAudit = auditExecution({
+    state:              result.state,
+    decomposition:      result.decomposition,
+    executor_artifacts,
+  });
   // ── FIM DA AUDITORIA ─────────────────────────────────────────────────────
 
   return {
@@ -3086,16 +3100,22 @@ async function handleCompleteTask(request, env) {
 // Query params:
 //   contract_id {string} — ID do contrato
 //
+// Body (opcional, JSON):
+//   executor_artifacts {object} — artefatos reais de /audit e /propose.
+//     Quando presente → CAMADA 1: compara artefatos reais vs. contrato.
+//     Quando ausente  → CAMADA 2: compara tasks vs. definition_of_done.
+//
 // Retorna ExecutionAudit:
 //   {
-//     contract_id,           — string
-//     contract_reference,    — { goal, contracted_items }
-//     implemented_reference, — string[]
-//     missing_items,         — string[]
-//     unauthorized_items,    — string[]
+//     contract_id,
+//     audit_mode,            — "executor_artifacts" | "task_decomposition"
+//     contract_reference,
+//     implemented_reference,
+//     missing_items,
+//     unauthorized_items,
 //     adherence_status,      — "aderente_ao_contrato" | "parcial_desviado" | "fora_do_contrato"
-//     reason,                — string auditável
-//     next_action,           — string coerente
+//     reason,
+//     next_action,
 //   }
 // ============================================================================
 async function handleGetExecutionAudit(request, env) {
@@ -3117,7 +3137,21 @@ async function handleGetExecutionAudit(request, env) {
     };
   }
 
-  const executionAudit = auditExecution({ state, decomposition });
+  // Accept optional executor_artifacts from request body (GET with JSON body or POST)
+  let executor_artifacts;
+  try {
+    const bodyText = request._body_text || null;
+    if (bodyText) {
+      const parsed = JSON.parse(bodyText);
+      if (parsed && typeof parsed.executor_artifacts === "object") {
+        executor_artifacts = parsed.executor_artifacts;
+      }
+    }
+  } catch (_) {
+    // body absent or not JSON — use CAMADA 2 (task-based fallback)
+  }
+
+  const executionAudit = auditExecution({ state, decomposition, executor_artifacts });
 
   return {
     status: 200,
