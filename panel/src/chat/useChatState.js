@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { chatSend, normalizeError } from "../api";
+import { onChatSuccess } from "../store/plannerStore";
 
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
@@ -70,6 +71,7 @@ export function useChatState() {
 
       const { role, content, timestamp } = result.data;
       setMessages((prev) => [...prev, makeMsg(role, content, timestamp)]);
+      onChatSuccess(trimmed);
       setThinking(false);
       sendingRef.current = false;
     },

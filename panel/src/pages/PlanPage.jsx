@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchPlan, PLAN_STATUS } from "../api";
+import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
 import OutputModeCard from "../plan/OutputModeCard";
@@ -67,7 +68,7 @@ function BlockedBanner({ gate }) {
 
 // ── PlanPage ───────────────────────────────────────────────────────────────
 export default function PlanPage() {
-  const [currentState, setCurrentState] = useState(PLAN_STATUS.READY);
+  const { visibleState, demoOverride, lastChatText } = usePlannerStore();
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -75,7 +76,7 @@ export default function PlanPage() {
   useEffect(() => {
     setLoading(true);
     setFetchError(null);
-    fetchPlan({ _mockState: currentState }).then((r) => {
+    fetchPlan({ _mockState: visibleState }).then((r) => {
       if (r.ok) {
         setPlan(r.data.plan);
       } else {
@@ -84,7 +85,7 @@ export default function PlanPage() {
       }
       setLoading(false);
     });
-  }, [currentState]);
+  }, [visibleState]);
 
   if (loading) {
     return <div style={s.loading}>Carregando...</div>;
@@ -99,8 +100,11 @@ export default function PlanPage() {
       {/* Header + state switcher */}
       <PlanHeader
         plan={plan}
-        currentState={currentState}
-        onStateChange={setCurrentState}
+        currentState={visibleState}
+        lastChatText={lastChatText}
+        hasDemoOverride={demoOverride !== null}
+        onDemoOverride={setDemoOverride}
+        onClearDemoOverride={clearDemoOverride}
       />
 
       {/* Blocked banner */}

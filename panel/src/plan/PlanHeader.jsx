@@ -47,7 +47,7 @@ function formatTs(iso) {
   });
 }
 
-export default function PlanHeader({ plan, currentState, onStateChange }) {
+export default function PlanHeader({ plan, currentState, lastChatText, hasDemoOverride, onDemoOverride, onClearDemoOverride }) {
   const meta = STATUS_META[currentState];
 
   return (
@@ -92,6 +92,16 @@ export default function PlanHeader({ plan, currentState, onStateChange }) {
           <p style={s.requestText}>{plan.request.text}</p>
           <p style={s.requestTs}>{formatTs(plan.request.timestamp)}</p>
         </div>
+      ) : lastChatText ? (
+        <div style={s.requestBlock}>
+          <p style={s.requestLabel}>Instrução</p>
+          <p style={{ ...s.requestText, fontStyle: "italic", color: "var(--text-muted)" }}>
+            {lastChatText}
+          </p>
+          <p style={{ ...s.requestTs, fontSize: "10px", color: "var(--text-muted)", opacity: 0.6 }}>
+            Texto do chat — não é plano homologado
+          </p>
+        </div>
       ) : (
         <div style={s.requestBlock}>
           <p style={s.requestLabel}>Pedido</p>
@@ -103,7 +113,9 @@ export default function PlanHeader({ plan, currentState, onStateChange }) {
 
       {/* State switcher — demo */}
       <div style={s.switcher} role="group" aria-label="Estado do plano (demo)">
-        <span style={s.switcherLabel}>Estado demo:</span>
+        <span style={s.switcherLabel}>
+          Estado demo{hasDemoOverride ? " (ativo)" : ""}:
+        </span>
         {Object.values(PLAN_STATUS).map((st) => {
           const m = STATUS_META[st];
           const active = st === currentState;
@@ -116,7 +128,7 @@ export default function PlanHeader({ plan, currentState, onStateChange }) {
                   ? { color: m.color, background: m.bg, borderColor: m.border }
                   : {}),
               }}
-              onClick={() => onStateChange(st)}
+              onClick={() => (active && hasDemoOverride ? onClearDemoOverride() : onDemoOverride(st))}
               aria-pressed={active}
             >
               {m.label}
