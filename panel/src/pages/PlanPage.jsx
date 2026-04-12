@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
@@ -157,6 +157,12 @@ export default function PlanPage() {
     if (result.ok) {
       setBridgeSendStatus("sent");
       setBridgeSendResult(result.data);
+      // P14 — record approved decision after bridge dispatch with real bridge_id.
+      // Fire-and-forget: does not block UX. bridge_id is guaranteed by sendBridge response.
+      const bridgeId = result.data?.bridge_id;
+      if (bridgeId && typeof bridgeId === "string") {
+        postDecision({ decision: "approved", bridge_id: bridgeId }).catch(() => {/* non-blocking */});
+      }
     } else {
       setBridgeSendStatus("error");
       setBridgeSendError(result.error?.message ?? "Falha ao enviar bridge payload.");
@@ -188,6 +194,12 @@ export default function PlanPage() {
   }
   function handleGateReject() {
     setGateAction("blocked");
+    // P14 — rejection: only record if bridge_id already exists (pós-bridge rejection).
+    // Pre-bridge rejection has no bridge_id and MUST NOT be recorded as P14.
+    const bridgeId = bridgeSendResult?.bridge_id;
+    if (bridgeId && typeof bridgeId === "string") {
+      postDecision({ decision: "rejected", bridge_id: bridgeId }).catch(() => {/* non-blocking */});
+    }
   }
 
   // P11 — gate efetivo: sobrepõe state do gate com decisão local do operador
