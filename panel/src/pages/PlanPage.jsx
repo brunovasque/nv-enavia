@@ -188,13 +188,15 @@ export default function PlanPage() {
     // P12: trigger real bridge send, then P14: persist approval with bridge_id
     handleBridgeSend().then((bridgeData) => {
       const bridgeId = bridgeData?.bridge_id ?? null;
-      postDecision({ decision: "approved", bridge_id: bridgeId, context: "Gate aprovado pelo operador" });
+      postDecision({ decision: "approved", bridge_id: bridgeId, context: "Gate aprovado pelo operador" })
+        .catch(() => { /* P14 persistence is non-blocking — UI already applied gate action */ });
     });
   }
   function handleGateReject() {
     setGateAction("blocked");
     // P14: persist rejection decision (fire-and-forget — no bridge_id since gate was blocked)
-    postDecision({ decision: "rejected", bridge_id: null, context: "Gate rejeitado pelo operador" });
+    postDecision({ decision: "rejected", bridge_id: null, context: "Gate rejeitado pelo operador" })
+      .catch(() => { /* P14 persistence is non-blocking — UI already applied gate action */ });
   }
 
   // P11 — gate efetivo: sobrepõe state do gate com decisão local do operador

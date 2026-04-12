@@ -3366,7 +3366,11 @@ async function handlePostDecision(request, env) {
       try {
         const raw = await env.ENAVIA_BRAIN.get(listKey, "json");
         if (Array.isArray(raw)) existing = raw;
-      } catch (_) { /* first decision for this bridge */ }
+      } catch (readErr) {
+        logNV("⚠️ [P14/DECISION] Falha ao ler lista existente (não crítico, tratando como vazia)", {
+          bridgeId, error: String(readErr),
+        });
+      }
       existing.push(record);
       await env.ENAVIA_BRAIN.put(listKey, JSON.stringify(existing));
     }
