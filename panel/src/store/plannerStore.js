@@ -1,5 +1,5 @@
 // ============================================================================
-// ENAVIA Panel — plannerStore (P8)
+// ENAVIA Panel — plannerStore (P9)
 //
 // Singleton module-level store. Fonte única de verdade do estado do planner.
 //
@@ -19,22 +19,81 @@
 //   visibleState = demoOverride ?? realState
 //   Estado real é soberano. Override é camada visual temporária, reversível.
 //
-// Comportamento no reload:
-//   Store é in-memory. Ao recarregar a página, realState volta para EMPTY.
-//   Comportamento aceito da P8 — persistência é escopo de fase futura.
+// Persistência — chave: "enavia_planner_state"
+//   Shape persistido: { realState, lastChatText }
+//   Campos NÃO persistidos: demoOverride (visual temporário), visibleState (derivado).
+//   demoOverride não reidrata. No reload, visibleState == realState reidratado.
+//
+// Comportamento para storage inválido:
+//   - JSON inválido  → chave removida, fallback EMPTY.
+//   - realState fora do enum → chave removida, fallback EMPTY.
+//   - estrutura parcial/incompleta → chave removida, fallback EMPTY.
+//   - lastChatText não-string → descartado silenciosamente (null), chave mantida.
+//   - sessionStorage inacessível → capturado por try/catch, fallback EMPTY.
+//   Nunca crash. Nunca hidratação ambígua.
+//
+// Estratégia de hidratação/escrita:
+//   Leitura: UMA VEZ, na inicialização do módulo (antes do primeiro render).
+//   Escrita: a cada onChatSuccess() — síncrona, antes de _rebuild() e _notify().
+//   setDemoOverride/clearDemoOverride não escrevem em storage (in-memory apenas).
+//   O sessionStorage é referenciado SOMENTE dentro deste arquivo.
 // ============================================================================
 
 import { useSyncExternalStore } from "react";
 import { PLAN_STATUS } from "../api";
 
-// ── Valid status set — used to guard setDemoOverride ─────────────────────────
+// ── Storage key — never hardcoded outside this file ──────────────────────────
+export const PLANNER_STORAGE_KEY = "enavia_planner_state";
+
+// ── Valid status set — used to guard setDemoOverride and hydration ────────────
 const _VALID_STATUSES = new Set(Object.values(PLAN_STATUS));
 
-// ── Singleton state ──────────────────────────────────────────────────────────
+// ── Storage helpers ──────────────────────────────────────────────────────────
 
-let _realState    = PLAN_STATUS.EMPTY;
-let _demoOverride = null;
-let _lastChatText = null;
+function _readFromStorage() {
+  try {
+    const raw = sessionStorage.getItem(PLANNER_STORAGE_KEY);
+    if (raw === null) return null; // key absent — use defaults
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !_VALID_STATUSES.has(parsed.realState)
+    ) {
+      // Invalid structure or out-of-enum realState — clean up and use defaults.
+      sessionStorage.removeItem(PLANNER_STORAGE_KEY);
+      return null;
+    }
+    return {
+      realState:    parsed.realState,
+      // lastChatText: discard if not a non-empty string; keep key intact.
+      lastChatText: typeof parsed.lastChatText === "string" && parsed.lastChatText.length > 0
+        ? parsed.lastChatText
+        : null,
+    };
+  } catch {
+    // JSON.parse error or sessionStorage unavailable — clean up if possible.
+    try { sessionStorage.removeItem(PLANNER_STORAGE_KEY); } catch { /* ignore */ }
+    return null;
+  }
+}
+
+function _writeToStorage(realState, lastChatText) {
+  try {
+    sessionStorage.setItem(
+      PLANNER_STORAGE_KEY,
+      JSON.stringify({ realState, lastChatText }),
+    );
+  } catch { /* sessionStorage unavailable — silent, state is still in-memory */ }
+}
+
+// ── Singleton state — hydrated once at module init ───────────────────────────
+
+const _hydrated = _readFromStorage();
+
+let _realState    = _hydrated ? _hydrated.realState    : PLAN_STATUS.EMPTY;
+let _demoOverride = null; // never persisted — always starts as null
+let _lastChatText = _hydrated ? _hydrated.lastChatText : null;
 
 // ── Snapshot cache ───────────────────────────────────────────────────────────
 // useSyncExternalStore exige referência estável quando o estado não mudou.
@@ -95,6 +154,10 @@ export function onChatSuccess(text) {
   // fallback with whitespace-only or non-string values.
   const trimmed = typeof text === "string" ? text.trim() : "";
   _lastChatText = trimmed.length > 0 ? trimmed : null;
+
+  // Persist real state. demoOverride is intentionally excluded — it is a
+  // transient visual layer and must never survive a reload.
+  _writeToStorage(_realState, _lastChatText);
 
   _rebuild();
   _notify();
