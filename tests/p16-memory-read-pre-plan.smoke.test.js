@@ -321,5 +321,3 @@ runTests().catch((err) => {
   console.error("Fatal error in P16 smoke tests:", err);
   process.exit(1);
 });
-
-
