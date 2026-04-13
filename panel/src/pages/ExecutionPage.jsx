@@ -10,6 +10,7 @@ import CodeTrailCard from "../execution/CodeTrailCard";
 import ResultBlock from "../execution/ResultBlock";
 import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
+import UnifiedReplayBlock from "../execution/UnifiedReplayBlock";
 
 export default function ExecutionPage() {
   const { currentState } = useExecutionStore();
@@ -108,6 +109,16 @@ export default function ExecutionPage() {
               {/* Completed: result hero comes first */}
               {isCompleted && execution?.result && (
                 <ResultBlock result={execution.result} />
+              )}
+
+              {/* Unified replay — F5-PR4: consolidated view for completed/blocked/failed */}
+              {(isCompleted || hasError) && (
+                <UnifiedReplayBlock
+                  events={execution?.events ?? []}
+                  browserEvents={execution?.browserEvents ?? []}
+                  codeEvents={execution?.codeEvents ?? []}
+                  executionSummary={execution?.executionSummary ?? null}
+                />
               )}
 
               {/* Timeline — dominant in running, history in completed */}
