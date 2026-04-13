@@ -286,6 +286,15 @@ export const MOCK_EXECUTIONS = {
         "Calculando cronograma baseado em capacidade e precedências identificadas",
       startedAt: "2026-04-12T01:52:10Z",
     },
+    // Campos operacionais — surface da Frente 5
+    operation: {
+      action: "Calculando cronograma de capacidade regional",
+      contract: "canonical_plan_v1",
+      microStep: "Validando precedências entre etapas e janelas de entrega",
+      reason:
+        "Dados de capacidade identificados nas etapas 1 e 2; estimando janela de entrega para a região Sul",
+      nextStep: "Etapa 4 — Geração do plano canônico",
+    },
     events: RUNNING_EVENTS,
     result: null,
     error: null,
