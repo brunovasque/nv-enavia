@@ -75,6 +75,7 @@ function runTests() {
   assert("operacao_atual" in runningEvent, "G1: campo operacao_atual presente");
   assert("motivo_curto"   in runningEvent, "G1: campo motivo_curto presente");
   assert("patch_atual"    in runningEvent, "G1: campo patch_atual presente");
+  assert("emitted_at"     in runningEvent, "G1: campo emitted_at presente (metadata)");
 
   // ---- Group 2: Tipos e invariantes ----
   console.log("\nGroup 2: Tipos e invariantes por campo");
@@ -161,7 +162,8 @@ function runTests() {
   // ---- Group 5b: Contém os 6 campos exatos do contrato ----
   console.log("\nGroup 5b: Contém exatamente os 6 campos do contrato desta PR");
 
-  const REQUIRED = ["status_atual", "arquivo_atual", "bloco_atual", "operacao_atual", "motivo_curto", "patch_atual"];
+  // 6 canonical fields (contract PR1) + emitted_at (metadata)
+  const REQUIRED = ["status_atual", "arquivo_atual", "bloco_atual", "operacao_atual", "motivo_curto", "patch_atual", "emitted_at"];
   for (const field of REQUIRED) {
     assert(field in runningEvent, `G5b: campo obrigatório '${field}' presente`);
   }

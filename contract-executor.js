@@ -2184,19 +2184,22 @@ function _resolveExecutorArtifactsFromLog(cycles) {
 const EXECUTION_STATUSES = ["pending", "running", "success", "failed", "skipped"];
 
 // ---------------------------------------------------------------------------
-// PR1 — Minimal real exec event (6 canonical fields)
+// PR1 — Minimal real exec event (6 canonical fields + 1 metadata field)
 //
 // buildExecEvent(status, handoff, microPrId, motivo)
-//   Builds the 6-field object from real runtime values inside executeCurrentMicroPr.
+//   Builds the event object from real runtime values inside executeCurrentMicroPr.
 //   Pure function — no side effects, no KV, no fetch.
 //
-// Fields:
+// Canonical fields (contract PR1):
 //   status_atual   — "running" | "success" | "failed"
 //   arquivo_atual  — comma-joined target files from the handoff
 //   bloco_atual    — source task ID (e.g. "task_001")
 //   operacao_atual — task objective / description
 //   motivo_curto   — null on success; trimmed error message on failure (max 120 chars)
 //   patch_atual    — micro-PR candidate ID (e.g. "micro_pr_001")
+//
+// Metadata field (audit / ordering):
+//   emitted_at     — ISO 8601 timestamp of emission
 // ---------------------------------------------------------------------------
 function buildExecEvent(status, handoff, microPrId, motivo) {
   return {
