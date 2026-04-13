@@ -295,6 +295,19 @@ export const MOCK_EXECUTIONS = {
         "Dados de capacidade identificados nas etapas 1 e 2; estimando janela de entrega para a região Sul",
       nextStep: "Etapa 4 — Geração do plano canônico",
     },
+    // Trilha de código — surface da Frente 5 PR3 (demo/mock — não é runtime real)
+    codeTrail: {
+      file: "contract-executor.js",
+      block: "resolveStep(stepId, context)",
+      operationType: "VALIDATE",
+      diffSummary:
+        "+  stepsCompleted += 1;\n" +
+        "+  validatePrecedences(context.steps);\n" +
+        "-  // lógica anterior de contagem inline removida",
+      justification:
+        "Contagem de etapas ajustada para refletir estado atual do ciclo cognitivo — dependência identificada na etapa 2",
+      outOfScope: "Replay completo · Worker integration · noVNC · backend profundo",
+    },
     events: RUNNING_EVENTS,
     result: null,
     error: null,
