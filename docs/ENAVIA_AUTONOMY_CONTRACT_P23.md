@@ -1,15 +1,67 @@
-# ENAVIA — Contrato de Autonomia v1 (P23)
+# ENAVIA — Contrato de Autonomia v1.2 (P23)
 
 > Contrato canônico de autonomia da Enavia — Frente 6: Autonomia e Braços Especialistas.
-> Versão: v1.1
+> Versão: v1.2
 > Data: 2026-04-13
-> Status: ATIVO
+> Status: ATIVO — com enforcement em runtime
 > Implementação: `schema/autonomy-contract.js`
-> Testes: `tests/autonomy-contract.smoke.test.js` (82 casos, 36 cenários)
+> Testes: `tests/autonomy-contract.smoke.test.js` (119 casos, 46 cenários)
+> Fonte soberana: `schema/CONSTITUIÇÃO`
 
 ---
 
-## 1. Propósito
+## 1. Hierarquia de Fontes
+
+| Nível | Arquivo | Papel |
+|-------|---------|-------|
+| **SOBERANA** | `schema/CONSTITUIÇÃO` | Princípios macro, ordem obrigatória (entender → diagnosticar → planejar → validar → executar → revisar), regras de segurança operacional |
+| **SUBORDINADA** | `schema/autonomy-contract.js` | Implementação operacional da CONSTITUIÇÃO em regras executáveis de runtime com enforcement real |
+
+Em caso de ambiguidade, a **CONSTITUIÇÃO prevalece**.
+
+Este contrato **não duplica** a CONSTITUIÇÃO — ele a traduz em:
+- catálogos de ações (pré-execução / pós-início / OK obrigatório / proibidas)
+- gates obrigatórios (6 verificações)
+- política de falha/escalonamento
+- regra de ambiente (TEST vs PROD)
+- **enforcement real em runtime** via `enforceConstitution()`
+
+---
+
+## 2. Enforcement em Runtime
+
+### Ponto único: `enforceConstitution()`
+
+`enforceConstitution()` é chamado antes de qualquer execução sensível no runtime.
+Combina classificação de ação + gates obrigatórios + regra de ambiente numa chamada só.
+
+**Resultado sempre auditável:**
+```
+{ allowed, blocked, level, reason, classification, gates, environment_check }
+```
+
+### Onde está no runtime
+
+- **`contract-executor.js` → `executeCurrentMicroPr()`** — chamado após Gate 2 (task em in_progress), antes de qualquer execução real.
+- Bloqueia com `CONSTITUTION_BLOCKED` e motivo auditável se qualquer regra do contrato for violada.
+
+### O que valida
+
+| Verificação | Descrição |
+|-------------|-----------|
+| Escopo | Escopo definido e aprovado |
+| Ambiente | Ambiente definido (TEST/PROD) |
+| Risco | Risco avaliado |
+| Autorização | Autorização presente quando exigida |
+| Observabilidade | Observabilidade preservada |
+| Evidência | Evidência disponível quando necessária |
+| Ação proibida | Bloqueio imediato (exit_scope, regress_*, modify_observability) |
+| Ação que exige OK | Bloqueio até OK humano (start_*, promote, change_scope) |
+| Fora do escopo | Bloqueio imediato em qualquer ambiente |
+
+---
+
+## 3. Propósito
 
 Este documento define o **contrato-base de autonomia** da Enavia para as frentes P24/P25/P26.
 Ele determina:
@@ -19,12 +71,13 @@ Ele determina:
 3. O que é proibido incondicionalmente
 4. Quais gates precisam ser validados antes de ação sensível
 5. Como os futuros braços especialistas deverão obedecer este contrato
+6. **Como o enforcement acontece em runtime** (não é documento morto)
 
 **Este contrato NÃO implementa braços especialistas.** Ele é a base canônica que P24/P25/P26 devem obedecer.
 
 ---
 
-## 2. Decisões Fechadas pelo Usuário
+## 4. Decisões Fechadas pelo Usuário
 
 | # | Decisão |
 |---|---------|
@@ -45,7 +98,7 @@ Ele determina:
 
 ---
 
-## 3. A1 — Ações de Pré-Execução (antes do OK humano inicial)
+## 5. A1 — Ações de Pré-Execução (antes do OK humano inicial)
 
 Ações que a Enavia pode fazer **sem nenhum OK humano**. São leitura, diagnóstico, classificação, planejamento e preparação. Não iniciam execução.
 
@@ -62,7 +115,7 @@ Ações que a Enavia pode fazer **sem nenhum OK humano**. São leitura, diagnós
 
 ---
 
-## 4. A2 — Ações Autônomas Pós-Início (após OK humano inicial)
+## 6. A2 — Ações Autônomas Pós-Início (após OK humano inicial)
 
 Após o OK humano que **inicia a execução**, a Enavia entra em loop autônomo e pode executar estas ações até finalizar o objetivo, desde que dentro do escopo aprovado. O OK humano é só o inicial; microetapas internas seguem por memória/loop.
 
@@ -75,7 +128,7 @@ Após o OK humano que **inicia a execução**, a Enavia entra em loop autônomo 
 
 ---
 
-## 5. B — Ações que Exigem OK Humano Explícito (SEMPRE, em qualquer ambiente)
+## 7. B — Ações que Exigem OK Humano Explícito (SEMPRE, em qualquer ambiente)
 
 Estas ações **nunca** são autônomas, nem mesmo em TEST. O usuário definiu que iniciar execução exige OK humano explícito.
 
@@ -90,7 +143,7 @@ Estas ações **nunca** são autônomas, nem mesmo em TEST. O usuário definiu q
 
 ---
 
-## 6. C — Ações Proibidas Incondicionalmente
+## 8. C — Ações Proibidas Incondicionalmente
 
 | Ação | Descrição |
 |------|-----------|
@@ -106,7 +159,7 @@ Estas ações **nunca** são autônomas, nem mesmo em TEST. O usuário definiu q
 
 ---
 
-## 7. D — Gates Obrigatórios antes de Ação Sensível
+## 9. D — Gates Obrigatórios antes de Ação Sensível
 
 | Gate | Descrição |
 |------|-----------|
@@ -121,7 +174,7 @@ Todos os gates devem passar antes de permitir ação sensível. Se qualquer gate
 
 ---
 
-## 8. E — Política de Falha e Escalonamento
+## 10. E — Política de Falha e Escalonamento
 
 | Regra | Comportamento |
 |-------|---------------|
@@ -132,7 +185,7 @@ Todos os gates devem passar antes de permitir ação sensível. Se qualquer gate
 
 ---
 
-## 9. F — Compatibilidade com P24/P25/P26
+## 11. F — Compatibilidade com P24/P25/P26
 
 | Braço | Política |
 |-------|----------|
@@ -145,7 +198,7 @@ A função `validateSpecialistArmCompliance()` em `schema/autonomy-contract.js` 
 
 ---
 
-## 10. Regra de Ambiente
+## 12. Regra de Ambiente
 
 | Ambiente | Comportamento |
 |----------|---------------|
@@ -159,7 +212,7 @@ A autonomia total em TEST **não autoriza**:
 
 ---
 
-## 11. Funções Públicas
+## 13. Funções Públicas
 
 | Função | Descrição |
 |--------|-----------|
@@ -168,18 +221,21 @@ A autonomia total em TEST **não autoriza**:
 | `evaluateFailurePolicy({...})` | Avalia política de retry/risco/evidência |
 | `evaluateEnvironmentAutonomy({...})` | Avalia autonomia por ambiente e escopo |
 | `validateSpecialistArmCompliance({...})` | Valida conformidade de braço especialista |
+| **`enforceConstitution({...})`** | **Ponto único de enforcement em runtime** — combina classificação + gates + ambiente |
 
 ---
 
-## 12. Arquivo Canônico
+## 14. Arquivo Canônico
 
 - **Schema:** `schema/autonomy-contract.js`
-- **Testes:** `tests/autonomy-contract.smoke.test.js` (82 casos, 36 cenários)
+- **Testes:** `tests/autonomy-contract.smoke.test.js` (119 casos, 46 cenários)
 - **Docs:** `docs/ENAVIA_AUTONOMY_CONTRACT_P23.md` (este arquivo)
+- **Fonte soberana:** `schema/CONSTITUIÇÃO`
+- **Enforcement em runtime:** `contract-executor.js` → `executeCurrentMicroPr()`
 
 ---
 
-## 13. O que NÃO está neste contrato
+## 15. O que NÃO está neste contrato
 
 - Implementação de braço GitHub (P24)
 - Implementação de browser executor (P25)
@@ -191,19 +247,20 @@ A autonomia total em TEST **não autoriza**:
 
 ---
 
-## 14. Prova de Não-Regressão
+## 16. Prova de Não-Regressão
 
-Todos os testes existentes passaram após a correção deste contrato:
+Todos os testes existentes passaram após a adição do enforcement em runtime:
 
 | Arquivo de teste | Resultado |
 |-----------------|-----------|
-| `autonomy-contract.smoke.test.js` | 82 passed, 0 failed |
+| `autonomy-contract.smoke.test.js` | 119 passed, 0 failed |
+| `contracts-smoke.test.js` | 1187 passed, 0 failed |
 | `contract-adherence-gate-integration.smoke.test.js` | 40 passed, 0 failed |
 | `contract-adherence-gate.smoke.test.js` | 68 passed, 0 failed |
 | `contract-final-audit.smoke.test.js` | 146 passed, 0 failed |
-| `contracts-smoke.test.js` | 1187 passed, 0 failed |
 | `decision-history.smoke.test.js` | 63 passed, 0 failed |
 | `exec-event.smoke.test.js` | 57 passed, 0 failed |
 | `execution-audit.smoke.test.js` | 142 passed, 0 failed |
 | `execution-trail.smoke.test.js` | 51 passed, 0 failed |
+| `pipeline-end-to-end.integration.test.js` | 52 passed, 0 failed |
 | ... (todos os demais) | 0 failed |

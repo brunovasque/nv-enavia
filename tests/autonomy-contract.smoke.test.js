@@ -1,5 +1,5 @@
 // ============================================================================
-// 🧪 Smoke Tests — ENAVIA Autonomy Contract v1 (P23)
+// 🧪 Smoke Tests — ENAVIA Autonomy Contract v1.2 (P23)
 //
 // Run: node tests/autonomy-contract.smoke.test.js
 //
@@ -40,6 +40,16 @@
 //   S34. HUMAN_OK_REQUIRED_ACTIONS includes all start_* actions
 //   S35. evaluateEnvironmentAutonomy — TEST + act_on_undefined_external_service → requires human
 //   S36. evaluateEnvironmentAutonomy — TEST + pre-execution read → autonomous
+//   S37. enforceConstitution — allowed execution in TEST within scope
+//   S38. enforceConstitution — blocked: prohibited action (exit_scope)
+//   S39. enforceConstitution — blocked: gates fail (scope not defined)
+//   S40. enforceConstitution — blocked: start_plan_execution requires human OK in TEST
+//   S41. enforceConstitution — blocked: promote_to_prod in PROD requires human OK
+//   S42. enforceConstitution — blocked: out of scope
+//   S43. enforceConstitution — allowed: pre-execution read in PROD (no gates issue)
+//   S44. enforceConstitution — auditable reason always present
+//   S45. enforceConstitution — throws on invalid params
+//   S46. enforceConstitution — blocked: start_task_execution in PROD
 // ============================================================================
 
 import {
@@ -58,6 +68,7 @@ import {
   evaluateFailurePolicy,
   evaluateEnvironmentAutonomy,
   validateSpecialistArmCompliance,
+  enforceConstitution,
 } from "../schema/autonomy-contract.js";
 
 let passed = 0;
@@ -497,6 +508,218 @@ console.log("S36. evaluateEnvironmentAutonomy — TEST + pre-execution read → 
   });
   assert(r.autonomy_level === AUTONOMY_LEVEL.AUTONOMOUS, "TEST + read_only_diagnostic → autonomous");
   assert(r.can_proceed === true, "can_proceed = true");
+}
+
+// ── S37. enforceConstitution — allowed execution in TEST within scope ────────
+console.log("S37. enforceConstitution — allowed execution in TEST within scope");
+{
+  const r = enforceConstitution({
+    action: "execute_in_test_within_scope",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === true, "allowed = true");
+  assert(r.blocked === false, "blocked = false");
+  assert(typeof r.reason === "string" && r.reason.length > 0, "reason is auditable string");
+  assert(r.classification !== null, "classification present");
+  assert(r.gates !== null, "gates present");
+  assert(r.environment_check !== null, "environment_check present");
+}
+
+// ── S38. enforceConstitution — blocked: prohibited action ───────────────────
+console.log("S38. enforceConstitution — blocked: prohibited action (exit_scope)");
+{
+  const r = enforceConstitution({
+    action: "exit_scope",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === false, "allowed = false (prohibited action)");
+  assert(r.blocked === true, "blocked = true");
+  assert(r.level === AUTONOMY_LEVEL.PROHIBITED, "level = prohibited");
+  assert(r.reason.includes("proibida"), "reason mentions prohibition");
+  assert(r.gates === null, "gates null (blocked before gates check)");
+}
+
+// ── S39. enforceConstitution — blocked: gates fail ──────────────────────────
+console.log("S39. enforceConstitution — blocked: gates fail (scope not defined)");
+{
+  const r = enforceConstitution({
+    action: "execute_in_test_within_scope",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: false,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === false, "allowed = false (gate failed)");
+  assert(r.blocked === true, "blocked = true");
+  assert(r.level === "blocked_by_gates", "level = blocked_by_gates");
+  assert(r.gates !== null, "gates result present");
+  assert(r.gates.failed_gates.includes("scope_defined"), "scope_defined in failed gates");
+}
+
+// ── S40. enforceConstitution — blocked: start_plan_execution in TEST ────────
+console.log("S40. enforceConstitution — blocked: start_plan_execution requires human OK in TEST");
+{
+  const r = enforceConstitution({
+    action: "start_plan_execution",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === false, "allowed = false (start requires human OK)");
+  assert(r.blocked === true, "blocked = true");
+  assert(r.level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "level = requires_human_ok");
+  assert(typeof r.reason === "string" && r.reason.length > 0, "reason is auditable");
+}
+
+// ── S41. enforceConstitution — blocked: promote_to_prod in PROD ─────────────
+console.log("S41. enforceConstitution — blocked: promote_to_prod in PROD requires human OK");
+{
+  const r = enforceConstitution({
+    action: "promote_to_prod",
+    environment: ENVIRONMENT.PROD,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === false, "allowed = false (promote requires human OK)");
+  assert(r.blocked === true, "blocked = true");
+  assert(typeof r.reason === "string" && r.reason.length > 0, "reason is auditable");
+}
+
+// ── S42. enforceConstitution — blocked: out of scope ────────────────────────
+console.log("S42. enforceConstitution — blocked: out of scope");
+{
+  const r = enforceConstitution({
+    action: "execute_in_test_within_scope",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: false,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === false, "allowed = false (out of scope)");
+  assert(r.blocked === true, "blocked = true");
+  assert(r.reason.includes("escopo"), "reason mentions scope");
+}
+
+// ── S43. enforceConstitution — allowed: pre-execution read in PROD ──────────
+console.log("S43. enforceConstitution — allowed: pre-execution read in PROD");
+{
+  const r = enforceConstitution({
+    action: "read",
+    environment: ENVIRONMENT.PROD,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === true, "allowed = true (read is safe in PROD)");
+  assert(r.blocked === false, "blocked = false");
+}
+
+// ── S44. enforceConstitution — auditable reason always present ──────────────
+console.log("S44. enforceConstitution — auditable reason always present");
+{
+  // Allowed case
+  const r1 = enforceConstitution({
+    action: "read",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true, environment_defined: true, risk_assessed: true,
+      authorization_present_when_required: true, observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(typeof r1.reason === "string" && r1.reason.length > 5, "allowed: reason is non-trivial string");
+
+  // Blocked case
+  const r2 = enforceConstitution({
+    action: "exit_scope",
+    environment: ENVIRONMENT.TEST,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true, environment_defined: true, risk_assessed: true,
+      authorization_present_when_required: true, observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(typeof r2.reason === "string" && r2.reason.length > 5, "blocked: reason is non-trivial string");
+}
+
+// ── S45. enforceConstitution — throws on invalid params ─────────────────────
+console.log("S45. enforceConstitution — throws on invalid params");
+assertThrows(() => enforceConstitution({}), "missing action throws");
+assertThrows(() => enforceConstitution({ action: "read" }), "missing environment throws");
+assertThrows(() => enforceConstitution({ action: "read", environment: "TEST" }), "missing scope_approved throws");
+assertThrows(() => enforceConstitution({ action: "read", environment: "TEST", scope_approved: true }), "missing gates_context throws");
+
+// ── S46. enforceConstitution — blocked: start_task_execution in PROD ────────
+console.log("S46. enforceConstitution — blocked: start_task_execution in PROD");
+{
+  const r = enforceConstitution({
+    action: "start_task_execution",
+    environment: ENVIRONMENT.PROD,
+    scope_approved: true,
+    gates_context: {
+      scope_defined: true,
+      environment_defined: true,
+      risk_assessed: true,
+      authorization_present_when_required: true,
+      observability_preserved: true,
+      evidence_available_when_required: true,
+    },
+  });
+  assert(r.allowed === false, "allowed = false (start_task in PROD requires human OK)");
+  assert(r.blocked === true, "blocked = true");
+  assert(r.level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "level = requires_human_ok");
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────

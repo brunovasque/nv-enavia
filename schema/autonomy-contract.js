@@ -1,12 +1,27 @@
 // ============================================================================
-// 📦 ENAVIA — Autonomy Contract v1 (P23 — Frente 6: Autonomia e Braços)
+// 📦 ENAVIA — Autonomy Contract v1.2 (P23 — Frente 6: Autonomia e Braços)
 //
-// Contrato canônico de autonomia da Enavia.
-// Define o que a Enavia pode fazer sozinha, o que exige OK humano,
-// o que é proibido, quais gates devem ser validados antes de ação sensível,
-// e como futuros braços especialistas (P24/P25/P26) devem obedecer.
+// ─── HIERARQUIA DE FONTES ───────────────────────────────────────────────────
 //
-// Decisões fechadas pelo usuário:
+//   SOBERANA:      schema/CONSTITUIÇÃO (Constituição da ENAVIA Pessoal v1)
+//   SUBORDINADA:   schema/autonomy-contract.js (ESTE ARQUIVO)
+//
+//   A CONSTITUIÇÃO define os princípios macro e a ordem obrigatória:
+//     entender → diagnosticar → planejar → validar → executar → revisar
+//
+//   Este contrato é a implementação operacional subordinada à CONSTITUIÇÃO.
+//   Traduz princípios em regras executáveis de runtime com enforcement real.
+//   Em caso de ambiguidade, a CONSTITUIÇÃO prevalece.
+//
+// ─── ENFORCEMENT EM RUNTIME ─────────────────────────────────────────────────
+//
+//   enforceConstitution() é o ponto único de validação obrigatória.
+//   Chamado antes de qualquer execução sensível no runtime.
+//   Combina: classificação de ação + gates obrigatórios + regra de ambiente.
+//   Resultado: { allowed, blocked, level, reason } — sempre auditável.
+//
+// ─── DECISÕES FECHADAS PELO USUÁRIO ─────────────────────────────────────────
+//
 //   1. Após definição de plano/contrato/tarefa → só inicia com OK humano.
 //   2. Após início → loop autônomo até finalizar o objetivo.
 //   3. Em TEST → autonomia total dentro do escopo aprovado.
@@ -544,6 +559,110 @@ function validateSpecialistArmCompliance({ arm_id, action, gates_context } = {})
 }
 
 // ---------------------------------------------------------------------------
+// enforceConstitution({ action, environment, scope_approved, gates_context })
+//
+// Ponto ÚNICO de enforcement em runtime.
+// Combina classificação + gates + regra de ambiente numa chamada só.
+// Deve ser chamado antes de qualquer execução sensível.
+//
+// Hierarquia: subordinado à schema/CONSTITUIÇÃO (princípios macro).
+// Este é o enforcement operacional que traduz a CONSTITUIÇÃO em bloqueio real.
+//
+// Parâmetros:
+//   action         {string}  — identificador da ação
+//   environment    {string}  — "TEST" | "PROD"
+//   scope_approved {boolean} — se a ação está dentro do escopo aprovado
+//   gates_context  {object}  — contexto para avaliação dos 6 gates obrigatórios
+//
+// Retorna:
+//   {
+//     allowed,          — boolean
+//     blocked,          — boolean (inverso de allowed)
+//     level,            — string: nível de autonomia ou motivo de bloqueio
+//     reason,           — string auditável (motivo curto e claro)
+//     classification,   — resultado de classifyAction
+//     gates,            — resultado de evaluateGates (ou null se bloqueado antes)
+//     environment_check — resultado de evaluateEnvironmentAutonomy (ou null)
+//   }
+//
+// Lança:
+//   Error — se action, environment, scope_approved ou gates_context ausentes/inválidos
+// ---------------------------------------------------------------------------
+function enforceConstitution({ action, environment, scope_approved, gates_context } = {}) {
+  if (typeof action !== "string" || action.trim() === "") {
+    throw new Error("enforceConstitution: 'action' é obrigatório e deve ser string não-vazia");
+  }
+  if (typeof environment !== "string" || !Object.values(ENVIRONMENT).includes(environment)) {
+    throw new Error(
+      `enforceConstitution: 'environment' deve ser "${ENVIRONMENT.TEST}" ou "${ENVIRONMENT.PROD}"`
+    );
+  }
+  if (typeof scope_approved !== "boolean") {
+    throw new Error("enforceConstitution: 'scope_approved' é obrigatório e deve ser boolean");
+  }
+  if (!gates_context || typeof gates_context !== "object") {
+    throw new Error("enforceConstitution: 'gates_context' é obrigatório e deve ser um objeto");
+  }
+
+  const a = action.trim();
+
+  // ── STEP 1: Classificar a ação ──
+  const classification = classifyAction(a);
+
+  // Ação proibida → bloqueio imediato, sem avaliar gates
+  if (classification.autonomy_level === AUTONOMY_LEVEL.PROHIBITED) {
+    return {
+      allowed: false,
+      blocked: true,
+      level: AUTONOMY_LEVEL.PROHIBITED,
+      reason: classification.reason,
+      classification,
+      gates: null,
+      environment_check: null,
+    };
+  }
+
+  // ── STEP 2: Avaliar gates obrigatórios ──
+  const gates = evaluateGates(gates_context);
+  if (!gates.all_gates_passed) {
+    return {
+      allowed: false,
+      blocked: true,
+      level: "blocked_by_gates",
+      reason: gates.reason,
+      classification,
+      gates,
+      environment_check: null,
+    };
+  }
+
+  // ── STEP 3: Avaliar regra de ambiente + escopo ──
+  const environment_check = evaluateEnvironmentAutonomy({ environment, action: a, scope_approved });
+  if (!environment_check.can_proceed) {
+    return {
+      allowed: false,
+      blocked: true,
+      level: environment_check.autonomy_level,
+      reason: environment_check.reason,
+      classification,
+      gates,
+      environment_check,
+    };
+  }
+
+  // ── TUDO PASSOU → ação permitida ──
+  return {
+    allowed: true,
+    blocked: false,
+    level: classification.autonomy_level,
+    reason: `Constituição OK: ação '${a}' permitida — classificação=${classification.autonomy_level}, gates=passed, ambiente=${environment}, escopo=aprovado.`,
+    classification,
+    gates,
+    environment_check,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 export {
@@ -567,4 +686,7 @@ export {
   evaluateFailurePolicy,
   evaluateEnvironmentAutonomy,
   validateSpecialistArmCompliance,
+
+  // Runtime enforcement (single entry point)
+  enforceConstitution,
 };

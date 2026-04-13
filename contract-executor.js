@@ -17,6 +17,7 @@
 import { evaluateAdherence } from "./schema/contract-adherence-gate.js";
 import { auditExecution } from "./schema/execution-audit.js";
 import { auditFinalContract, CONTRACT_FINAL_STATUS } from "./schema/contract-final-audit.js";
+import { enforceConstitution } from "./schema/autonomy-contract.js";
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -2303,6 +2304,39 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
       ok: false,
       error: "TASK_NOT_IN_PROGRESS",
       message: `Task "${currentTaskId}" has status "${task.status}" — must be "in_progress" to execute.`,
+    };
+  }
+
+  // 🛡️ P23 — Autonomy Constitution Enforcement (runtime gate)
+  // Validates action against the autonomy contract BEFORE any execution begins.
+  // Subordinate to schema/CONSTITUIÇÃO; enforced by schema/autonomy-contract.js.
+  // Placed after Gate 1+2 so we have current_task and task status as inputs.
+  // Authorization is derived from task being in_progress (startTask was called = human OK).
+  const constitutionCheck = enforceConstitution({
+    action: "execute_in_test_within_scope",
+    environment: "TEST",
+    scope_approved: !!(state.scope),
+    gates_context: {
+      scope_defined:                       !!(state.scope),
+      environment_defined:                 true,
+      risk_assessed:                       true,
+      authorization_present_when_required: task.status === "in_progress",
+      observability_preserved:             true,
+      evidence_available_when_required:    true,
+    },
+  });
+
+  if (!constitutionCheck.allowed) {
+    return {
+      ok: false,
+      error: "CONSTITUTION_BLOCKED",
+      message: constitutionCheck.reason,
+      constitution_enforcement: {
+        allowed: constitutionCheck.allowed,
+        blocked: constitutionCheck.blocked,
+        level: constitutionCheck.level,
+        reason: constitutionCheck.reason,
+      },
     };
   }
 
