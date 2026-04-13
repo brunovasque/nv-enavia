@@ -316,6 +316,19 @@ export const MOCK_EXECUTIONS = {
       status: "running",
       actionSummary: "Validando precedências entre etapas e calculando janela de entrega",
     },
+    // Diff incremental visual — Nova frente PR2 (demo/mock — não é runtime real)
+    incrementalDiff: {
+      file: "contract-executor.js",
+      block: "resolveStep(stepId, context)",
+      lines: [
+        { type: "neutral", content: "function resolveStep(stepId, context) {" },
+        { type: "remove",  content: "  // lógica anterior de contagem inline removida" },
+        { type: "add",     content: "  stepsCompleted += 1;" },
+        { type: "add",     content: "  validatePrecedences(context.steps);" },
+        { type: "neutral", content: "}" },
+      ],
+      changeSummary: "Contagem de etapas ajustada; precedências validadas via validatePrecedences()",
+    },
     events: RUNNING_EVENTS,
     result: null,
     error: null,

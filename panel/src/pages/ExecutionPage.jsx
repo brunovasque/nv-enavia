@@ -8,6 +8,7 @@ import ExecutionTimeline from "../execution/ExecutionTimeline";
 import OperationalLiveCard from "../execution/OperationalLiveCard";
 import CodeTrailCard from "../execution/CodeTrailCard";
 import LiveTrailCard from "../execution/LiveTrailCard";
+import IncrementalDiffCard from "../execution/IncrementalDiffCard";
 import ResultBlock from "../execution/ResultBlock";
 import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
@@ -101,6 +102,11 @@ export default function ExecutionPage() {
           {/* Live trail surface — Nova frente PR1 */}
           {isRunning && (
             <LiveTrailCard liveTrail={execution?.liveTrail ?? null} />
+          )}
+
+          {/* Incremental diff surface — Nova frente PR2 */}
+          {isRunning && (
+            <IncrementalDiffCard incrementalDiff={execution?.incrementalDiff ?? null} />
           )}
 
           {/* Body: main (timeline) + sidebar */}
