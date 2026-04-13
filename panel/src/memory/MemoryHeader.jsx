@@ -1,8 +1,32 @@
 // ============================================================================
-// MemoryHeader — stats + filter tabs + state switcher (demo)
+// MemoryHeader — stats + filter tabs + secondary filters (tier, priority) + state switcher (demo)
 // ============================================================================
 
 import { MEMORY_STATES, MEMORY_FILTERS } from "./mockMemory";
+
+const TIER_LABELS = {
+  1: "Tier 1",
+  2: "Tier 2",
+  3: "Tier 3",
+  4: "Tier 4",
+  5: "Tier 5",
+  6: "Tier 6",
+  7: "Tier 7",
+};
+
+const PRIORITY_LABELS = {
+  critical: "Crítica",
+  high:     "Alta",
+  medium:   "Média",
+  low:      "Baixa",
+};
+
+const PRIORITY_ACCENTS = {
+  critical: { color: "#EF4444", bg: "rgba(239,68,68,0.1)",   border: "rgba(239,68,68,0.3)" },
+  high:     { color: "#F59E0B", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.3)" },
+  medium:   { color: "var(--color-primary)", bg: "var(--color-primary-glow)", border: "var(--color-primary-border)" },
+  low:      { color: "var(--text-muted)", bg: "rgba(100,116,139,0.1)", border: "rgba(100,116,139,0.25)" },
+};
 
 const STATE_META = {
   [MEMORY_STATES.POPULATED]: {
@@ -70,6 +94,12 @@ export default function MemoryHeader({
   onStateChange,
   activeFilter,
   onFilterChange,
+  tierFilter,
+  onTierFilterChange,
+  priorityFilter,
+  onPriorityFilterChange,
+  availableTiers,
+  availablePriorities,
 }) {
   const meta = STATE_META[currentState];
   const { summary } = memory;
@@ -123,7 +153,7 @@ export default function MemoryHeader({
         />
       </div>
 
-      {/* Filter tabs */}
+      {/* Filter tabs — type */}
       <div style={s.filters} role="group" aria-label="Filtrar entradas">
         {Object.values(MEMORY_FILTERS).map((f) => {
           const active = f === activeFilter;
@@ -170,6 +200,84 @@ export default function MemoryHeader({
           );
         })}
       </div>
+
+      {/* Secondary filters — tier + priority (P18-PR2) */}
+      {(availableTiers?.length > 0 || availablePriorities?.length > 0) && (
+        <div style={s.secondaryFilters} role="group" aria-label="Filtros secundários: tier e prioridade">
+          {/* Tier filter */}
+          {availableTiers?.length > 0 && (
+            <div style={s.filterGroup}>
+              <span style={s.filterGroupLabel}>Tier:</span>
+              <button
+                style={{
+                  ...s.secFilterBtn,
+                  ...(tierFilter === "all" ? s.secFilterBtnActive : {}),
+                }}
+                onClick={() => onTierFilterChange("all")}
+                aria-pressed={tierFilter === "all"}
+              >
+                Todos
+              </button>
+              {availableTiers.map((t) => {
+                const active = tierFilter === String(t);
+                return (
+                  <button
+                    key={t}
+                    style={{
+                      ...s.secFilterBtn,
+                      ...(active ? s.secFilterBtnActive : {}),
+                    }}
+                    onClick={() => onTierFilterChange(active ? "all" : String(t))}
+                    aria-pressed={active}
+                  >
+                    {TIER_LABELS[t] ?? `Tier ${t}`}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {availableTiers?.length > 0 && availablePriorities?.length > 0 && (
+            <div style={s.filterSep} aria-hidden="true" />
+          )}
+
+          {/* Priority filter */}
+          {availablePriorities?.length > 0 && (
+            <div style={s.filterGroup}>
+              <span style={s.filterGroupLabel}>Prioridade:</span>
+              <button
+                style={{
+                  ...s.secFilterBtn,
+                  ...(priorityFilter === "all" ? s.secFilterBtnActive : {}),
+                }}
+                onClick={() => onPriorityFilterChange("all")}
+                aria-pressed={priorityFilter === "all"}
+              >
+                Todas
+              </button>
+              {availablePriorities.map((p) => {
+                const active = priorityFilter === p;
+                const accent = active ? PRIORITY_ACCENTS[p] : null;
+                return (
+                  <button
+                    key={p}
+                    style={{
+                      ...s.secFilterBtn,
+                      ...(accent
+                        ? { color: accent.color, background: accent.bg, borderColor: accent.border }
+                        : {}),
+                    }}
+                    onClick={() => onPriorityFilterChange(active ? "all" : p)}
+                    aria-pressed={active}
+                  >
+                    {PRIORITY_LABELS[p] ?? p}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -320,5 +428,44 @@ const s = {
     cursor: "pointer",
     fontFamily: "var(--font-body)",
     transition: "all 0.15s ease",
+  },
+  // P18-PR2 — secondary filters (tier + priority)
+  secondaryFilters: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    flexWrap: "wrap",
+    paddingTop: "2px",
+    borderTop: "1px solid var(--border)",
+  },
+  filterGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    flexWrap: "wrap",
+  },
+  filterGroupLabel: {
+    fontSize: "10px",
+    color: "var(--text-muted)",
+    letterSpacing: "0.3px",
+    marginRight: "2px",
+  },
+  secFilterBtn: {
+    background: "transparent",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-sm)",
+    padding: "3px 9px",
+    fontSize: "11px",
+    fontWeight: 500,
+    color: "var(--text-muted)",
+    cursor: "pointer",
+    fontFamily: "var(--font-body)",
+    transition: "all 0.15s ease",
+  },
+  secFilterBtnActive: {
+    background: "var(--color-primary-glow)",
+    color: "var(--color-primary)",
+    borderColor: "var(--color-primary-border)",
+    fontWeight: 600,
   },
 };

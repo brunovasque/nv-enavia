@@ -117,6 +117,8 @@ export default function MemoryEntryList({
   canonicalEntries,
   operationalEntries,
   activeFilter,
+  tierFilter = "all",
+  priorityFilter = "all",
 }) {
   const showCanonical =
     activeFilter === MEMORY_FILTERS.ALL ||
@@ -126,12 +128,23 @@ export default function MemoryEntryList({
     activeFilter === MEMORY_FILTERS.OPERATIONAL;
   const showSessionOnly = activeFilter === MEMORY_FILTERS.SESSION;
 
-  const canonicalToShow = showCanonical ? canonicalEntries : [];
-  const operationalToShow = showOperational
-    ? operationalEntries
-    : showSessionOnly
-    ? operationalEntries.filter((e) => e.sessionId === CURRENT_SESSION_ID)
-    : [];
+  // Apply secondary filters (tier + priority) to an entry list
+  function applySecondary(entries) {
+    return entries.filter((e) => {
+      const tierOk = tierFilter === "all" || e.tier === Number(tierFilter);
+      const priorityOk = priorityFilter === "all" || e.priority === priorityFilter;
+      return tierOk && priorityOk;
+    });
+  }
+
+  const canonicalToShow = applySecondary(showCanonical ? canonicalEntries : []);
+  const operationalToShow = applySecondary(
+    showOperational
+      ? operationalEntries
+      : showSessionOnly
+      ? operationalEntries.filter((e) => e.sessionId === CURRENT_SESSION_ID)
+      : [],
+  );
 
   const total = canonicalToShow.length + operationalToShow.length;
 
@@ -144,7 +157,11 @@ export default function MemoryEntryList({
 
       {total === 0 ? (
         <div style={s.empty}>
-          <p style={s.emptyText}>Nenhuma entrada para o filtro selecionado.</p>
+          <p style={s.emptyText}>
+            {tierFilter !== "all" || priorityFilter !== "all"
+              ? "Nenhuma entrada para os filtros selecionados."
+              : "Nenhuma entrada para o filtro selecionado."}
+          </p>
         </div>
       ) : (
         <div style={s.list}>

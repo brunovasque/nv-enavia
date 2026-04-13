@@ -1,12 +1,11 @@
 // ============================================================================
-// MemoryInUseCard — P18-PR1 — "Memória em uso" visibility card
+// MemoryInUseCard — P18-PR1/PR2 — "Memória em uso" visibility card
 //
-// Answers 5 questions clearly for the operator:
-//   1. Which memories were consulted (count + type breakdown)
-//   2. Type/tier of memories in use
-//   3. Which priority won (applied priority)
-//   4. Whether memory was read before the plan
-//   5. Basic audit snapshots available
+// P18-PR1: answers 5 basic questions for the operator.
+// P18-PR2 additions:
+//   6. Human-readable explanation of why a memory won (priority explanation)
+//   7. Contract/micro-step reference when available from liveContext
+//   8. Block reason highlighted when gate_rejected snapshot present
 //
 // Receives data from the memory payload — displays honest state when absent.
 // PANEL-ONLY. No backend changes required.
@@ -80,14 +79,110 @@ function InfoPill({ icon, label, value, subValue, accent, honest }) {
 // ── Snapshot row ────────────────────────────────────────────────────────────
 function SnapshotRow({ snap }) {
   const typeLabel = SNAPSHOT_TYPE_LABELS[snap.type] || snap.type;
+  const isBlock = snap.type === "gate_rejected";
   return (
-    <div style={s.snapRow}>
-      <span style={s.snapDot} aria-hidden="true" />
+    <div style={{ ...s.snapRow, ...(isBlock ? s.snapRowBlock : {}) }}>
+      <span
+        style={{ ...s.snapDot, ...(isBlock ? s.snapDotBlock : {}) }}
+        aria-hidden="true"
+      />
       <div style={s.snapBody}>
-        <span style={s.snapLabel}>{snap.label}</span>
-        <span style={s.snapType}>{typeLabel}</span>
+        <span style={{ ...s.snapLabel, ...(isBlock ? s.snapLabelBlock : {}) }}>
+          {snap.label}
+        </span>
+        <span style={{ ...s.snapType, ...(isBlock ? s.snapTypeBlock : {}) }}>
+          {isBlock ? "⛔ BLOQUEADO" : typeLabel}
+        </span>
       </div>
       <span style={s.snapTs}>{formatTs(snap.createdAt)}</span>
+    </div>
+  );
+}
+
+// ── P18-PR2: Priority explanation ──────────────────────────────────────────
+function derivePriorityExplanation(readBeforePlan) {
+  if (!readBeforePlan?.happened) return null;
+  const parts = [];
+  if (readBeforePlan.topTier === 1) {
+    parts.push("tier mais alto (Tier 1)");
+  } else if (readBeforePlan.topTier != null) {
+    parts.push(`tier ativo (Tier ${readBeforePlan.topTier})`);
+  }
+  if (readBeforePlan.topPriority === "critical") {
+    parts.push("prioridade crítica");
+  } else if (readBeforePlan.topPriority === "high") {
+    parts.push("prioridade alta");
+  } else if (readBeforePlan.topPriority === "medium") {
+    parts.push("prioridade média");
+  }
+  if (parts.length === 0) return "leitura pré-plano confirmada";
+  return `venceu por ${parts.join(" + ")}`;
+}
+
+function PriorityExplanationBlock({ readBeforePlan }) {
+  const explanation = derivePriorityExplanation(readBeforePlan);
+  if (!explanation) return null;
+  const isPrePlan = readBeforePlan?.happened;
+  return (
+    <div style={s.explanationBlock}>
+      <p style={s.explanationLabel}>POR QUE VENCEU</p>
+      <p style={s.explanationText}>
+        <span style={s.explanationIcon} aria-hidden="true">
+          {isPrePlan ? "✓" : "—"}
+        </span>
+        {explanation}
+        {readBeforePlan?.happened && (
+          <span style={s.explanationSub}> · leitura pré-plano confirmada</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+// ── P18-PR2: Contract/micro-step link ──────────────────────────────────────
+function ContractLinkBlock({ liveContext }) {
+  const contracts = liveContext?.activeContracts ?? [];
+  return (
+    <div style={s.contractBlock}>
+      <p style={s.contractLabel}>VÍNCULO COM CONTRATO</p>
+      {contracts.length === 0 ? (
+        <p style={s.contractEmpty}>Sem vínculo disponível nesta sessão.</p>
+      ) : (
+        <div style={s.contractList}>
+          {contracts.map((c) => {
+            const isRunning = c.status === "running";
+            const isWaiting = c.status === "waiting";
+            return (
+              <div key={c.id} style={s.contractRow}>
+                <span
+                  style={{
+                    ...s.contractDot,
+                    background: isRunning
+                      ? "#10B981"
+                      : isWaiting
+                      ? "#F59E0B"
+                      : "var(--text-muted)",
+                  }}
+                  aria-hidden="true"
+                />
+                <span style={s.contractRowLabel}>{c.label}</span>
+                <span
+                  style={{
+                    ...s.contractStatus,
+                    color: isRunning
+                      ? "#10B981"
+                      : isWaiting
+                      ? "#F59E0B"
+                      : "var(--text-muted)",
+                  }}
+                >
+                  {isRunning ? "em execução" : isWaiting ? "aguardando" : c.status}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -98,6 +193,9 @@ export default function MemoryInUseCard({ memory }) {
   const snapshots      = memory?.auditSnapshots ?? [];
   const canonical      = memory?.canonicalEntries ?? [];
   const operational    = memory?.operationalEntries ?? [];
+  const liveContext    = memory?.liveContext ?? null;
+
+  const hasBlock = snapshots.some((s) => s.type === "gate_rejected");
 
   const totalConsulted = canonical.length + operational.length;
   const hasData        = totalConsulted > 0;
@@ -152,10 +250,14 @@ export default function MemoryInUseCard({ memory }) {
         <span
           style={{
             ...s.badge,
-            ...(hasData ? s.badgeActive : s.badgeEmpty),
+            ...(hasData
+              ? hasBlock
+                ? s.badgeBlock
+                : s.badgeActive
+              : s.badgeEmpty),
           }}
         >
-          {hasData ? "COM DADOS" : "SEM DADOS"}
+          {hasData ? (hasBlock ? "BLOQUEADO" : "COM DADOS") : "SEM DADOS"}
         </span>
       </div>
 
@@ -238,6 +340,12 @@ export default function MemoryInUseCard({ memory }) {
             honest
           />
         )}
+      </div>
+
+      {/* P18-PR2: Priority explanation + contract link */}
+      <div style={s.pr2Row}>
+        <PriorityExplanationBlock readBeforePlan={readBeforePlan} />
+        <ContractLinkBlock liveContext={liveContext} />
       </div>
 
       {/* Audit snapshots */}
@@ -325,6 +433,11 @@ const s = {
     color: "var(--text-muted)",
     background: "rgba(100,116,139,0.1)",
     borderColor: "rgba(100,116,139,0.2)",
+  },
+  badgeBlock: {
+    color: "#EF4444",
+    background: "rgba(239,68,68,0.1)",
+    borderColor: "rgba(239,68,68,0.3)",
   },
 
   // Pills row
@@ -427,6 +540,10 @@ const s = {
     borderRadius: "var(--radius-sm)",
     border: "1px solid var(--border)",
   },
+  snapRowBlock: {
+    background: "rgba(239,68,68,0.06)",
+    borderColor: "rgba(239,68,68,0.25)",
+  },
   snapDot: {
     width: "6px",
     height: "6px",
@@ -434,6 +551,10 @@ const s = {
     background: "var(--color-primary)",
     flexShrink: 0,
     opacity: 0.7,
+  },
+  snapDotBlock: {
+    background: "#EF4444",
+    opacity: 1,
   },
   snapBody: {
     flex: 1,
@@ -452,6 +573,9 @@ const s = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
+  snapLabelBlock: {
+    color: "#EF4444",
+  },
   snapType: {
     fontSize: "9px",
     color: "var(--text-muted)",
@@ -461,6 +585,12 @@ const s = {
     borderRadius: "3px",
     letterSpacing: "0.3px",
     flexShrink: 0,
+  },
+  snapTypeBlock: {
+    color: "#EF4444",
+    background: "rgba(239,68,68,0.1)",
+    borderColor: "rgba(239,68,68,0.3)",
+    fontWeight: 700,
   },
   snapTs: {
     fontSize: "10px",
@@ -474,5 +604,109 @@ const s = {
     color: "var(--text-muted)",
     opacity: 0.6,
     fontStyle: "italic",
+  },
+
+  // P18-PR2 — priority explanation + contract link row
+  pr2Row: {
+    display: "flex",
+    gap: "0",
+    borderBottom: "1px solid var(--border)",
+    flexWrap: "wrap",
+  },
+
+  // Priority explanation block
+  explanationBlock: {
+    flex: "1 1 260px",
+    padding: "12px 20px",
+    borderRight: "1px solid var(--border)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+  explanationLabel: {
+    fontSize: "9px",
+    fontWeight: 700,
+    color: "var(--text-muted)",
+    letterSpacing: "1.2px",
+    textTransform: "uppercase",
+  },
+  explanationText: {
+    fontSize: "12px",
+    color: "var(--text-primary)",
+    fontWeight: 600,
+    lineHeight: 1.5,
+    display: "flex",
+    alignItems: "baseline",
+    gap: "5px",
+    flexWrap: "wrap",
+  },
+  explanationIcon: {
+    color: "#10B981",
+    fontWeight: 700,
+    flexShrink: 0,
+  },
+  explanationSub: {
+    fontSize: "10px",
+    color: "var(--text-muted)",
+    fontWeight: 400,
+  },
+
+  // Contract link block
+  contractBlock: {
+    flex: "1 1 260px",
+    padding: "12px 20px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+  contractLabel: {
+    fontSize: "9px",
+    fontWeight: 700,
+    color: "var(--text-muted)",
+    letterSpacing: "1.2px",
+    textTransform: "uppercase",
+  },
+  contractEmpty: {
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    opacity: 0.6,
+    fontStyle: "italic",
+  },
+  contractList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  contractRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "5px 8px",
+    background: "var(--bg-base)",
+    borderRadius: "var(--radius-sm)",
+    border: "1px solid var(--border)",
+  },
+  contractDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    flexShrink: 0,
+    opacity: 0.85,
+  },
+  contractRowLabel: {
+    fontSize: "11px",
+    color: "var(--text-secondary)",
+    fontWeight: 500,
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  contractStatus: {
+    fontSize: "9px",
+    fontWeight: 600,
+    letterSpacing: "0.3px",
+    flexShrink: 0,
   },
 };

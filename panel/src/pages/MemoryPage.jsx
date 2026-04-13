@@ -12,6 +12,8 @@ import MemoryInUseCard from "../memory/MemoryInUseCard";
 export default function MemoryPage() {
   const [currentState, setCurrentState] = useState(MEMORY_STATES.POPULATED);
   const [activeFilter, setActiveFilter] = useState(MEMORY_FILTERS.ALL);
+  const [tierFilter, setTierFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
   const [memory, setMemory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -48,15 +50,36 @@ export default function MemoryPage() {
 
   const hasMemory = memory.summary.total > 0;
 
+  // Derive unique tiers and priorities from current entries for secondary filters
+  const allEntries = [
+    ...(memory.canonicalEntries ?? []),
+    ...(memory.operationalEntries ?? []),
+  ];
+  const availableTiers = [...new Set(allEntries.map((e) => e.tier).filter(Boolean))].sort(
+    (a, b) => a - b,
+  );
+  const PRIORITY_ORDER = ["critical", "high", "medium", "low"];
+  const availablePriorities = PRIORITY_ORDER.filter((p) =>
+    allEntries.some((e) => e.priority === p),
+  );
+
   return (
     <div style={s.page}>
       {/* Header: stats + filters + state switcher */}
       <MemoryHeader
         memory={memory}
         currentState={currentState}
+        tierFilter={tierFilter}
+        onTierFilterChange={setTierFilter}
+        priorityFilter={priorityFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        availableTiers={availableTiers}
+        availablePriorities={availablePriorities}
         onStateChange={(st) => {
           setCurrentState(st);
           setActiveFilter(MEMORY_FILTERS.ALL);
+          setTierFilter("all");
+          setPriorityFilter("all");
         }}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
@@ -81,6 +104,8 @@ export default function MemoryPage() {
                 canonicalEntries={memory.canonicalEntries}
                 operationalEntries={memory.operationalEntries}
                 activeFilter={activeFilter}
+                tierFilter={tierFilter}
+                priorityFilter={priorityFilter}
               />
             </div>
 
