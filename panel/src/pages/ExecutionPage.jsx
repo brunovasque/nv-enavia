@@ -14,6 +14,7 @@ import ResultBlock from "../execution/ResultBlock";
 import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
 import UnifiedReplayBlock from "../execution/UnifiedReplayBlock";
+import MacroCycleTimeline from "../execution/MacroCycleTimeline";
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -142,6 +143,11 @@ export default function ExecutionPage() {
 
         {/* Idle state */}
         {isIdle && <IdleState />}
+
+        {/* Ciclo operacional macro — P19 — visible for all non-idle states */}
+        {!isIdle && (
+          <MacroCycleTimeline execution={execution} currentState={currentState} />
+        )}
 
         {!isIdle && (
           <>
