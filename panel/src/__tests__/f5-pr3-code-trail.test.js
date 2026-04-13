@@ -105,7 +105,7 @@ describe("F5-PR3 — CodeTrailCard", () => {
     expect(html).toContain("sem dado disponível");
   });
 
-  it("9. campo 'bloco' null exibe 'sem dado disponível'", () => {
+  it("9b. campo 'bloco' null exibe 'sem dado disponível'", () => {
     const html = render(CodeTrailCard, { codeTrail: { ...FULL_CODE_TRAIL, block: null } });
     expect(html).toContain("sem dado disponível");
   });
