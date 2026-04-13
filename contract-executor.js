@@ -18,6 +18,13 @@ import { evaluateAdherence } from "./schema/contract-adherence-gate.js";
 import { auditExecution } from "./schema/execution-audit.js";
 import { auditFinalContract, CONTRACT_FINAL_STATUS } from "./schema/contract-final-audit.js";
 import { enforceConstitution } from "./schema/autonomy-contract.js";
+import {
+  enforceGitHubPrArm,
+  evaluateMergeReadiness,
+  buildMergeGateState,
+  GITHUB_PR_ARM_ID,
+  MERGE_STATUS,
+} from "./schema/github-pr-arm-contract.js";
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -3662,6 +3669,275 @@ async function handleGetExecutionAudit(request, env) {
 }
 
 // ============================================================================
+// 🛡️ P24 — GitHub/PR Arm Runtime Enforcement
+//
+// Real runtime entry points for the GitHub/PR arm.
+// Each function calls enforceGitHubPrArm() BEFORE any action.
+// If enforcement blocks, the function returns the block result — no action taken.
+//
+// Separate from the Cloudflare executor (executeCurrentMicroPr).
+// P24 operates on branch/PR/repo, NOT on Workers/deploy.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// executeGitHubPrAction({ action, scope_approved, gates_context,
+//                         drift_detected, regression_detected })
+//
+// Runtime entry point for any pre-merge GitHub/PR arm action.
+// Calls enforceGitHubPrArm() first; if blocked, returns immediately.
+// If allowed, returns the enforcement result with execution_status.
+//
+// This is the P24 equivalent of executeCurrentMicroPr() for P23.
+// ---------------------------------------------------------------------------
+function executeGitHubPrAction({
+  action,
+  scope_approved,
+  gates_context,
+  drift_detected = false,
+  regression_detected = false,
+} = {}) {
+  const enforcement = enforceGitHubPrArm({
+    action,
+    scope_approved,
+    gates_context,
+    drift_detected,
+    regression_detected,
+  });
+
+  if (!enforcement.allowed) {
+    return {
+      ok: false,
+      error: "GITHUB_PR_ARM_BLOCKED",
+      message: enforcement.reason,
+      enforcement,
+    };
+  }
+
+  return {
+    ok: true,
+    execution_status: "executed",
+    action: enforcement.action,
+    arm_id: enforcement.arm_id,
+    enforcement,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// requestMergeApproval({ scope_approved, gates_context, merge_context,
+//                        drift_detected, regression_detected })
+//
+// Runtime entry point for requesting merge approval.
+// Evaluates merge readiness and builds merge gate state.
+// Does NOT merge — produces the state (not_ready / awaiting_formal_approval / blocked).
+//
+// merge_context must include:
+//   contract_rechecked, phase_validated, no_regression, diff_reviewed,
+//   summary_reviewed, summary_for_merge, reason_merge_ok, approval_status
+// ---------------------------------------------------------------------------
+function requestMergeApproval({
+  scope_approved,
+  gates_context,
+  merge_context,
+  drift_detected = false,
+  regression_detected = false,
+} = {}) {
+  // Enforce the full P24 arm contract first (action = merge_to_main)
+  const enforcement = enforceGitHubPrArm({
+    action: "merge_to_main",
+    scope_approved,
+    gates_context,
+    merge_context,
+    drift_detected,
+    regression_detected,
+  });
+
+  // If enforcement allowed → that means approval was "approved" and all gates passed.
+  // If blocked → return the merge gate state for the caller to know what's missing.
+  if (!enforcement.allowed) {
+    return {
+      ok: false,
+      error: "MERGE_NOT_READY",
+      message: enforcement.reason,
+      merge_status: enforcement.merge_gate
+        ? enforcement.merge_gate.merge_status
+        : MERGE_STATUS.NOT_READY,
+      merge_gate: enforcement.merge_gate,
+      enforcement,
+    };
+  }
+
+  return {
+    ok: true,
+    merge_status: MERGE_STATUS.APPROVED,
+    message: enforcement.reason,
+    merge_gate: enforcement.merge_gate,
+    enforcement,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// approveMerge({ scope_approved, gates_context, merge_context,
+//                drift_detected, regression_detected })
+//
+// Runtime entry point for the formal approval path.
+// This is the ONLY path that can produce merge_status === "approved_for_merge".
+//
+// The caller MUST set merge_context.approval_status = "approved".
+// If not, this will block with awaiting_formal_approval.
+// ---------------------------------------------------------------------------
+function approveMerge({
+  scope_approved,
+  gates_context,
+  merge_context,
+  drift_detected = false,
+  regression_detected = false,
+} = {}) {
+  if (!merge_context || typeof merge_context !== "object") {
+    return {
+      ok: false,
+      error: "MERGE_CONTEXT_MISSING",
+      message: "merge_context é obrigatório para approval de merge.",
+      merge_status: MERGE_STATUS.NOT_READY,
+    };
+  }
+
+  // Force the action to merge_to_main
+  const enforcement = enforceGitHubPrArm({
+    action: "merge_to_main",
+    scope_approved,
+    gates_context,
+    merge_context,
+    drift_detected,
+    regression_detected,
+  });
+
+  if (!enforcement.allowed) {
+    return {
+      ok: false,
+      error: "MERGE_BLOCKED",
+      message: enforcement.reason,
+      merge_status: enforcement.merge_gate
+        ? enforcement.merge_gate.merge_status
+        : MERGE_STATUS.BLOCKED,
+      merge_gate: enforcement.merge_gate,
+      enforcement,
+    };
+  }
+
+  return {
+    ok: true,
+    merge_status: MERGE_STATUS.APPROVED,
+    can_merge: true,
+    message: enforcement.reason,
+    summary_for_merge: enforcement.merge_gate.summary_for_merge,
+    reason_merge_ok: enforcement.merge_gate.reason_merge_ok,
+    merge_gate: enforcement.merge_gate,
+    enforcement,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleGitHubPrAction(request, env) — POST /github-pr/action
+//
+// Route handler for GitHub/PR arm actions.
+// Reads { action, scope_approved, gates_context, drift_detected, regression_detected }
+// from request body and dispatches to executeGitHubPrAction().
+// ---------------------------------------------------------------------------
+async function handleGitHubPrAction(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return {
+      status: 400,
+      body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." },
+    };
+  }
+
+  if (!body || typeof body.action !== "string") {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_PARAM", message: '"action" is required.' },
+    };
+  }
+
+  const result = executeGitHubPrAction({
+    action: body.action,
+    scope_approved: body.scope_approved === true,
+    gates_context: body.gates_context || {},
+    drift_detected: body.drift_detected === true,
+    regression_detected: body.regression_detected === true,
+  });
+
+  return {
+    status: result.ok ? 200 : 403,
+    body: result,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleRequestMergeApproval(request, env) — POST /github-pr/request-merge
+//
+// Route handler for merge approval request.
+// Reads merge_context from request body and evaluates merge readiness.
+// ---------------------------------------------------------------------------
+async function handleRequestMergeApproval(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return {
+      status: 400,
+      body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." },
+    };
+  }
+
+  const result = requestMergeApproval({
+    scope_approved: body && body.scope_approved === true,
+    gates_context: (body && body.gates_context) || {},
+    merge_context: (body && body.merge_context) || null,
+    drift_detected: body && body.drift_detected === true,
+    regression_detected: body && body.regression_detected === true,
+  });
+
+  return {
+    status: result.ok ? 200 : 403,
+    body: result,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleApproveMerge(request, env) — POST /github-pr/approve-merge
+//
+// Route handler for formal merge approval.
+// This is the endpoint for the "approve merge" button in the panel.
+// ---------------------------------------------------------------------------
+async function handleApproveMerge(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return {
+      status: 400,
+      body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." },
+    };
+  }
+
+  const result = approveMerge({
+    scope_approved: body && body.scope_approved === true,
+    gates_context: (body && body.gates_context) || {},
+    merge_context: (body && body.merge_context) || null,
+    drift_detected: body && body.drift_detected === true,
+    regression_detected: body && body.regression_detected === true,
+  });
+
+  return {
+    status: result.ok ? 200 : 403,
+    body: result,
+  };
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 export {
@@ -3747,4 +4023,11 @@ export {
   closeFinalContract,
   handleCloseFinalContract,
   FINAL_CLOSURE_SOURCE_STATUSES,
+  // 🛡️ P24 — GitHub/PR Arm Runtime (separate from Cloudflare executor)
+  executeGitHubPrAction,
+  requestMergeApproval,
+  approveMerge,
+  handleGitHubPrAction,
+  handleRequestMergeApproval,
+  handleApproveMerge,
 };
