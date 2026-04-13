@@ -16,6 +16,7 @@ import IdleState from "../execution/IdleState";
 import UnifiedReplayBlock from "../execution/UnifiedReplayBlock";
 import MacroCycleTimeline from "../execution/MacroCycleTimeline";
 import FunctionalLogsCard from "../execution/FunctionalLogsCard";
+import OperationalAuditCard from "../execution/OperationalAuditCard";
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -275,6 +276,11 @@ export default function ExecutionPage() {
           {/* ── Sidebar ────────────────────────────────────────────────── */}
           <div style={s.sidebar}>
             <ExecutionStatusCard execution={execution} />
+            {/* P21 — Auditoria operacional por execução */}
+            <OperationalAuditCard
+              execution={execution}
+              currentState={currentState}
+            />
           </div>
 
         </div>
