@@ -231,6 +231,7 @@ export default function ConsolidatedFeedCard({ changeHistory }) {
     !changeHistory ||
     !Array.isArray(changeHistory) ||
     changeHistory.length === 0;
+  const isMinimalReal = !isEmpty && changeHistory[0]?._pr2Source === "exec_event";
 
   return (
     <div style={s.card}>
@@ -240,8 +241,8 @@ export default function ConsolidatedFeedCard({ changeHistory }) {
           <span style={s.feedIcon} aria-hidden="true">☰</span>
           <p style={s.cardTitle}>Feed de mudanças</p>
         </div>
-        <span style={isEmpty ? s.emptyBadge : s.demoBadge}>
-          {isEmpty ? "SEM DADOS" : "DEMO"}
+        <span style={isEmpty ? s.emptyBadge : isMinimalReal ? s.minimalBadge : s.demoBadge}>
+          {isEmpty ? "SEM DADOS" : isMinimalReal ? "MÍNIMO REAL" : "DEMO"}
         </span>
       </div>
 
@@ -319,6 +320,16 @@ const s = {
     color: "#F59E0B",
     background: "rgba(245,158,11,0.10)",
     border: "1px solid rgba(245,158,11,0.30)",
+    padding: "2px 7px",
+    borderRadius: "4px",
+  },
+  minimalBadge: {
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1px",
+    color: "#10B981",
+    background: "rgba(16,185,129,0.10)",
+    border: "1px solid rgba(16,185,129,0.30)",
     padding: "2px 7px",
     borderRadius: "4px",
   },
