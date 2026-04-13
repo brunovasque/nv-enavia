@@ -3709,7 +3709,7 @@ if (request.method === "GET") {
     return withCORS(jsonResponse({
       ok: true,
       route: "POST /planner/run",
-      description: "Planner endpoint canônico — executa pipeline PM4→PM9 e retorna payload estruturado.",
+      description: "Planner endpoint canônico — executa pipeline PM3→PM9→P15 e retorna payload estruturado.",
       schema: {
         request: {
           message: "string (obrigatório) — texto do usuário",
@@ -3732,7 +3732,7 @@ if (request.method === "GET") {
           telemetry: {
             duration_ms: "number",
             session_id: "string | null",
-            pipeline: "string — 'PM4→PM5→PM6→PM7→PM8→PM9→P15'",
+            pipeline: "string — 'PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15'",
             consolidation_persisted: "array — [{memory_id, memory_type, is_canonical, kv_key, write_ok, error?}]",
           },
         },
