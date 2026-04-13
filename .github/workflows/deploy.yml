@@ -1,6 +1,14 @@
 name: Deploy nv-enavia
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "nv-enavia.js"
+      - "wrangler.toml"
+      - "schema/**"
+      - "contract-executor.js"
   workflow_dispatch:
     inputs:
       target_env:
@@ -74,9 +82,48 @@ jobs:
           [ "$STATUS" -eq 200 ] || { echo "Smoke FAILED: /__internal__/build returned $STATUS"; exit 1; }
 
       - name: Deploy PROD with Wrangler
-        if: ${{ github.event.inputs.target_env == 'prod' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.target_env == 'prod' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+      - name: Smoke PROD — OPTIONS /planner/run (CORS x-session-id)
+        if: ${{ github.event_name == 'push' || github.event.inputs.target_env == 'prod' }}
+        run: |
+          HEADERS=$(curl -s -o /dev/null -D - -X OPTIONS \
+            "https://nv-enavia.brunovasque.workers.dev/planner/run" \
+            -H "Origin: https://nv-enavia-panel.vercel.app" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: x-session-id, content-type")
+          echo "$HEADERS"
+          echo "$HEADERS" | grep -i "access-control-allow-headers" | grep -i "x-session-id" \
+            || { echo "Smoke FAILED: x-session-id not in Access-Control-Allow-Headers for /planner/run"; exit 1; }
+          echo "✅ /planner/run CORS OK"
+
+      - name: Smoke PROD — OPTIONS /memory (CORS x-session-id)
+        if: ${{ github.event_name == 'push' || github.event.inputs.target_env == 'prod' }}
+        run: |
+          HEADERS=$(curl -s -o /dev/null -D - -X OPTIONS \
+            "https://nv-enavia.brunovasque.workers.dev/memory" \
+            -H "Origin: https://nv-enavia-panel.vercel.app" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: x-session-id")
+          echo "$HEADERS"
+          echo "$HEADERS" | grep -i "access-control-allow-headers" | grep -i "x-session-id" \
+            || { echo "Smoke FAILED: x-session-id not in Access-Control-Allow-Headers for /memory"; exit 1; }
+          echo "✅ /memory CORS OK"
+
+      - name: Smoke PROD — OPTIONS /execution (CORS x-session-id)
+        if: ${{ github.event_name == 'push' || github.event.inputs.target_env == 'prod' }}
+        run: |
+          HEADERS=$(curl -s -o /dev/null -D - -X OPTIONS \
+            "https://nv-enavia.brunovasque.workers.dev/execution" \
+            -H "Origin: https://nv-enavia-panel.vercel.app" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: x-session-id")
+          echo "$HEADERS"
+          echo "$HEADERS" | grep -i "access-control-allow-headers" | grep -i "x-session-id" \
+            || { echo "Smoke FAILED: x-session-id not in Access-Control-Allow-Headers for /execution"; exit 1; }
+          echo "✅ /execution CORS OK"
