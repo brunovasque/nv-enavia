@@ -114,6 +114,7 @@ export default function IncrementalDiffCard({ incrementalDiff }) {
     ? incrementalDiff.lines
     : [];
   const hasLines = lines.length > 0;
+  const isMinimalReal = !isEmpty && incrementalDiff._pr2Source === "exec_event";
 
   const addCount    = lines.filter((l) => l.type === "add").length;
   const removeCount = lines.filter((l) => l.type === "remove").length;
@@ -133,8 +134,8 @@ export default function IncrementalDiffCard({ incrementalDiff }) {
               <span style={s.removeBadge}>−{removeCount}</span>
             </div>
           )}
-          <span style={isEmpty ? s.emptyBadge : s.demoBadge}>
-            {isEmpty ? "SEM DADOS" : "DEMO"}
+          <span style={isEmpty ? s.emptyBadge : isMinimalReal ? s.minimalBadge : s.demoBadge}>
+            {isEmpty ? "SEM DADOS" : isMinimalReal ? "MÍNIMO REAL" : "DEMO"}
           </span>
         </div>
       </div>
@@ -257,6 +258,16 @@ const s = {
     color: "#F59E0B",
     background: "rgba(245,158,11,0.10)",
     border: "1px solid rgba(245,158,11,0.30)",
+    padding: "2px 7px",
+    borderRadius: "4px",
+  },
+  minimalBadge: {
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1px",
+    color: "#10B981",
+    background: "rgba(16,185,129,0.10)",
+    border: "1px solid rgba(16,185,129,0.30)",
     padding: "2px 7px",
     borderRadius: "4px",
   },

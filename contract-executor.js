@@ -2226,6 +2226,8 @@ async function emitExecEvent(env, contractId, event) {
   try {
     const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_EXEC_EVENT}`;
     await env.ENAVIA_BRAIN.put(key, JSON.stringify(event));
+    // PR2 — pointer so GET /execution can locate the latest exec_event via readExecEvent
+    await env.ENAVIA_BRAIN.put("execution:exec_event:latest_contract_id", contractId);
   } catch (_) {
     // emitExecEvent must never crash the executor
   }

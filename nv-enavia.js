@@ -9,6 +9,7 @@ import {
   handleResolvePlanRevision,
   handleCompleteTask,
   handleCloseFinalContract,
+  readExecEvent,
 } from "./contract-executor.js";
 
 import { classifyRequest } from "./schema/planner-classifier.js";
@@ -3406,7 +3407,24 @@ async function handleGetExecution(env) {
   }
   try {
     const trail = await env.ENAVIA_BRAIN.get("execution:trail:latest", "json");
-    return jsonResponse({ ok: true, execution: trail });
+
+    // PR2 — read real exec_event via readExecEvent (canonical PR1 source)
+    let execEvent = null;
+    try {
+      const latestContractId = await env.ENAVIA_BRAIN.get("execution:exec_event:latest_contract_id");
+      if (latestContractId) {
+        execEvent = await readExecEvent(env, latestContractId);
+      }
+    } catch (evErr) { /* exec_event read failure is non-critical — trail still returned */
+      logNV("⚠️ [GET /execution] Falha não-crítica ao ler exec_event (trilha retornada sem ele)", { error: String(evErr) });
+    }
+
+    // Merge trail + exec_event into a single execution object
+    const execution = (trail || execEvent)
+      ? { ...(trail ?? {}), ...(execEvent ? { exec_event: execEvent } : {}) }
+      : null;
+
+    return jsonResponse({ ok: true, execution });
   } catch (err) {
     logNV("🔴 [GET /execution] Falha ao ler trilha do KV", { error: String(err) });
     return jsonResponse({ ok: false, execution: null, error: "Falha ao ler trilha de execução." }, 500);
