@@ -383,6 +383,23 @@ export const MOCK_EXECUTIONS = {
     events: RUNNING_EVENTS,
     result: null,
     error: null,
+    // Logs funcionais legíveis — P20 (demo/mock — não é runtime real)
+    functionalLogs: [
+      {
+        id: "fl1",
+        type: "decisao",
+        label: "Gate aprovado — execução autorizada",
+        message: "Ops Lead confirmou autorização em 00:03:22. Execução iniciada imediatamente após a aprovação do gate humano.",
+        timestamp: "2026-04-12T01:51:26Z",
+      },
+      {
+        id: "fl2",
+        type: "decisao",
+        label: "Etapa 3 iniciada após mapeamento",
+        message: "Etapas 1 e 2 concluídas com sucesso. Um bloqueio potencial foi identificado no fornecedor logístico; execução prosseguiu para estimativa de prazos.",
+        timestamp: "2026-04-12T01:52:10Z",
+      },
+    ],
   },
 
   [EXECUTION_STATUS.BLOCKED]: {
@@ -408,6 +425,23 @@ export const MOCK_EXECUTIONS = {
       recoverable: true,
       blockedAt: "2026-04-12T03:48:04Z",
     },
+    // Logs funcionais legíveis — P20 (demo/mock — não é runtime real)
+    functionalLogs: [
+      {
+        id: "fl1",
+        type: "bloqueio",
+        label: "Gate humano não respondido dentro do prazo",
+        message: "O aprovador Ops Lead não autorizou a execução em até 2 horas. Timeout atingido automaticamente; nenhuma etapa foi executada.",
+        timestamp: "2026-04-12T03:48:04Z",
+      },
+      {
+        id: "fl2",
+        type: "bloqueio",
+        label: "Execução pausada — requer escalação manual",
+        message: "A execução está retida no gate humano. Ação necessária: escalar para Ops Lead e obter aprovação manual para retomada.",
+        timestamp: "2026-04-12T03:48:04Z",
+      },
+    ],
   },
 
   [EXECUTION_STATUS.FAILED]: {
@@ -433,6 +467,23 @@ export const MOCK_EXECUTIONS = {
       recoverable: false,
       blockedAt: "2026-04-12T01:52:20Z",
     },
+    // Logs funcionais legíveis — P20 (demo/mock — não é runtime real)
+    functionalLogs: [
+      {
+        id: "fl1",
+        type: "decisao",
+        label: "Etapas 1 e 2 concluídas — execução prosseguiu",
+        message: "Escopo estruturado e dependências mapeadas com sucesso. Um bloqueio potencial foi identificado; execução avançou para estimativa de prazos.",
+        timestamp: "2026-04-12T01:51:49Z",
+      },
+      {
+        id: "fl2",
+        type: "bloqueio",
+        label: "Etapa 3 interrompida por dados insuficientes",
+        message: "O cálculo do cronograma falhou pois os dados do fornecedor logístico para a região Sul estavam incompletos. Intervenção necessária para retomada.",
+        timestamp: "2026-04-12T01:52:20Z",
+      },
+    ],
   },
 
   [EXECUTION_STATUS.COMPLETED]: {
@@ -527,5 +578,36 @@ Memória: 3 entradas de contexto consolidadas`,
       deliveredAt: "2026-04-12T01:53:15Z",
     },
     error: null,
+    // Logs funcionais legíveis — P20 (demo/mock — não é runtime real)
+    functionalLogs: [
+      {
+        id: "fl1",
+        type: "decisao",
+        label: "Gate aprovado — execução autorizada pelo Ops Lead",
+        message: "Operador confirmou autorização em 00:03:22. Execução iniciada imediatamente após aprovação do gate humano.",
+        timestamp: "2026-04-12T01:51:26Z",
+      },
+      {
+        id: "fl2",
+        type: "decisao",
+        label: "Bloqueio potencial identificado — execução continuou",
+        message: "Etapa 2 identificou risco no fornecedor logístico para a região Sul. Decisão: prosseguir com estimativa conservadora; risco documentado no plano.",
+        timestamp: "2026-04-12T01:51:49Z",
+      },
+      {
+        id: "fl3",
+        type: "consolidacao",
+        label: "Plano canônico entregue e memória consolidada",
+        message: "4 etapas concluídas em 05:16. Cronograma de 14 semanas gerado e validado. 3 entradas salvas na memória de sessão para reutilização futura.",
+        timestamp: "2026-04-12T01:53:16Z",
+      },
+      {
+        id: "fl4",
+        type: "consolidacao",
+        label: "Escopo de expansão validado para aprovação",
+        message: "Análise completa do contrato para a região Sul entregue com estimativas de prazo e dependências críticas identificadas. Aguardando aprovação final do Ops Lead.",
+        timestamp: "2026-04-12T01:53:15Z",
+      },
+    ],
   },
 };
