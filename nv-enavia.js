@@ -5327,6 +5327,123 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // ============================================================
+      // 🧠 GET /memory — Estado da memória persistida no KV
+      // Painel: aba Memória. Contrato: mapMemoryResponse(raw).
+      // ============================================================
+      if (method === "GET" && path === "/memory") {
+        try {
+          const memResult = await searchRelevantMemory({}, env);
+          const allMems = memResult.ok ? memResult.results : [];
+
+          const toStrength = (confidence) =>
+            confidence === "confirmed" || confidence === "high" ? "strong" : "weak";
+
+          const toTier = (mem) => {
+            if (mem.memory_type === "canonical_rules" && mem.is_canonical) return 1;
+            if (mem.is_canonical) return 2;
+            if (mem.memory_type === "project") return 3;
+            if (mem.memory_type === "live_context") return 4;
+            if (mem.memory_type === "user_profile") return 5;
+            if (mem.memory_type === "operational_history") return 6;
+            return 7;
+          };
+
+          const toValue = (mem) => {
+            const cs = mem.content_structured;
+            if (!cs) return "";
+            if (typeof cs.text === "string") return cs.text;
+            if (typeof cs.summary === "string") return cs.summary;
+            return JSON.stringify(cs);
+          };
+
+          const canonicalMems = allMems.filter(
+            (m) => m.memory_type === "canonical_rules" || m.is_canonical === true,
+          );
+          const liveContextMems = allMems.filter(
+            (m) => m.memory_type === "live_context" && !canonicalMems.includes(m),
+          );
+          const operationalMems = allMems.filter(
+            (m) => !canonicalMems.includes(m) && !liveContextMems.includes(m),
+          );
+
+          const canonicalEntries = canonicalMems.map((m) => ({
+            id:        m.memory_id,
+            key:       m.entity_id || m.title,
+            value:     toValue(m),
+            strength:  toStrength(m.confidence),
+            scope:     m.entity_type || "global",
+            createdAt: m.created_at,
+            tags:      Array.isArray(m.flags) ? m.flags : [],
+            tier:      toTier(m),
+            priority:  m.priority,
+          }));
+
+          const operationalEntries = operationalMems.map((m) => ({
+            id:        m.memory_id,
+            key:       m.entity_id || m.title,
+            value:     toValue(m),
+            strength:  toStrength(m.confidence),
+            source:    m.source,
+            sessionId: m.entity_id || null,
+            createdAt: m.created_at,
+            tags:      Array.isArray(m.flags) ? m.flags : [],
+            tier:      toTier(m),
+            priority:  m.priority,
+          }));
+
+          const liveCtxMem = liveContextMems[0] || null;
+          const liveContext = liveCtxMem
+            ? {
+                sessionId:       liveCtxMem.entity_id || null,
+                startedAt:       liveCtxMem.created_at,
+                duration:        null,
+                intent:          toValue(liveCtxMem),
+                activeContracts: liveCtxMem.content_structured?.activeContracts ?? [],
+                signals:         liveCtxMem.content_structured?.signals ?? [],
+              }
+            : null;
+
+          const total = canonicalEntries.length + operationalEntries.length;
+
+          const memoryPayload = {
+            state:   total > 0 ? "populated" : "empty",
+            summary: {
+              total,
+              canonical:        canonicalEntries.length,
+              operational:      operationalEntries.length,
+              sessionEntries:   liveContextMems.length,
+              lastConsolidation: null,
+            },
+            canonicalEntries,
+            operationalEntries,
+            liveContext,
+            consolidation: {
+              pending:      [],
+              consolidated: [],
+              lastRun:      null,
+              nextRun:      null,
+            },
+            memoryReadBeforePlan: {
+              happened:     total > 0,
+              readAt:       total > 0 ? new Date().toISOString() : null,
+              memoriesRead: total,
+              topTier:      total > 0 ? 1 : null,
+              topPriority:  canonicalEntries[0]?.priority ?? null,
+            },
+            auditSnapshots: [],
+          };
+
+          return withCORS(jsonResponse(memoryPayload, 200));
+        } catch (err) {
+          logNV("❌ [GET /memory] erro:", String(err));
+          return withCORS(jsonResponse(
+            { ok: false, error: "Falha ao carregar memória.", detail: String(err) },
+            500,
+          ));
+        }
+      }
+
       // -------------------------------------------------------
       // GET / → Teste rápido de saúde
       // -------------------------------------------------------
@@ -5358,7 +5475,8 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • GET  /audit          → Schema/contrato da rota POST /audit",
             "  • GET  /brain/read     → Ler System Prompt + estado",
             "  • GET  /brain/index    → INDEX completo do cérebro",
-            "  • GET  /planner/run    → Schema/contrato da rota POST /planner/run"
+            "  • GET  /planner/run    → Schema/contrato da rota POST /planner/run",
+            "  • GET  /memory         → Estado da memória persistida no KV (aba Memória do painel)"
           ].join("\n"),
           { status: 200 }
         ));
