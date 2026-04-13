@@ -7,6 +7,7 @@ import CurrentStepBlock from "../execution/CurrentStepBlock";
 import ExecutionTimeline from "../execution/ExecutionTimeline";
 import OperationalLiveCard from "../execution/OperationalLiveCard";
 import CodeTrailCard from "../execution/CodeTrailCard";
+import LiveTrailCard from "../execution/LiveTrailCard";
 import ResultBlock from "../execution/ResultBlock";
 import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
@@ -95,6 +96,11 @@ export default function ExecutionPage() {
           {/* Code trail surface — F5-PR3 */}
           {isRunning && (
             <CodeTrailCard codeTrail={execution?.codeTrail ?? null} />
+          )}
+
+          {/* Live trail surface — Nova frente PR1 */}
+          {isRunning && (
+            <LiveTrailCard liveTrail={execution?.liveTrail ?? null} />
           )}
 
           {/* Body: main (timeline) + sidebar */}
