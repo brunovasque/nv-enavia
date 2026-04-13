@@ -13,6 +13,8 @@
 // Dados derivados de mockHealth.js (agregado do sistema, não execução única).
 // ============================================================================
 
+import { useState, useEffect } from "react";
+import { fetchHealth, getApiConfig } from "../api";
 import {
   MOCK_HEALTH,
   HEALTH_STATUS,
@@ -111,8 +113,22 @@ function CompletedRow({ item }) {
  * Visão macro e operacional do sistema.
  */
 export default function HealthPage() {
-  // In mock mode the health data is static; no fetch needed.
-  const health = MOCK_HEALTH;
+  // Initial state: MOCK_HEALTH (keeps static render / tests working).
+  // In real mode, useEffect fetches and replaces with real minimal data.
+  const [health, setHealth] = useState(MOCK_HEALTH);
+
+  useEffect(() => {
+    const { mode } = getApiConfig();
+    if (mode !== "real") return; // mock mode — keep MOCK_HEALTH
+
+    fetchHealth()
+      .then((res) => {
+        if (res.ok && res.data) setHealth(res.data);
+      })
+      .catch(() => {
+        // fetch failure — keep initial state (MOCK_HEALTH fallback)
+      });
+  }, []);
 
   const statusMeta = STATUS_META[health.status] ?? STATUS_META[HEALTH_STATUS.IDLE];
   const { summary, recentErrors, blockedExecutions, recentCompleted } = health;

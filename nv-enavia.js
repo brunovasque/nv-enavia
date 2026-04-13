@@ -3432,6 +3432,128 @@ async function handleGetExecution(env) {
 }
 
 // ============================================================================
+// PR3 — GET /health (handler canônico)
+//
+// Retorna dados reais mínimos de saúde do sistema Enavia.
+// Fonte: exec_event mais recente (PR1) via readExecEvent +
+//        ponteiro execution:exec_event:latest_contract_id.
+//
+// Grupos entregues:
+//   - contadores: real mínimo (1 evento — status do último exec_event)
+//   - erros recentes: real mínimo (exec_event com status de erro)
+//   - bloqueadas: fallback honesto [] (não disponível na fonte PR1)
+//   - concluídas: real mínimo (exec_event com status success)
+//
+// Honestidade:
+//   - Apenas o ÚLTIMO exec_event está disponível (sem histórico acumulado).
+//   - blocked=0 sempre: a fonte PR1 não registra execuções bloqueadas.
+//   - durationMs=null: a fonte PR1 não registra duração da execução.
+// ============================================================================
+async function handleGetHealth(env) {
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({
+      ok: true,
+      health: {
+        generatedAt:       new Date().toISOString(),
+        status:            "idle",
+        summary:           { total: 0, completed: 0, failed: 0, blocked: 0, running: 0 },
+        recentErrors:      [],
+        blockedExecutions: [],
+        recentCompleted:   [],
+        _source:           "no_kv",
+      },
+    });
+  }
+
+  try {
+    const latestContractId = await env.ENAVIA_BRAIN.get("execution:exec_event:latest_contract_id");
+    let execEvent = null;
+    if (latestContractId) {
+      execEvent = await readExecEvent(env, latestContractId);
+    }
+
+    if (!execEvent) {
+      return jsonResponse({
+        ok: true,
+        health: {
+          generatedAt:       new Date().toISOString(),
+          status:            "idle",
+          summary:           { total: 0, completed: 0, failed: 0, blocked: 0, running: 0 },
+          recentErrors:      [],
+          blockedExecutions: [],
+          recentCompleted:   [],
+          _source:           "exec_event_absent",
+        },
+      });
+    }
+
+    // Derive health from exec_event (PR1 source: 6 canonical fields)
+    const statusAtual = execEvent.status_atual ?? null;
+    const op          = execEvent.operacao_atual ?? null;
+    const motivo      = execEvent.motivo_curto  ?? null;
+    const patch       = execEvent.patch_atual   ?? null;
+    const ts          = execEvent.emitted_at    ?? null;
+
+    const isRunning = statusAtual === "running";
+    const isSuccess = statusAtual === "success";
+    const isError   = !isRunning && !isSuccess && statusAtual !== null;
+
+    // Contadores reais mínimos (1 evento — não histórico acumulado)
+    const summary = {
+      total:     1,
+      completed: isSuccess ? 1 : 0,
+      failed:    isError   ? 1 : 0,
+      blocked:   0,         // não disponível na fonte PR1 — honesto
+      running:   isRunning ? 1 : 0,
+    };
+
+    // Status do sistema
+    const status = (isRunning || isSuccess) ? "healthy" : "degraded";
+
+    // Erros recentes reais mínimos
+    const recentErrors = isError ? [
+      {
+        id:           `exec-event-${latestContractId}`,
+        requestLabel: op ?? "Execução",
+        errorCode:    "STEP_EXECUTION_ERROR",
+        message:      motivo ?? "Erro na execução.",
+        failedAt:     ts,
+      },
+    ] : [];
+
+    // Bloqueadas — não disponível na fonte PR1
+    const blockedExecutions = [];
+
+    // Concluídas reais mínimas
+    const recentCompleted = isSuccess ? [
+      {
+        id:           `exec-event-${latestContractId}`,
+        requestLabel: op ?? "Execução",
+        completedAt:  ts,
+        durationMs:   null, // não disponível na fonte PR1
+        summary:      patch ?? motivo ?? "Execução concluída.",
+      },
+    ] : [];
+
+    return jsonResponse({
+      ok: true,
+      health: {
+        generatedAt:       ts ?? new Date().toISOString(),
+        status,
+        summary,
+        recentErrors,
+        blockedExecutions,
+        recentCompleted,
+        _source:           "exec_event",
+      },
+    });
+  } catch (err) {
+    logNV("🔴 [GET /health] Falha ao ler exec_event", { error: String(err) });
+    return jsonResponse({ ok: false, error: "Falha ao ler dados de saúde." }, 500);
+  }
+}
+
+// ============================================================================
 // 📝 P14 — POST /execution/decision (handler canônico, Worker-only)
 //
 // Registra uma decisão humana (approved / rejected) vinculada a uma execução
@@ -3712,6 +3834,19 @@ if (request.method === "GET") {
   const url = new URL(request.url);
   if (url.pathname === "/execution/decisions") {
     const response = await handleGetDecisions(env, request);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
+// PR3 — GET /health
+// Retorna dados reais mínimos de saúde da Enavia.
+// Fonte: exec_event (PR1) via readExecEvent.
+// ============================================================
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/health") {
+    const response = await handleGetHealth(env);
     return withCORS(response);
   }
 }
