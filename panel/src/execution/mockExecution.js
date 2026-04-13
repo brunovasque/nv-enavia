@@ -308,6 +308,14 @@ export const MOCK_EXECUTIONS = {
         "Contagem de etapas ajustada para refletir estado atual do ciclo cognitivo — dependência identificada na etapa 2",
       outOfScope: "Replay completo · Worker integration · noVNC · backend profundo",
     },
+    // Trilha viva de arquivo/operação — Nova frente PR1 (demo/mock — não é runtime real)
+    liveTrail: {
+      file: "contract-executor.js",
+      block: "resolveStep(stepId, context)",
+      operationType: "VALIDATE",
+      status: "running",
+      actionSummary: "Validando precedências entre etapas e calculando janela de entrega",
+    },
     events: RUNNING_EVENTS,
     result: null,
     error: null,
