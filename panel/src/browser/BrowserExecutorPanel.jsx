@@ -732,7 +732,7 @@ const s = {
     color: "var(--text-primary)",
     lineHeight: 1.45,
     fontWeight: 500,
-    wordBreak: "break-all",
+    overflowWrap: "break-word",
   },
   fieldAbsent: {
     fontSize: "12px",
@@ -867,7 +867,7 @@ const s = {
     fontFamily: "var(--font-mono)",
     color: "var(--text-secondary)",
     textAlign: "right",
-    wordBreak: "break-all",
+    overflowWrap: "break-word",
   },
   statusBadge: {
     display: "flex",
