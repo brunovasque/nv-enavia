@@ -3619,11 +3619,7 @@ export default {
 // 🌐 CORS — PRE-FLIGHT (CANÔNICO)
 // ==============================
 if (request.method === "OPTIONS") {
-  return withCORS(
-    new Response(null, {
-      status: 204,
-    })
-  );
+  return handleCORSPreflight(request);
 }
 
 // ============================================================================
