@@ -24,18 +24,34 @@ const TABS = [
   { id: "replay",   label: "Replay",   icon: "⊡" },
 ];
 
+// Stable IDs derived from TABS — avoids hardcoded strings elsewhere
+const TAB_ID = Object.fromEntries(TABS.map((t) => [t.id, t.id]));
+
+function tabBtnId(id)   { return `exec-tab-${id}`; }
+function tabPanelId(id) { return `exec-tabpanel-${id}`; }
+
 // ── Tab button ────────────────────────────────────────────────────────────────
 
 function TabButton({ tab, active, onClick }) {
+  function handleKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick(tab.id);
+    }
+  }
+
   return (
     <button
+      id={tabBtnId(tab.id)}
+      role="tab"
+      aria-selected={active}
+      aria-controls={tabPanelId(tab.id)}
       style={{
         ...s.tabBtn,
         ...(active ? s.tabBtnActive : {}),
       }}
       onClick={() => onClick(tab.id)}
-      aria-selected={active}
-      role="tab"
+      onKeyDown={handleKeyDown}
     >
       <span style={{ ...s.tabIcon, ...(active ? s.tabIconActive : {}) }} aria-hidden="true">
         {tab.icon}
@@ -52,7 +68,7 @@ export default function ExecutionPage() {
   const [execution, setExecution] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
-  const [activeTab, setActiveTab] = useState("codigo");
+  const [activeTab, setActiveTab] = useState(TAB_ID.codigo);
 
   useEffect(() => {
     // Stale-response guard: if currentState changes before the previous fetch
@@ -83,9 +99,9 @@ export default function ExecutionPage() {
       currentState === EXECUTION_STATUS.BLOCKED ||
       currentState === EXECUTION_STATUS.FAILED
     ) {
-      setActiveTab("replay");
+      setActiveTab(TAB_ID.replay);
     } else {
-      setActiveTab("codigo");
+      setActiveTab(TAB_ID.codigo);
     }
   }, [currentState]);
 
@@ -174,29 +190,49 @@ export default function ExecutionPage() {
             <div style={s.tabContent}>
 
               {/* Código — CodeTrailCard + LiveTrailCard */}
-              {activeTab === "codigo" && (
+              <div
+                id={tabPanelId(TAB_ID.codigo)}
+                role="tabpanel"
+                aria-labelledby={tabBtnId(TAB_ID.codigo)}
+                hidden={activeTab !== TAB_ID.codigo}
+              >
                 <div style={s.tabInner}>
                   <CodeTrailCard codeTrail={execution?.codeTrail ?? null} />
                   <LiveTrailCard liveTrail={execution?.liveTrail ?? null} />
                 </div>
-              )}
+              </div>
 
               {/* Diff — IncrementalDiffCard */}
-              {activeTab === "diff" && (
+              <div
+                id={tabPanelId(TAB_ID.diff)}
+                role="tabpanel"
+                aria-labelledby={tabBtnId(TAB_ID.diff)}
+                hidden={activeTab !== TAB_ID.diff}
+              >
                 <div style={s.tabInner}>
                   <IncrementalDiffCard incrementalDiff={execution?.incrementalDiff ?? null} />
                 </div>
-              )}
+              </div>
 
               {/* Mudanças — ConsolidatedFeedCard */}
-              {activeTab === "mudancas" && (
+              <div
+                id={tabPanelId(TAB_ID.mudancas)}
+                role="tabpanel"
+                aria-labelledby={tabBtnId(TAB_ID.mudancas)}
+                hidden={activeTab !== TAB_ID.mudancas}
+              >
                 <div style={s.tabInner}>
                   <ConsolidatedFeedCard changeHistory={execution?.changeHistory ?? null} />
                 </div>
-              )}
+              </div>
 
               {/* Replay — UnifiedReplayBlock (completed/error) + ExecutionTimeline */}
-              {activeTab === "replay" && (
+              <div
+                id={tabPanelId(TAB_ID.replay)}
+                role="tabpanel"
+                aria-labelledby={tabBtnId(TAB_ID.replay)}
+                hidden={activeTab !== TAB_ID.replay}
+              >
                 <div style={s.tabInner}>
                   {(isCompleted || hasError) && (
                     <UnifiedReplayBlock
@@ -211,7 +247,7 @@ export default function ExecutionPage() {
                     isHistory={isCompleted}
                   />
                 </div>
-              )}
+              </div>
 
             </div>
           </div>
