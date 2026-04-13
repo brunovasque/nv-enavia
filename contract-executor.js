@@ -25,6 +25,8 @@ const KV_PREFIX_STATE = "contract:";
 const KV_SUFFIX_STATE = ":state";
 const KV_SUFFIX_DECOMPOSITION = ":decomposition";
 const KV_INDEX_KEY = "contract:index";
+// PR1 — exec event key: contract:<id>:exec_event (read by PR2/PR3)
+const KV_SUFFIX_EXEC_EVENT = ":exec_event";
 
 // ---------------------------------------------------------------------------
 // Canonical global statuses for the Contract Executor state machine.
@@ -2182,6 +2184,70 @@ function _resolveExecutorArtifactsFromLog(cycles) {
 const EXECUTION_STATUSES = ["pending", "running", "success", "failed", "skipped"];
 
 // ---------------------------------------------------------------------------
+// PR1 — Minimal real exec event (6 canonical fields + 1 metadata field)
+//
+// buildExecEvent(status, handoff, microPrId, motivo)
+//   Builds the event object from real runtime values inside executeCurrentMicroPr.
+//   Pure function — no side effects, no KV, no fetch.
+//
+// Canonical fields (contract PR1):
+//   status_atual   — "running" | "success" | "failed"
+//   arquivo_atual  — comma-joined target files from the handoff
+//   bloco_atual    — source task ID (e.g. "task_001")
+//   operacao_atual — task objective / description
+//   motivo_curto   — null on success; trimmed error message on failure (max 120 chars)
+//   patch_atual    — micro-PR candidate ID (e.g. "micro_pr_001")
+//
+// Metadata field (audit / ordering):
+//   emitted_at     — ISO 8601 timestamp of emission
+// ---------------------------------------------------------------------------
+function buildExecEvent(status, handoff, microPrId, motivo) {
+  return {
+    status_atual:   status,
+    arquivo_atual:  Array.isArray(handoff.target_files) && handoff.target_files.length > 0
+      ? handoff.target_files.join(", ")
+      : null,
+    bloco_atual:    handoff.source_task  || null,
+    operacao_atual: handoff.objective    || null,
+    motivo_curto:   motivo               || null,
+    patch_atual:    microPrId            || null,
+    emitted_at:     new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// emitExecEvent(env, contractId, event)
+//   Persists the exec event to KV under contract:<id>:exec_event.
+//   Overwrites the previous value — only the latest event is kept.
+//   Canonical write path for PR2 (/execution) and PR3 (/health).
+//   Failures are swallowed to never crash the executor.
+// ---------------------------------------------------------------------------
+async function emitExecEvent(env, contractId, event) {
+  try {
+    const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_EXEC_EVENT}`;
+    await env.ENAVIA_BRAIN.put(key, JSON.stringify(event));
+  } catch (_) {
+    // emitExecEvent must never crash the executor
+  }
+}
+
+// ---------------------------------------------------------------------------
+// readExecEvent(env, contractId)
+//   Reads the latest exec event from KV.
+//   Returns the parsed event object or null if none exists.
+//   Intended for PR2 (/execution) and PR3 (/health).
+// ---------------------------------------------------------------------------
+async function readExecEvent(env, contractId) {
+  try {
+    const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_EXEC_EVENT}`;
+    const raw = await env.ENAVIA_BRAIN.get(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // executeCurrentMicroPr(env, contractId, executionParams) → result
 //
 // executionParams (optional):
@@ -2334,6 +2400,9 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
 
   state.updated_at = executionStartedAt;
 
+  // PR1 — emit real exec event: running
+  await emitExecEvent(env, contractId, buildExecEvent("running", handoff, microPrId, null));
+
   // Persist running state immediately so it survives crashes
   await persistContract(env, state, decomposition);
 
@@ -2380,6 +2449,8 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
+    // PR1 — emit real exec event: success
+    await emitExecEvent(env, contractId, buildExecEvent("success", handoff, microPrId, null));
     await persistContract(env, state, decomposition);
 
     return {
@@ -2406,6 +2477,13 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
+    // PR1 — emit real exec event: failed
+    await emitExecEvent(env, contractId, buildExecEvent(
+      "failed", handoff, microPrId,
+      executionError && executionError.message
+        ? String(executionError.message).slice(0, 120)
+        : "execution_failed"
+    ));
     await persistContract(env, state, decomposition);
 
     // Feed error_loop via canonical recordError
@@ -3599,6 +3677,11 @@ export {
   // C1 — Real Micro-PR Execution in TEST
   executeCurrentMicroPr,
   EXECUTION_STATUSES,
+  // PR1 — Minimal real exec event emission (6 fields)
+  buildExecEvent,
+  emitExecEvent,
+  readExecEvent,
+  KV_SUFFIX_EXEC_EVENT,
   // C2 — Automatic Contract Closure in TEST
   closeContractInTest,
   CONTRACT_CLOSURE_STATUSES,
