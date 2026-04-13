@@ -273,7 +273,7 @@ const s = {
     gap: "12px",
     height: "100%",
     overflow: "hidden",
-    padding: "4px 0 0",
+    padding: "20px 24px 0",
   },
 
   // Fixed top section — never scrolls away
@@ -282,6 +282,8 @@ const s = {
     flexDirection: "column",
     gap: "12px",
     flexShrink: 0,
+    overflowY: "auto",
+    maxHeight: "50%",
   },
 
   // Lower area: tab panel + sidebar
@@ -291,6 +293,7 @@ const s = {
     flex: 1,
     minHeight: 0,
     overflow: "hidden",
+    paddingBottom: "20px",
   },
 
   // Tab panel (left side of body)

@@ -4,11 +4,13 @@ import TopBar from "./TopBar";
 
 const BROWSER_PATH = "/browser";
 const CHAT_PATH = "/chat";
+const EXECUTION_PATH = "/execution";
 
 export default function Layout() {
   const { pathname } = useLocation();
   const isBrowser = pathname === BROWSER_PATH;
   const isChat = pathname === CHAT_PATH;
+  const isExecution = pathname === EXECUTION_PATH;
 
   return (
     <div style={styles.shell}>
@@ -22,6 +24,7 @@ export default function Layout() {
             ...styles.content,
             ...(isBrowser ? styles.contentBrowser : {}),
             ...(isChat ? styles.contentChat : {}),
+            ...(isExecution ? styles.contentExecution : {}),
           }}
         >
           <Outlet />
@@ -57,6 +60,10 @@ const styles = {
     overflow: "hidden",
   },
   contentChat: {
+    padding: 0,
+    overflow: "hidden",
+  },
+  contentExecution: {
     padding: 0,
     overflow: "hidden",
   },
