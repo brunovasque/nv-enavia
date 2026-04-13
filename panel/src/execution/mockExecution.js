@@ -329,6 +329,57 @@ export const MOCK_EXECUTIONS = {
       ],
       changeSummary: "Contagem de etapas ajustada; precedências validadas via validatePrecedences()",
     },
+    // Feed consolidado de mudanças — Nova frente PR3 (demo/mock — não é runtime real)
+    changeHistory: [
+      {
+        file: "contract-executor.js",
+        patchStatus: "partial",
+        changes: [
+          {
+            id: "ch1",
+            seq: 1,
+            summary: "Contagem de etapas ajustada (stepsCompleted += 1)",
+            status: "applied",
+            addedLines: 1,
+            removedLines: 1,
+            ts: "2026-04-12T01:52:10Z",
+          },
+          {
+            id: "ch2",
+            seq: 2,
+            summary: "Validação de precedências adicionada via validatePrecedences()",
+            status: "applied",
+            addedLines: 1,
+            removedLines: 0,
+            ts: "2026-04-12T01:52:18Z",
+          },
+          {
+            id: "ch3",
+            seq: 3,
+            summary: "Serialização do plano canônico — pendente conclusão da etapa 3",
+            status: "pending",
+            addedLines: 3,
+            removedLines: 0,
+            ts: null,
+          },
+        ],
+      },
+      {
+        file: "planner-store.js",
+        patchStatus: "pending",
+        changes: [
+          {
+            id: "ch4",
+            seq: 1,
+            summary: "Atualização do estado de progresso — aguardando etapa 3",
+            status: "pending",
+            addedLines: 2,
+            removedLines: 1,
+            ts: null,
+          },
+        ],
+      },
+    ],
     events: RUNNING_EVENTS,
     result: null,
     error: null,
