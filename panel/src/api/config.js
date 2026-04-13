@@ -10,14 +10,22 @@
 // ============================================================================
 
 export function getApiConfig() {
-  const base =
-    import.meta.env.VITE_NV_ENAVIA_URL ??
-    import.meta.env.VITE_API_BASE_URL ??
-    "";
+  const enaviaPrimaryUrl = import.meta.env.VITE_NV_ENAVIA_URL ?? "";
+  const legacyUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+  const base = enaviaPrimaryUrl !== "" ? enaviaPrimaryUrl : legacyUrl;
+
   // If no base URL is configured, force mock regardless of VITE_API_MODE.
-  // When a URL is present, default to "real" so the Vercel env wires up automatically.
-  const mode =
-    base === "" ? "mock" : (import.meta.env.VITE_API_MODE ?? "real");
+  // When VITE_NV_ENAVIA_URL is set, default to "real" so the Vercel env wires up automatically.
+  // Legacy VITE_API_BASE_URL keeps the old default of "mock" unless VITE_API_MODE is explicit.
+  let mode;
+  if (base === "") {
+    mode = "mock";
+  } else if (enaviaPrimaryUrl !== "") {
+    mode = import.meta.env.VITE_API_MODE ?? "real";
+  } else {
+    mode = import.meta.env.VITE_API_MODE ?? "mock";
+  }
+
   return {
     baseUrl: base,
     mode,
