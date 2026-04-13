@@ -7,6 +7,7 @@ import OperationalMemoryCard from "../memory/OperationalMemoryCard";
 import ConsolidationBlock from "../memory/ConsolidationBlock";
 import MemoryEntryList from "../memory/MemoryEntryList";
 import EmptyMemoryState from "../memory/EmptyMemoryState";
+import MemoryInUseCard from "../memory/MemoryInUseCard";
 
 export default function MemoryPage() {
   const [currentState, setCurrentState] = useState(MEMORY_STATES.POPULATED);
@@ -60,6 +61,9 @@ export default function MemoryPage() {
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
       />
+
+      {/* P18-PR1: Memory-in-use visibility card — always rendered */}
+      <MemoryInUseCard memory={memory} />
 
       {/* Empty state */}
       {!hasMemory ? (
