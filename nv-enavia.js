@@ -2366,7 +2366,7 @@ function handleCORSPreflight(request) {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-session-id",
       "Access-Control-Max-Age": "86400",
     },
   });
@@ -2377,7 +2377,7 @@ function withCORS(response) {
 
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-session-id");
 
   return new Response(response.body, {
     status: response.status,
