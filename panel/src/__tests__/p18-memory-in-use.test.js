@@ -2,7 +2,7 @@
 // ENAVIA Panel — P18-PR1 smoke tests: MemoryInUseCard
 //
 // Smoke tests for the "Memória em uso" visibility card added in P18-PR1.
-// Verifies the 5 acceptance criteria:
+// Verifies acceptance criteria across 24 test cases:
 //   1. Card renders without crash (populated data)
 //   2. Card renders without crash (empty data — honest state)
 //   3. Memory consulted info is shown when data exists

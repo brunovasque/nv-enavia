@@ -124,7 +124,7 @@ export default function MemoryInUseCard({ memory }) {
   const tierSub   = minTier != null ? TIER_LABELS[minTier] : null;
 
   // Pill 3 — Priority applied
-  const prioValue  = topPriority ? PRIORITY_LABELS[topPriority] ?? topPriority.toUpperCase() : null;
+  const prioValue  = topPriority ? PRIORITY_LABELS[topPriority] ?? (typeof topPriority === "string" ? topPriority.toUpperCase() : String(topPriority)) : null;
   const prioAccent = topPriority ? PRIORITY_COLORS[topPriority] : null;
   const prioSub    = topPriority ? `prioridade aplicada` : null;
 
