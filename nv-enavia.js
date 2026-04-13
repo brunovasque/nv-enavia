@@ -5337,7 +5337,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
           const allMems = memResult.ok ? memResult.results : [];
 
           const toStrength = (confidence) =>
-            confidence === "confirmed" || confidence === "high" ? "strong" : "weak";
+            (confidence === "confirmed" || confidence === "high") ? "strong" : "weak";
 
           const toTier = (mem) => {
             if (mem.memory_type === "canonical_rules" && mem.is_canonical) return 1;
@@ -5360,11 +5360,13 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
           const canonicalMems = allMems.filter(
             (m) => m.memory_type === "canonical_rules" || m.is_canonical === true,
           );
+          const canonicalIds = new Set(canonicalMems.map((m) => m.memory_id));
           const liveContextMems = allMems.filter(
-            (m) => m.memory_type === "live_context" && !canonicalMems.includes(m),
+            (m) => m.memory_type === "live_context" && !canonicalIds.has(m.memory_id),
           );
+          const liveContextIds = new Set(liveContextMems.map((m) => m.memory_id));
           const operationalMems = allMems.filter(
-            (m) => !canonicalMems.includes(m) && !liveContextMems.includes(m),
+            (m) => !canonicalIds.has(m.memory_id) && !liveContextIds.has(m.memory_id),
           );
 
           const canonicalEntries = canonicalMems.map((m) => ({
