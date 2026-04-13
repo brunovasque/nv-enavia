@@ -128,6 +128,30 @@ Combina classificação + escopo + drift + regressão + P23 compliance + merge g
 - Explica o motivo (reason auditável)
 - Não age
 
+### Onde está no runtime
+
+- **`contract-executor.js` → `executeGitHubPrAction()`** — chamado antes de ação pré-merge do braço GitHub/PR
+- **`contract-executor.js` → `requestMergeApproval()`** — avalia merge readiness e produz estado de merge gate
+- **`contract-executor.js` → `approveMerge()`** — caminho de approval formal para merge em main
+- **`nv-enavia.js` → `POST /github-pr/action`** — rota HTTP do braço GitHub/PR
+- **`nv-enavia.js` → `POST /github-pr/request-merge`** — rota HTTP para request de merge
+- **`nv-enavia.js` → `POST /github-pr/approve-merge`** — rota HTTP para approval formal (botão no painel)
+
+Separado do executor Cloudflare (`executeCurrentMicroPr`).
+
+---
+
+## 8. Runtime Functions
+
+| Função | Descrição |
+|--------|-----------|
+| `executeGitHubPrAction({...})` | Runtime: executa ação pré-merge com enforcement P24 |
+| `requestMergeApproval({...})` | Runtime: avalia merge readiness + produz estado de gate |
+| `approveMerge({...})` | Runtime: caminho de approval formal para merge em main |
+| `handleGitHubPrAction(req)` | Route handler: `POST /github-pr/action` |
+| `handleRequestMergeApproval(req)` | Route handler: `POST /github-pr/request-merge` |
+| `handleApproveMerge(req)` | Route handler: `POST /github-pr/approve-merge` |
+
 ---
 
 ## 8. Gate Formal para Merge em Main
@@ -175,7 +199,10 @@ Combina classificação + escopo + drift + regressão + P23 compliance + merge g
 ## 10. Arquivo Canônico
 
 - **Schema:** `schema/github-pr-arm-contract.js`
-- **Testes:** `tests/github-pr-arm-contract.smoke.test.js` (153 casos, 38 cenários)
+- **Runtime:** `contract-executor.js` → `executeGitHubPrAction()`, `requestMergeApproval()`, `approveMerge()`
+- **Rotas:** `nv-enavia.js` → `POST /github-pr/action`, `POST /github-pr/request-merge`, `POST /github-pr/approve-merge`
+- **Testes (contrato):** `tests/github-pr-arm-contract.smoke.test.js` (153 casos, 38 cenários)
+- **Testes (runtime):** `tests/github-pr-arm-runtime.integration.test.js` (69 casos, 20 cenários)
 - **Docs:** `docs/ENAVIA_GITHUB_PR_ARM_CONTRACT_P24.md` (este arquivo)
 - **Fonte soberana:** `schema/CONSTITUIÇÃO`
 - **Contrato superior:** `schema/autonomy-contract.js` (P23)
@@ -201,6 +228,7 @@ Todos os testes existentes passaram após a adição do P24:
 | Arquivo de teste | Resultado |
 |-----------------|-----------|
 | `github-pr-arm-contract.smoke.test.js` | 153 passed, 0 failed |
+| `github-pr-arm-runtime.integration.test.js` | 69 passed, 0 failed |
 | `autonomy-contract.smoke.test.js` | 119 passed, 0 failed |
 | `contracts-smoke.test.js` | 1187 passed, 0 failed |
 | `contract-adherence-gate-integration.smoke.test.js` | 40 passed, 0 failed |

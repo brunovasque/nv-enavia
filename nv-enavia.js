@@ -10,6 +10,10 @@ import {
   handleCompleteTask,
   handleCloseFinalContract,
   readExecEvent,
+  // P24 — GitHub/PR Arm
+  handleGitHubPrAction,
+  handleRequestMergeApproval,
+  handleApproveMerge,
 } from "./contract-executor.js";
 
 import { classifyRequest } from "./schema/planner-classifier.js";
@@ -5477,6 +5481,29 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       // POST /contracts/close-final → 🛡️ Gate final pesado do contrato inteiro (PR 3)
       if (method === "POST" && path === "/contracts/close-final") {
         const result = await handleCloseFinalContract(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // ============================================================
+      // 🛡️ P24 — GitHub/PR Arm Runtime Endpoints
+      // Separate from Cloudflare executor. Operates on branch/PR/repo.
+      // ============================================================
+
+      // POST /github-pr/action → Execute a GitHub/PR arm action with enforcement
+      if (method === "POST" && path === "/github-pr/action") {
+        const result = await handleGitHubPrAction(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // POST /github-pr/request-merge → Request merge approval (evaluates readiness)
+      if (method === "POST" && path === "/github-pr/request-merge") {
+        const result = await handleRequestMergeApproval(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // POST /github-pr/approve-merge → Formal merge approval (button in panel)
+      if (method === "POST" && path === "/github-pr/approve-merge") {
+        const result = await handleApproveMerge(request, env);
         return jsonResponse(result.body, result.status);
       }
 
