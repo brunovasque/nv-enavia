@@ -33,6 +33,8 @@ const CANONICAL_ENTRIES = [
     scope: "global",
     createdAt: "2026-03-01T10:00:00Z",
     tags: ["identidade", "cognição"],
+    tier: 1,
+    priority: "critical",
   },
   {
     id: "cn-002",
@@ -43,6 +45,8 @@ const CANONICAL_ENTRIES = [
     scope: "contratos",
     createdAt: "2026-03-05T14:30:00Z",
     tags: ["gate", "contratos", "aprovação"],
+    tier: 1,
+    priority: "critical",
   },
   {
     id: "cn-003",
@@ -53,6 +57,8 @@ const CANONICAL_ENTRIES = [
     scope: "output",
     createdAt: "2026-03-08T09:15:00Z",
     tags: ["output", "formato"],
+    tier: 1,
+    priority: "high",
   },
   {
     id: "cn-004",
@@ -63,6 +69,8 @@ const CANONICAL_ENTRIES = [
     scope: "execução",
     createdAt: "2026-03-12T11:20:00Z",
     tags: ["retry", "execução", "escalação"],
+    tier: 1,
+    priority: "high",
   },
   {
     id: "cn-005",
@@ -73,6 +81,8 @@ const CANONICAL_ENTRIES = [
     scope: "operacional",
     createdAt: "2026-04-01T16:45:00Z",
     tags: ["fornecedor", "logística", "sul"],
+    tier: 2,
+    priority: "medium",
   },
 ];
 
@@ -88,6 +98,8 @@ const OPERATIONAL_ENTRIES = [
     sessionId: PREV_SESSION_ID,
     createdAt: "2026-04-11T10:30:00Z",
     tags: ["expansão", "sul", "contrato"],
+    tier: 3,
+    priority: "high",
   },
   {
     id: "op-002",
@@ -99,6 +111,8 @@ const OPERATIONAL_ENTRIES = [
     sessionId: PREV_SESSION_ID,
     createdAt: "2026-04-11T10:45:00Z",
     tags: ["prazo", "planejamento", "q3"],
+    tier: 3,
+    priority: "high",
   },
   {
     id: "op-003",
@@ -110,6 +124,8 @@ const OPERATIONAL_ENTRIES = [
     sessionId: PREV_SESSION_ID,
     createdAt: "2026-04-11T11:20:00Z",
     tags: ["gate", "performance", "feedback"],
+    tier: 6,
+    priority: "low",
   },
   {
     id: "op-004",
@@ -121,6 +137,8 @@ const OPERATIONAL_ENTRIES = [
     sessionId: SESSION_ID,
     createdAt: "2026-04-12T02:00:00Z",
     tags: ["sessão", "contrato", "revisão"],
+    tier: 4,
+    priority: "medium",
   },
 ];
 
@@ -151,6 +169,44 @@ const LIVE_CONTEXT_BASE = {
 };
 
 // ── Consolidation data ──────────────────────────────────────────────────────
+
+// ── Memory-in-use: pre-plan read + audit snapshots ──────────────────────────
+const MEMORY_READ_BEFORE_PLAN = {
+  happened: true,
+  readAt: "2026-04-12T02:01:00Z",
+  memoriesRead: CANONICAL_ENTRIES.length + OPERATIONAL_ENTRIES.length,
+  topTier: 1,
+  topPriority: "critical",
+};
+
+const MEMORY_READ_BEFORE_PLAN_EMPTY = {
+  happened: false,
+  readAt: null,
+  memoriesRead: 0,
+  topTier: null,
+  topPriority: null,
+};
+
+const AUDIT_SNAPSHOTS = [
+  {
+    id: "snap-001",
+    label: "Início de sessão",
+    createdAt: "2026-04-12T02:00:00Z",
+    type: "session_start",
+  },
+  {
+    id: "snap-002",
+    label: "Pré-plano — leitura de memória",
+    createdAt: "2026-04-12T02:01:00Z",
+    type: "pre_plan_read",
+  },
+  {
+    id: "snap-003",
+    label: "Gate aprovado — Ops Lead",
+    createdAt: "2026-04-12T02:30:00Z",
+    type: "gate_approved",
+  },
+];
 const CONSOLIDATION_PENDING = [
   {
     id: "pend-001",
@@ -217,6 +273,8 @@ export const MOCK_MEMORY = {
       lastRun: "2026-04-11T23:30:00Z",
       nextRun: "2026-04-12T05:30:00Z",
     },
+    memoryReadBeforePlan: MEMORY_READ_BEFORE_PLAN,
+    auditSnapshots: AUDIT_SNAPSHOTS,
   },
 
   [MEMORY_STATES.EMPTY]: {
@@ -237,6 +295,8 @@ export const MOCK_MEMORY = {
       lastRun: null,
       nextRun: null,
     },
+    memoryReadBeforePlan: MEMORY_READ_BEFORE_PLAN_EMPTY,
+    auditSnapshots: [],
   },
 
   [MEMORY_STATES.CONSOLIDATING]: {
@@ -261,6 +321,8 @@ export const MOCK_MEMORY = {
       lastRun: "2026-04-11T23:30:00Z",
       nextRun: null,
     },
+    memoryReadBeforePlan: MEMORY_READ_BEFORE_PLAN,
+    auditSnapshots: AUDIT_SNAPSHOTS,
   },
 
   [MEMORY_STATES.LIVE_SESSION]: {
@@ -281,5 +343,7 @@ export const MOCK_MEMORY = {
       lastRun: "2026-04-11T23:30:00Z",
       nextRun: "2026-04-12T05:30:00Z",
     },
+    memoryReadBeforePlan: MEMORY_READ_BEFORE_PLAN,
+    auditSnapshots: AUDIT_SNAPSHOTS,
   },
 };
