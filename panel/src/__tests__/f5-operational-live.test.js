@@ -4,7 +4,7 @@
 // Verifica acceptance criteria da Frente 5 PR1 — Observabilidade Operacional:
 //   1. Card renderiza sem crash (dados completos)
 //   2. Card renderiza sem crash (operation null — estado honesto)
-//   3. Campos com dados são exibidos legìvelmente
+//   3. Campos com dados são exibidos legivelmente
 //   4. Campos ausentes mostram "sem dado disponível" (honesto)
 //   5. Estado vazio (operation=null) exibe mensagem honesta
 //   6. Badge "AO VIVO" aparece quando há dados operacionais
