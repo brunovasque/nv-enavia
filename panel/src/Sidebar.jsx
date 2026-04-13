@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
-  { path: "/chat", label: "Chat", icon: "💬" },
-  { path: "/plan", label: "Plano", icon: "📋" },
-  { path: "/memory", label: "Memória", icon: "🧠" },
+  { path: "/chat",      label: "Chat",    icon: "💬" },
+  { path: "/plan",      label: "Plano",   icon: "📋" },
+  { path: "/memory",    label: "Memória", icon: "🧠" },
   { path: "/execution", label: "Execução", icon: "⚡" },
-  { path: "/browser", label: "Browser", icon: "🌐" },
+  { path: "/health",    label: "Saúde",   icon: "◆", badge: "P22" },
+  { path: "/browser",   label: "Browser", icon: "🌐" },
 ];
 
 export default function Sidebar({ collapsed }) {
@@ -26,7 +27,7 @@ export default function Sidebar({ collapsed }) {
 
       {/* Navigation */}
       <nav style={styles.nav}>
-        {NAV_ITEMS.map(({ path, label, icon }) => {
+        {NAV_ITEMS.map(({ path, label, icon, badge }) => {
           const isActive = pathname === path;
           const isBrowserItem = path === "/browser";
 
@@ -45,6 +46,9 @@ export default function Sidebar({ collapsed }) {
               <span style={styles.navIcon}>{icon}</span>
               {!collapsed && (
                 <span style={styles.navLabel}>{label}</span>
+              )}
+              {badge && !collapsed && (
+                <span style={styles.browserBadge}>{badge}</span>
               )}
               {isBrowserItem && !collapsed && (
                 <span style={styles.browserBadge}>CORE</span>
