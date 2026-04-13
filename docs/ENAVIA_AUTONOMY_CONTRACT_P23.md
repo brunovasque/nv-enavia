@@ -1,11 +1,11 @@
 # ENAVIA — Contrato de Autonomia v1 (P23)
 
 > Contrato canônico de autonomia da Enavia — Frente 6: Autonomia e Braços Especialistas.
-> Versão: v1
+> Versão: v1.1
 > Data: 2026-04-13
 > Status: ATIVO
 > Implementação: `schema/autonomy-contract.js`
-> Testes: `tests/autonomy-contract.smoke.test.js` (62 casos)
+> Testes: `tests/autonomy-contract.smoke.test.js` (82 casos, 36 cenários)
 
 ---
 
@@ -45,7 +45,9 @@ Ele determina:
 
 ---
 
-## 3. A — Ações Permitidas sem Novo OK (após início aprovado)
+## 3. A1 — Ações de Pré-Execução (antes do OK humano inicial)
+
+Ações que a Enavia pode fazer **sem nenhum OK humano**. São leitura, diagnóstico, classificação, planejamento e preparação. Não iniciam execução.
 
 | Ação | Descrição |
 |------|-----------|
@@ -57,6 +59,15 @@ Ele determina:
 | `query_health` | Consulta de health |
 | `query_execution_state` | Consulta de estado de execução |
 | `prepare_payload` | Preparação de payloads |
+
+---
+
+## 4. A2 — Ações Autônomas Pós-Início (após OK humano inicial)
+
+Após o OK humano que **inicia a execução**, a Enavia entra em loop autônomo e pode executar estas ações até finalizar o objetivo, desde que dentro do escopo aprovado. O OK humano é só o inicial; microetapas internas seguem por memória/loop.
+
+| Ação | Descrição |
+|------|-----------|
 | `execute_in_test_within_scope` | Execução em TEST dentro do escopo |
 | `reexecute_in_test_within_scope` | Reexecução em TEST dentro do escopo |
 | `internal_loop_until_objective_done` | Loop interno até finalizar objetivo |
@@ -64,20 +75,22 @@ Ele determina:
 
 ---
 
-## 4. B — Ações que Exigem OK Humano Explícito
+## 5. B — Ações que Exigem OK Humano Explícito (SEMPRE, em qualquer ambiente)
+
+Estas ações **nunca** são autônomas, nem mesmo em TEST. O usuário definiu que iniciar execução exige OK humano explícito.
 
 | Ação | Descrição |
 |------|-----------|
-| `start_plan_execution` | Iniciar execução de plano |
-| `start_contract_execution` | Iniciar execução de contrato |
-| `start_task_execution` | Iniciar execução de tarefa |
+| `start_plan_execution` | Iniciar execução de plano (sempre exige OK) |
+| `start_contract_execution` | Iniciar execução de contrato (sempre exige OK) |
+| `start_task_execution` | Iniciar execução de tarefa (sempre exige OK) |
 | `promote_to_prod` | Qualquer promoção para PROD |
 | `act_on_undefined_external_service` | Ação em serviço externo não definido |
 | `change_scope` | Qualquer mudança de escopo |
 
 ---
 
-## 5. C — Ações Proibidas Incondicionalmente
+## 6. C — Ações Proibidas Incondicionalmente
 
 | Ação | Descrição |
 |------|-----------|
@@ -93,7 +106,7 @@ Ele determina:
 
 ---
 
-## 6. D — Gates Obrigatórios antes de Ação Sensível
+## 7. D — Gates Obrigatórios antes de Ação Sensível
 
 | Gate | Descrição |
 |------|-----------|
@@ -108,7 +121,7 @@ Todos os gates devem passar antes de permitir ação sensível. Se qualquer gate
 
 ---
 
-## 7. E — Política de Falha e Escalonamento
+## 8. E — Política de Falha e Escalonamento
 
 | Regra | Comportamento |
 |-------|---------------|
@@ -119,7 +132,7 @@ Todos os gates devem passar antes de permitir ação sensível. Se qualquer gate
 
 ---
 
-## 8. F — Compatibilidade com P24/P25/P26
+## 9. F — Compatibilidade com P24/P25/P26
 
 | Braço | Política |
 |-------|----------|
@@ -132,18 +145,21 @@ A função `validateSpecialistArmCompliance()` em `schema/autonomy-contract.js` 
 
 ---
 
-## 9. Regra de Ambiente
+## 10. Regra de Ambiente
 
 | Ambiente | Comportamento |
 |----------|---------------|
-| **TEST** | Autonomia total dentro do escopo aprovado. Ações operacionais em serviços externos permitidas. Promoção para PROD e mudança de escopo **continuam** exigindo OK humano. |
-| **PROD** | Leituras e diagnósticos permitidos. Qualquer ação operacional ou promoção exige OK humano explícito. |
+| **TEST** | Pré-execução: autônomo. Pós-início aprovado: autonomia total dentro do escopo. **Início de execução exige OK humano.** Promoção para PROD, mudança de escopo e ação em serviço externo não definido **continuam** exigindo OK humano. |
+| **PROD** | Leituras e diagnósticos permitidos. Qualquer ação operacional, início de execução ou promoção exige OK humano explícito. |
 
-A autonomia total em TEST **não autoriza** sair do escopo nem degradar observabilidade.
+A autonomia total em TEST **não autoriza**:
+- iniciar execução sem OK humano
+- sair do escopo
+- degradar observabilidade
 
 ---
 
-## 10. Funções Públicas
+## 11. Funções Públicas
 
 | Função | Descrição |
 |--------|-----------|
@@ -155,15 +171,15 @@ A autonomia total em TEST **não autoriza** sair do escopo nem degradar observab
 
 ---
 
-## 11. Arquivo Canônico
+## 12. Arquivo Canônico
 
 - **Schema:** `schema/autonomy-contract.js`
-- **Testes:** `tests/autonomy-contract.smoke.test.js` (62 casos, 26 cenários)
+- **Testes:** `tests/autonomy-contract.smoke.test.js` (82 casos, 36 cenários)
 - **Docs:** `docs/ENAVIA_AUTONOMY_CONTRACT_P23.md` (este arquivo)
 
 ---
 
-## 12. O que NÃO está neste contrato
+## 13. O que NÃO está neste contrato
 
 - Implementação de braço GitHub (P24)
 - Implementação de browser executor (P25)
@@ -175,13 +191,13 @@ A autonomia total em TEST **não autoriza** sair do escopo nem degradar observab
 
 ---
 
-## 13. Prova de Não-Regressão
+## 14. Prova de Não-Regressão
 
-Todos os testes existentes passaram após a adição deste contrato:
+Todos os testes existentes passaram após a correção deste contrato:
 
 | Arquivo de teste | Resultado |
 |-----------------|-----------|
-| `autonomy-contract.smoke.test.js` | 62 passed, 0 failed |
+| `autonomy-contract.smoke.test.js` | 82 passed, 0 failed |
 | `contract-adherence-gate-integration.smoke.test.js` | 40 passed, 0 failed |
 | `contract-adherence-gate.smoke.test.js` | 68 passed, 0 failed |
 | `contract-final-audit.smoke.test.js` | 146 passed, 0 failed |

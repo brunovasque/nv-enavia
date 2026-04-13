@@ -4,7 +4,7 @@
 // Run: node tests/autonomy-contract.smoke.test.js
 //
 // Tests:
-//   S1.  classifyAction — allowed action
+//   S1.  classifyAction — allowed action (pre-execution)
 //   S2.  classifyAction — requires_human_ok action
 //   S3.  classifyAction — prohibited action
 //   S4.  classifyAction — unknown action (defaults to requires_human)
@@ -17,7 +17,7 @@
 //   S11. evaluateFailurePolicy — max retries exceeded → escalate
 //   S12. evaluateFailurePolicy — high risk → escalate
 //   S13. evaluateFailurePolicy — insufficient evidence → escalate
-//   S14. evaluateEnvironmentAutonomy — TEST + in scope → autonomous
+//   S14. evaluateEnvironmentAutonomy — TEST + post-start action in scope → autonomous
 //   S15. evaluateEnvironmentAutonomy — TEST + out of scope → prohibited
 //   S16. evaluateEnvironmentAutonomy — PROD + promote → requires human
 //   S17. evaluateEnvironmentAutonomy — PROD + read → autonomous
@@ -30,11 +30,23 @@
 //   S24. evaluateEnvironmentAutonomy — prohibited action in TEST → still prohibited
 //   S25. evaluateFailurePolicy — attempt 1 with no issues → can continue
 //   S26. SPECIALIST_ARM_POLICY references P24/P25/P26
+//   S27. start_plan_execution requires human OK in TEST (BLOCKER 1 fix)
+//   S28. start_contract_execution requires human OK in TEST (BLOCKER 1 fix)
+//   S29. start_task_execution requires human OK in TEST (BLOCKER 1 fix)
+//   S30. start_plan_execution requires human OK in PROD
+//   S31. PRE_EXECUTION_ACTIONS are all autonomous without start
+//   S32. POST_START_AUTONOMOUS_ACTIONS are autonomous in TEST after start
+//   S33. PRE_EXECUTION_ACTIONS and POST_START_AUTONOMOUS_ACTIONS are disjoint
+//   S34. HUMAN_OK_REQUIRED_ACTIONS includes all start_* actions
+//   S35. evaluateEnvironmentAutonomy — TEST + act_on_undefined_external_service → requires human
+//   S36. evaluateEnvironmentAutonomy — TEST + pre-execution read → autonomous
 // ============================================================================
 
 import {
   ENVIRONMENT,
   AUTONOMY_LEVEL,
+  PRE_EXECUTION_ACTIONS,
+  POST_START_AUTONOMOUS_ACTIONS,
   ALLOWED_ACTIONS,
   HUMAN_OK_REQUIRED_ACTIONS,
   PROHIBITED_ACTIONS,
@@ -196,8 +208,8 @@ console.log("S13. evaluateFailurePolicy — insufficient evidence → escalate")
   assert(r.escalation_type === "insufficient_evidence", "escalation_type = insufficient_evidence");
 }
 
-// ── S14. evaluateEnvironmentAutonomy — TEST + in scope ──────────────────────
-console.log("S14. evaluateEnvironmentAutonomy — TEST + in scope → autonomous");
+// ── S14. evaluateEnvironmentAutonomy — TEST + post-start in scope ────────────
+console.log("S14. evaluateEnvironmentAutonomy — TEST + post-start action in scope → autonomous");
 {
   const r = evaluateEnvironmentAutonomy({
     environment: ENVIRONMENT.TEST,
@@ -364,6 +376,127 @@ console.log("S26. SPECIALIST_ARM_POLICY references P24/P25/P26");
   assert(typeof SPECIALIST_ARM_POLICY.p25_browser_arm === "string", "P25 reference exists");
   assert(typeof SPECIALIST_ARM_POLICY.p26_deploy_test === "string", "P26 reference exists");
   assert(SPECIALIST_ARM_POLICY.general_rule.includes("no_arm_can_override"), "general rule present");
+}
+
+// ── S27. start_plan_execution requires human OK in TEST (BLOCKER 1 fix) ─────
+console.log("S27. start_plan_execution requires human OK in TEST (BLOCKER 1 fix)");
+{
+  const r = evaluateEnvironmentAutonomy({
+    environment: ENVIRONMENT.TEST,
+    action: "start_plan_execution",
+    scope_approved: true,
+  });
+  assert(r.autonomy_level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "TEST + start_plan_execution → requires_human");
+  assert(r.can_proceed === false, "can_proceed = false (even in TEST)");
+}
+
+// ── S28. start_contract_execution requires human OK in TEST ─────────────────
+console.log("S28. start_contract_execution requires human OK in TEST (BLOCKER 1 fix)");
+{
+  const r = evaluateEnvironmentAutonomy({
+    environment: ENVIRONMENT.TEST,
+    action: "start_contract_execution",
+    scope_approved: true,
+  });
+  assert(r.autonomy_level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "TEST + start_contract_execution → requires_human");
+  assert(r.can_proceed === false, "can_proceed = false (even in TEST)");
+}
+
+// ── S29. start_task_execution requires human OK in TEST ─────────────────────
+console.log("S29. start_task_execution requires human OK in TEST (BLOCKER 1 fix)");
+{
+  const r = evaluateEnvironmentAutonomy({
+    environment: ENVIRONMENT.TEST,
+    action: "start_task_execution",
+    scope_approved: true,
+  });
+  assert(r.autonomy_level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "TEST + start_task_execution → requires_human");
+  assert(r.can_proceed === false, "can_proceed = false (even in TEST)");
+}
+
+// ── S30. start_plan_execution requires human OK in PROD ─────────────────────
+console.log("S30. start_plan_execution requires human OK in PROD");
+{
+  const r = evaluateEnvironmentAutonomy({
+    environment: ENVIRONMENT.PROD,
+    action: "start_plan_execution",
+    scope_approved: true,
+  });
+  assert(r.autonomy_level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "PROD + start_plan_execution → requires_human");
+  assert(r.can_proceed === false, "can_proceed = false");
+}
+
+// ── S31. PRE_EXECUTION_ACTIONS are all autonomous without start ─────────────
+console.log("S31. PRE_EXECUTION_ACTIONS are all autonomous (no start needed)");
+{
+  let allAutonomous = true;
+  for (const action of PRE_EXECUTION_ACTIONS) {
+    const r = classifyAction(action);
+    if (r.autonomy_level !== AUTONOMY_LEVEL.AUTONOMOUS) {
+      allAutonomous = false;
+      break;
+    }
+  }
+  assert(allAutonomous, "all PRE_EXECUTION_ACTIONS classify as autonomous");
+  assert(PRE_EXECUTION_ACTIONS.length >= 8, "at least 8 pre-execution actions defined");
+}
+
+// ── S32. POST_START_AUTONOMOUS_ACTIONS are autonomous in TEST ────────────────
+console.log("S32. POST_START_AUTONOMOUS_ACTIONS are autonomous in TEST after start");
+{
+  let allAutonomous = true;
+  for (const action of POST_START_AUTONOMOUS_ACTIONS) {
+    const r = evaluateEnvironmentAutonomy({
+      environment: ENVIRONMENT.TEST,
+      action,
+      scope_approved: true,
+    });
+    if (r.autonomy_level !== AUTONOMY_LEVEL.AUTONOMOUS) {
+      allAutonomous = false;
+      break;
+    }
+  }
+  assert(allAutonomous, "all POST_START_AUTONOMOUS_ACTIONS are autonomous in TEST");
+  assert(POST_START_AUTONOMOUS_ACTIONS.length >= 4, "at least 4 post-start actions defined");
+}
+
+// ── S33. PRE_EXECUTION and POST_START are disjoint ──────────────────────────
+console.log("S33. PRE_EXECUTION_ACTIONS and POST_START_AUTONOMOUS_ACTIONS are disjoint");
+{
+  const overlap = PRE_EXECUTION_ACTIONS.filter(a => POST_START_AUTONOMOUS_ACTIONS.includes(a));
+  assert(overlap.length === 0, "no overlap between PRE_EXECUTION and POST_START");
+}
+
+// ── S34. HUMAN_OK_REQUIRED_ACTIONS includes all start_* actions ─────────────
+console.log("S34. HUMAN_OK_REQUIRED_ACTIONS includes all start_* actions");
+{
+  assert(HUMAN_OK_REQUIRED_ACTIONS.includes("start_plan_execution"), "start_plan_execution in HUMAN_OK");
+  assert(HUMAN_OK_REQUIRED_ACTIONS.includes("start_contract_execution"), "start_contract_execution in HUMAN_OK");
+  assert(HUMAN_OK_REQUIRED_ACTIONS.includes("start_task_execution"), "start_task_execution in HUMAN_OK");
+}
+
+// ── S35. TEST + act_on_undefined_external_service → requires human ──────────
+console.log("S35. evaluateEnvironmentAutonomy — TEST + act_on_undefined_external_service → requires human");
+{
+  const r = evaluateEnvironmentAutonomy({
+    environment: ENVIRONMENT.TEST,
+    action: "act_on_undefined_external_service",
+    scope_approved: true,
+  });
+  assert(r.autonomy_level === AUTONOMY_LEVEL.REQUIRES_HUMAN, "TEST + undefined service → requires_human");
+  assert(r.can_proceed === false, "can_proceed = false");
+}
+
+// ── S36. TEST + pre-execution read → autonomous ─────────────────────────────
+console.log("S36. evaluateEnvironmentAutonomy — TEST + pre-execution read → autonomous");
+{
+  const r = evaluateEnvironmentAutonomy({
+    environment: ENVIRONMENT.TEST,
+    action: "read_only_diagnostic",
+    scope_approved: true,
+  });
+  assert(r.autonomy_level === AUTONOMY_LEVEL.AUTONOMOUS, "TEST + read_only_diagnostic → autonomous");
+  assert(r.can_proceed === true, "can_proceed = true");
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────

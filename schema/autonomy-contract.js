@@ -50,12 +50,13 @@ const AUTONOMY_LEVEL = {
 };
 
 // ---------------------------------------------------------------------------
-// A. ALLOWED_ACTIONS — ações permitidas sem novo OK após início
+// A1. PRE_EXECUTION_ACTIONS — ações permitidas ANTES do OK humano inicial
 //
-// Após o OK humano inicial, a Enavia pode executar estas ações em loop
-// autônomo até finalizar o objetivo, desde que dentro do escopo aprovado.
+// A Enavia pode fazer tudo isto sem precisar de OK humano.
+// São ações de leitura, diagnóstico, classificação, planejamento e preparação.
+// Não iniciam execução de nenhum plano/contrato/tarefa.
 // ---------------------------------------------------------------------------
-const ALLOWED_ACTIONS = [
+const PRE_EXECUTION_ACTIONS = [
   "read",
   "read_only_diagnostic",
   "classify",
@@ -64,10 +65,33 @@ const ALLOWED_ACTIONS = [
   "query_health",
   "query_execution_state",
   "prepare_payload",
+];
+
+// ---------------------------------------------------------------------------
+// A2. POST_START_AUTONOMOUS_ACTIONS — ações autônomas APÓS o OK humano inicial
+//
+// Após o OK humano que inicia a execução, a Enavia entra em loop autônomo
+// e pode executar estas ações até finalizar o objetivo, desde que dentro
+// do escopo aprovado. O OK humano é só o inicial; microetapas internas
+// seguem por memória/loop do contrato.
+// ---------------------------------------------------------------------------
+const POST_START_AUTONOMOUS_ACTIONS = [
   "execute_in_test_within_scope",
   "reexecute_in_test_within_scope",
   "internal_loop_until_objective_done",
   "operate_external_service_in_test_within_scope",
+];
+
+// ---------------------------------------------------------------------------
+// A. ALLOWED_ACTIONS — união de pré-execução + pós-início
+//
+// Catálogo completo de ações autônomas (sem novo OK) em qualquer fase.
+// Para consulta de fase específica, usar PRE_EXECUTION_ACTIONS ou
+// POST_START_AUTONOMOUS_ACTIONS.
+// ---------------------------------------------------------------------------
+const ALLOWED_ACTIONS = [
+  ...PRE_EXECUTION_ACTIONS,
+  ...POST_START_AUTONOMOUS_ACTIONS,
 ];
 
 // ---------------------------------------------------------------------------
@@ -392,11 +416,17 @@ function evaluateEnvironmentAutonomy({ environment, action, scope_approved } = {
     };
   }
 
-  // TEST + dentro do escopo → autônomo (inclui ações que normalmente requerem OK, exceto as que SEMPRE requerem OK)
+  // TEST + dentro do escopo → autônomo (inclui ações pós-início, exceto as que SEMPRE exigem OK)
   if (environment === ENVIRONMENT.TEST) {
-    // Ações que SEMPRE exigem OK, mesmo em TEST
+    // Ações que SEMPRE exigem OK humano, mesmo em TEST.
+    // Inclui: promoção PROD, mudança de escopo, e INÍCIO de execução.
+    // O usuário definiu: "só pode iniciar execução com OK humano explícito".
     const always_requires_human = [
+      "start_plan_execution",
+      "start_contract_execution",
+      "start_task_execution",
       "promote_to_prod",
+      "act_on_undefined_external_service",
       "change_scope",
     ];
 
@@ -522,6 +552,8 @@ export {
   AUTONOMY_LEVEL,
 
   // Catalogues
+  PRE_EXECUTION_ACTIONS,
+  POST_START_AUTONOMOUS_ACTIONS,
   ALLOWED_ACTIONS,
   HUMAN_OK_REQUIRED_ACTIONS,
   PROHIBITED_ACTIONS,
