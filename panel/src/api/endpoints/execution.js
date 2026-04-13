@@ -28,6 +28,7 @@ export { EXECUTION_STATUS } from "../../execution/mockExecution.js";
  */
 export async function fetchExecution(opts = {}) {
   const t0 = Date.now();
+  const { mode } = getApiConfig();
   try {
     const res = await apiClient.request("/execution", {
       _resource:  "execution",
@@ -41,7 +42,10 @@ export async function fetchExecution(opts = {}) {
       );
     }
 
-    const data = mapExecutionResponse(res.data);
+    // In real mode the worker wraps the execution trail: { ok, execution }.
+    // In mock mode res.data is already the execution object (or null for IDLE).
+    const rawExecution = mode === "real" ? (res.data?.execution ?? null) : res.data;
+    const data = mapExecutionResponse(rawExecution);
     return { ok: true, data, meta: { durationMs: Date.now() - t0 } };
   } catch (err) {
     return normalizeError(err, "execution");

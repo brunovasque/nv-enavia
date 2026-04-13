@@ -30,7 +30,7 @@ function MetricRow({ label, value, mono, valueColor }) {
 }
 
 export default function ExecutionStatusCard({ execution }) {
-  if (!execution) return null;
+  if (!execution || !execution.metrics) return null;
 
   const { metrics, status, planId, id } = execution;
   const progressPct =
