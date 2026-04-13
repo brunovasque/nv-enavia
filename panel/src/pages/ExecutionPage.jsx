@@ -5,6 +5,7 @@ import ExecutionHeader from "../execution/ExecutionHeader";
 import ExecutionStatusCard from "../execution/ExecutionStatusCard";
 import CurrentStepBlock from "../execution/CurrentStepBlock";
 import ExecutionTimeline from "../execution/ExecutionTimeline";
+import OperationalLiveCard from "../execution/OperationalLiveCard";
 import ResultBlock from "../execution/ResultBlock";
 import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
@@ -82,6 +83,11 @@ export default function ExecutionPage() {
           {/* Running: current step indicator */}
           {isRunning && execution?.currentStep && (
             <CurrentStepBlock step={execution.currentStep} />
+          )}
+
+          {/* Operational live surface — F5-PR1 */}
+          {isRunning && (
+            <OperationalLiveCard operation={execution?.operation ?? null} />
           )}
 
           {/* Body: main (timeline) + sidebar */}
