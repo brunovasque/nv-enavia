@@ -6,6 +6,7 @@ import ExecutionStatusCard from "../execution/ExecutionStatusCard";
 import CurrentStepBlock from "../execution/CurrentStepBlock";
 import ExecutionTimeline from "../execution/ExecutionTimeline";
 import OperationalLiveCard from "../execution/OperationalLiveCard";
+import CodeTrailCard from "../execution/CodeTrailCard";
 import ResultBlock from "../execution/ResultBlock";
 import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
@@ -88,6 +89,11 @@ export default function ExecutionPage() {
           {/* Operational live surface — F5-PR1 */}
           {isRunning && (
             <OperationalLiveCard operation={execution?.operation ?? null} />
+          )}
+
+          {/* Code trail surface — F5-PR3 */}
+          {isRunning && (
+            <CodeTrailCard codeTrail={execution?.codeTrail ?? null} />
           )}
 
           {/* Body: main (timeline) + sidebar */}
