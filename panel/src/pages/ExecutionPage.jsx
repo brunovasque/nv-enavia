@@ -15,6 +15,7 @@ import ErrorBlock from "../execution/ErrorBlock";
 import IdleState from "../execution/IdleState";
 import UnifiedReplayBlock from "../execution/UnifiedReplayBlock";
 import MacroCycleTimeline from "../execution/MacroCycleTimeline";
+import FunctionalLogsCard from "../execution/FunctionalLogsCard";
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ const TABS = [
   { id: "codigo",   label: "Código",   icon: "⊞" },
   { id: "diff",     label: "Diff",     icon: "±" },
   { id: "mudancas", label: "Mudanças", icon: "☰" },
+  { id: "logs",     label: "Logs",     icon: "≡" },
   { id: "replay",   label: "Replay",   icon: "⊡" },
 ];
 
@@ -229,6 +231,18 @@ export default function ExecutionPage() {
               >
                 <div style={s.tabInner}>
                   <ConsolidatedFeedCard changeHistory={execution?.changeHistory ?? null} />
+                </div>
+              </div>
+
+              {/* Logs — FunctionalLogsCard */}
+              <div
+                id={tabPanelId(TAB_ID.logs)}
+                role="tabpanel"
+                aria-labelledby={tabBtnId(TAB_ID.logs)}
+                hidden={activeTab !== TAB_ID.logs}
+              >
+                <div style={s.tabInner}>
+                  <FunctionalLogsCard functionalLogs={execution?.functionalLogs ?? null} />
                 </div>
               </div>
 
