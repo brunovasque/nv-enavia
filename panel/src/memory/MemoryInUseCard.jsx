@@ -91,7 +91,7 @@ function SnapshotRow({ snap }) {
           {snap.label}
         </span>
         <span style={{ ...s.snapType, ...(isBlock ? s.snapTypeBlock : {}) }}>
-          {isBlock ? "⛔ BLOQUEADO" : typeLabel}
+          {isBlock ? "■ BLOQUEADO" : typeLabel}
         </span>
       </div>
       <span style={s.snapTs}>{formatTs(snap.createdAt)}</span>
@@ -105,7 +105,7 @@ function derivePriorityExplanation(readBeforePlan) {
   const parts = [];
   if (readBeforePlan.topTier === 1) {
     parts.push("tier mais alto (Tier 1)");
-  } else if (readBeforePlan.topTier != null) {
+  } else if (readBeforePlan.topTier !== null && readBeforePlan.topTier !== undefined) {
     parts.push(`tier ativo (Tier ${readBeforePlan.topTier})`);
   }
   if (readBeforePlan.topPriority === "critical") {
