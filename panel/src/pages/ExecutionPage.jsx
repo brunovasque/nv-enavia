@@ -18,6 +18,8 @@ import MacroCycleTimeline from "../execution/MacroCycleTimeline";
 import FunctionalLogsCard from "../execution/FunctionalLogsCard";
 import OperationalAuditCard from "../execution/OperationalAuditCard";
 
+import MergeGateCard from "../execution/MergeGateCard";
+
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
 const TABS = [
@@ -281,6 +283,10 @@ export default function ExecutionPage() {
               execution={execution}
               currentState={currentState}
             />
+            {/* P24 — Merge gate: approval formal antes de merge em main */}
+            {isCompleted && execution?.merge_gate && (
+              <MergeGateCard mergeGate={execution.merge_gate} />
+            )}
           </div>
 
         </div>
