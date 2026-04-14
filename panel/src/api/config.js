@@ -29,6 +29,6 @@ export function getApiConfig() {
   return {
     baseUrl: base,
     mode,
-    timeoutMs: Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 5000),
+    timeoutMs: Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 60000),
   };
 }
