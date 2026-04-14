@@ -237,7 +237,7 @@ function renderOperationalAwarenessBlock(ctx) {
   lines.push("DIFERENCIAÇÃO OBRIGATÓRIA DE INTENÇÃO:");
   const it = ctx.interaction_types;
   if (it) {
-    for (const [, def] of Object.entries(it)) {
+    for (const def of Object.values(it)) {
       lines.push(`• ${def.label}: ${def.description}`);
     }
   }
