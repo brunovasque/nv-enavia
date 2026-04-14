@@ -22,6 +22,8 @@
 //  18.  ExecutionPage importa MergeGateCard
 //  19.  ExecutionPage renderiza MergeGateCard condicionalmente com isCompleted + merge_gate
 //  20.  MergeGateCard não importa nada de PlanPage/GateCard (sem acoplamento cruzado)
+//  21.  approveMerge NÃO fabrica readiness gates no cliente
+//  22.  approval depende do merge_gate do runtime, não de gates inventados
 //
 // =============================================================================
 
@@ -176,8 +178,13 @@ describe("P24 PROVAS 12–14 — approveMerge exposta no api/index.js e em endpo
   it("PROVA 14 — approveMerge em mock retorna ok=true e approved_for_merge", async () => {
     const { approveMerge } = await import("../api/index.js");
     const result = await approveMerge({
-      summary_for_merge: "Resumo de teste para smoke test P24.",
-      reason_merge_ok: "Sem regressão, diff revisado — apto para merge.",
+      merge_gate: {
+        merge_status: "awaiting_formal_approval",
+        summary_for_merge: "Resumo de teste para smoke test P24.",
+        reason_merge_ok: "Sem regressão, diff revisado — apto para merge.",
+        approval_status: "pending",
+        can_merge: false,
+      },
     });
     expect(result.ok).toBe(true);
     expect(result.data.merge_status).toBe("approved_for_merge");
@@ -238,5 +245,91 @@ describe("P24 PROVA 20 — MergeGateCard sem acoplamento com PlanPage/GateCard",
     // Procura por import statements que referenciem GateCard.jsx ou PlanPage.jsx
     expect(MERGE_GATE_CARD_SRC).not.toMatch(/from\s+["'].*GateCard/);
     expect(MERGE_GATE_CARD_SRC).not.toMatch(/from\s+["'].*PlanPage/);
+  });
+});
+
+// =============================================================================
+// PROVA 21 — O cliente NÃO envia readiness gates booleanos fabricados
+// =============================================================================
+
+describe("P24 PROVA 21 — approveMerge NÃO fabrica readiness gates no cliente", () => {
+  it("fonte de approveMerge NÃO contém contract_rechecked", () => {
+    // Extrai apenas o corpo da função approveMerge
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("contract_rechecked");
+  });
+
+  it("fonte de approveMerge NÃO contém phase_validated", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("phase_validated");
+  });
+
+  it("fonte de approveMerge NÃO contém no_regression", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("no_regression");
+  });
+
+  it("fonte de approveMerge NÃO contém diff_reviewed", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("diff_reviewed");
+  });
+
+  it("fonte de approveMerge NÃO contém summary_reviewed", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("summary_reviewed");
+  });
+
+  it("fonte de approveMerge NÃO contém scope_approved", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("scope_approved");
+  });
+
+  it("fonte de approveMerge NÃO contém drift_detected", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("drift_detected");
+  });
+
+  it("fonte de approveMerge NÃO contém regression_detected", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("regression_detected");
+  });
+});
+
+// =============================================================================
+// PROVA 22 — O approval depende do estado real emitido pelo backend (merge_gate)
+// =============================================================================
+
+describe("P24 PROVA 22 — approval depende do merge_gate do runtime, não de gates inventados", () => {
+  it("approveMerge aceita { merge_gate } como param (estado real do backend)", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart, fnStart + 200);
+    expect(fnBody).toContain("{ merge_gate }");
+  });
+
+  it("body enviado ao backend contém merge_gate (estado do runtime)", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    // No body: { merge_gate, approval_status: "approved" }
+    expect(fnBody).toContain("merge_gate");
+    expect(fnBody).toContain('approval_status: "approved"');
+  });
+
+  it("body enviado NÃO contém merge_context fabricado pelo cliente", () => {
+    const fnStart = EXECUTION_ENDPOINT_SRC.indexOf("export async function approveMerge");
+    const fnBody = EXECUTION_ENDPOINT_SRC.slice(fnStart);
+    expect(fnBody).not.toContain("merge_context");
+  });
+
+  it("MergeGateCard passa merge_gate inteiro para approveMerge (não campos individuais)", () => {
+    // O card passa { merge_gate: mergeGate }, não { summary_for_merge, reason_merge_ok }
+    expect(MERGE_GATE_CARD_SRC).toContain("merge_gate: mergeGate");
   });
 });

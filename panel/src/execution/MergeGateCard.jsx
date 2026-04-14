@@ -68,8 +68,7 @@ export default function MergeGateCard({ mergeGate }) {
     setApproveError(null);
 
     const result = await approveMerge({
-      summary_for_merge: mergeGate.summary_for_merge,
-      reason_merge_ok:   mergeGate.reason_merge_ok,
+      merge_gate: mergeGate,
     });
 
     setApproving(false);

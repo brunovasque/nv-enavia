@@ -55,10 +55,17 @@ export async function fetchExecution(opts = {}) {
 // ── P24 — approveMerge ────────────────────────────────────────────────────
 //
 // Calls POST /github-pr/approve-merge — the formal merge approval button in
-// the panel. The caller provides summary_for_merge and reason_merge_ok (both
-// sourced from the merge_gate state returned by the backend). All boolean
-// readiness gates are set to true because the backend already verified them
-// when it produced the awaiting_formal_approval state.
+// the panel.
+//
+// REGRA: O painel NÃO fabrica/afirma readiness gates (contract_rechecked,
+// phase_validated, no_regression, diff_reviewed, summary_reviewed).
+// Esses critérios são soberanos do runtime/backend.
+//
+// O painel envia apenas:
+//   - merge_gate: o objeto de estado do gate já emitido/validado pelo backend
+//   - approval_status: "approved" (a única asserção humana)
+//
+// O backend confirma que o estado real está apto antes de retornar approved.
 //
 // Mock mode: simulates an approved_for_merge response.
 // Real mode: calls the actual worker route.
@@ -67,11 +74,10 @@ export async function fetchExecution(opts = {}) {
  * Send formal merge approval for the current PR/execution.
  *
  * @param {object} params
- * @param {string} params.summary_for_merge - Summary of what was done (from merge_gate)
- * @param {string} params.reason_merge_ok   - Short reason why merge is safe (from merge_gate)
+ * @param {object} params.merge_gate - The merge_gate state object received from the backend
  * @returns {Promise<import("../contracts.js").ResponseEnvelope>}
  */
-export async function approveMerge({ summary_for_merge, reason_merge_ok }) {
+export async function approveMerge({ merge_gate }) {
   const t0 = Date.now();
   const { mode } = getApiConfig();
 
@@ -84,8 +90,8 @@ export async function approveMerge({ summary_for_merge, reason_merge_ok }) {
         merge_status: "approved_for_merge",
         can_merge: true,
         message: "Merge aprovado formalmente (mock).",
-        summary_for_merge,
-        reason_merge_ok,
+        summary_for_merge: merge_gate?.summary_for_merge ?? null,
+        reason_merge_ok: merge_gate?.reason_merge_ok ?? null,
       },
       meta: { durationMs: Date.now() - t0 },
     };
@@ -95,20 +101,8 @@ export async function approveMerge({ summary_for_merge, reason_merge_ok }) {
     const res = await apiClient.request("/github-pr/approve-merge", {
       method: "POST",
       body: {
-        scope_approved: true,
-        gates_context: { arm_id: "p24_github_pr_arm" },
-        merge_context: {
-          contract_rechecked: true,
-          phase_validated: true,
-          no_regression: true,
-          diff_reviewed: true,
-          summary_reviewed: true,
-          summary_for_merge,
-          reason_merge_ok,
-          approval_status: "approved",
-        },
-        drift_detected: false,
-        regression_detected: false,
+        merge_gate,
+        approval_status: "approved",
       },
     });
 
