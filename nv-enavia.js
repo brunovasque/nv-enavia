@@ -3270,6 +3270,20 @@ async function handleChatLLM(request, env) {
   const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
   const context = body.context && typeof body.context === "object" ? body.context : {};
 
+  // Guard: API key must be configured — return 503 (not 500) with a clear message.
+  if (!env.OPENAI_API_KEY) {
+    return jsonResponse(
+      {
+        ok: false,
+        system: "ENAVIA-NV-FIRST",
+        mode: "llm-first",
+        error: "Serviço LLM indisponível: OPENAI_API_KEY não configurada no worker.",
+        timestamp: Date.now(),
+      },
+      503
+    );
+  }
+
   try {
     // --- System prompt LLM-first com sinal estruturado ---
     // The LLM is the sole decision-maker for whether the planner tool is needed.
@@ -3307,11 +3321,13 @@ Regras para o campo use_planner (boolean):
     // --- Chamada LLM com resposta estruturada ---
     // Max tokens capped at 1200 to balance response quality with Cloudflare Worker
     // CPU time limits (~30s). Increase if moving to Unbound or Durable Objects.
+    // response_format is intentionally omitted: not all model versions (including
+    // gpt-5.x) accept the json_object parameter. The system prompt already mandates
+    // JSON output, and the JSON.parse block below falls back gracefully to plain text.
     const CHAT_LLM_MAX_TOKENS = 1200;
     const llmResult = await callChatModel(env, llmMessages, {
       temperature: 0.5,
       max_tokens: CHAT_LLM_MAX_TOKENS,
-      response_format: { type: "json_object" },
     });
 
     // Parse the structured response — fall back gracefully if the model returns
