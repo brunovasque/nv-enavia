@@ -659,8 +659,8 @@ const s = {
     background: "var(--bg-surface)",
     border: "1px solid var(--color-primary-border)",
     borderRadius: "var(--radius-lg)",
-    overflow: "hidden",
     overflowX: "auto",
+    overflowY: "hidden",
     flexShrink: 0,
   },
   viewportHeader: {
