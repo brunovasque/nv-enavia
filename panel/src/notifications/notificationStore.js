@@ -1,18 +1,19 @@
 // ============================================================================
-// ENAVIA Panel — notificationStore (P25-PR5)
+// ENAVIA Panel — notificationStore (P25-PR5 / P25-PR7)
 //
 // Module-level singleton store for Browser Arm real notifications.
 // Follows the same useSyncExternalStore pattern as plannerStore.js.
 //
 // State:
 //   unreadCount — number of unread events since last markAllRead()
-//   toasts      — active toast list for rendering
+//   toasts      — active toast list for rendering (ephemeral; removed on dismiss)
+//   history     — persistent in-session event log (never removed; resets on reload)
 //
 // Public API:
-//   addNotificationEvent(type, message) → adds a toast + increments unreadCount
-//   dismissToast(id)                    → removes a toast (no effect on unreadCount)
-//   markAllRead()                       → resets unreadCount to 0
-//   useNotificationStore()              → hook: returns { unreadCount, toasts }
+//   addNotificationEvent(type, message) → adds a toast + history item + increments unreadCount
+//   dismissToast(id)                    → removes a toast (no effect on unreadCount or history)
+//   markAllRead()                       → resets unreadCount to 0; marks all history items read
+//   useNotificationStore()              → hook: returns { unreadCount, toasts, history }
 //
 // Event types: "block" | "permission" | "suggestion" | "error"
 //
@@ -28,14 +29,15 @@ import { useSyncExternalStore } from "react";
 
 let _unreadCount = 0;
 let _toasts = [];   // Array<{ id: number, type: string, message: string, ts: number }>
+let _history = [];  // Array<{ id: number, type: string, message: string, ts: number, read: boolean }>
 let _nextId = 1;
 
 // ── Snapshot cache (stable reference when unchanged) ─────────────────────────
 
-let _snapshot = { unreadCount: 0, toasts: [] };
+let _snapshot = { unreadCount: 0, toasts: [], history: [] };
 
 function _rebuild() {
-  _snapshot = { unreadCount: _unreadCount, toasts: _toasts.slice() };
+  _snapshot = { unreadCount: _unreadCount, toasts: _toasts.slice(), history: _history.slice() };
 }
 
 function _getSnapshot() {
@@ -65,9 +67,13 @@ function _subscribe(listener) {
  * @param {string} message — human-readable description of the event
  */
 export function addNotificationEvent(type, message) {
-  const toast = { id: _nextId++, type, message, ts: Date.now() };
+  const id = _nextId++;
+  const ts = Date.now();
+  const toast = { id, type, message, ts };
+  const histItem = { id, type, message, ts, read: false };
   _unreadCount = _unreadCount + 1;
   _toasts = [..._toasts, toast];
+  _history = [..._history, histItem];
   _rebuild();
   _notify();
 }
@@ -84,10 +90,12 @@ export function dismissToast(id) {
 
 /**
  * Reset the unread counter to 0 (e.g., when user sees the notification panel).
+ * Also marks all history items as read.
  */
 export function markAllRead() {
   if (_unreadCount === 0) return;
   _unreadCount = 0;
+  _history = _history.map((item) => (item.read ? item : { ...item, read: true }));
   _rebuild();
   _notify();
 }
@@ -105,11 +113,12 @@ export function clearAllToasts() {
 
 /**
  * React hook — subscribe to the notification store.
- * Returns { unreadCount, toasts }.
+ * Returns { unreadCount, toasts, history }.
  *
  * Consumers:
- *   - Sidebar.jsx     → reads unreadCount for badge
- *   - NotificationToast.jsx → reads toasts for rendering
+ *   - Sidebar.jsx              → reads unreadCount for badge
+ *   - NotificationToast.jsx    → reads toasts for rendering
+ *   - NotificationHistory.jsx  → reads history for in-session event list (P25-PR7)
  */
 export function useNotificationStore() {
   return useSyncExternalStore(_subscribe, _getSnapshot, _getSnapshot);

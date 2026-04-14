@@ -24,6 +24,15 @@
 //   - Badge: contador de não-lidos no Sidebar (/browser nav item)
 //   - Som: Web Audio API, curto, não-repetitivo
 //
+// Permissão dentro do painel (P25-PR6):
+//   - botão "Conceder permissão" só para bloqueios grantable
+//   - grant honesto + refresh do estado real
+//
+// Histórico de notificações (P25-PR7):
+//   - NotificationHistory: lista in-session de todos os eventos reais
+//   - Fonte: notificationStore._history (in-memory, reseta ao recarregar)
+//   - Sem backend novo. Panel-only.
+//
 // Domínios operacionais:
 //   noVNC  → browser.nv-imoveis.com/novnc/vnc.html (viewer do VNC desktop)
 //   API    → run.nv-imoveis.com/browser-arm/state  (estado do arm/executor)
@@ -36,6 +45,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
 import { useBrowserNotifications } from "../notifications/useBrowserNotifications";
 import NotificationToast from "../notifications/NotificationToast";
+import NotificationHistory from "../notifications/NotificationHistory";
 import { markAllRead } from "../notifications/notificationStore";
 import { grantBrowserArmPermission, GRANTABLE_BLOCK_LEVELS } from "../api/endpoints/browserSession";
 
@@ -721,6 +731,9 @@ export default function BrowserExecutorPanel() {
                 </div>
               </div>
             )}
+
+            {/* P25-PR7: Notification history — in-session list of real Browser Arm events */}
+            <NotificationHistory />
           </div>
 
           {/* Sidebar */}
