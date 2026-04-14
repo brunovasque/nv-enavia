@@ -32,7 +32,7 @@ const NOVNC_BASE_URL =
 
 const STATUS_META = {
   [BROWSER_SESSION_STATUS.SEM_SESSAO]: {
-    label: "Sem sessão",
+    label: "Standby",
     color: "var(--text-muted)",
     dot: "var(--text-muted)",
     bg: "rgba(100,116,139,0.10)",
@@ -660,6 +660,7 @@ const s = {
     border: "1px solid var(--color-primary-border)",
     borderRadius: "var(--radius-lg)",
     overflow: "hidden",
+    overflowX: "auto",
     flexShrink: 0,
   },
   viewportHeader: {
