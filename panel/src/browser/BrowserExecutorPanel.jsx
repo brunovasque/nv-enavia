@@ -12,7 +12,10 @@
 //   - useBrowserSession() → fetchBrowserSession() → GET /browser-arm/state
 //   - Sem mock fixo. Sem demo switcher. Sem estado fabricado.
 //
-// Domínio operacional: run.nv-imoveis.com/*
+// Domínios operacionais:
+//   noVNC  → browser.nv-imoveis.com/novnc/vnc.html (viewer do VNC desktop)
+//   API    → run.nv-imoveis.com/browser-arm/state  (estado do arm/executor)
+// São responsabilidades distintas — domínios diferentes.
 //
 // Regra de honestidade: campo ausente = "sem dado disponível". Nunca inventar.
 // ============================================================================
@@ -21,12 +24,12 @@ import { useState } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
 
 // ── Canonical noVNC URL ───────────────────────────────────────────────────
-// Points to the standard noVNC viewer page (vnc.html) so the iframe serves
-// the native Connect button and full noVNC UI — not a directory listing.
-// VITE_NOVNC_URL overrides the full URL (should include /vnc.html if needed).
+// Confirmed canonical endpoint: browser.nv-imoveis.com/novnc/vnc.html?autoconnect=1
+// ?autoconnect=1 triggers noVNC to connect immediately (no manual "Connect" click).
+// VITE_NOVNC_URL overrides the full URL (should include path + query params).
 const NOVNC_BASE_URL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_NOVNC_URL) ||
-  "https://run.nv-imoveis.com/novnc/vnc.html";
+  "https://browser.nv-imoveis.com/novnc/vnc.html?autoconnect=1";
 
 // ── Status metadata ────────────────────────────────────────────────────────
 
@@ -185,7 +188,7 @@ function BrowserIdleState({ domain }) {
       </p>
       <div style={s.idleDomain}>
         <span style={s.idleDomainLabel}>Domínio operacional</span>
-        <span style={s.idleDomainValue}>{domain || "run.nv-imoveis.com"}/*</span>
+        <span style={s.idleDomainValue}>{domain || "—"}</span>
       </div>
     </div>
   );
@@ -312,7 +315,7 @@ function SessionSidebarCard({ session }) {
         <div style={s.sidebarRow}>
           <span style={s.sidebarLabel}>Domínio</span>
           <span style={s.sidebarMono}>
-            {session?.operationalDomain ?? "run.nv-imoveis.com"}
+            {session?.operationalDomain ?? "—"}
           </span>
         </div>
 
@@ -506,7 +509,7 @@ export default function BrowserExecutorPanel() {
                 <div style={s.idleDomain}>
                   <span style={s.idleDomainLabel}>Domínio operacional</span>
                   <span style={s.idleDomainValue}>
-                    {session?.operationalDomain || "run.nv-imoveis.com"}/*
+                    {session?.operationalDomain || "—"}
                   </span>
                 </div>
               </div>
