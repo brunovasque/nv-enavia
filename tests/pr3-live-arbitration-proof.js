@@ -12,16 +12,23 @@
 //     2. Configure OPENAI_API_KEY real no worker
 //     3. Execute: WORKER_URL=https://your-worker.workers.dev node tests/pr3-live-arbitration-proof.js
 //
+// GATE PM4 AUTORITATIVO (PR3 v2):
+//   - Level A (simples) → planner BLOQUEADO em código (mesmo que LLM queira)
+//   - Level B/C (estruturado) → planner FORÇADO em código (mesmo que LLM não queira)
+//   - final_decision = 'planner_activated' (coerente) ou 'planner_forced_level_BC' (PM4 forçou)
+//
 // Casos testados:
 //   Caso A: conversa simples / pergunta casual
-//     → espera: planner_used=false, arbitration.pm4_level="A"
-//     → resposta continua natural
+//     → espera: planner_used=false, final_decision='planner_blocked_level_A'
 //   Caso B: pedido claramente estruturado / multi-etapa
-//     → espera: planner_used=true (se LLM concordar), arbitration.pm4_allows_planner=true
-//     → resposta continua natural mesmo com planner interno
+//     → espera: planner_used=true, final_decision='planner_activated' ou 'planner_forced_level_BC'
+//     → reply é fala natural, NÃO um plano estruturado com Fase 1/Etapa 2
 //   Caso C: borderline — pergunta ambígua
-//     → espera: planner_used=false (na dúvida, prefere conversa)
-//     → resposta continua natural
+//     → espera: planner_used=false (na dúvida, PM4=A, conversa ganha)
+//
+// O caso B é o cenário que falhou no TEST anterior (LLM escrevia plano no reply,
+// use_planner=false). Com PM4 autoritativo, planner_used deve ser true
+// (PM4 forçou), e o reply deve ser natural (manual plan sanitizado).
 // ============================================================================
 
 const WORKER_URL = process.env.WORKER_URL || "http://localhost:8787";
@@ -33,6 +40,20 @@ if (!OPENAI_API_KEY || OPENAI_API_KEY.startsWith("test-")) {
   console.log("   Rode com: OPENAI_API_KEY=sk-... WORKER_URL=https://... node tests/pr3-live-arbitration-proof.js");
   console.log("   Todos os smoke tests deterministicos passam sem bloqueio (tests/pr3-tool-arbitration.smoke.test.js).");
   process.exit(0);
+}
+
+function manualPlanMatchCount(text) {
+  const patterns = [
+    /\bFase\s+\d+/ig, /\bEtapa\s+\d+/ig, /\bPasso\s+\d+/ig,
+    /\bPhase\s+\d+/ig, /\bStep\s+\d+/ig, /^#{1,3}\s+\w/gm,
+    /\bCritérios de aceite\b/ig, /\bCriteria\b.*:/ig,
+  ];
+  let count = 0;
+  for (const p of patterns) {
+    const matches = text.match(p);
+    if (matches) count += matches.length;
+  }
+  return count;
 }
 
 async function callChat(message, context) {
@@ -63,7 +84,7 @@ async function runLiveProof() {
 
   // =========================================================================
   // Caso A: Conversa simples / pergunta casual
-  // Espera: planner_used=false, pm4_level=A, reply=texto natural
+  // Espera: planner_used=false, final_decision='planner_blocked_level_A'
   // =========================================================================
   console.log("Caso A: Conversa simples — 'oi, tudo bem?'");
   const caseA = await callChat("oi, tudo bem?");
@@ -73,48 +94,50 @@ async function runLiveProof() {
 
   ok(caseA.ok === true, "Caso A: ok=true");
   ok(typeof caseA.reply === "string" && caseA.reply.length > 0, "Caso A: reply tem conteúdo");
-  ok(caseA.planner_used === false, "Caso A: planner_used=false (conversa simples)");
+  ok(caseA.planner_used === false, "Caso A: planner_used=false (PM4 bloqueou nível A)");
   ok(caseA.telemetry?.arbitration?.pm4_level === "A", "Caso A: pm4_level=A");
   ok(caseA.telemetry?.arbitration?.pm4_allows_planner === false, "Caso A: pm4_allows_planner=false");
-  ok(
-    caseA.telemetry?.arbitration?.final_decision === "planner_not_requested" ||
-    caseA.telemetry?.arbitration?.final_decision === "planner_blocked_level_A",
-    "Caso A: final_decision mostra planner não ativado"
-  );
-  // Resposta não pode ser mecânica
-  ok(!caseA.reply.includes("next_action"), "Caso A: reply não contém next_action");
-  ok(!caseA.reply.includes("scope_summary"), "Caso A: reply não contém scope_summary");
+  ok(caseA.telemetry?.arbitration?.final_decision === "planner_blocked_level_A",
+     "Caso A: final_decision='planner_blocked_level_A'");
+  ok(!caseA.reply.includes("next_action"), "Caso A: reply sem next_action");
+  ok(!caseA.reply.includes("scope_summary"), "Caso A: reply sem scope_summary");
+  ok(manualPlanMatchCount(caseA.reply) < 2, "Caso A: reply é natural (sem estrutura de plano)");
 
   // =========================================================================
   // Caso B: Pedido estruturado / multi-etapa
-  // Espera: planner ativado ou pm4 autoriza, reply=texto natural
+  // Espera: planner_used=true (PM4 força), final_decision indica B/C,
+  //         reply é NATURAL (não um plano estruturado)
+  // Este é o cenário que falhou antes: LLM escrevia plano no reply, use_planner=false.
+  // Com PM4 autoritativo: planner_used=true garantido pelo gate.
+  // Com manual plan sanitizer: reply substituído por fala natural.
   // =========================================================================
   console.log("\nCaso B: Pedido estruturado multi-etapa");
   const caseBMsg = "Preciso de um plano completo dividido em fases para migrar o nosso sistema de contratos para o novo banco de dados, com múltiplas etapas, critérios de aceite e pontos de revisão";
   const caseB = await callChat(caseBMsg);
-  console.log("  → reply:", JSON.stringify(caseB.reply).slice(0, 120));
+  console.log("  → reply:", JSON.stringify(caseB.reply).slice(0, 150));
   console.log("  → planner_used:", caseB.planner_used);
   console.log("  → arbitration:", JSON.stringify(caseB.telemetry?.arbitration));
 
   ok(caseB.ok === true, "Caso B: ok=true");
   ok(typeof caseB.reply === "string" && caseB.reply.length > 0, "Caso B: reply tem conteúdo");
-  // PM4 deve ter autorizado o planner (mesmo que LLM não queira)
+  ok(caseB.planner_used === true, "Caso B: planner_used=true (PM4 forçou para nível B/C)");
+  ok(["B", "C"].includes(caseB.telemetry?.arbitration?.pm4_level),
+     "Caso B: pm4_level B ou C");
+  ok(caseB.telemetry?.arbitration?.pm4_allows_planner === true, "Caso B: pm4_allows_planner=true");
   ok(
-    caseB.telemetry?.arbitration?.pm4_allows_planner === true,
-    "Caso B: pm4_allows_planner=true (pedido estruturado)"
+    caseB.telemetry?.arbitration?.final_decision === "planner_activated" ||
+    caseB.telemetry?.arbitration?.final_decision === "planner_forced_level_BC",
+    "Caso B: final_decision indica planner forçado ou ativado"
   );
-  ok(
-    ["B", "C"].includes(caseB.telemetry?.arbitration?.pm4_level),
-    "Caso B: pm4_level B ou C (pedido complexo)"
-  );
-  // Resposta deve continuar natural mesmo com planner ativo
-  ok(!caseB.reply.includes("next_action"), "Caso B: reply não contém next_action (resposta natural)");
-  ok(!caseB.reply.includes("scope_summary"), "Caso B: reply não contém scope_summary");
-  ok(!caseB.reply.includes("plan_type"), "Caso B: reply não contém plan_type");
+  // Reply DEVE ser natural — não um plano estruturado
+  ok(!caseB.reply.includes("next_action"), "Caso B: reply sem next_action");
+  ok(!caseB.reply.includes("scope_summary"), "Caso B: reply sem scope_summary");
+  ok(manualPlanMatchCount(caseB.reply) < 2,
+     "Caso B: reply é natural (sem Fase 1/Etapa 2 na superfície)");
 
   // =========================================================================
   // Caso C: Borderline — pedido ambíguo
-  // Espera: planner não ativa, reply natural
+  // Espera: PM4 diz A, planner_used=false, reply natural
   // =========================================================================
   console.log("\nCaso C: Borderline — 'me ajuda com uma coisa'");
   const caseC = await callChat("me ajuda com uma coisa");
@@ -124,19 +147,16 @@ async function runLiveProof() {
 
   ok(caseC.ok === true, "Caso C: ok=true");
   ok(typeof caseC.reply === "string" && caseC.reply.length > 0, "Caso C: reply tem conteúdo");
-  // Na dúvida prefere conversa simples
-  ok(caseC.telemetry?.arbitration?.pm4_level === "A", "Caso C: pm4_level=A (borderline → simples)");
-  ok(caseC.planner_used === false, "Caso C: planner_used=false (borderline → conversa ganha)");
+  ok(caseC.telemetry?.arbitration?.pm4_level === "A",
+     "Caso C: pm4_level=A (borderline → simples → planner bloqueado)");
+  ok(caseC.planner_used === false, "Caso C: planner_used=false");
+  ok(manualPlanMatchCount(caseC.reply) < 2, "Caso C: reply é natural");
 
   // =========================================================================
   // Summary
   // =========================================================================
   console.log(`\n============================================================`);
   console.log(`Resultados: ${passed} passed, ${failed} failed`);
-  if (failed > 0) {
-    console.log("NOTA: Se Caso B falhou em planner_used=true, o LLM julgou o pedido");
-    console.log("como simples — verifique pm4_allows_planner e final_decision para entender a decisão.");
-  }
   console.log(`============================================================`);
 
   if (failed > 0) process.exit(1);

@@ -3231,17 +3231,21 @@ async function handlePlannerRun(request, env) {
 }
 
 // ============================================================================
-// 🛡️ PR3 — Tool Arbitration: Reply Sanitizer
+// 🛡️ PR3 — Tool Arbitration: Reply Sanitizers
 //
-// Garante que a resposta conversacional do /chat/run nunca exponha termos
-// mecânicos internos do planner como fala principal. Se o reply contiver
-// termos como next_action, reason, scope_summary, acceptance_criteria como
-// campos/estrutura dominante, é sinal de leak do planner para a superfície.
+// Two complementary sanitization layers for /chat/run:
 //
-// Estratégia: se detectar que o reply é predominantemente mecânico (parece
-// saída de planner, não conversa humana), retorna o fallback genérico.
-// Casos normais (conversa natural que menciona "razão", "próxima ação" etc.
-// no contexto humano) passam sem alteração.
+// Layer 1 — Mechanical term leak (_sanitizeChatReply):
+//   Catches replies where the LLM dumped internal planner field names
+//   (next_action, reason:, scope_summary, etc.) as the dominant structure.
+//   Threshold: 3+ distinct mechanical terms = planner output leaked to surface.
+//
+// Layer 2 — Manual plan leak (_isManualPlanReply):
+//   Catches replies where the LLM "did the planner manually" by writing a
+//   full structured plan inline (Fase 1 / Etapa 2 / ## Header, etc.) instead
+//   of a natural conversational reply. Used only when PM4 already forced the
+//   planner internally — so the plan structure belongs in plannerSnapshot,
+//   not in the conversational reply surface.
 // ============================================================================
 const _PLANNER_LEAK_PATTERNS = [
   /\bnext_action\b/i,
@@ -3276,6 +3280,44 @@ function _sanitizeChatReply(reply) {
   }
 
   return reply;
+}
+
+// Patterns indicating the LLM wrote a full structured plan inline in reply
+// instead of a natural conversational acknowledgement.
+const _MANUAL_PLAN_PATTERNS = [
+  /\bFase\s+\d+/i,           // Fase 1:, Fase 2, etc.
+  /\bEtapa\s+\d+/i,          // Etapa 1:, etc.
+  /\bPasso\s+\d+/i,          // Passo 1:, etc.
+  /\bPhase\s+\d+/i,          // Phase 1 (English)
+  /\bStep\s+\d+/i,           // Step 1 (English)
+  /^#{1,3}\s+\w/m,           // Markdown headers (##, ###)
+  /\bCritérios de aceite\b/i, // acceptance criteria language
+  /\bCriteria\b.*:/i,         // criteria: pattern
+];
+
+// Threshold: 2+ structural plan patterns in reply = manual plan structure
+const _MANUAL_PLAN_THRESHOLD = 2;
+
+// Natural fallback reply when a manual plan leak is detected in the reply surface.
+// The plan structure lives in plannerSnapshot — the reply must stay conversational.
+const _MANUAL_PLAN_FALLBACK =
+  "Entendido. Estou organizando isso por dentro — o plano está estruturado internamente.";
+
+// Returns true if the reply looks like the LLM wrote a structured plan inline
+// (instead of a short natural conversational reply).
+// Counts total occurrences across all patterns (not just distinct patterns),
+// so "Fase 1 / Fase 2 / Fase 3" with a single pattern counts as 3 hits.
+function _isManualPlanReply(reply) {
+  if (!reply || typeof reply !== "string") return false;
+  let count = 0;
+  for (const pattern of _MANUAL_PLAN_PATTERNS) {
+    // Re-create with global flag to count all occurrences (not just first match)
+    const flags = pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g";
+    const globalPat = new RegExp(pattern.source, flags);
+    const matches = reply.match(globalPat);
+    if (matches) count += matches.length;
+  }
+  return count >= _MANUAL_PLAN_THRESHOLD;
 }
 
 // ============================================================================
@@ -3417,19 +3459,23 @@ async function handleChatLLM(request, env) {
     // superfície dominante, é sinal de leak — o reply é sanitizado.
     reply = _sanitizeChatReply(reply);
 
-    // --- PR3: Arbitration Gate — dois sinais obrigatórios (PM4 + LLM) ---
-    // Para o planner ativar, AMBOS os sinais devem concordar:
-    //   1. LLM decidiu use_planner=true (julgamento conversacional)
-    //   2. PM4 classificou o pedido como nível B ou C (pedido não-trivial)
+    // --- PR3: Arbitration Gate — PM4 é autoritativo ---
     //
-    // Se apenas o LLM quer planner mas PM4 diz nível A (simples):
-    //   → bloqueado. Conversa ganha.
-    // Se PM4 diz B/C mas o LLM não quer planner:
-    //   → bloqueado. LLM tem palavra final na conversa.
-    // Se nenhum quer planner:
-    //   → não ativa (path mais frequente — conversa casual).
-    const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : true;
-    const shouldActivatePlanner = wantsPlan && pm4AllowsPlanner;
+    // PM4 decides planner activation unilaterally:
+    //   Level A (simple/operational) → planner BLOCKED always. Conversation wins.
+    //     Even if LLM signals use_planner=true, Level A blocks it.
+    //   Level B/C (tactical/strategic) → planner FORCED always.
+    //     Even if LLM signals use_planner=false, Level B/C forces it.
+    //
+    // The LLM's use_planner signal is now advisory only — it's recorded in the
+    // arbitration audit trail but does NOT control planner activation.
+    //
+    // Rationale: In TEST, the LLM bypassed the gate by returning use_planner=false
+    // while generating a full structured plan in reply. PM4 as sole authority
+    // closes this gap: if the message is B/C, planner always runs internally,
+    // and the reply must remain conversational (enforced by _isManualPlanReply).
+    const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : false;
+    const shouldActivatePlanner = pm4AllowsPlanner;
 
     // Auditoria da decisão de arbitration — provável sem LLM real
     const arbitrationDecision = {
@@ -3438,11 +3484,13 @@ async function handleChatLLM(request, env) {
       pm4_signals:          pm4Arbitration?.signals      || [],
       pm4_allows_planner:   pm4AllowsPlanner,
       llm_requested_planner: wantsPlan,
-      final_decision:       shouldActivatePlanner
-        ? "planner_activated"
-        : !wantsPlan
-          ? "planner_not_requested"
-          : "planner_blocked_level_A",
+      // final_decision reflects PM4-only authority:
+      //   "planner_activated"      → LLM requested + PM4 level B/C (coherent)
+      //   "planner_forced_level_BC"→ PM4 level B/C but LLM didn't request it
+      //   "planner_blocked_level_A"→ PM4 level A (blocks even if LLM wanted it)
+      final_decision: shouldActivatePlanner
+        ? (wantsPlan ? "planner_activated" : "planner_forced_level_BC")
+        : "planner_blocked_level_A",
     };
 
     logNV("🗣️ [CHAT/LLM] LLM respondeu", {
@@ -3452,7 +3500,7 @@ async function handleChatLLM(request, env) {
       session_id,
     });
 
-    // --- Planner como ferramenta interna (gate: PM4 + LLM) ---
+    // --- Planner como ferramenta interna (PM4 autoritativo) ---
     let plannerSnapshot = null;
     let plannerUsed = false;
 
@@ -3495,6 +3543,18 @@ async function handleChatLLM(request, env) {
       }
     }
 
+    // --- PR3: Manual plan leak guard ---
+    // When PM4 forced planner (Level B/C), the LLM may still have written a
+    // full structured plan inline in reply (Fase 1, Etapa 2, ## headers, etc.)
+    // instead of a natural conversational reply. This is a "manual plan leak":
+    // the plan structure belongs inside plannerSnapshot, not on the reply surface.
+    // Replace with a natural acknowledgement that preserves conversational surface.
+    if (shouldActivatePlanner && _isManualPlanReply(reply)) {
+      reply = _MANUAL_PLAN_FALLBACK;
+      arbitrationDecision.reply_sanitized = "manual_plan_replaced";
+      logNV("🛡️ [CHAT/LLM] Manual plan leak detectado no reply — sanitizado", { session_id });
+    }
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
@@ -3524,9 +3584,14 @@ async function handleChatLLM(request, env) {
         telemetry: {
           duration_ms: Date.now() - startedAt,
           // Include PM4 pre-check result even on LLM failure — it's deterministic
-          arbitration: pm4Arbitration
-            ? { pm4_level: pm4Arbitration.level, pm4_allows_planner: pm4Arbitration.allows_planner }
-            : null,
+          arbitration: pm4Arbitration ? {
+            pm4_level: pm4Arbitration.level,
+            pm4_allows_planner: pm4Arbitration.allows_planner,
+            // Compute final_decision from PM4 alone (LLM decision unknown on failure)
+            final_decision: pm4Arbitration.allows_planner
+              ? "planner_forced_level_BC"
+              : "planner_blocked_level_A",
+          } : null,
         },
       },
       500
@@ -4211,9 +4276,10 @@ if (request.method === "GET") {
               pm4_level: "string — 'A' | 'B' | 'C' (nível PM4 do pedido)",
               pm4_category: "string — 'simple' | 'tactical' | 'complex'",
               pm4_signals: "string[] — sinais detectados pelo PM4",
-              pm4_allows_planner: "boolean — PM4 permite planner (false se nível A)",
-              llm_requested_planner: "boolean — LLM retornou use_planner=true",
-              final_decision: "string — 'planner_activated' | 'planner_not_requested' | 'planner_blocked_level_A'",
+              pm4_allows_planner: "boolean — PM4 é autoritativo: false bloqueia (A), true força (B/C)",
+              llm_requested_planner: "boolean — LLM retornou use_planner=true (advisory only)",
+              final_decision: "string — 'planner_activated' | 'planner_forced_level_BC' | 'planner_blocked_level_A'",
+              reply_sanitized: "string (opcional) — 'manual_plan_replaced' se manual plan leak detectado",
             },
           },
         },
