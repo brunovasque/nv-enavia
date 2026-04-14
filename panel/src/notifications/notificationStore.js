@@ -101,12 +101,23 @@ export function markAllRead() {
 }
 
 /**
- * Clear all active toasts. Does not affect unreadCount.
+ * Clear all active toasts. Does not affect unreadCount or history.
  * Useful for programmatic reset (e.g., on page navigation).
  */
 export function clearAllToasts() {
   if (_toasts.length === 0) return;
   _toasts = [];
+  _rebuild();
+  _notify();
+}
+
+/**
+ * Clear the in-session history log. Does not affect unreadCount or toasts.
+ * Intended for test isolation — in production the history accumulates for the session.
+ */
+export function clearHistory() {
+  if (_history.length === 0) return;
+  _history = [];
   _rebuild();
   _notify();
 }

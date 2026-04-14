@@ -62,6 +62,7 @@ import {
   addNotificationEvent,
   dismissToast,
   clearAllToasts,
+  clearHistory,
   markAllRead,
   useNotificationStore,
 } from "../notifications/notificationStore";
@@ -129,15 +130,17 @@ describe("P25-PR7 — notificationStore: history", () => {
   beforeEach(() => {
     markAllRead();
     clearAllToasts();
-    // Reset history by calling markAllRead (unreadCount guard won't help if already 0)
-    // We use a direct approach: add and clear cycle
+    clearHistory();
   });
 
-  it("1. useNotificationStore retorna snapshot com campo history", () => {
-    expect(typeof useNotificationStore).toBe("function");
-    // The hook is callable — verify _snapshot shape via renderToStaticMarkup
-    // (module-level state, verified by testing NotificationHistory which reads history)
-    expect(true).toBe(true); // hook shape verified by integration tests below
+  it("1. useNotificationStore snapshot contém campo history no render", () => {
+    // Verify that NotificationHistory (which reads history from the store) renders correctly
+    // and that the store snapshot shape includes history — verified by integration.
+    addNotificationEvent("block", "Verificação snapshot history");
+    const html = renderHistory();
+    // If history were absent from snapshot, the component would crash or show empty state.
+    expect(html).toContain("notification-history-list");
+    expect(html).toContain("history-item-block");
   });
 
   it("2. addNotificationEvent adiciona item a history", async () => {
@@ -209,16 +212,15 @@ describe("P25-PR7 — NotificationHistory: renderização", () => {
   beforeEach(() => {
     markAllRead();
     clearAllToasts();
+    clearHistory();
   });
 
   it("6. renderiza estado vazio quando sem eventos", () => {
-    // After markAllRead + clearAllToasts: history may still have items from previous tests.
-    // We test the empty state by importing a fresh module or verifying the empty testid.
-    // Since module state persists across tests, check for non-crash at minimum.
-    // The empty-state test is meaningful only in isolation (first test).
+    // After reset: history is empty → empty state renders
     const html = renderHistory();
-    // Always renders the card container
     expect(html).toContain("notification-history-card");
+    expect(html).toContain("notification-history-empty");
+    expect(html).not.toContain("notification-history-list");
   });
 
   it("7. renderiza lista quando há eventos", () => {
@@ -268,6 +270,7 @@ describe("P25-PR7 — BrowserExecutorPanel: integração e sem regressão", () =
     vi.clearAllMocks();
     markAllRead();
     clearAllToasts();
+    clearHistory();
   });
 
   it("12. BrowserExecutorPanel renderiza notification-history-card com sessão ativa", () => {
