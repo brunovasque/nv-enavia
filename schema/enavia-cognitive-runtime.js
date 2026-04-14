@@ -153,7 +153,7 @@ export function buildChatSystemPrompt(opts = {}) {
   if (context.metadata && typeof context.metadata === "object") {
     const meta = Object.entries(context.metadata)
       .filter(([, v]) => v !== null && v !== undefined && v !== "")
-      .map(([k, v]) => `${k}: ${v}`)
+      .map(([k, v]) => `${k}: ${String(v).replace(/[\n\r]+/g, " ").slice(0, 200)}`)
       .join(", ");
     if (meta) contextParts.push(`Contexto adicional: ${meta}`);
   }

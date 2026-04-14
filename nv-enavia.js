@@ -3309,6 +3309,8 @@ async function handleChatLLM(request, env) {
     // JSON output, and the JSON.parse block below falls back gracefully to plain text.
     const CHAT_LLM_MAX_TOKENS = 1600;
     const llmResult = await callChatModel(env, llmMessages, {
+      // Temperature 0.6 (up from 0.5): slightly more creative for natural conversation
+      // while still constrained enough for coherent, on-topic replies.
       temperature: 0.6,
       max_tokens: CHAT_LLM_MAX_TOKENS,
     });
