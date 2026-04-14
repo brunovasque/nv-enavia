@@ -3231,6 +3231,51 @@ async function handlePlannerRun(request, env) {
 }
 
 // ============================================================================
+// 🛡️ PR3 — Tool Arbitration: Reply Sanitizer
+//
+// Garante que a resposta conversacional do /chat/run nunca exponha termos
+// mecânicos internos do planner como fala principal. Se o reply contiver
+// termos como next_action, reason, scope_summary, acceptance_criteria como
+// campos/estrutura dominante, é sinal de leak do planner para a superfície.
+//
+// Estratégia: se detectar que o reply é predominantemente mecânico (parece
+// saída de planner, não conversa humana), retorna o fallback genérico.
+// Casos normais (conversa natural que menciona "razão", "próxima ação" etc.
+// no contexto humano) passam sem alteração.
+// ============================================================================
+const _PLANNER_LEAK_PATTERNS = [
+  /\bnext_action\b/i,
+  /\breason\b[:=]/i,
+  /\bscope_summary\b/i,
+  /\bacceptance_criteria\b/i,
+  /\bplan_type\b/i,
+  /\bcomplexity_level\b/i,
+  /\boutput_mode\b/i,
+  /\bplan_version\b/i,
+  /\bneeds_human_approval\b/i,
+  /\bneeds_formal_contract\b/i,
+];
+
+function _sanitizeChatReply(reply) {
+  if (!reply || typeof reply !== "string") return reply;
+
+  // Count how many planner-internal patterns are present in the reply
+  let leakCount = 0;
+  for (const pattern of _PLANNER_LEAK_PATTERNS) {
+    if (pattern.test(reply)) leakCount++;
+  }
+
+  // Threshold: 3+ distinct mechanical terms = planner leak
+  // (a casual mention of "reason" in natural text is fine; a dump of
+  // next_action + reason + scope_summary is a mechanical leak)
+  if (leakCount >= 3) {
+    return "Entendido. Vou organizar isso internamente e te respondo em seguida.";
+  }
+
+  return reply;
+}
+
+// ============================================================================
 // 💬 CHAT LLM-FIRST — POST /chat/run
 //
 // Rota de conversa livre LLM-first para a aba Chat do painel.
@@ -3330,6 +3375,12 @@ async function handleChatLLM(request, env) {
       reply = llmResult.text || "Instrução recebida.";
       wantsPlan = false;
     }
+
+    // --- PR3: Tool Arbitration — Sanitização de reply ---
+    // Garante que o reply nunca exponha termos mecânicos do planner como fala
+    // principal. Se a resposta contiver termos internos do planner como
+    // superfície dominante, é sinal de leak — o reply é sanitizado.
+    reply = _sanitizeChatReply(reply);
 
     logNV("🗣️ [CHAT/LLM] LLM respondeu", { use_planner: wantsPlan, session_id });
 

@@ -115,9 +115,11 @@ async function runTests() {
   ok(prompt.includes("FORMATO DE RESPOSTA"), "prompt sinaliza seção de formato");
   ok(prompt.includes("fala livremente") || prompt.includes("fala natural"), "prompt encoraja fala livre no campo reply");
 
-  // === NÃO expõe mecânica excessiva ===
-  ok(!prompt.includes("next_action"), "prompt NÃO menciona next_action");
-  ok(!prompt.includes("reason"), "prompt NÃO força campo reason");
+  // === NÃO expõe mecânica excessiva como instrução de uso ===
+  // PR3: o prompt agora menciona next_action/reason para PROIBI-LOS no reply.
+  // O teste verifica que o prompt NÃO instrui o LLM a USAR esses campos como fala.
+  ok(!prompt.includes("Responda com next_action"), "prompt NÃO instrui usar next_action como fala");
+  ok(!prompt.includes("Responda com reason"), "prompt NÃO instrui usar reason como fala");
 
   // =========================================================================
   // Group 2: buildChatSystemPrompt — contexto dinâmico
