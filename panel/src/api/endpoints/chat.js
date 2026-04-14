@@ -7,9 +7,9 @@
 //
 // Real mode: posts to /planner/run. The backend returns a structured planner
 // payload, NOT a ready-made chat text. The chat content displayed to the user
-// is derived locally from response.planner.canonicalPlan.next_action — a real
-// field generated deterministically by PM6. This derivation is transparent:
-// the text was NOT returned as a chat message by the backend.
+// is derived locally from response.planner.canonicalPlan.chat_reply — the
+// conversational surface field added to PM6. next_action is an internal
+// operational directive for the executor and is NOT used for chat display.
 // The raw response.planner is returned as plannerSnapshot so the caller can
 // pass it to plannerStore for persistence as-is.
 // ============================================================================
@@ -64,22 +64,23 @@ async function mockChatSend(text, t0) {
 /**
  * Derive a human-readable chat text from the structured planner response.
  *
- * TRANSPARENCY: the backend /planner/run does NOT return a chat-ready text.
- * This function derives the chat bubble content from real backend fields:
- *   1. canonicalPlan.next_action (PM6 deterministic output) — preferred
- *   2. canonicalPlan.reason (PM6 reasoning summary) — fallback
+ * TRANSPARENCY: the backend /planner/run does NOT return a chat-ready text in
+ * a root field. This function derives the chat bubble content from real backend
+ * fields in priority order:
+ *   1. canonicalPlan.chat_reply (PM6 conversational surface) — preferred
+ *   2. canonicalPlan.reason (PM4 reasoning summary) — fallback
  *   3. Generic acknowledgement — last resort
  *
- * The returned string is displayed as Enavia's reply in the chat. It is NOT
- * a fabricated response — it uses real data from the backend pipeline.
+ * NOTE: canonicalPlan.next_action is an internal operational directive for the
+ * executor and is NOT used for chat display.
  *
  * @param {object} planner - raw response.planner from /planner/run
  * @returns {string}
  */
 function _deriveChatContent(planner) {
   const cp = planner?.canonicalPlan;
-  if (typeof cp?.next_action === "string" && cp.next_action.length > 0) {
-    return cp.next_action;
+  if (typeof cp?.chat_reply === "string" && cp.chat_reply.length > 0) {
+    return cp.chat_reply;
   }
   if (typeof cp?.reason === "string" && cp.reason.length > 0) {
     return cp.reason;

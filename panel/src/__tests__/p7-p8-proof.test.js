@@ -37,6 +37,7 @@ const SYNTHETIC_BACKEND_PLANNER = {
       "Acionar executor de tarefas",
     ],
     next_action: "Inicie a avaliação de escopo antes de prosseguir.",
+    chat_reply: "Recebido. Processando sua solicitação.",
     reason: "Pipeline ativado pelo planner.",
   },
   gate: {
@@ -143,16 +144,17 @@ describe("ITEM 1+2+12 — chatSend() routes to /planner/run and returns planner.
     expect(result.plannerSnapshot.outputMode).toBe("structured_plan");
   });
 
-  it("derives chat content from canonicalPlan.next_action (TRANSPARENCY: not a backend chat response)", async () => {
+  it("derives chat content from canonicalPlan.chat_reply (conversational surface, not next_action)", async () => {
     mockFetch();
     const { chatSend } = await import("../api/endpoints/chat.js");
 
     const result = await chatSend("Ativar pipeline tático");
 
-    // Chat text is derived locally from next_action, NOT a backend chat field
+    // Chat text is derived locally from chat_reply (conversational surface).
+    // next_action is an internal operational directive — NOT displayed to user.
     expect(result.ok).toBe(true);
     expect(result.data.content).toBe(
-      SYNTHETIC_BACKEND_PLANNER.canonicalPlan.next_action
+      SYNTHETIC_BACKEND_PLANNER.canonicalPlan.chat_reply
     );
   });
 });
