@@ -4274,6 +4274,23 @@ async function executeBrowserArmAction({
 
   // If no executor URL configured, return enforcement-only result (PR1 compat)
   if (!executorUrl) {
+    // ── Update in-memory state for enforcement-only path ──
+    _browserArmLastExecution = {
+      action: enforcement.action,
+      timestamp: new Date().toISOString(),
+      request_id: null,
+      ok: true,
+      execution_status: "executed",
+      error_type: null,
+      error_message: null,
+      target_url: null,
+      result_summary: null,
+      blocked: false,
+      block_level: null,
+      block_reason: null,
+      suggestion_required: false,
+    };
+
     return {
       ok: true,
       execution_status: "executed",
