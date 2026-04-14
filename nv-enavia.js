@@ -895,6 +895,10 @@ async function callChatModel(env, messages, options = {}) {
     temperature: options.temperature ?? 0.2,
     max_tokens: options.max_tokens ?? 1600,
     top_p: options.top_p ?? 1,
+    // response_format is forwarded when set (e.g. { type: "json_object" } for
+    // structured output). Omitted entirely when not provided to stay compatible
+    // with model versions that do not support the parameter.
+    ...(options.response_format ? { response_format: options.response_format } : {}),
   };
 
   logNV("🔁 Chamando modelo:", model);
@@ -3267,60 +3271,68 @@ async function handleChatLLM(request, env) {
   const context = body.context && typeof body.context === "object" ? body.context : {};
 
   try {
-    // --- Detecção de intenção de plano ---
-    // NOTE: Simple substring matching is an intentional Phase 1 trade-off.
-    // False positives (e.g. "não quero plano") are acceptable at this stage —
-    // the planner only produces supplementary data alongside the LLM reply.
-    const _planSignals = [
-      "gere um plano", "gerar plano", "montar plano", "monte um plano",
-      "crie um plano", "criar plano", "estruture um plano", "planejar",
-      "quero um plano", "faça um plano", "elabore um plano",
-      "plano para", "plano de ação", "plano tático", "plano estratégico",
-    ];
-    const lowerMsg = message.toLowerCase();
-    const wantsPlan = _planSignals.some((s) => lowerMsg.includes(s));
-
-    // --- System prompt LLM-first (conversa livre) ---
+    // --- System prompt LLM-first com sinal estruturado ---
+    // The LLM is the sole decision-maker for whether the planner tool is needed.
+    // No substring lists — the model reads the user's full intent and returns a
+    // small JSON object: { reply, use_planner }.
+    //   reply       — the free-form conversational response shown to the user
+    //   use_planner — true only when the user is clearly requesting a structured
+    //                 plan, action breakdown, or task organisation
     const ownerName = env.OWNER || "usuário";
     const systemName = env.SYSTEM_NAME || "ENAVIA";
 
     const chatSystemPrompt = `Você é a ${systemName}, assistente inteligente da NV Imóveis.
 
-Seu papel principal nesta conversa:
-- Responder de forma natural, clara e humana.
-- Conversar livremente sobre qualquer assunto relacionado ao contexto do usuário.
-- Quando o usuário pedir para estruturar, planejar ou organizar algo, você pode ajudar de forma livre e também acionar ferramentas internas de planejamento.
-- Nunca responder com templates rígidos tipo A/B/C.
-- Nunca usar campos como "next_action" ou "reason" como fala.
-- Ser direta, objetiva e acolhedora.
+Responda SEMPRE em JSON válido, sem markdown, sem texto fora do JSON. Formato obrigatório:
+{"reply":"<sua resposta em português>","use_planner":<true ou false>}
 
-Regras:
+Regras para o campo reply:
+- Responda de forma natural, clara e humana.
+- Se o usuário disser algo casual (oi, tudo bem, etc.), responda naturalmente.
+- Se o usuário pedir algo técnico ou estruturado, responda de forma completa e direta.
 - Fale sempre em português do Brasil.
-- Seja concisa, mas completa quando necessário.
-- Se o usuário só disser "oi" ou algo casual, responda naturalmente sem forçar formalidade.
-- Se o usuário pedir um plano ou tarefa estruturada, explique o que vai fazer de forma natural e organize a resposta.
-- Você tem acesso a ferramentas internas de planejamento e execução, mas a conversa é sempre LLM-first.
-- O nome do dono/operador é ${ownerName}.
+- Nunca use templates rígidos, campos como "next_action" ou "reason" como fala.
+- O nome do operador é ${ownerName}.
+- Você está no painel da ${systemName}, ambiente de gestão da NV Imóveis.
 
-Contexto: você está operando dentro do painel da ${systemName}, ambiente de gestão e operações da NV Imóveis.`;
+Regras para o campo use_planner (boolean):
+- true: apenas quando o usuário pede explicitamente um plano de ação estruturado, lista de etapas, ou organização de tarefa.
+- false: em qualquer outra situação (conversa livre, perguntas, análises, pedidos simples).`;
 
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
       { role: "user", content: message },
     ];
 
-    // --- Chamada LLM ---
+    // --- Chamada LLM com resposta estruturada ---
     // Max tokens capped at 1200 to balance response quality with Cloudflare Worker
     // CPU time limits (~30s). Increase if moving to Unbound or Durable Objects.
     const CHAT_LLM_MAX_TOKENS = 1200;
     const llmResult = await callChatModel(env, llmMessages, {
       temperature: 0.5,
       max_tokens: CHAT_LLM_MAX_TOKENS,
+      response_format: { type: "json_object" },
     });
 
-    const reply = llmResult.text;
+    // Parse the structured response — fall back gracefully if the model returns
+    // plain text (e.g. older model versions that ignore response_format).
+    let reply = "";
+    let wantsPlan = false;
+    try {
+      const parsed = JSON.parse(llmResult.text);
+      reply = typeof parsed.reply === "string" && parsed.reply.length > 0
+        ? parsed.reply
+        : llmResult.text;
+      wantsPlan = parsed.use_planner === true;
+    } catch {
+      // Model returned plain text — use as-is, no planner
+      reply = llmResult.text || "Instrução recebida.";
+      wantsPlan = false;
+    }
 
-    // --- Planner como ferramenta interna (quando solicitado) ---
+    logNV("🗣️ [CHAT/LLM] LLM respondeu", { use_planner: wantsPlan, session_id });
+
+    // --- Planner como ferramenta interna (decisão do LLM) ---
     let plannerSnapshot = null;
     let plannerUsed = false;
 
