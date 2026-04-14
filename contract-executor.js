@@ -4060,18 +4060,84 @@ const BROWSER_EXECUTOR_RESPONSE_SHAPE = {
 };
 
 // ---------------------------------------------------------------------------
-// In-memory state for Browser Arm — lightweight, no heavy persistence.
+// In-memory state for Browser Arm — backed by KV for restart survival.
 // Tracks last execution result for getBrowserArmState().
-// Reset on worker restart (acceptable for this stage).
+// Persisted to ENAVIA_BRAIN KV under KV_KEY_BROWSER_ARM_STATE after each write.
 // ---------------------------------------------------------------------------
 let _browserArmLastExecution = null;
 
 // ---------------------------------------------------------------------------
 // In-memory suggestions buffer for Browser Arm.
 // Populated when the runtime or executor returns suggestions following
-// the canonical SUGGESTION_SHAPE. Reset on worker restart.
+// the canonical SUGGESTION_SHAPE. Persisted to KV alongside last_execution.
 // ---------------------------------------------------------------------------
 let _browserArmSuggestions = [];
+
+// KV key for Browser Arm persisted state.
+// Singleton — one Browser Arm per deployment, no per-contract scope.
+// Uses the same ENAVIA_BRAIN KV binding as all other persistent state.
+const KV_KEY_BROWSER_ARM_STATE = "browser-arm:state";
+
+// ---------------------------------------------------------------------------
+// persistBrowserArmState(env)
+//
+// Persists _browserArmLastExecution + _browserArmSuggestions to KV.
+// Called after every _browserArmLastExecution write so state survives restart.
+// Silent on failure — never crashes the executor (same pattern as emitExecEvent).
+// ---------------------------------------------------------------------------
+async function persistBrowserArmState(env) {
+  if (!env?.ENAVIA_BRAIN) return;
+  try {
+    const data = {
+      last_execution: _browserArmLastExecution,
+      suggestions: _browserArmSuggestions,
+      persisted_at: new Date().toISOString(),
+    };
+    await env.ENAVIA_BRAIN.put(KV_KEY_BROWSER_ARM_STATE, JSON.stringify(data));
+  } catch {
+    // Never crash the executor on persistence failure
+  }
+}
+
+// ---------------------------------------------------------------------------
+// rehydrateBrowserArmState(env)
+//
+// Reads persisted Browser Arm state from KV and restores in-memory vars.
+// Called by getBrowserArmStateWithKV when memory is null (worker restart).
+// Silent on failure — falls back to in-memory (may be empty after fresh deploy).
+// ---------------------------------------------------------------------------
+async function rehydrateBrowserArmState(env) {
+  if (!env?.ENAVIA_BRAIN) return;
+  try {
+    const raw = await env.ENAVIA_BRAIN.get(KV_KEY_BROWSER_ARM_STATE);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.last_execution && _browserArmLastExecution === null) {
+      _browserArmLastExecution = data.last_execution;
+    }
+    if (Array.isArray(data.suggestions) && _browserArmSuggestions.length === 0) {
+      _browserArmSuggestions = data.suggestions;
+    }
+  } catch {
+    // Never crash on rehydration — falls back to current in-memory state
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getBrowserArmStateWithKV(env)
+//
+// Async variant of getBrowserArmState for the route handler.
+// Rehydrates from KV first when in-memory state is null (worker restart),
+// then delegates to the synchronous getBrowserArmState().
+//
+// The synchronous getBrowserArmState() is kept unchanged for test compat.
+// ---------------------------------------------------------------------------
+async function getBrowserArmStateWithKV(env) {
+  if (_browserArmLastExecution === null) {
+    await rehydrateBrowserArmState(env);
+  }
+  return getBrowserArmState();
+}
 
 // ---------------------------------------------------------------------------
 // buildBrowserExecutorPayload({ action, params, execution_context })
@@ -4257,6 +4323,8 @@ async function executeBrowserArmAction({
       block_reason: enforcement.reason,
       suggestion_required: enforcement.suggestion_required || false,
     };
+    // ── Persist to KV — survives worker restart ──
+    await persistBrowserArmState(env);
 
     return {
       ok: false,
@@ -4290,6 +4358,8 @@ async function executeBrowserArmAction({
       block_reason: null,
       suggestion_required: false,
     };
+    // ── Persist to KV — survives worker restart ──
+    await persistBrowserArmState(env);
 
     return {
       ok: true,
@@ -4329,6 +4399,8 @@ async function executeBrowserArmAction({
     block_reason: null,
     suggestion_required: false,
   };
+  // ── Persist to KV — survives worker restart ──
+  await persistBrowserArmState(env);
 
   if (!bridgeResult.ok) {
     return {
@@ -4600,7 +4672,12 @@ export {
   executeBrowserArmAction,
   handleBrowserArmAction,
   getBrowserArmState,
+  getBrowserArmStateWithKV,
   resetBrowserArmState,
+  // P25-PR4+ — KV persistence helpers (exported for testing)
+  persistBrowserArmState,
+  rehydrateBrowserArmState,
+  KV_KEY_BROWSER_ARM_STATE,
   // P25-PR2 — Bridge internals (exported for testing)
   buildBrowserExecutorPayload,
   validateBrowserExecutorResponse,
