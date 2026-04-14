@@ -138,13 +138,18 @@ function BrowserIdleState({ domain }) {
 }
 
 // ── Real session metadata card ─────────────────────────────────────────────
-
+// Fields shown here MUST come from the real backend shape:
+//   last_action (armState.last_action) — ✅ exists in backend
+//   execution_status (exec.execution_status) — ✅ exists in backend
+//   session_id (exec.request_id) — ✅ exists in backend (shown in sidebar)
+//
+// NOT shown (not present in backend P25-PR2 shape — do not fabricate):
+//   target_url, result_summary, evidence
+//
 function SessionMetadataCard({ session }) {
   const fields = [
-    { key: "currentUrl",      label: "Página atual",   icon: "🔗", mono: true },
-    { key: "currentAction",   label: "Ação atual",     icon: "▷" },
-    { key: "currentTarget",   label: "Alvo atual",     icon: "🎯" },
-    { key: "evidence",        label: "Resumo/Evidência", icon: "◆" },
+    { key: "currentAction",   label: "Última ação",       icon: "▷" },
+    { key: "executionStatus", label: "Status de execução", icon: "◎", mono: true },
   ];
 
   return (
@@ -317,13 +322,24 @@ function formatTs(iso) {
  * Sem demo switcher. Sem mock fixo. Sessão real ou "sem sessão" honesto.
  */
 export default function BrowserExecutorPanel() {
-  const { session, loading, error, refresh, lastUpdated } = useBrowserSession();
+  const { session, loading, error, source, refresh, lastUpdated } = useBrowserSession();
 
   const sessionStatus = session?.sessionStatus || BROWSER_SESSION_STATUS.SEM_SESSAO;
   const meta = STATUS_META[sessionStatus] || DEFAULT_STATUS_META;
   const isActive = session?.active === true;
   const hasError = sessionStatus === BROWSER_SESSION_STATUS.ERRO
                 || sessionStatus === BROWSER_SESSION_STATUS.BLOQUEADO;
+
+  // Source label for the indicator
+  const isUnconfigured = source === "unconfigured";
+  const isUnreachable  = source === "unreachable";
+  const sourceLabel = isUnconfigured
+    ? "Fonte não configurada — /browser-arm/state indisponível (VITE_NV_ENAVIA_URL ausente)"
+    : isUnreachable
+    ? "Fonte inacessível — /browser-arm/state não respondeu"
+    : source === "real"
+    ? `Fonte: /browser-arm/state · Atualizado: ${formatTs(lastUpdated)}`
+    : "Consultando /browser-arm/state…";
 
   return (
     <div style={s.page}>
@@ -360,14 +376,27 @@ export default function BrowserExecutorPanel() {
           </span>
         </div>
 
-        {/* Source indicator — real vs mock */}
-        <div style={s.sourceIndicator} data-testid="source-indicator">
-          <span style={s.sourceIcon} aria-hidden="true">●</span>
-          <span style={s.sourceText}>
-            Fonte: sessão real via /browser-arm/state
-            {lastUpdated && ` · Atualizado: ${formatTs(lastUpdated)}`}
+        {/* Source indicator — shows real source or honest unavailability */}
+        <div
+          style={{
+            ...s.sourceIndicator,
+            ...(isUnconfigured || isUnreachable ? s.sourceIndicatorWarn : {}),
+          }}
+          data-testid="source-indicator"
+        >
+          <span
+            style={{
+              ...s.sourceIcon,
+              color: isUnconfigured || isUnreachable ? "#F59E0B" : "#10B981",
+            }}
+            aria-hidden="true"
+          >
+            {isUnconfigured || isUnreachable ? "⚠" : "●"}
           </span>
-          <button style={s.refreshBtn} onClick={refresh} title="Atualizar agora">↻</button>
+          <span style={s.sourceText}>{sourceLabel}</span>
+          {!isUnconfigured && (
+            <button style={s.refreshBtn} onClick={refresh} title="Atualizar agora">↻</button>
+          )}
         </div>
 
         {/* Connection error */}
@@ -375,7 +404,7 @@ export default function BrowserExecutorPanel() {
           <div style={s.connectionError} data-testid="connection-error">
             <span style={s.connectionErrorIcon} aria-hidden="true">⚠</span>
             <span style={s.connectionErrorText}>
-              Falha ao consultar sessão: {typeof error === "string" ? error : error.message || "Erro desconhecido"}
+              {typeof error === "object" && error.message ? error.message : String(error)}
             </span>
           </div>
         )}
@@ -502,6 +531,10 @@ const s = {
     background: "rgba(16,185,129,0.06)",
     border: "1px solid rgba(16,185,129,0.20)",
     borderRadius: "var(--radius-md)",
+  },
+  sourceIndicatorWarn: {
+    background: "rgba(245,158,11,0.06)",
+    border: "1px solid rgba(245,158,11,0.25)",
   },
   sourceIcon: {
     color: "#10B981",
