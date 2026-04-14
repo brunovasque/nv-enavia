@@ -88,9 +88,19 @@ async function runTests() {
   // === Não confunde identidade ===
   ok(!prompt.includes("Você é a Enova"), "prompt NÃO diz 'Você é a Enova'");
   ok(!prompt.includes("Você é a NV Imóveis"), "prompt NÃO diz 'Você é a NV Imóveis'");
-  ok(prompt.includes("você é a inteligência operacional dela") ||
-     prompt.includes("ENAVIA — Inteligência operacional"),
-     "prompt distingue ENAVIA da empresa NV Imóveis");
+  ok(!prompt.includes("da NV Imóveis") ||
+     prompt.includes("A empresa dele é a NV Imóveis"),
+     "prompt NÃO apresenta ENAVIA como 'da NV Imóveis' na abertura de identidade");
+  ok(prompt.includes("ENAVIA — Inteligência operacional"),
+     "prompt abre com ENAVIA como inteligência autônoma");
+  ok(prompt.includes("A empresa dele é a NV Imóveis"),
+     "prompt posiciona NV Imóveis como empresa do operador, não como identidade da ENAVIA");
+  ok(prompt.includes("NÃO é a NV Imóveis"),
+     "prompt proíbe explicitamente ENAVIA de se identificar como NV Imóveis");
+  ok(prompt.includes("sou a assistente da NV Imóveis"),
+     "prompt contém guardrail explícito contra 'sou a assistente da NV Imóveis'");
+  ok(prompt.includes("Identidade fixa"),
+     "prompt inclui seção de identidade fixa no tom conversacional");
 
   // === Capacidades reais ===
   ok(prompt.includes("O que você consegue fazer"), "prompt lista capacidades reais");
