@@ -3,7 +3,7 @@
 > Contrato canônico do braço Browser da Enavia — olhos externos.
 > Versão: v1.0
 > Data: 2026-04-14
-> Status: ATIVO — com enforcement em runtime
+> Status: ATIVO — contrato + enforcement em runtime; binding externo real ainda não implementado nesta PR1
 > Implementação: `schema/browser-arm-contract.js`
 > Testes (contrato): `tests/browser-arm-contract.smoke.test.js` (140 casos)
 > Testes (runtime): `tests/browser-arm-runtime.integration.test.js` (59 casos)
@@ -236,7 +236,32 @@ Separado do executor Cloudflare (`executeCurrentMicroPr`) e do braço GitHub (`e
 
 ---
 
-## 15. O que NÃO está neste contrato
+## 15. O que está VIVO nesta PR1
+
+| Componente | Status |
+|------------|--------|
+| Contrato canônico P25 (`schema/browser-arm-contract.js`) | ✅ Ativo |
+| Enforcement em runtime (`enforceBrowserArm()`) | ✅ Ativo |
+| Runtime functions (`executeBrowserArmAction`, `handleBrowserArmAction`, `getBrowserArmState`) | ✅ Ativo |
+| Rotas HTTP (`POST /browser-arm/action`, `GET /browser-arm/state`) | ✅ Ativo |
+| Mapeamento canônico de `run.nv-imoveis.com/*` | ✅ Mapeado |
+| Handler exige `scope_approved` + `gates_context` explícitos | ✅ Sem defaults permissivos |
+
+## 16. O que NÃO está vivo nesta PR1
+
+| Componente | Status |
+|------------|--------|
+| Binding operacional real com browser externo (`run.nv-imoveis.com`) | ❌ Ainda não implementado |
+| Execução real de navegação/browser | ❌ Ainda não implementado |
+| Persistência de estado do braço em KV | ❌ Ainda não implementado |
+| Automação de rotina de pesquisa/evolução | ❌ Ainda não implementado |
+| UX/painel do browser | ❌ Ainda não implementado |
+
+O mapeamento de `run.nv-imoveis.com/*` é **canônico** nesta etapa: a rota/base está definida e referenciada, mas o binding operacional completo com o browser executor físico externo será implementado em PRs futuras.
+
+---
+
+## 17. O que NÃO está neste contrato
 
 - Executor Cloudflare (Workers/runtime/deploy)
 - GitHub/PR arm (P24)
@@ -249,7 +274,7 @@ Separado do executor Cloudflare (`executeCurrentMicroPr`) e do braço GitHub (`e
 
 ---
 
-## 16. Prova de Não-Regressão
+## 18. Prova de Não-Regressão
 
 Todos os testes existentes passaram após a adição do P25:
 

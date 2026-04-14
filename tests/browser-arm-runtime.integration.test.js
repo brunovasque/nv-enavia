@@ -30,6 +30,11 @@
 //   R19. handleBrowserArmAction — blocked action via handler
 //   R20. handleBrowserArmAction — missing action returns 400
 //   R21. executeBrowserArmAction — blocked: P23 gates fail
+//   R22. handleBrowserArmAction — missing scope_approved returns 400
+//   R23. handleBrowserArmAction — missing gates_context returns 400
+//   R24. handleBrowserArmAction — missing both scope_approved and gates_context
+//   R25. handleBrowserArmAction — scope_approved=false blocks via enforcement
+//   R26. handleBrowserArmAction — full correct payload still works after hardening
 // ============================================================================
 
 import {
@@ -250,6 +255,87 @@ console.log("R21. executeBrowserArmAction — blocked: P23 gates fail");
   const r = executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: GATES_FAIL });
   assert(r.ok === false, "blocked by P23 gates");
   assert(r.error === "BROWSER_ARM_BLOCKED", "error code correct");
+}
+
+// ── R22: handleBrowserArmAction — missing scope_approved returns 400 ──
+console.log("R22. handleBrowserArmAction — missing scope_approved returns 400");
+{
+  const mockRequest = {
+    json: async () => ({
+      action: "navigate",
+      gates_context: ALL_GATES_OK,
+      // scope_approved deliberately omitted
+    }),
+  };
+  const r = await handleBrowserArmAction(mockRequest, {});
+  assert(r.status === 400, "status 400 without scope_approved");
+  assert(r.body.error === "MISSING_SCOPE_APPROVED", "error is MISSING_SCOPE_APPROVED");
+  assert(r.body.ok === false, "body ok = false");
+}
+
+// ── R23: handleBrowserArmAction — missing gates_context returns 400 ──
+console.log("R23. handleBrowserArmAction — missing gates_context returns 400");
+{
+  const mockRequest = {
+    json: async () => ({
+      action: "navigate",
+      scope_approved: true,
+      // gates_context deliberately omitted
+    }),
+  };
+  const r = await handleBrowserArmAction(mockRequest, {});
+  assert(r.status === 400, "status 400 without gates_context");
+  assert(r.body.error === "MISSING_GATES_CONTEXT", "error is MISSING_GATES_CONTEXT");
+  assert(r.body.ok === false, "body ok = false");
+}
+
+// ── R24: handleBrowserArmAction — missing both scope_approved and gates_context ──
+console.log("R24. handleBrowserArmAction — missing both scope_approved and gates_context");
+{
+  const mockRequest = {
+    json: async () => ({
+      action: "navigate",
+      // both deliberately omitted
+    }),
+  };
+  const r = await handleBrowserArmAction(mockRequest, {});
+  assert(r.status === 400, "status 400 without both");
+  assert(r.body.ok === false, "body ok = false");
+  // scope_approved is checked first
+  assert(r.body.error === "MISSING_SCOPE_APPROVED", "checks scope_approved first");
+}
+
+// ── R25: handleBrowserArmAction — scope_approved=false with gates blocks correctly ──
+console.log("R25. handleBrowserArmAction — scope_approved=false blocks via enforcement");
+{
+  const mockRequest = {
+    json: async () => ({
+      action: "navigate",
+      scope_approved: false,
+      gates_context: ALL_GATES_OK,
+    }),
+  };
+  const r = await handleBrowserArmAction(mockRequest, {});
+  assert(r.status === 403, "status 403 — enforcement blocked");
+  assert(r.body.ok === false, "body ok = false");
+  assert(r.body.error === "BROWSER_ARM_BLOCKED", "blocked by enforcement, not 400");
+}
+
+// ── R26: handleBrowserArmAction — full correct payload still works ──
+console.log("R26. handleBrowserArmAction — full correct payload still works after hardening");
+{
+  const mockRequest = {
+    json: async () => ({
+      action: "search",
+      scope_approved: true,
+      gates_context: ALL_GATES_OK,
+    }),
+  };
+  const r = await handleBrowserArmAction(mockRequest, {});
+  assert(r.status === 200, "status 200 with full payload");
+  assert(r.body.ok === true, "body ok = true");
+  assert(r.body.arm_id === BROWSER_ARM_ID, "arm_id correct");
+  assert(r.body.external_base.host === "run.nv-imoveis.com", "external_base intact");
 }
 
 // ============================================================

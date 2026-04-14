@@ -4114,7 +4114,7 @@ async function handleBrowserArmAction(request, _env) {
 
   const {
     action,
-    scope_approved = true,
+    scope_approved,
     gates_context,
     justification = null,
     user_permission = false,
@@ -4129,20 +4129,34 @@ async function handleBrowserArmAction(request, _env) {
     };
   }
 
-  // Default gates context — all gates pass (caller can override)
-  const resolvedGates = gates_context || {
-    scope_defined: true,
-    environment_defined: true,
-    risk_assessed: true,
-    authorization_present_when_required: true,
-    observability_preserved: true,
-    evidence_available_when_required: true,
-  };
+  // scope_approved must be explicitly provided as boolean — no implicit authorization
+  if (typeof scope_approved !== "boolean") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "MISSING_SCOPE_APPROVED",
+        message: "'scope_approved' é obrigatório e deve ser boolean. O runtime não assume autorização implícita.",
+      },
+    };
+  }
+
+  // gates_context must be explicitly provided — no fabricated gates
+  if (!gates_context || typeof gates_context !== "object") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "MISSING_GATES_CONTEXT",
+        message: "'gates_context' é obrigatório e deve ser um objeto com os gates P23. O runtime não fabrica gates implicitamente.",
+      },
+    };
+  }
 
   const result = executeBrowserArmAction({
     action,
     scope_approved,
-    gates_context: resolvedGates,
+    gates_context,
     justification,
     user_permission,
     drift_detected,
