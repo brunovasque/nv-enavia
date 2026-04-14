@@ -169,7 +169,34 @@ export function buildChatSystemPrompt(opts = {}) {
     }
   }
 
-  // === 6. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
+  // === 6. Política de arbitração de ferramentas internas (PR3) ===
+  // Orienta o LLM sobre o papel do reply vs. planner interno — sem expor mecânica.
+  sections.push(
+    "",
+    "POLÍTICA DE USO DE FERRAMENTAS INTERNAS:",
+    "Você tem acesso a um planner interno que organiza tarefas complexas por baixo dos panos.",
+    "O planner NUNCA aparece como superfície da conversa. Ele é ferramenta interna sua.",
+    "O runtime decide automaticamente quando ativar o planner, baseado no tipo de pedido.",
+    "Você sinaliza sua intenção via use_planner, mas o runtime tem a palavra final.",
+    "",
+    "Regras de use_planner:",
+    "• use_planner = true quando o operador pede explicitamente um plano, organização de tarefa, lista de etapas ou estruturação de projeto.",
+    "• use_planner = true quando a intenção do operador envolve múltiplas etapas que se beneficiariam de estruturação interna — mesmo que ele não peça explicitamente.",
+    "• use_planner = false para conversa livre, perguntas simples, cumprimentos, análises pontuais, dúvidas, ou qualquer interação que não precise de planejamento estruturado.",
+    "• Na dúvida, prefira false. Planner é ferramenta de apoio, não padrão.",
+    "",
+    "REGRA CRÍTICA: o campo reply é SEMPRE fala natural — curta, direta, conversacional.",
+    "Mesmo quando o pedido for claramente multietapa ou de planejamento:",
+    "• NÃO expanda o reply em um plano completo com fases, etapas numeradas, seções ou estruturas.",
+    "• NÃO escreva Fase 1 / Fase 2 / Etapa 1 / Passo 1 e similares no reply.",
+    "• NÃO use markdown headers (##, ###) no reply.",
+    "• O runtime ativa o planner internamente para organizar — seu reply confirma e conversa.",
+    "• Exemplo de reply correto para pedido de plano: 'Claro, estou organizando isso por dentro. Pode seguir.'",
+    "Nunca coloque no reply termos mecânicos como 'next_action', 'reason', 'scope_summary', 'acceptance_criteria', 'plan_type', 'complexity_level'.",
+    "O reply é sempre conversa humana. O planner trabalha silenciosamente por baixo.",
+  );
+
+  // === 7. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
   sections.push(
     "",
     "FORMATO DE RESPOSTA (técnico — não afeta como você fala):",
@@ -177,8 +204,6 @@ export function buildChatSystemPrompt(opts = {}) {
     '{"reply":"<sua resposta natural em português>","use_planner":<true ou false>}',
     "",
     "O campo reply é onde você fala livremente. Escreva como se fosse fala natural.",
-    "O campo use_planner deve ser true APENAS quando o operador pede explicitamente um plano de ação, lista de etapas ou organização de tarefa.",
-    "Em qualquer outra situação (conversa, perguntas, análises, pedidos simples), use_planner é false.",
     "Nunca coloque campos extras no JSON. Nunca use markdown fora do JSON.",
   );
 

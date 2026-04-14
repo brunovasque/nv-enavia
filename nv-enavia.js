@@ -3231,6 +3231,96 @@ async function handlePlannerRun(request, env) {
 }
 
 // ============================================================================
+// 🛡️ PR3 — Tool Arbitration: Reply Sanitizers
+//
+// Two complementary sanitization layers for /chat/run:
+//
+// Layer 1 — Mechanical term leak (_sanitizeChatReply):
+//   Catches replies where the LLM dumped internal planner field names
+//   (next_action, reason:, scope_summary, etc.) as the dominant structure.
+//   Threshold: 3+ distinct mechanical terms = planner output leaked to surface.
+//
+// Layer 2 — Manual plan leak (_isManualPlanReply):
+//   Catches replies where the LLM "did the planner manually" by writing a
+//   full structured plan inline (Fase 1 / Etapa 2 / ## Header, etc.) instead
+//   of a natural conversational reply. Used only when PM4 already forced the
+//   planner internally — so the plan structure belongs in plannerSnapshot,
+//   not in the conversational reply surface.
+// ============================================================================
+const _PLANNER_LEAK_PATTERNS = [
+  /\bnext_action\b/i,
+  /\breason\b[:=]/i,
+  /\bscope_summary\b/i,
+  /\bacceptance_criteria\b/i,
+  /\bplan_type\b/i,
+  /\bcomplexity_level\b/i,
+  /\boutput_mode\b/i,
+  /\bplan_version\b/i,
+  /\bneeds_human_approval\b/i,
+  /\bneeds_formal_contract\b/i,
+];
+
+// Threshold: 3+ distinct mechanical terms in reply = planner leak.
+// A casual mention of "reason" in natural text is fine; a dump of
+// next_action + reason + scope_summary is a mechanical leak.
+const _PLANNER_LEAK_THRESHOLD = 3;
+
+function _sanitizeChatReply(reply) {
+  if (!reply || typeof reply !== "string") return reply;
+
+  // Count how many planner-internal patterns are present in the reply
+  let leakCount = 0;
+  for (const pattern of _PLANNER_LEAK_PATTERNS) {
+    if (pattern.test(reply)) leakCount++;
+  }
+
+  // Threshold: 3+ distinct mechanical terms = planner leak
+  if (leakCount >= _PLANNER_LEAK_THRESHOLD) {
+    return "Entendido. Vou organizar isso internamente e te respondo em seguida.";
+  }
+
+  return reply;
+}
+
+// Patterns indicating the LLM wrote a full structured plan inline in reply
+// instead of a natural conversational acknowledgement.
+const _MANUAL_PLAN_PATTERNS = [
+  /\bFase\s+\d+/i,           // Fase 1:, Fase 2, etc.
+  /\bEtapa\s+\d+/i,          // Etapa 1:, etc.
+  /\bPasso\s+\d+/i,          // Passo 1:, etc.
+  /\bPhase\s+\d+/i,          // Phase 1 (English)
+  /\bStep\s+\d+/i,           // Step 1 (English)
+  /^#{1,3}\s+\w/m,           // Markdown headers (##, ###)
+  /\bCritérios de aceite\b/i, // acceptance criteria language
+  /\bCriteria\b.*:/i,         // criteria: pattern
+];
+
+// Threshold: 2+ structural plan patterns in reply = manual plan structure
+const _MANUAL_PLAN_THRESHOLD = 2;
+
+// Natural fallback reply when a manual plan leak is detected in the reply surface.
+// The plan structure lives in plannerSnapshot — the reply must stay conversational.
+const _MANUAL_PLAN_FALLBACK =
+  "Entendido. Estou organizando isso por dentro — o plano está estruturado internamente.";
+
+// Returns true if the reply looks like the LLM wrote a structured plan inline
+// (instead of a short natural conversational reply).
+// Counts total occurrences across all patterns (not just distinct patterns),
+// so "Fase 1 / Fase 2 / Fase 3" with a single pattern counts as 3 hits.
+function _isManualPlanReply(reply) {
+  if (!reply || typeof reply !== "string") return false;
+  let count = 0;
+  for (const pattern of _MANUAL_PLAN_PATTERNS) {
+    // Re-create with global flag to count all occurrences (not just first match)
+    const flags = pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g";
+    const globalPat = new RegExp(pattern.source, flags);
+    const matches = reply.match(globalPat);
+    if (matches) count += matches.length;
+  }
+  return count >= _MANUAL_PLAN_THRESHOLD;
+}
+
+// ============================================================================
 // 💬 CHAT LLM-FIRST — POST /chat/run
 //
 // Rota de conversa livre LLM-first para a aba Chat do painel.
@@ -3270,6 +3360,38 @@ async function handleChatLLM(request, env) {
 
   const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
   const context = body.context && typeof body.context === "object" ? body.context : {};
+
+  // -------------------------------------------------------------------------
+  // PR3 — Arbitration pre-check (deterministic, runs before LLM call)
+  //
+  // PM4 classifier (classifyRequest) is used as a deterministic gate on the
+  // incoming message. This gives an auditable pre-signal that works regardless
+  // of what the LLM decides via use_planner.
+  //
+  // Rule:
+  //   Level A (simple / operational) → planner MUST NOT activate.
+  //     Even if the LLM returns use_planner=true for a trivial message,
+  //     the PM4 gate blocks it. Conversation wins.
+  //   Level B (tactical) / C (complex/strategic) → planner MAY activate
+  //     if and only if the LLM also requests it.
+  //
+  // This creates a two-signal gate:  LLM + PM4 must both agree for planner.
+  // Either signal can veto activation.  PM4 veto prevents over-triggering on
+  // simple conversation; LLM veto prevents under-triggering on nuanced intent.
+  // -------------------------------------------------------------------------
+  let pm4Arbitration = null;
+  try {
+    const pm4Classification = classifyRequest({ text: message, context });
+    pm4Arbitration = {
+      level:           pm4Classification.complexity_level,
+      category:        pm4Classification.category,
+      signals:         pm4Classification.signals,
+      allows_planner:  pm4Classification.complexity_level !== "A",
+    };
+  } catch (pm4Err) {
+    // PM4 failure is non-critical — fall through to LLM-only decision
+    logNV("⚠️ [CHAT/LLM] PM4 pre-check falhou (não crítico)", { error: String(pm4Err) });
+  }
 
   // Guard: API key must be configured — return 503 (not 500) with a clear message.
   if (!env.OPENAI_API_KEY) {
@@ -3331,13 +3453,58 @@ async function handleChatLLM(request, env) {
       wantsPlan = false;
     }
 
-    logNV("🗣️ [CHAT/LLM] LLM respondeu", { use_planner: wantsPlan, session_id });
+    // --- PR3: Tool Arbitration — Sanitização de reply ---
+    // Garante que o reply nunca exponha termos mecânicos do planner como fala
+    // principal. Se a resposta contiver termos internos do planner como
+    // superfície dominante, é sinal de leak — o reply é sanitizado.
+    reply = _sanitizeChatReply(reply);
 
-    // --- Planner como ferramenta interna (decisão do LLM) ---
+    // --- PR3: Arbitration Gate — PM4 é autoritativo ---
+    //
+    // PM4 decides planner activation unilaterally:
+    //   Level A (simple/operational) → planner BLOCKED always. Conversation wins.
+    //     Even if LLM signals use_planner=true, Level A blocks it.
+    //   Level B/C (tactical/strategic) → planner FORCED always.
+    //     Even if LLM signals use_planner=false, Level B/C forces it.
+    //
+    // The LLM's use_planner signal is now advisory only — it's recorded in the
+    // arbitration audit trail but does NOT control planner activation.
+    //
+    // Rationale: In TEST, the LLM bypassed the gate by returning use_planner=false
+    // while generating a full structured plan in reply. PM4 as sole authority
+    // closes this gap: if the message is B/C, planner always runs internally,
+    // and the reply must remain conversational (enforced by _isManualPlanReply).
+    const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : false;
+    const shouldActivatePlanner = pm4AllowsPlanner;
+
+    // Auditoria da decisão de arbitration — provável sem LLM real
+    const arbitrationDecision = {
+      pm4_level:            pm4Arbitration?.level        || null,
+      pm4_category:         pm4Arbitration?.category     || null,
+      pm4_signals:          pm4Arbitration?.signals      || [],
+      pm4_allows_planner:   pm4AllowsPlanner,
+      llm_requested_planner: wantsPlan,
+      // final_decision reflects PM4-only authority:
+      //   "planner_activated"      → LLM requested + PM4 level B/C (coherent)
+      //   "planner_forced_level_BC"→ PM4 level B/C but LLM didn't request it
+      //   "planner_blocked_level_A"→ PM4 level A (blocks even if LLM wanted it)
+      final_decision: shouldActivatePlanner
+        ? (wantsPlan ? "planner_activated" : "planner_forced_level_BC")
+        : "planner_blocked_level_A",
+    };
+
+    logNV("🗣️ [CHAT/LLM] LLM respondeu", {
+      use_planner: wantsPlan,
+      pm4_allows: pm4AllowsPlanner,
+      final: arbitrationDecision.final_decision,
+      session_id,
+    });
+
+    // --- Planner como ferramenta interna (PM4 autoritativo) ---
     let plannerSnapshot = null;
     let plannerUsed = false;
 
-    if (wantsPlan) {
+    if (shouldActivatePlanner) {
       try {
         const classification = classifyRequest({ text: message, context });
         const envelope = buildOutputEnvelope(classification, { text: message });
@@ -3366,7 +3533,7 @@ async function handleChatLLM(request, env) {
 
         logNV("🔧 [CHAT/LLM] Planner acionado como ferramenta interna", {
           session_id,
-          level: classification.level,
+          level: classification.complexity_level,
         });
       } catch (planErr) {
         logNV("⚠️ [CHAT/LLM] Planner falhou como tool (não crítico)", {
@@ -3374,6 +3541,18 @@ async function handleChatLLM(request, env) {
         });
         // Planner failure is non-critical — the LLM reply is still valid
       }
+    }
+
+    // --- PR3: Manual plan leak guard ---
+    // When PM4 forced planner (Level B/C), the LLM may still have written a
+    // full structured plan inline in reply (Fase 1, Etapa 2, ## headers, etc.)
+    // instead of a natural conversational reply. This is a "manual plan leak":
+    // the plan structure belongs inside plannerSnapshot, not on the reply surface.
+    // Replace with a natural acknowledgement that preserves conversational surface.
+    if (shouldActivatePlanner && _isManualPlanReply(reply)) {
+      reply = _MANUAL_PLAN_FALLBACK;
+      arbitrationDecision.reply_sanitized = "manual_plan_replaced";
+      logNV("🛡️ [CHAT/LLM] Manual plan leak detectado no reply — sanitizado", { session_id });
     }
 
     return jsonResponse({
@@ -3389,6 +3568,7 @@ async function handleChatLLM(request, env) {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
+        arbitration: arbitrationDecision,
       },
     });
   } catch (err) {
@@ -3403,6 +3583,15 @@ async function handleChatLLM(request, env) {
         detail: String(err),
         telemetry: {
           duration_ms: Date.now() - startedAt,
+          // Include PM4 pre-check result even on LLM failure — it's deterministic
+          arbitration: pm4Arbitration ? {
+            pm4_level: pm4Arbitration.level,
+            pm4_allows_planner: pm4Arbitration.allows_planner,
+            // Compute final_decision from PM4 alone (LLM decision unknown on failure)
+            final_decision: pm4Arbitration.allows_planner
+              ? "planner_forced_level_BC"
+              : "planner_blocked_level_A",
+          } : null,
         },
       },
       500
@@ -4083,6 +4272,15 @@ if (request.method === "GET") {
             duration_ms: "number",
             session_id: "string | null",
             pipeline: "string — 'LLM-only' ou 'LLM + PM4→PM9'",
+            arbitration: {
+              pm4_level: "string — 'A' | 'B' | 'C' (nível PM4 do pedido)",
+              pm4_category: "string — 'simple' | 'tactical' | 'complex'",
+              pm4_signals: "string[] — sinais detectados pelo PM4",
+              pm4_allows_planner: "boolean — PM4 é autoritativo: false bloqueia (A), true força (B/C)",
+              llm_requested_planner: "boolean — LLM retornou use_planner=true (advisory only)",
+              final_decision: "string — 'planner_activated' | 'planner_forced_level_BC' | 'planner_blocked_level_A'",
+              reply_sanitized: "string (opcional) — 'manual_plan_replaced' se manual plan leak detectado",
+            },
           },
         },
       },
