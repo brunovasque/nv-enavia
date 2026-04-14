@@ -2406,6 +2406,8 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
       ...blockResp,
       // Backwards-compatible: keep constitution_enforcement shape for callers
       // that already handle it. The supervisor_enforcement field is additive.
+      // Note: 'level' maps to supervisor reason_code (e.g. SCOPE_VIOLATION, AUTONOMY_BLOCKED)
+      // which is the closest semantic equivalent to the original P23 enforcement level.
       constitution_enforcement: {
         allowed: false,
         blocked: true,
