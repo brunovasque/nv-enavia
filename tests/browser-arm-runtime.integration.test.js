@@ -41,6 +41,7 @@ import {
   executeBrowserArmAction,
   handleBrowserArmAction,
   getBrowserArmState,
+  resetBrowserArmState,
 } from "../contract-executor.js";
 
 import {
@@ -198,6 +199,7 @@ console.log("R14. executeBrowserArmAction — all 9 allowed actions pass in runt
 // ── R15–R17: getBrowserArmState ──
 console.log("R15–R17. getBrowserArmState");
 {
+  resetBrowserArmState(); // Reset to test initial state shape
   const state = getBrowserArmState();
   assert(state.ok === true, "state ok");
   assert(state.arm_id === BROWSER_ARM_ID, "arm_id is canonical");

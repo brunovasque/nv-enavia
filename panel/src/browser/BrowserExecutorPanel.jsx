@@ -1,16 +1,22 @@
 // ============================================================================
-// BrowserExecutorPanel — P25-PR3 (Browser Arm — sessão real + noVNC real)
+// BrowserExecutorPanel — P25-PR4 (Browser Arm — feed operacional real)
 //
-// Painel operacional do Browser Executor com sessão REAL.
+// Painel operacional do Browser Executor com sessão REAL e feed operacional.
 //
 // Regra central:
 //   - noVNC = visão ao vivo da sessão gráfica do browser executor
 //   - Este painel = estado real + metadados reais + viewport noVNC real
+//   - Feed operacional = ação, status, url, resultado, erro, bloqueio, sugestões
 //   - ZERO teatro visual — sessão real ou "sem sessão" honesto
 //
 // Fonte de dados:
 //   - useBrowserSession() → fetchBrowserSession() → GET /browser-arm/state
 //   - Sem mock fixo. Sem demo switcher. Sem estado fabricado.
+//
+// Feed operacional (P25-PR4):
+//   - OperationalFeedCard: ação atual, status, url, resultado
+//   - PermissionBlockCard: bloqueio/permissão quando enforcement bloqueia
+//   - SuggestionsFeedCard: sugestões reais da Enavia
 //
 // Domínios operacionais:
 //   noVNC  → browser.nv-imoveis.com/novnc/vnc.html (viewer do VNC desktop)
@@ -194,25 +200,29 @@ function BrowserIdleState({ domain }) {
   );
 }
 
-// ── Real session metadata card ─────────────────────────────────────────────
-// Fields shown here MUST come from the real backend shape:
-//   last_action (armState.last_action) — ✅ exists in backend
-//   execution_status (exec.execution_status) — ✅ exists in backend
-//   session_id (exec.request_id) — ✅ exists in backend (shown in sidebar)
+// ── Operational Feed Card (P25-PR4) ────────────────────────────────────────
+// The real operational feed of the Browser Executor.
+// All fields come from the real backend shape via /browser-arm/state.
+// Fields that don't exist in the runtime show "sem dado disponível" — never fake.
 //
-// NOT shown (not present in backend P25-PR2 shape — do not fabricate):
-//   target_url, result_summary, evidence
+// Fields:
+//   currentAction   → armState.last_action (real)
+//   executionStatus → exec.execution_status (real)
+//   targetUrl       → exec.target_url (real, when present)
+//   resultSummary   → exec.result_summary (real, when present)
 //
-function SessionMetadataCard({ session }) {
+function OperationalFeedCard({ session }) {
   const fields = [
-    { key: "currentAction",   label: "Última ação",       icon: "▷" },
-    { key: "executionStatus", label: "Status de execução", icon: "◎", mono: true },
+    { key: "currentAction",   label: "Ação atual",           icon: "▷" },
+    { key: "executionStatus", label: "Status atual",          icon: "◎", mono: true },
+    { key: "targetUrl",       label: "Página / URL atual",    icon: "🔗", mono: true },
+    { key: "resultSummary",   label: "Resultado curto",       icon: "✓" },
   ];
 
   return (
-    <div style={s.card} data-testid="session-metadata-card">
+    <div style={s.card} data-testid="operational-feed-card">
       <div style={s.cardHeader}>
-        <p style={s.cardTitle}>Execução em curso</p>
+        <p style={s.cardTitle}>Feed Operacional</p>
         {session.lastActionTs && (
           <span style={s.stepBadge}>
             Último update: {formatTs(session.lastActionTs)}
@@ -251,6 +261,89 @@ function SessionMetadataCard({ session }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── Permission / Block Card (P25-PR4) ─────────────────────────────────────
+// Shows when the Browser Arm is blocked by enforcement (scope, permission, etc).
+// Data comes from real enforcement result stored in /browser-arm/state.
+// Does NOT implement approval UX — only displays the real block state.
+//
+function PermissionBlockCard({ block, error }) {
+  if (!block && !error?.recoverable) return null;
+
+  const reason = block?.reason || error?.message || "Motivo não disponível";
+  const level = block?.level || error?.code || null;
+  const needsPermission = block?.suggestionRequired === true;
+
+  return (
+    <div style={s.blockCard} data-testid="permission-block-card">
+      <div style={s.blockHeader}>
+        <span style={s.blockIcon} aria-hidden="true">🚫</span>
+        <span style={s.blockTitle}>Ação bloqueada — requer permissão</span>
+      </div>
+      {level && (
+        <span style={s.blockLevel} data-testid="block-level">{level}</span>
+      )}
+      <p style={s.blockReason} data-testid="block-reason">{reason}</p>
+      {needsPermission && (
+        <div style={s.blockPermissionNote} data-testid="block-permission-note">
+          <span style={s.blockPermissionIcon} aria-hidden="true">⚠</span>
+          <span style={s.blockPermissionText}>
+            A Enavia precisa de permissão do usuário para prosseguir com esta ação.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Suggestions Feed Card (P25-PR4) ───────────────────────────────────────
+// Displays real suggestions from the Enavia/Browser Arm runtime.
+// Suggestions follow the canonical SUGGESTION_SHAPE from the contract:
+//   { type, discovery, benefit, missing_requirement, expected_impact, permission_needed }
+// Always presented as suggestion — never as automatic action.
+//
+function SuggestionsFeedCard({ suggestions }) {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+
+  return (
+    <div style={s.suggestionsCard} data-testid="suggestions-feed-card">
+      <p style={s.cardTitle}>Sugestões da Enavia</p>
+      <div style={s.suggestionsList}>
+        {suggestions.map((sug, idx) => (
+          <div key={idx} style={s.suggestionItem} data-testid="suggestion-item">
+            <div style={s.suggestionHeader}>
+              <span style={s.suggestionTypeIcon} aria-hidden="true">💡</span>
+              <span style={s.suggestionType}>{sug.type || "sugestão"}</span>
+              {sug.permission_needed && (
+                <span style={s.suggestionPermBadge}>requer permissão</span>
+              )}
+            </div>
+            {sug.discovery && (
+              <p style={s.suggestionText}>
+                <strong>Descoberta:</strong> {sug.discovery}
+              </p>
+            )}
+            {sug.benefit && (
+              <p style={s.suggestionText}>
+                <strong>Benefício:</strong> {sug.benefit}
+              </p>
+            )}
+            {sug.missing_requirement && (
+              <p style={s.suggestionText}>
+                <strong>O que falta:</strong> {sug.missing_requirement}
+              </p>
+            )}
+            {sug.expected_impact && (
+              <p style={s.suggestionText}>
+                <strong>Impacto esperado:</strong> {sug.expected_impact}
+              </p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -485,7 +578,7 @@ export default function BrowserExecutorPanel() {
       {/* onStatusChange lifts iframe load state up so header/body stay coherent */}
       {!loading && <NoVncViewport session={session} onStatusChange={setViewportStatus} />}
 
-      {/* Body — always shown; sidebar shows state, main shows metadata or idle info */}
+      {/* Body — always shown; sidebar shows state, main shows feed or idle info */}
       {!loading && (
         <div style={s.body}>
           {/* Main column */}
@@ -495,11 +588,21 @@ export default function BrowserExecutorPanel() {
               <BrowserErrorCard error={session.error} />
             )}
 
-            {/* Session metadata when active */}
-            {isActive && <SessionMetadataCard session={session} />}
+            {/* Permission / block card — shown when arm is blocked (P25-PR4) */}
+            {(session?.block || (hasError && session?.error?.recoverable)) && (
+              <PermissionBlockCard block={session.block} error={session.error} />
+            )}
+
+            {/* Operational feed — real data from /browser-arm/state (P25-PR4) */}
+            {isActive && <OperationalFeedCard session={session} />}
+
+            {/* Suggestions from Enavia — real, never automatic (P25-PR4) */}
+            {session?.suggestions && (
+              <SuggestionsFeedCard suggestions={session.suggestions} />
+            )}
 
             {/* Idle info when not active — shows arm state, coherent with header + viewport badge */}
-            {!isActive && (
+            {!isActive && !session?.block && (
               <div style={s.idleInfo} data-testid="browser-idle-info">
                 <span style={s.idleInfoIcon} aria-hidden="true">◎</span>
                 <p style={s.idleInfoTitle}>Arm em standby</p>
@@ -1049,6 +1152,129 @@ const s = {
     flexShrink: 0,
   },
   noVncNoteText: {
+    fontSize: "11px",
+    color: "var(--text-secondary)",
+    lineHeight: 1.5,
+  },
+
+  // ── Block/Permission card (P25-PR4) ──────────────────────────────────────
+  blockCard: {
+    background: "rgba(239,68,68,0.06)",
+    border: "1px solid rgba(239,68,68,0.25)",
+    borderRadius: "var(--radius-lg)",
+    padding: "14px 18px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    flexShrink: 0,
+  },
+  blockHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  blockIcon: {
+    fontSize: "16px",
+    flexShrink: 0,
+  },
+  blockTitle: {
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#EF4444",
+    letterSpacing: "0.3px",
+  },
+  blockLevel: {
+    fontSize: "10px",
+    fontWeight: 600,
+    fontFamily: "var(--font-mono)",
+    color: "#EF4444",
+    background: "rgba(239,68,68,0.10)",
+    border: "1px solid rgba(239,68,68,0.25)",
+    padding: "2px 8px",
+    borderRadius: "4px",
+    alignSelf: "flex-start",
+    letterSpacing: "0.5px",
+  },
+  blockReason: {
+    fontSize: "12px",
+    color: "var(--text-secondary)",
+    lineHeight: 1.5,
+  },
+  blockPermissionNote: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "6px",
+    marginTop: "4px",
+    padding: "8px 10px",
+    background: "rgba(245,158,11,0.08)",
+    border: "1px solid rgba(245,158,11,0.25)",
+    borderRadius: "var(--radius-md)",
+  },
+  blockPermissionIcon: {
+    fontSize: "14px",
+    flexShrink: 0,
+    color: "#F59E0B",
+  },
+  blockPermissionText: {
+    fontSize: "11px",
+    color: "#F59E0B",
+    lineHeight: 1.4,
+    fontWeight: 500,
+  },
+
+  // ── Suggestions card (P25-PR4) ──────────────────────────────────────────
+  suggestionsCard: {
+    background: "var(--bg-surface)",
+    border: "1px solid rgba(139,92,246,0.25)",
+    borderRadius: "var(--radius-lg)",
+    padding: "16px 20px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    flexShrink: 0,
+  },
+  suggestionsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+  suggestionItem: {
+    padding: "10px 14px",
+    background: "rgba(139,92,246,0.06)",
+    border: "1px solid rgba(139,92,246,0.20)",
+    borderRadius: "var(--radius-md)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+  suggestionHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  suggestionTypeIcon: {
+    fontSize: "14px",
+    flexShrink: 0,
+  },
+  suggestionType: {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#8B5CF6",
+    letterSpacing: "0.5px",
+    textTransform: "uppercase",
+  },
+  suggestionPermBadge: {
+    marginLeft: "auto",
+    fontSize: "9px",
+    fontWeight: 700,
+    color: "#F59E0B",
+    background: "rgba(245,158,11,0.10)",
+    border: "1px solid rgba(245,158,11,0.30)",
+    padding: "2px 6px",
+    borderRadius: "4px",
+    letterSpacing: "0.5px",
+  },
+  suggestionText: {
     fontSize: "11px",
     color: "var(--text-secondary)",
     lineHeight: 1.5,

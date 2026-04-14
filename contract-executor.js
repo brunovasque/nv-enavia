@@ -30,6 +30,7 @@ import {
   BROWSER_ARM_ID,
   BROWSER_EXTERNAL_BASE,
   BROWSER_ARM_STATE_SHAPE,
+  validateSuggestion,
 } from "./schema/browser-arm-contract.js";
 
 // ---------------------------------------------------------------------------
@@ -4056,15 +4057,144 @@ const BROWSER_EXECUTOR_PAYLOAD_SHAPE = {
 // ---------------------------------------------------------------------------
 const BROWSER_EXECUTOR_RESPONSE_SHAPE = {
   required_fields: ["ok", "execution_status", "action"],
-  optional_fields: ["target_url", "result_summary", "evidence", "error", "message"],
+  optional_fields: ["target_url", "result_summary", "evidence", "error", "message", "suggestions"],
 };
 
 // ---------------------------------------------------------------------------
-// In-memory state for Browser Arm — lightweight, no heavy persistence.
+// In-memory state for Browser Arm — backed by KV for restart survival.
 // Tracks last execution result for getBrowserArmState().
-// Reset on worker restart (acceptable for this stage).
+// Persisted to ENAVIA_BRAIN KV under KV_KEY_BROWSER_ARM_STATE after each write.
 // ---------------------------------------------------------------------------
 let _browserArmLastExecution = null;
+
+// ---------------------------------------------------------------------------
+// In-memory suggestions buffer for Browser Arm.
+// Populated when the runtime or executor returns suggestions following
+// the canonical SUGGESTION_SHAPE. Persisted to KV alongside last_execution.
+// ---------------------------------------------------------------------------
+let _browserArmSuggestions = [];
+
+// KV key for Browser Arm persisted state.
+// Singleton — one Browser Arm per deployment, no per-contract scope.
+// Uses the same ENAVIA_BRAIN KV binding as all other persistent state.
+const KV_KEY_BROWSER_ARM_STATE = "browser-arm:state";
+
+// ---------------------------------------------------------------------------
+// buildSuggestionFromEnforcement(enforcement)
+//
+// Builds a canonical suggestion object from an enforcement block result when
+// enforcement.suggestion_required is true.
+//
+// This is the real runtime source of suggestions: when the enforcement layer
+// blocks an action that requires user permission/scope expansion, it signals
+// that a suggestion must be created. This function materialises that signal
+// into a SUGGESTION_SHAPE-compliant object that gets stored in
+// _browserArmSuggestions and persisted to KV.
+//
+// @param {object} enforcement - Result from enforceBrowserArm(). Required fields:
+//   - level    {string}  Block level (e.g. "blocked_out_of_scope",
+//                        "blocked_not_browser_arm", "blocked_conditional_not_met")
+//   - reason   {string}  Human-readable reason for the block — becomes suggestion.discovery
+//
+// @returns {object} SUGGESTION_SHAPE-compliant suggestion ready for validateSuggestion()
+// ---------------------------------------------------------------------------
+function buildSuggestionFromEnforcement(enforcement) {
+  const levelDefs = {
+    blocked_out_of_scope: {
+      type: "capability",
+      benefit: "Permitir esta ação expande a capacidade operacional do Browser Arm com escopo aprovado.",
+      missing_requirement: "Aprovação explícita de escopo para a ação solicitada.",
+      expected_impact: "Execução da ação bloqueada após aprovação de escopo.",
+    },
+    blocked_not_browser_arm: {
+      type: "integration",
+      benefit: "Roteamento correto da ação para o braço especializado adequado aumenta a eficiência.",
+      missing_requirement: "Identificação e habilitação do braço correto para esta ação.",
+      expected_impact: "Execução da ação pelo braço especializado adequado.",
+    },
+    blocked_conditional_not_met: {
+      type: "capability",
+      benefit: "Permite execução de ação condicionada com justificativa e permissão explícita do usuário.",
+      missing_requirement: "Justificativa válida e permissão do usuário para a ação condicionada.",
+      expected_impact: "Execução controlada da ação condicionada após aprovação.",
+    },
+  };
+  const def = levelDefs[enforcement.level] || {
+    type: "capability",
+    benefit: "Revisão do bloqueio pode revelar oportunidade de expansão segura do escopo.",
+    missing_requirement: "Revisão do escopo e das permissões necessárias.",
+    expected_impact: "Desbloqueio controlado da ação após revisão.",
+  };
+  return {
+    type: def.type,
+    discovery: enforcement.reason,
+    benefit: def.benefit,
+    missing_requirement: def.missing_requirement,
+    expected_impact: def.expected_impact,
+    permission_needed: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// persistBrowserArmState(env)
+//
+// Persists _browserArmLastExecution + _browserArmSuggestions to KV.
+// Called after every _browserArmLastExecution write so state survives restart.
+// Silent on failure — never crashes the executor (same pattern as emitExecEvent).
+// ---------------------------------------------------------------------------
+async function persistBrowserArmState(env) {
+  if (!env?.ENAVIA_BRAIN) return;
+  try {
+    const data = {
+      last_execution: _browserArmLastExecution,
+      suggestions: _browserArmSuggestions,
+      persisted_at: new Date().toISOString(),
+    };
+    await env.ENAVIA_BRAIN.put(KV_KEY_BROWSER_ARM_STATE, JSON.stringify(data));
+  } catch {
+    // Never crash the executor on persistence failure
+  }
+}
+
+// ---------------------------------------------------------------------------
+// rehydrateBrowserArmState(env)
+//
+// Reads persisted Browser Arm state from KV and restores in-memory vars.
+// Called by getBrowserArmStateWithKV when memory is null (worker restart).
+// Silent on failure — falls back to in-memory (may be empty after fresh deploy).
+// ---------------------------------------------------------------------------
+async function rehydrateBrowserArmState(env) {
+  if (!env?.ENAVIA_BRAIN) return;
+  try {
+    const raw = await env.ENAVIA_BRAIN.get(KV_KEY_BROWSER_ARM_STATE);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.last_execution && _browserArmLastExecution === null) {
+      _browserArmLastExecution = data.last_execution;
+    }
+    if (Array.isArray(data.suggestions) && _browserArmSuggestions.length === 0) {
+      _browserArmSuggestions = data.suggestions;
+    }
+  } catch {
+    // Never crash on rehydration — falls back to current in-memory state
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getBrowserArmStateWithKV(env)
+//
+// Async variant of getBrowserArmState for the route handler.
+// Rehydrates from KV first when in-memory state is null (worker restart),
+// then delegates to the synchronous getBrowserArmState().
+//
+// The synchronous getBrowserArmState() is kept unchanged for test compat.
+// ---------------------------------------------------------------------------
+async function getBrowserArmStateWithKV(env) {
+  if (_browserArmLastExecution === null) {
+    await rehydrateBrowserArmState(env);
+  }
+  return getBrowserArmState();
+}
 
 // ---------------------------------------------------------------------------
 // buildBrowserExecutorPayload({ action, params, execution_context })
@@ -4234,6 +4364,34 @@ async function executeBrowserArmAction({
   });
 
   if (!enforcement.allowed) {
+    // ── Update in-memory state so /browser-arm/state reflects the block ──
+    _browserArmLastExecution = {
+      action,
+      timestamp: new Date().toISOString(),
+      request_id: null,
+      ok: false,
+      execution_status: "blocked",
+      error_type: "BROWSER_ARM_BLOCKED",
+      error_message: enforcement.reason,
+      target_url: null,
+      result_summary: null,
+      blocked: true,
+      block_level: enforcement.level || null,
+      block_reason: enforcement.reason,
+      suggestion_required: enforcement.suggestion_required || false,
+    };
+    // ── When the enforcement requires a suggestion, build a real canonical
+    //    suggestion from the block context and store in the suggestions buffer.
+    //    This is the real runtime source of suggestions (not manual injection).
+    if (enforcement.suggestion_required) {
+      const suggestion = buildSuggestionFromEnforcement(enforcement);
+      if (validateSuggestion(suggestion).valid) {
+        _browserArmSuggestions = [suggestion];
+      }
+    }
+    // ── Persist to KV — survives worker restart ──
+    await persistBrowserArmState(env);
+
     return {
       ok: false,
       error: "BROWSER_ARM_BLOCKED",
@@ -4250,6 +4408,25 @@ async function executeBrowserArmAction({
 
   // If no executor URL configured, return enforcement-only result (PR1 compat)
   if (!executorUrl) {
+    // ── Update in-memory state for enforcement-only path ──
+    _browserArmLastExecution = {
+      action: enforcement.action,
+      timestamp: new Date().toISOString(),
+      request_id: null,
+      ok: true,
+      execution_status: "executed",
+      error_type: null,
+      error_message: null,
+      target_url: null,
+      result_summary: null,
+      blocked: false,
+      block_level: null,
+      block_reason: null,
+      suggestion_required: false,
+    };
+    // ── Persist to KV — survives worker restart ──
+    await persistBrowserArmState(env);
+
     return {
       ok: true,
       execution_status: "executed",
@@ -4281,7 +4458,27 @@ async function executeBrowserArmAction({
       : "failed",
     error_type: bridgeResult.error_type,
     error_message: bridgeResult.message,
+    target_url: (bridgeResult.ok && bridgeResult.data?.target_url) || null,
+    result_summary: (bridgeResult.ok && bridgeResult.data?.result_summary) || null,
+    blocked: false,
+    block_level: null,
+    block_reason: null,
+    suggestion_required: false,
   };
+  // ── Capture real suggestions returned by the external browser executor ──
+  // The executor may return a suggestions[] array in its response when it
+  // discovers capabilities or optimisations during browsing. Only valid,
+  // canonical suggestions (per SUGGESTION_SHAPE) are accepted.
+  if (bridgeResult.ok) {
+    const exSuggestions = bridgeResult.data?.suggestions;
+    if (Array.isArray(exSuggestions) && exSuggestions.length > 0) {
+      _browserArmSuggestions = exSuggestions.filter(
+        (s) => validateSuggestion(s).valid,
+      );
+    }
+  }
+  // ── Persist to KV — survives worker restart ──
+  await persistBrowserArmState(env);
 
   if (!bridgeResult.ok) {
     return {
@@ -4325,7 +4522,9 @@ function getBrowserArmState() {
   const base = { ...BROWSER_ARM_STATE_SHAPE.initial_state };
 
   if (_browserArmLastExecution) {
-    base.status = _browserArmLastExecution.ok ? "active" : "error";
+    base.status = _browserArmLastExecution.blocked
+      ? "disabled"
+      : _browserArmLastExecution.ok ? "active" : "error";
     base.last_action = _browserArmLastExecution.action;
     base.last_action_ts = _browserArmLastExecution.timestamp;
     base.last_execution = {
@@ -4334,8 +4533,25 @@ function getBrowserArmState() {
       request_id: _browserArmLastExecution.request_id,
       error_type: _browserArmLastExecution.error_type || null,
       error_message: _browserArmLastExecution.error_message || null,
+      target_url: _browserArmLastExecution.target_url || null,
+      result_summary: _browserArmLastExecution.result_summary || null,
     };
+    // Block/permission state — real enforcement data
+    if (_browserArmLastExecution.blocked) {
+      base.block = {
+        blocked: true,
+        level: _browserArmLastExecution.block_level || null,
+        reason: _browserArmLastExecution.block_reason || null,
+        suggestion_required: _browserArmLastExecution.suggestion_required || false,
+      };
+    }
   }
+
+  // Suggestions — real array, empty when none exist.
+  // Populated only when the runtime registers suggestions via the canonical shape.
+  base.suggestions = _browserArmSuggestions.length > 0
+    ? _browserArmSuggestions.slice()
+    : [];
 
   return {
     ok: true,
@@ -4350,6 +4566,7 @@ function getBrowserArmState() {
 // ---------------------------------------------------------------------------
 function resetBrowserArmState() {
   _browserArmLastExecution = null;
+  _browserArmSuggestions = [];
 }
 
 // ---------------------------------------------------------------------------
@@ -4533,7 +4750,13 @@ export {
   executeBrowserArmAction,
   handleBrowserArmAction,
   getBrowserArmState,
+  getBrowserArmStateWithKV,
   resetBrowserArmState,
+  // P25-PR4+ — KV persistence helpers (exported for testing)
+  persistBrowserArmState,
+  rehydrateBrowserArmState,
+  buildSuggestionFromEnforcement,
+  KV_KEY_BROWSER_ARM_STATE,
   // P25-PR2 — Bridge internals (exported for testing)
   buildBrowserExecutorPayload,
   validateBrowserExecutorResponse,

@@ -16,7 +16,7 @@ import {
   handleApproveMerge,
   // P25 — Browser Arm
   handleBrowserArmAction,
-  getBrowserArmState,
+  getBrowserArmStateWithKV,
 } from "./contract-executor.js";
 
 import { classifyRequest } from "./schema/planner-classifier.js";
@@ -5769,9 +5769,9 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
-      // GET /browser-arm/state → Get current Browser Arm state
+      // GET /browser-arm/state → Get current Browser Arm state (KV-rehydrated)
       if (method === "GET" && path === "/browser-arm/state") {
-        return jsonResponse(getBrowserArmState(), 200);
+        return jsonResponse(await getBrowserArmStateWithKV(env), 200);
       }
 
       // ============================================================
