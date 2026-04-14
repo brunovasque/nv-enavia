@@ -205,26 +205,36 @@ export async function fetchBrowserSession() {
 // "blocked_regression_detected"→ NOT grantable (regression must be resolved first)
 // "blocked_p23_noncompliant"   → NOT grantable (P23 gates must pass independently)
 export const GRANTABLE_BLOCK_LEVELS = [
-  "blocked_out_of_scope",       // remedy: scope_approved: true
-  "blocked_conditional_not_met", // remedy: user_permission: true (expand_scope)
+  "blocked_out_of_scope",        // out-of-scope action — user grants scope + permission
+  "blocked_conditional_not_met", // conditional action (e.g. expand_scope) — user grants permission
 ];
 
 /**
  * P25-PR6 — Grant user permission for a blocked Browser Arm action.
  *
  * Sends POST /browser-arm/action with:
- *   - user_permission: true  (explicit user grant)
- *   - scope_approved: true   (user is approving the scope for this action)
+ *   - scope_approved: true   — user approves the scope for this action
+ *   - user_permission: true  — user explicitly grants permission
  *   - gates_context: all required P23 gates set to true (user is the authorizer)
  *
+ * Both scope_approved and user_permission are always sent together regardless of
+ * the specific block level — this is the safest remedy payload, covering both
+ * "blocked_out_of_scope" (needs scope_approved) and "blocked_conditional_not_met"
+ * (needs user_permission). The backend enforcement re-validates both.
+ *
  * ONLY valid for grantable block levels (GRANTABLE_BLOCK_LEVELS).
- * Returns an honest error envelope if blockLevel is not grantable.
+ * Returns an honest GRANT_NOT_APPLICABLE error if blockLevel is provided and
+ * is not in GRANTABLE_BLOCK_LEVELS — no placebo button for irresolvable blocks.
+ *
+ * If blockLevel is null/undefined (unknown), the call proceeds and backend
+ * enforcement decides. This preserves forward compatibility.
  *
  * Does NOT fall back to mock. If the real source is not configured, returns
- * an honest "unconfigured" error — no fake grant, no placebo.
+ * an honest "unconfigured" error — no fake grant.
  *
- * @param {string} action      — the blocked action to retry with permission
- * @param {string} blockLevel  — the block level from session.block.level
+ * @param {string}      action     — the blocked action to retry with permission
+ * @param {string|null} [blockLevel] — the block level from session.block.level;
+ *                                     if provided, validated against GRANTABLE_BLOCK_LEVELS
  * @returns {Promise<import("../contracts.js").ResponseEnvelope>}
  */
 export async function grantBrowserArmPermission(action, blockLevel) {
@@ -250,7 +260,9 @@ export async function grantBrowserArmPermission(action, blockLevel) {
     };
   }
 
-  if (blockLevel && !GRANTABLE_BLOCK_LEVELS.includes(blockLevel)) {
+  // If blockLevel is provided and known, validate it is grantable.
+  // If blockLevel is null/undefined, we proceed — backend enforcement decides.
+  if (blockLevel != null && !GRANTABLE_BLOCK_LEVELS.includes(blockLevel)) {
     return {
       ok: false,
       error: {

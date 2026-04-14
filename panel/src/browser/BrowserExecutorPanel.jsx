@@ -550,6 +550,8 @@ export default function BrowserExecutorPanel() {
   // On success: refreshes session state (clears the block if enforcement passed).
   // On failure: surfaces the real error — no fake success.
   const handleGrant = useCallback(async () => {
+    // Defensive guard: button should only be rendered when block and currentAction exist.
+    // If session state somehow diverged, abort silently — a no-op is safer than a crash.
     if (!session?.currentAction || !session?.block) return;
     setIsGranting(true);
     setGrantResult(null);
