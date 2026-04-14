@@ -15,7 +15,7 @@
 export function getEnaviaIdentity() {
   return {
     name: "ENAVIA",
-    role: "Inteligência operacional cognitiva",
+    role: "Inteligência operacional e cognitiva",
     owner: "NV Imóveis",
     description:
       "A ENAVIA é a inteligência operacional principal do usuário dentro do seu próprio sistema. " +

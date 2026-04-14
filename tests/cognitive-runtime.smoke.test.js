@@ -64,7 +64,7 @@ async function runTests() {
   ok(Array.isArray(caps.cannot_yet) && caps.cannot_yet.length > 0, "capabilities.cannot_yet é array não vazio");
   // PR1 honest capabilities must be present
   ok(caps.can.some((c) => c.toLowerCase().includes("chat")), "capabilities.can inclui chat");
-  ok(caps.can.some((c) => c.toLowerCase().includes("identidade") || c.toLowerCase().includes("institucional")), "capabilities.can menciona base institucional");
+  ok(caps.can.some((c) => c.toLowerCase().includes("identidade") || c.toLowerCase().includes("institucional")), "capabilities.can menciona identidade ou base institucional");
   ok(caps.can.some((c) => c.toLowerCase().includes("limites") || c.toLowerCase().includes("guardrails") || c.toLowerCase().includes("aprovação")), "capabilities.can menciona guardrails/aprovação");
   // PR1 honesty: overpromised items must be in cannot_yet, not in can
   const canText = caps.can.join(" ").toLowerCase();
