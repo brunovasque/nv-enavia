@@ -9,13 +9,14 @@
 // Rules:
 //   - Toast only rendered when toasts array is non-empty.
 //   - Auto-dismiss after 4.5s (user can also dismiss manually).
-//   - markAllRead() called when toasts are visible (user is looking at the panel).
+//   - markAllRead() is NOT called here — seeing a toast ≠ consuming the read.
+//     markAllRead() is called by BrowserExecutorPanel when the user enters /browser.
 //   - No modal. No intrusive overlay. Discrete bottom-right stack.
 //   - Uses aria-live="polite" for accessibility.
 // ============================================================================
 
 import { useEffect } from "react";
-import { useNotificationStore, dismissToast, markAllRead } from "./notificationStore";
+import { useNotificationStore, dismissToast } from "./notificationStore";
 
 const TOAST_DURATION_MS = 4500;
 
@@ -97,11 +98,6 @@ function ToastItem({ toast }) {
 
 export default function NotificationToast() {
   const { toasts } = useNotificationStore();
-
-  // Mark all read when the user is actively viewing the panel (toasts visible)
-  useEffect(() => {
-    if (toasts.length > 0) markAllRead();
-  }, [toasts]);
 
   if (toasts.length === 0) return null;
 

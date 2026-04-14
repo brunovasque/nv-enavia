@@ -32,10 +32,11 @@
 // Regra de honestidade: campo ausente = "sem dado disponível". Nunca inventar.
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
 import { useBrowserNotifications } from "../notifications/useBrowserNotifications";
 import NotificationToast from "../notifications/NotificationToast";
+import { markAllRead } from "../notifications/notificationStore";
 
 // ── Canonical noVNC URL ───────────────────────────────────────────────────
 // Confirmed canonical endpoint: browser.nv-imoveis.com/novnc/vnc.html?autoconnect=1
@@ -484,6 +485,13 @@ export default function BrowserExecutorPanel() {
 
   // P25-PR5: detect real events and trigger notifications (dedup inside the hook)
   useBrowserNotifications(session);
+
+  // P25-PR5: mark all unread notifications as read when user enters /browser page.
+  // Seeing a toast is NOT the same as consuming the read — markAllRead only here,
+  // on mount, so the badge clears when the user intentionally visits the page.
+  useEffect(() => {
+    markAllRead();
+  }, []);
 
   const sessionStatus = session?.sessionStatus || BROWSER_SESSION_STATUS.SEM_SESSAO;
   const meta = STATUS_META[sessionStatus] || DEFAULT_STATUS_META;

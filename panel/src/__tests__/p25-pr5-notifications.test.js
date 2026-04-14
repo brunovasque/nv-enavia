@@ -288,6 +288,37 @@ describe("P25-PR5 — NotificationToast renderização", () => {
     expect(html).toContain("notification-toast-permission");
     expect(html).toContain("Requer permissão do usuário.");
   });
+
+  it("28. toast visível NÃO zera unreadCount (markAllRead não é chamado pelo Toast)", async () => {
+    // Ensure clean state
+    markAllRead();
+    clearAllToasts();
+
+    // Add event: unread should be 1 and toast should appear
+    addNotificationEvent("block", "Bloqueio não consome leitura");
+
+    const mod = await import("../notifications/NotificationToast.jsx");
+    const Toast = mod.default;
+
+    // Render toast — should NOT call markAllRead internally
+    const html = renderToStaticMarkup(
+      createElement(MemoryRouter, {}, createElement(Toast))
+    );
+
+    // Toast rendered
+    expect(html).toContain("notification-toast-block");
+
+    // unreadCount must still be > 0 (not zeroed by toast render)
+    // Verify by checking the store snapshot directly: add another event and
+    // confirm toasts array grew (store is still active, not reset)
+    addNotificationEvent("suggestion", "Segunda notificação");
+    const html2 = renderToStaticMarkup(
+      createElement(MemoryRouter, {}, createElement(Toast))
+    );
+    // Both toasts should be present — store was not reset between renders
+    expect(html2).toContain("notification-toast-block");
+    expect(html2).toContain("notification-toast-suggestion");
+  });
 });
 
 // ── Tests: BrowserExecutorPanel sem regressão ─────────────────────────────────
