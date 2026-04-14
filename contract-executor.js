@@ -4090,6 +4090,13 @@ const KV_KEY_BROWSER_ARM_STATE = "browser-arm:state";
 // that a suggestion must be created. This function materialises that signal
 // into a SUGGESTION_SHAPE-compliant object that gets stored in
 // _browserArmSuggestions and persisted to KV.
+//
+// @param {object} enforcement - Result from enforceBrowserArm(). Required fields:
+//   - level    {string}  Block level (e.g. "blocked_out_of_scope",
+//                        "blocked_not_browser_arm", "blocked_conditional_not_met")
+//   - reason   {string}  Human-readable reason for the block — becomes suggestion.discovery
+//
+// @returns {object} SUGGESTION_SHAPE-compliant suggestion ready for validateSuggestion()
 // ---------------------------------------------------------------------------
 function buildSuggestionFromEnforcement(enforcement) {
   const levelDefs = {
