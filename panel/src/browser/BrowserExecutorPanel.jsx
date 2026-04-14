@@ -1,5 +1,5 @@
 // ============================================================================
-// BrowserExecutorPanel — P25-PR4 (Browser Arm — feed operacional real)
+// BrowserExecutorPanel — P25-PR5 (Browser Arm — notificações reais)
 //
 // Painel operacional do Browser Executor com sessão REAL e feed operacional.
 //
@@ -18,6 +18,12 @@
 //   - PermissionBlockCard: bloqueio/permissão quando enforcement bloqueia
 //   - SuggestionsFeedCard: sugestões reais da Enavia
 //
+// Notificações reais (P25-PR5):
+//   - useBrowserNotifications: detecta eventos reais e deduplica
+//   - NotificationToast: toast discreto com auto-dismiss (4.5s)
+//   - Badge: contador de não-lidos no Sidebar (/browser nav item)
+//   - Som: Web Audio API, curto, não-repetitivo
+//
 // Domínios operacionais:
 //   noVNC  → browser.nv-imoveis.com/novnc/vnc.html (viewer do VNC desktop)
 //   API    → run.nv-imoveis.com/browser-arm/state  (estado do arm/executor)
@@ -26,8 +32,11 @@
 // Regra de honestidade: campo ausente = "sem dado disponível". Nunca inventar.
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
+import { useBrowserNotifications } from "../notifications/useBrowserNotifications";
+import NotificationToast from "../notifications/NotificationToast";
+import { markAllRead } from "../notifications/notificationStore";
 
 // ── Canonical noVNC URL ───────────────────────────────────────────────────
 // Confirmed canonical endpoint: browser.nv-imoveis.com/novnc/vnc.html?autoconnect=1
@@ -474,6 +483,16 @@ function formatTs(iso) {
 export default function BrowserExecutorPanel() {
   const { session, loading, error, source, refresh, lastUpdated } = useBrowserSession();
 
+  // P25-PR5: detect real events and trigger notifications (dedup inside the hook)
+  useBrowserNotifications(session);
+
+  // P25-PR5: mark all unread notifications as read when user enters /browser page.
+  // Seeing a toast is NOT the same as consuming the read — markAllRead only here,
+  // on mount, so the badge clears when the user intentionally visits the page.
+  useEffect(() => {
+    markAllRead();
+  }, []);
+
   const sessionStatus = session?.sessionStatus || BROWSER_SESSION_STATUS.SEM_SESSAO;
   const meta = STATUS_META[sessionStatus] || DEFAULT_STATUS_META;
   const isActive = session?.active === true;
@@ -625,6 +644,9 @@ export default function BrowserExecutorPanel() {
           </div>
         </div>
       )}
+
+      {/* P25-PR5: Discrete toast stack — real events only, auto-dismiss 4.5s */}
+      <NotificationToast />
     </div>
   );
 }
