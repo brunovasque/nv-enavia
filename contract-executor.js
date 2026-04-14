@@ -92,6 +92,22 @@ function _buildSupervisorBlockResponse(supervisorDecision) {
 }
 
 // ---------------------------------------------------------------------------
+// 🛡️ P26-PR2 — _CANONICAL_NULL_GATES_CONTEXT
+//
+// Canonical fallback gates context used when a caller does not provide one.
+// All 6 P23 gates are explicitly false — the supervisor and arm enforcement
+// will block on missing gates. Never use {} as a silent fallback.
+// ---------------------------------------------------------------------------
+const _CANONICAL_NULL_GATES_CONTEXT = {
+  scope_defined:                       false,
+  environment_defined:                 false,
+  risk_assessed:                       false,
+  authorization_present_when_required: false,
+  observability_preserved:             false,
+  evidence_available_when_required:    false,
+};
+
+// ---------------------------------------------------------------------------
 // KV Key Prefixes
 // ---------------------------------------------------------------------------
 const KV_PREFIX_STATE = "contract:";
@@ -2397,7 +2413,8 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     environment: "TEST",
     scope_approved: !!(state.scope),
     gates_context: supervisorGatesContext,
-    evidence_sufficient: true,
+    // evidence_sufficient derived from the canonical P23 gate — the real source
+    evidence_sufficient: supervisorGatesContext.evidence_available_when_required === true,
   });
 
   if (!supervisorGate.pass) {
@@ -3777,12 +3794,15 @@ function executeGitHubPrAction({
 
   // 🛡️ P26-PR2 — Security Supervisor gate (consolidated decision ABOVE arm)
   // Passes arm_check_result so the supervisor can factor in the arm's assessment.
+  // evidence_sufficient derived from the canonical P23 gate (real source from caller).
+  const resolvedGatesContext = gates_context || _CANONICAL_NULL_GATES_CONTEXT;
   const supervisorGate = _runSupervisorGate({
     action,
     environment: "TEST",
     scope_approved: scope_approved === true,
-    gates_context: gates_context || {},
-    evidence_sufficient: true,
+    gates_context: resolvedGatesContext,
+    // Real source: evidence_available_when_required gate provided by the caller
+    evidence_sufficient: !!(resolvedGatesContext.evidence_available_when_required),
     arm_id: GITHUB_PR_ARM_ID,
     arm_check_result: {
       allowed: enforcement.allowed,
@@ -3958,7 +3978,7 @@ async function handleGitHubPrAction(request) {
   const result = executeGitHubPrAction({
     action: body.action,
     scope_approved: body.scope_approved === true,
-    gates_context: body.gates_context || {},
+    gates_context: body.gates_context || _CANONICAL_NULL_GATES_CONTEXT,
     drift_detected: body.drift_detected === true,
     regression_detected: body.regression_detected === true,
   });
@@ -4453,12 +4473,15 @@ async function executeBrowserArmAction({
 
   // 🛡️ P26-PR2 — Security Supervisor gate (consolidated decision ABOVE arm)
   // Passes arm_check_result so the supervisor can factor in the arm's assessment.
+  // evidence_sufficient derived from the canonical P23 gate (real source from caller).
+  const resolvedGatesContext = gates_context || _CANONICAL_NULL_GATES_CONTEXT;
   const supervisorGate = _runSupervisorGate({
     action,
     environment: "TEST",
     scope_approved: scope_approved === true,
-    gates_context: gates_context || {},
-    evidence_sufficient: true,
+    gates_context: resolvedGatesContext,
+    // Real source: evidence_available_when_required gate provided by the caller
+    evidence_sufficient: !!(resolvedGatesContext.evidence_available_when_required),
     arm_id: BROWSER_ARM_ID,
     arm_check_result: {
       allowed: enforcement.allowed,

@@ -196,19 +196,39 @@ console.log("\n── E9: Action in PROD environment requires human review ─�
   assert(result.ok === false, "E9: ok is false for high-risk action");
 }
 
-// ── E10: Evidence insufficient blocks (GitHub arm) ───────────────────────
-// Note: executeGitHubPrAction currently passes evidence_sufficient=true
-// to the supervisor. This test validates the supervisor integration doesn't
-// crash and that the normal path works. A dedicated test for evidence=false
-// would need direct _runSupervisorGate access or a modified entry point.
-console.log("\n── E10: Normal evidence-sufficient action allowed ──");
+// ── E10: Evidence gate — action blocked when evidence_available_when_required=false ──
+// After the Item 1 fix: evidence_sufficient is derived from
+// gates_context.evidence_available_when_required (the real canonical P23 source).
+// When that gate is false, the supervisor receives evidence_sufficient=false and blocks.
+// Note: with evidence_available_when_required=false, the P23 constitution check
+// also fails (GATES_FAILED), so the block is caught by STEP 2 of the supervisor
+// via AUTONOMY_BLOCKED/GATES_FAILED — the canonical path for missing evidence.
+console.log("\n── E10: Evidence gate — false evidence_available_when_required blocks ──");
+{
+  const evidenceGateFalse = { ...allGatesOk(), evidence_available_when_required: false };
+  const result = executeGitHubPrAction({
+    action: "open_pr",
+    scope_approved: true,
+    gates_context: evidenceGateFalse,
+  });
+  assert(result.ok === false, "E10a: action blocked when evidence_available_when_required=false");
+  assert(typeof result.error === "string" && result.error.length > 0, "E10a: error code present");
+  // Supervisor sees evidence_sufficient=false (derived from the gate)
+  const svDecision = result.supervisor_enforcement;
+  assert(svDecision != null, "E10a: supervisor_enforcement present in block");
+  if (svDecision) {
+    assert(svDecision.evidence_sufficient === false, "E10a: supervisor reports evidence_sufficient=false");
+    assert(svDecision.allowed === false, "E10a: supervisor allowed=false");
+  }
+}
+// E10b: verify the allowed path still works with all gates including evidence=true
 {
   const result = executeGitHubPrAction({
     action: "open_pr",
     scope_approved: true,
-    gates_context: allGatesOk(),
+    gates_context: allGatesOk(),  // includes evidence_available_when_required: true
   });
-  assert(result.ok === true, "E10: action with sufficient evidence is allowed");
+  assert(result.ok === true, "E10b: action allowed when evidence_available_when_required=true");
 }
 
 // ── E11: Supervisor enforcement in browser arm block ─────────────────────
