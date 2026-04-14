@@ -111,7 +111,7 @@ function NoVncViewport({ session }) {
         src={noVncUrl}
         title="noVNC — Sessão ao vivo do Browser Executor"
         style={s.viewportIframe}
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox="allow-scripts allow-forms"
         data-testid="novnc-iframe"
       />
     </div>

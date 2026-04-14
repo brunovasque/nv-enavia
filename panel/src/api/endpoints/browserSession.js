@@ -36,7 +36,7 @@ export const BROWSER_SESSION_STATUS = {
 
 // ── Map runtime arm status → panel session status ─────────────────────────
 function mapArmStatusToSessionStatus(armState) {
-  if (!armState || !armState.ok) return BROWSER_SESSION_STATUS.ERRO;
+  if (!armState?.ok) return BROWSER_SESSION_STATUS.ERRO;
 
   const status = armState.status;
   const exec = armState.last_execution;
@@ -62,7 +62,7 @@ function mapArmStatusToSessionStatus(armState) {
 
 // ── Normalize the raw arm state into a panel-consumable session object ────
 function normalizeSessionFromArm(armState) {
-  if (!armState || !armState.ok) {
+  if (!armState?.ok) {
     return {
       active: false,
       sessionStatus: BROWSER_SESSION_STATUS.SEM_SESSAO,
@@ -141,8 +141,9 @@ export async function fetchBrowserSession() {
 
     if (!res.ok || !res.data) {
       return {
-        ok: true,
+        ok: false,
         data: normalizeSessionFromArm(null),
+        error: { code: "BROWSER_SESSION_UNREACHABLE", message: "Browser arm não alcançável." },
         meta: { durationMs: Date.now() - t0, source: "real", reachable: false },
       };
     }

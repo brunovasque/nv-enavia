@@ -34,6 +34,8 @@ export function useBrowserSession() {
         setSession(result.data);
         setError(null);
       } else {
+        // Even when unreachable, show the normalized idle session data
+        if (result.data) setSession(result.data);
         setError(result.error || result.data?.error || "Falha ao consultar sessão do browser.");
       }
       setLastUpdated(new Date().toISOString());
