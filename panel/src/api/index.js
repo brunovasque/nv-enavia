@@ -29,6 +29,7 @@ export { fetchExecution, postDecision, approveMerge, EXECUTION_STATUS }  from ".
 export { fetchMemory,    MEMORY_STATES, MEMORY_FILTERS } from "./endpoints/memory.js";
 export { sendBridge, fetchBridgeStatus }    from "./endpoints/bridge.js";
 export { fetchHealth }                      from "./endpoints/health.js";
+export { fetchBrowserSession, BROWSER_SESSION_STATUS } from "./endpoints/browserSession.js";
 
 // ── Plan mapper — public surface for page-level snapshot translation ─────────
 // Pages must import mapPlannerSnapshot from here, NOT from api/mappers/plan.js.

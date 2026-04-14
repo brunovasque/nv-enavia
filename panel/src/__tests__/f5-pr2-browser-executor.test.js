@@ -1,38 +1,57 @@
 // =============================================================================
 // ENAVIA Panel — F5-PR2 smoke tests: BrowserExecutorPanel
 //
-// Verifica acceptance criteria da Frente 5 PR2 — Integração Browser Executor + noVNC:
+// Originally tested the demo/explanatory panel. Updated in P25-PR3 to test
+// the real session panel. The mock data shape tests remain unchanged for
+// backward compatibility.
+//
+// Updated acceptance criteria (P25-PR3):
 //   1. BrowserExecutorPanel renderiza sem crash (estado idle)
-//   2. BrowserExecutorPanel renderiza sem crash (estado navigating)
-//   3. BrowserExecutorPanel renderiza sem crash (estado acting)
-//   4. BrowserExecutorPanel renderiza sem crash (estado blocked)
-//   5. BrowserExecutorPanel renderiza sem crash (estado completed)
 //   6. Estado idle exibe mensagem de standby honesta
 //   7. Estado idle exibe domínio operacional run.nv-imoveis.com/*
-//   8. Estado ativo exibe sessão ID
-//   9. Estado ativo exibe ação atual
-//  10. Estado ativo exibe alvo atual
-//  11. Estado ativo exibe evidência textual
-//  12. Estado ativo exibe log de passos
-//  13. Estado bloqueado exibe erro/bloqueio
-//  14. Estado bloqueado exibe código de erro
-//  15. Campo ausente exibe 'sem dado disponível' (honesto)
-//  16. Referência ao noVNC é visível — "noVNC"
-//  17. Separação noVNC/painel é explícita — "Painel Explicativo" ou "EXPLICAÇÃO"
-//  18. Domínio operacional aparece corretamente em sessão ativa
+//  16. Referência ao noVNC é visível
+//  17. Browser Executor é visível no título
 //  19. Sem regressão F5-PR1 — OperationalLiveCard não é afetado
 //  20. Sem regressão P18 — mockMemory não é afetado
-//  21. mockBrowserSession.js exporta BROWSER_STATUS com todos os estados
-//  22. mockBrowserSession.js exporta BROWSER_OPERATIONAL_DOMAIN correto
-//  23. mockBrowserSession.js sessions idle=null, demais com shape esperado
-//  24. Estado completed exibe evidência de dados extraídos
+//  21-24. mockBrowserSession shape tests (unchanged)
 // =============================================================================
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
+
+// ── Mock the useBrowserSession hook for SSR tests ──────────────────────────
+vi.mock("../browser/useBrowserSession", () => ({
+  useBrowserSession: () => ({
+    session: {
+      active: false,
+      sessionStatus: "sem_sessao",
+      sessionId: null,
+      operationalDomain: "run.nv-imoveis.com",
+      currentAction: null,
+      executionStatus: null,
+      error: null,
+      lastActionTs: null,
+      raw: null,
+    },
+    loading: false,
+    error: null,
+    source: "unconfigured",
+    refresh: () => {},
+    lastUpdated: "2026-04-14T00:00:00Z",
+  }),
+  BROWSER_SESSION_STATUS: {
+    SEM_SESSAO: "sem_sessao",
+    NAVEGANDO: "navegando",
+    AGINDO: "agindo",
+    AGUARDANDO: "aguardando",
+    BLOQUEADO: "bloqueado",
+    CONCLUIDO: "concluido",
+    ERRO: "erro",
+  },
+}));
 
 import BrowserExecutorPanel from "../browser/BrowserExecutorPanel.jsx";
 import {
@@ -43,9 +62,6 @@ import {
 } from "../browser/mockBrowserSession.js";
 
 // ── Render helper ──────────────────────────────────────────────────────────
-// BrowserExecutorPanel usa useState mas não usa Router — renderToStaticMarkup
-// captura o estado inicial (idle). Para testar outros estados, testamos o
-// mock data shape diretamente (abordagem usada em P18 e F5-PR1).
 
 function renderPanel() {
   return renderToStaticMarkup(
@@ -62,7 +78,7 @@ describe("F5-PR2 — BrowserExecutorPanel render", () => {
 
   it("6. estado idle exibe mensagem de standby honesta", () => {
     const html = renderPanel();
-    expect(html).toContain("Nenhuma sessão ativa");
+    expect(html).toContain("Arm em standby");
   });
 
   it("7. estado idle exibe domínio operacional run.nv-imoveis.com/*", () => {
@@ -75,19 +91,14 @@ describe("F5-PR2 — BrowserExecutorPanel render", () => {
     expect(html).toContain("noVNC");
   });
 
-  it("17. separação noVNC/painel é explícita — badge EXPLICAÇÃO", () => {
-    const html = renderPanel();
-    expect(html).toContain("EXPLICAÇÃO");
-  });
-
-  it("17. título do painel explicativo é visível", () => {
+  it("17. título do painel contém Browser Executor", () => {
     const html = renderPanel();
     expect(html).toContain("Browser Executor");
   });
 
-  it("17. 'Painel Explicativo' aparece no cabeçalho", () => {
+  it("17. painel mostra 'Painel Real' (P25-PR3 — sessão real)", () => {
     const html = renderPanel();
-    expect(html).toContain("Painel Explicativo");
+    expect(html).toContain("Painel Real");
   });
 });
 
