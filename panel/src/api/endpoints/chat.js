@@ -68,7 +68,7 @@ async function mockChatSend(text, t0) {
  * a root field. This function derives the chat bubble content from real backend
  * fields in priority order:
  *   1. canonicalPlan.chat_reply (PM6 conversational surface) — preferred
- *   2. canonicalPlan.reason (PM4 reasoning summary) — fallback
+ *   2. canonicalPlan.reason (classification reasoning from PM4) — fallback
  *   3. Generic acknowledgement — last resort
  *
  * NOTE: canonicalPlan.next_action is an internal operational directive for the
