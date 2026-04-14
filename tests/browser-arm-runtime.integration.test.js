@@ -82,7 +82,7 @@ console.log("============================================================\n");
 // ── R1: Allowed action within scope ──
 console.log("R1. executeBrowserArmAction — allowed action (navigate)");
 {
-  const r = executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === true, "result ok");
   assert(r.execution_status === "executed", "execution_status = executed");
   assert(r.arm_id === BROWSER_ARM_ID, "arm_id is canonical");
@@ -91,7 +91,7 @@ console.log("R1. executeBrowserArmAction — allowed action (navigate)");
 // ── R2: Allowed action within scope (search) ──
 console.log("R2. executeBrowserArmAction — allowed action (search)");
 {
-  const r = executeBrowserArmAction({ action: "search", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "search", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === true, "result ok");
   assert(r.action === "search", "action is search");
 }
@@ -99,7 +99,7 @@ console.log("R2. executeBrowserArmAction — allowed action (search)");
 // ── R3: Blocked out of scope ──
 console.log("R3. executeBrowserArmAction — blocked: out of scope");
 {
-  const r = executeBrowserArmAction({ action: "navigate", scope_approved: false, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "navigate", scope_approved: false, gates_context: ALL_GATES_OK });
   assert(r.ok === false, "blocked");
   assert(r.error === "BROWSER_ARM_BLOCKED", "error code correct");
   assert(r.suggestion_required === true, "suggestion_required for out of scope");
@@ -108,21 +108,21 @@ console.log("R3. executeBrowserArmAction — blocked: out of scope");
 // ── R4: Blocked drift ──
 console.log("R4. executeBrowserArmAction — blocked: drift detected");
 {
-  const r = executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: ALL_GATES_OK, drift_detected: true });
+  const r = await executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: ALL_GATES_OK, drift_detected: true });
   assert(r.ok === false, "blocked by drift");
 }
 
 // ── R5: Blocked regression ──
 console.log("R5. executeBrowserArmAction — blocked: regression detected");
 {
-  const r = executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: ALL_GATES_OK, regression_detected: true });
+  const r = await executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: ALL_GATES_OK, regression_detected: true });
   assert(r.ok === false, "blocked by regression");
 }
 
 // ── R6: Blocked prohibited ──
 console.log("R6. executeBrowserArmAction — blocked: prohibited action (exit_scope)");
 {
-  const r = executeBrowserArmAction({ action: "exit_scope", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "exit_scope", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === false, "blocked");
   assert(r.error === "BROWSER_ARM_BLOCKED", "error code correct");
 }
@@ -130,7 +130,7 @@ console.log("R6. executeBrowserArmAction — blocked: prohibited action (exit_sc
 // ── R7: Not in browser arm ──
 console.log("R7. executeBrowserArmAction — blocked: action not in browser arm (merge_to_main)");
 {
-  const r = executeBrowserArmAction({ action: "merge_to_main", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "merge_to_main", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === false, "blocked");
   assert(r.suggestion_required === true, "suggestion_required for action outside arm");
 }
@@ -138,7 +138,7 @@ console.log("R7. executeBrowserArmAction — blocked: action not in browser arm 
 // ── R8: Conditional expand_scope without permission ──
 console.log("R8. executeBrowserArmAction — blocked: expand_scope without permission");
 {
-  const r = executeBrowserArmAction({ action: "expand_scope", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "expand_scope", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === false, "blocked without permission");
   assert(r.suggestion_required === true, "suggestion_required for expand_scope");
 }
@@ -146,7 +146,7 @@ console.log("R8. executeBrowserArmAction — blocked: expand_scope without permi
 // ── R9: Conditional expand_scope with permission ──
 console.log("R9. executeBrowserArmAction — allowed: expand_scope with permission");
 {
-  const r = executeBrowserArmAction({ action: "expand_scope", scope_approved: true, gates_context: ALL_GATES_OK, user_permission: true });
+  const r = await executeBrowserArmAction({ action: "expand_scope", scope_approved: true, gates_context: ALL_GATES_OK, user_permission: true });
   assert(r.ok === true, "allowed with permission");
   assert(r.execution_status === "executed", "executed");
 }
@@ -154,28 +154,28 @@ console.log("R9. executeBrowserArmAction — allowed: expand_scope with permissi
 // ── R10: Conditional delete without justification ──
 console.log("R10. executeBrowserArmAction — blocked: delete without justification");
 {
-  const r = executeBrowserArmAction({ action: "delete", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "delete", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === false, "blocked without justification");
 }
 
 // ── R11: Conditional delete with justification ──
 console.log("R11. executeBrowserArmAction — allowed: delete with justification");
 {
-  const r = executeBrowserArmAction({ action: "delete", scope_approved: true, gates_context: ALL_GATES_OK, justification: "Remover cache temporário" });
+  const r = await executeBrowserArmAction({ action: "delete", scope_approved: true, gates_context: ALL_GATES_OK, justification: "Remover cache temporário" });
   assert(r.ok === true, "allowed with justification");
 }
 
 // ── R12: Suggestion required ──
 console.log("R12. executeBrowserArmAction — suggestion_required for out of scope");
 {
-  const r = executeBrowserArmAction({ action: "search", scope_approved: false, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "search", scope_approved: false, gates_context: ALL_GATES_OK });
   assert(r.suggestion_required === true, "suggestion_required = true");
 }
 
 // ── R13: External base present ──
 console.log("R13. executeBrowserArmAction — external_base present when allowed");
 {
-  const r = executeBrowserArmAction({ action: "open_page", scope_approved: true, gates_context: ALL_GATES_OK });
+  const r = await executeBrowserArmAction({ action: "open_page", scope_approved: true, gates_context: ALL_GATES_OK });
   assert(r.ok === true, "allowed");
   assert(r.external_base === BROWSER_EXTERNAL_BASE, "external_base present");
   assert(r.external_base.host === "run.nv-imoveis.com", "external_base host correct");
@@ -187,7 +187,7 @@ console.log("R14. executeBrowserArmAction — all 9 allowed actions pass in runt
 {
   let allPass = true;
   for (const a of BROWSER_ALLOWED_ACTIONS) {
-    const r = executeBrowserArmAction({ action: a, scope_approved: true, gates_context: ALL_GATES_OK });
+    const r = await executeBrowserArmAction({ action: a, scope_approved: true, gates_context: ALL_GATES_OK });
     if (!r.ok) allPass = false;
     assert(r.ok === true, `${a} passes runtime`);
     assert(r.arm_id === BROWSER_ARM_ID, `${a} correct arm_id`);
@@ -252,7 +252,7 @@ console.log("R20. handleBrowserArmAction — missing action returns 400");
 // ── R21: P23 gates fail ──
 console.log("R21. executeBrowserArmAction — blocked: P23 gates fail");
 {
-  const r = executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: GATES_FAIL });
+  const r = await executeBrowserArmAction({ action: "navigate", scope_approved: true, gates_context: GATES_FAIL });
   assert(r.ok === false, "blocked by P23 gates");
   assert(r.error === "BROWSER_ARM_BLOCKED", "error code correct");
 }

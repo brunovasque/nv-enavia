@@ -4026,22 +4026,192 @@ async function handleApproveMerge(request) {
 // 🌐 P25 — Browser Arm Runtime Functions
 //
 // Separate from Cloudflare executor (executeCurrentMicroPr) and GitHub arm (P24).
-// This is the minimal runtime wiring for the Browser Arm contract.
-// Does NOT implement full browser execution — only contract enforcement layer.
+// P25-PR1 established contract enforcement layer.
+// P25-PR2 adds the REAL operational bridge: Enavia governs → browser executes.
+//
+// Bridge flow:
+//   1. enforceBrowserArm() validates action (P23/P25 gates)
+//   2. If allowed: build canonical payload → call external browser executor
+//   3. External browser at BROWSER_EXECUTOR_URL (run.nv-imoveis.com/*) executes
+//   4. Enavia consumes canonical response → returns to runtime
+//   5. Failures are separated: enforcement | connectivity | execution
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// CANONICAL PAYLOAD SHAPE — what Enavia sends to the browser executor
+//
+// Minimal, consistent, canonical. No bloat.
+// ---------------------------------------------------------------------------
+const BROWSER_EXECUTOR_PAYLOAD_SHAPE = {
+  required_fields: ["arm_id", "action", "external_base", "request_id", "timestamp"],
+  optional_fields: ["params", "execution_context"],
+};
+
+// ---------------------------------------------------------------------------
+// CANONICAL RESPONSE SHAPE — what Enavia expects from the browser executor
+//
+// The browser executor MUST return at minimum:
+//   { ok, execution_status, action }
+// Additional fields are consumed when present.
+// ---------------------------------------------------------------------------
+const BROWSER_EXECUTOR_RESPONSE_SHAPE = {
+  required_fields: ["ok", "execution_status", "action"],
+  optional_fields: ["target_url", "result_summary", "evidence", "error", "message"],
+};
+
+// ---------------------------------------------------------------------------
+// In-memory state for Browser Arm — lightweight, no heavy persistence.
+// Tracks last execution result for getBrowserArmState().
+// Reset on worker restart (acceptable for this stage).
+// ---------------------------------------------------------------------------
+let _browserArmLastExecution = null;
+
+// ---------------------------------------------------------------------------
+// buildBrowserExecutorPayload({ action, params, execution_context })
+//
+// Builds the canonical payload to send to the external browser executor.
+// Always includes arm_id, action, external_base, request_id, timestamp.
+// ---------------------------------------------------------------------------
+function buildBrowserExecutorPayload({ action, params = null, execution_context = null } = {}) {
+  const payload = {
+    arm_id: BROWSER_ARM_ID,
+    action,
+    external_base: BROWSER_EXTERNAL_BASE.base_url,
+    request_id: `ba_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    timestamp: new Date().toISOString(),
+  };
+  if (params !== null && params !== undefined) {
+    payload.params = params;
+  }
+  if (execution_context !== null && execution_context !== undefined) {
+    payload.execution_context = execution_context;
+  }
+  return payload;
+}
+
+// ---------------------------------------------------------------------------
+// validateBrowserExecutorResponse(response)
+//
+// Validates the response from the external browser executor against the
+// canonical response shape. Returns normalized result.
+// ---------------------------------------------------------------------------
+function validateBrowserExecutorResponse(data) {
+  if (!data || typeof data !== "object") {
+    return {
+      valid: false,
+      reason: "Resposta do browser executor não é um objeto válido.",
+    };
+  }
+  const missing = BROWSER_EXECUTOR_RESPONSE_SHAPE.required_fields.filter(
+    (f) => data[f] === undefined || data[f] === null,
+  );
+  if (missing.length > 0) {
+    return {
+      valid: false,
+      reason: `Resposta do browser executor incompleta — campos faltantes: ${missing.join(", ")}.`,
+      missing_fields: missing,
+    };
+  }
+  return { valid: true, reason: "Resposta válida." };
+}
+
+// ---------------------------------------------------------------------------
+// callBrowserExecutor(url, payload)
+//
+// Makes the real HTTP call to the external browser executor.
+// Returns { ok, data, error_type, message } with clear failure separation.
+//
+// Failure types:
+//   - BRIDGE_CONNECTIVITY_ERROR: fetch failed (network, DNS, timeout)
+//   - BRIDGE_HTTP_ERROR: non-2xx status from browser executor
+//   - BRIDGE_INVALID_RESPONSE: response body is not valid JSON or shape
+//   - BRIDGE_EXECUTOR_ERROR: browser executor returned ok=false
+// ---------------------------------------------------------------------------
+async function callBrowserExecutor(url, payload) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      data: null,
+      error_type: "BRIDGE_CONNECTIVITY_ERROR",
+      message: `Falha de conectividade com o browser executor: ${err.message || String(err)}`,
+    };
+  }
+
+  if (!response.ok) {
+    let errorBody = null;
+    try { errorBody = await response.text(); } catch { /* ignore */ }
+    return {
+      ok: false,
+      data: null,
+      error_type: "BRIDGE_HTTP_ERROR",
+      message: `Browser executor retornou HTTP ${response.status}: ${errorBody || "sem corpo"}`,
+      http_status: response.status,
+    };
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return {
+      ok: false,
+      data: null,
+      error_type: "BRIDGE_INVALID_RESPONSE",
+      message: "Resposta do browser executor não é JSON válido.",
+    };
+  }
+
+  const validation = validateBrowserExecutorResponse(data);
+  if (!validation.valid) {
+    return {
+      ok: false,
+      data,
+      error_type: "BRIDGE_INVALID_RESPONSE",
+      message: validation.reason,
+    };
+  }
+
+  if (!data.ok) {
+    return {
+      ok: false,
+      data,
+      error_type: "BRIDGE_EXECUTOR_ERROR",
+      message: data.message || data.error || "Browser executor retornou ok=false.",
+    };
+  }
+
+  return {
+    ok: true,
+    data,
+    error_type: null,
+    message: null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // executeBrowserArmAction({ action, scope_approved, gates_context,
 //                           justification, user_permission,
-//                           drift_detected, regression_detected })
+//                           drift_detected, regression_detected,
+//                           params, execution_context, env })
 //
 // Runtime entry point for any Browser Arm action.
-// Calls enforceBrowserArm() first; if blocked, returns immediately.
-// If allowed, returns the enforcement result with execution_status.
+// 1. Calls enforceBrowserArm() first; if blocked, returns immediately.
+// 2. If allowed AND env.BROWSER_EXECUTOR_URL is configured:
+//    → builds canonical payload → calls external browser executor
+//    → returns real execution result
+// 3. If allowed but no BROWSER_EXECUTOR_URL:
+//    → returns enforcement-only result (backwards-compatible with PR1 tests)
 //
 // This is the P25 equivalent of executeGitHubPrAction() for P24.
 // ---------------------------------------------------------------------------
-function executeBrowserArmAction({
+async function executeBrowserArmAction({
   action,
   scope_approved,
   gates_context,
@@ -4049,6 +4219,9 @@ function executeBrowserArmAction({
   user_permission = false,
   drift_detected = false,
   regression_detected = false,
+  params = null,
+  execution_context = null,
+  env = null,
 } = {}) {
   const enforcement = enforceBrowserArm({
     action,
@@ -4070,13 +4243,75 @@ function executeBrowserArmAction({
     };
   }
 
+  // ── Resolve BROWSER_EXECUTOR_URL ──
+  const executorUrl = (env && env.BROWSER_EXECUTOR_URL)
+    ? env.BROWSER_EXECUTOR_URL
+    : null;
+
+  // If no executor URL configured, return enforcement-only result (PR1 compat)
+  if (!executorUrl) {
+    return {
+      ok: true,
+      execution_status: "executed",
+      action: enforcement.action,
+      arm_id: enforcement.arm_id,
+      external_base: BROWSER_EXTERNAL_BASE,
+      enforcement,
+    };
+  }
+
+  // ── Build canonical payload ──
+  const payload = buildBrowserExecutorPayload({
+    action: enforcement.action,
+    params,
+    execution_context,
+  });
+
+  // ── Call external browser executor ──
+  const bridgeResult = await callBrowserExecutor(executorUrl, payload);
+
+  // ── Update in-memory state ──
+  _browserArmLastExecution = {
+    action: enforcement.action,
+    timestamp: payload.timestamp,
+    request_id: payload.request_id,
+    ok: bridgeResult.ok,
+    execution_status: bridgeResult.ok
+      ? (bridgeResult.data && bridgeResult.data.execution_status) || "executed"
+      : "failed",
+    error_type: bridgeResult.error_type,
+    error_message: bridgeResult.message,
+  };
+
+  if (!bridgeResult.ok) {
+    return {
+      ok: false,
+      error: "BROWSER_BRIDGE_FAILED",
+      error_type: bridgeResult.error_type,
+      message: bridgeResult.message,
+      action: enforcement.action,
+      arm_id: enforcement.arm_id,
+      external_base: BROWSER_EXTERNAL_BASE,
+      enforcement,
+      payload_sent: payload,
+    };
+  }
+
+  // ── Success — return real execution result ──
+  const exData = bridgeResult.data;
   return {
     ok: true,
-    execution_status: "executed",
-    action: enforcement.action,
+    execution_status: exData.execution_status,
+    action: exData.action || enforcement.action,
     arm_id: enforcement.arm_id,
     external_base: BROWSER_EXTERNAL_BASE,
     enforcement,
+    browser_result: {
+      target_url: exData.target_url || null,
+      result_summary: exData.result_summary || null,
+      evidence: exData.evidence || null,
+    },
+    request_id: payload.request_id,
   };
 }
 
@@ -4084,14 +4319,37 @@ function executeBrowserArmAction({
 // getBrowserArmState()
 //
 // Returns the current canonical state of the Browser Arm.
-// Minimal implementation: returns the initial state shape.
-// Future: read from KV or in-memory state.
+// Includes last execution tracking (in-memory, reset on worker restart).
 // ---------------------------------------------------------------------------
 function getBrowserArmState() {
+  const base = { ...BROWSER_ARM_STATE_SHAPE.initial_state };
+
+  if (_browserArmLastExecution) {
+    base.status = _browserArmLastExecution.ok ? "active" : "error";
+    base.last_action = _browserArmLastExecution.action;
+    base.last_action_ts = _browserArmLastExecution.timestamp;
+    base.last_execution = {
+      ok: _browserArmLastExecution.ok,
+      execution_status: _browserArmLastExecution.execution_status,
+      request_id: _browserArmLastExecution.request_id,
+      error_type: _browserArmLastExecution.error_type || null,
+      error_message: _browserArmLastExecution.error_message || null,
+    };
+  }
+
   return {
     ok: true,
-    ...BROWSER_ARM_STATE_SHAPE.initial_state,
+    ...base,
   };
+}
+
+// ---------------------------------------------------------------------------
+// resetBrowserArmState()
+//
+// Resets in-memory Browser Arm state. Used for testing only.
+// ---------------------------------------------------------------------------
+function resetBrowserArmState() {
+  _browserArmLastExecution = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -4099,9 +4357,9 @@ function getBrowserArmState() {
 //
 // Route handler for POST /browser-arm/action.
 // Extracts enforcement fields from request body and dispatches
-// to executeBrowserArmAction().
+// to executeBrowserArmAction(). Passes env for BROWSER_EXECUTOR_URL.
 // ---------------------------------------------------------------------------
-async function handleBrowserArmAction(request, _env) {
+async function handleBrowserArmAction(request, env) {
   let body;
   try {
     body = await request.json();
@@ -4120,6 +4378,8 @@ async function handleBrowserArmAction(request, _env) {
     user_permission = false,
     drift_detected = false,
     regression_detected = false,
+    params = null,
+    execution_context = null,
   } = body;
 
   if (!action || typeof action !== "string") {
@@ -4153,7 +4413,7 @@ async function handleBrowserArmAction(request, _env) {
     };
   }
 
-  const result = executeBrowserArmAction({
+  const result = await executeBrowserArmAction({
     action,
     scope_approved,
     gates_context,
@@ -4161,10 +4421,21 @@ async function handleBrowserArmAction(request, _env) {
     user_permission,
     drift_detected,
     regression_detected,
+    params,
+    execution_context,
+    env: env || null,
   });
 
+  // Bridge failures → 502 (bad gateway)
+  // Enforcement blocks → 403
+  // Success → 200
+  let status = 200;
+  if (!result.ok) {
+    status = result.error === "BROWSER_BRIDGE_FAILED" ? 502 : 403;
+  }
+
   return {
-    status: result.ok ? 200 : 403,
+    status,
     body: result,
   };
 }
@@ -4262,4 +4533,11 @@ export {
   executeBrowserArmAction,
   handleBrowserArmAction,
   getBrowserArmState,
+  resetBrowserArmState,
+  // P25-PR2 — Bridge internals (exported for testing)
+  buildBrowserExecutorPayload,
+  validateBrowserExecutorResponse,
+  callBrowserExecutor,
+  BROWSER_EXECUTOR_PAYLOAD_SHAPE,
+  BROWSER_EXECUTOR_RESPONSE_SHAPE,
 };
