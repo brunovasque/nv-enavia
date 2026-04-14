@@ -1,5 +1,5 @@
 // ============================================================================
-// BrowserExecutorPanel — P25-PR5 (Browser Arm — notificações reais)
+// BrowserExecutorPanel — P25-PR8 (Browser Arm — melhoria da UX do feed operacional)
 //
 // Painel operacional do Browser Executor com sessão REAL e feed operacional.
 //
@@ -32,6 +32,12 @@
 //   - NotificationHistory: lista in-session de todos os eventos reais
 //   - Fonte: notificationStore._history (in-memory, reseta ao recarregar)
 //   - Sem backend novo. Panel-only.
+//
+// UX do feed operacional (P25-PR8):
+//   - Hierarquia visual: status (destacado) > ação > url > resultado
+//   - Status como badge colorido (usa STATUS_META — deixa óbvio o estado atual)
+//   - "Último update" movido para linha dedicada no rodapé do card (mais visível)
+//   - BrowserErrorCard suprimido quando PermissionBlockCard já cobre o bloqueio
 //
 // Domínios operacionais:
 //   noVNC  → browser.nv-imoveis.com/novnc/vnc.html (viewer do VNC desktop)
@@ -220,32 +226,63 @@ function BrowserIdleState({ domain }) {
   );
 }
 
-// ── Operational Feed Card (P25-PR4) ────────────────────────────────────────
+// ── Operational Feed Card (P25-PR4 / P25-PR8) ─────────────────────────────
 // The real operational feed of the Browser Executor.
 // All fields come from the real backend shape via /browser-arm/state.
 // Fields that don't exist in the runtime show "sem dado disponível" — never fake.
 //
+// P25-PR8 UX improvements (surgical):
+//   - Hierarquia visual: status (destacado como badge) → ação → url → resultado
+//   - "Último update" movido para linha dedicada no rodapé (mais visível)
+//   - Status badge colorido via STATUS_META (torna o estado atual imediatamente óbvio)
+//
 // Fields:
+//   executionStatus → exec.execution_status (real) — MOVED TO FIRST, highlighted badge
 //   currentAction   → armState.last_action (real)
-//   executionStatus → exec.execution_status (real)
 //   targetUrl       → exec.target_url (real, when present)
 //   resultSummary   → exec.result_summary (real, when present)
 //
 function OperationalFeedCard({ session }) {
+  // Status gets special highlighted treatment (P25-PR8): badge colored by STATUS_META.
+  // Map executionStatus back to a session status for color lookup.
+  const statusMeta = STATUS_META[session.sessionStatus] || DEFAULT_STATUS_META;
+
+  // Secondary fields rendered as plain rows below the status highlight.
   const fields = [
-    { key: "currentAction",   label: "Ação atual",           icon: "▷" },
-    { key: "executionStatus", label: "Status atual",          icon: "◎", mono: true },
-    { key: "targetUrl",       label: "Página / URL atual",    icon: "🔗", mono: true },
-    { key: "resultSummary",   label: "Resultado curto",       icon: "✓" },
+    { key: "currentAction",   label: "Ação atual",     icon: "▷" },
+    { key: "targetUrl",       label: "URL atual",       icon: "🔗", mono: true },
+    { key: "resultSummary",   label: "Resultado curto", icon: "✓" },
   ];
+
+  const statusValue = session.executionStatus ?? null;
+  const statusAbsent = statusValue == null || statusValue === "";
 
   return (
     <div style={s.card} data-testid="operational-feed-card">
       <div style={s.cardHeader}>
         <p style={s.cardTitle}>Feed Operacional</p>
-        {session.lastActionTs && (
-          <span style={s.stepBadge}>
-            Último update: {formatTs(session.lastActionTs)}
+      </div>
+
+      {/* Status highlight row (P25-PR8) — primary visual anchor of the feed */}
+      <div style={s.feedStatusRow} data-testid="feed-status-row">
+        <span style={s.feedStatusLabel}>Status atual</span>
+        {statusAbsent ? (
+          <span style={s.fieldAbsent}>sem dado disponível</span>
+        ) : (
+          <span
+            style={{
+              ...s.feedStatusBadge,
+              color: statusMeta.color,
+              background: statusMeta.bg,
+              borderColor: statusMeta.border,
+            }}
+            data-testid="feed-status-badge"
+          >
+            <span
+              style={{ ...s.feedStatusDot, background: statusMeta.dot }}
+              aria-hidden="true"
+            />
+            {statusValue}
           </span>
         )}
       </div>
@@ -282,6 +319,14 @@ function OperationalFeedCard({ session }) {
           );
         })}
       </div>
+
+      {/* Último update — dedicated bottom row (P25-PR8: mais visível que o badge anterior) */}
+      {session.lastActionTs && (
+        <div style={s.feedTimestampRow} data-testid="feed-timestamp-row">
+          <span style={s.feedTimestampLabel}>Último update</span>
+          <span style={s.feedTimestampValue}>{formatTs(session.lastActionTs)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -528,7 +573,7 @@ function formatTs(iso) {
 // ── Main component ─────────────────────────────────────────────────────────
 
 /**
- * BrowserExecutorPanel — P25-PR3 / P25-PR6
+ * BrowserExecutorPanel — P25-PR3 / P25-PR6 / P25-PR8
  *
  * Painel real do Browser Executor.
  * noVNC = viewport ao vivo. Painel = estado real + metadados reais.
@@ -537,6 +582,9 @@ function formatTs(iso) {
  * P25-PR6: grant workflow — honesto e cirúrgico.
  * O botão "Conceder permissão" aparece SOMENTE para bloqueios que user_permission
  * pode realmente resolver. Sem placebo para bloqueios irresolvíveis pelo usuário.
+ *
+ * P25-PR8: UX do feed operacional — hierarquia visual, status destacado,
+ * último update em linha dedicada, sem ruído duplicado de BrowserErrorCard + PermissionBlockCard.
  */
 export default function BrowserExecutorPanel() {
   const { session, loading, error, source, refresh, lastUpdated } = useBrowserSession();
@@ -690,8 +738,9 @@ export default function BrowserExecutorPanel() {
         <div style={s.body}>
           {/* Main column */}
           <div style={s.main}>
-            {/* Error / blocker banner */}
-            {isActive && hasError && session?.error && (
+            {/* Error / blocker banner — suppressed when PermissionBlockCard already covers it.
+                P25-PR8: avoids duplicate noise when block + error coexist for the same state. */}
+            {isActive && hasError && session?.error && !session?.block && (
               <BrowserErrorCard error={session.error} />
             )}
 
@@ -1118,6 +1167,70 @@ const s = {
     border: "1px solid var(--color-primary-border)",
     padding: "2px 8px",
     borderRadius: "4px",
+  },
+
+  // ── Feed status highlight (P25-PR8) ──────────────────────────────────────
+  // Status is the primary anchor of the feed — rendered as a colored badge
+  // so the operator can scan "what state is the arm in" at a glance.
+  feedStatusRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    padding: "10px 0 12px",
+    borderBottom: "1px solid var(--border)",
+  },
+  feedStatusLabel: {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "var(--text-muted)",
+    letterSpacing: "0.8px",
+    textTransform: "uppercase",
+    flexShrink: 0,
+  },
+  feedStatusBadge: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    fontWeight: 600,
+    padding: "4px 12px",
+    borderRadius: "12px",
+    border: "1px solid",
+    letterSpacing: "0.3px",
+  },
+  feedStatusDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    flexShrink: 0,
+  },
+
+  // ── Feed timestamp row (P25-PR8) ─────────────────────────────────────────
+  // "Último update" moved from tiny cardHeader badge to a dedicated bottom row
+  // so it's consistently visible and easy to scan.
+  feedTimestampRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    paddingTop: "10px",
+    borderTop: "1px solid var(--border)",
+    marginTop: "2px",
+  },
+  feedTimestampLabel: {
+    fontSize: "10px",
+    fontWeight: 700,
+    color: "var(--text-muted)",
+    letterSpacing: "0.8px",
+    textTransform: "uppercase",
+  },
+  feedTimestampValue: {
+    fontSize: "11px",
+    fontFamily: "var(--font-mono)",
+    color: "var(--color-primary)",
+    fontWeight: 600,
+    letterSpacing: "0.3px",
   },
 
   // Fields
