@@ -14,6 +14,7 @@
 import { getEnaviaIdentity } from "./enavia-identity.js";
 import { getEnaviaCapabilities } from "./enavia-capabilities.js";
 import { getEnaviaConstitution } from "./enavia-constitution.js";
+import { renderOperationalAwarenessBlock } from "./operational-awareness.js";
 
 /**
  * Monta o contexto cognitivo completo da Enavia em runtime.
@@ -85,13 +86,16 @@ export function buildCognitivePromptBlock(opts = {}) {
  *   - contexto dinâmico da sessão (quando fornecido)
  *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
  *
- * @param {{ ownerName?: string, context?: object }} [opts]
+ * @param {{ ownerName?: string, context?: object, operational_awareness?: object }} [opts]
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
   const { identity, capabilities, constitution } = buildCognitiveRuntime();
   const ownerName = opts.ownerName || "usuário";
   const context = opts.context && typeof opts.context === "object" ? opts.context : {};
+  const operational_awareness = opts.operational_awareness && typeof opts.operational_awareness === "object"
+    ? opts.operational_awareness
+    : null;
 
   const sections = [];
 
@@ -166,6 +170,16 @@ export function buildChatSystemPrompt(opts = {}) {
     );
     for (const cp of contextParts) {
       sections.push(`• ${cp}`);
+    }
+  }
+
+  // === 5b. Operational Awareness (PR4) — estado real dos braços operacionais ===
+  // Injeta o estado real de browser, executor e modo de aprovação no prompt.
+  // Sem awareness = LLM pode prometer execução que não está disponível.
+  if (operational_awareness) {
+    const awarenessBlock = renderOperationalAwarenessBlock(operational_awareness);
+    if (awarenessBlock) {
+      sections.push("", awarenessBlock);
     }
   }
 

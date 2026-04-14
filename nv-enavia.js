@@ -16,6 +16,7 @@ import {
   handleApproveMerge,
   // P25 — Browser Arm
   handleBrowserArmAction,
+  getBrowserArmState,
   getBrowserArmStateWithKV,
 } from "./contract-executor.js";
 
@@ -29,6 +30,7 @@ import { writeMemory } from "./schema/memory-storage.js";
 import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
 import { searchRelevantMemory } from "./schema/memory-read.js";
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
+import { buildOperationalAwareness } from "./schema/operational-awareness.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -3407,6 +3409,13 @@ async function handleChatLLM(request, env) {
     );
   }
 
+  // --- PR4: Operational Awareness ---
+  // Computed before the try block so it's available in both success and error paths.
+  // Pure and synchronous — getBrowserArmState() is in-memory, no I/O overhead.
+  const operationalAwareness = buildOperationalAwareness(env, {
+    browserArmState: getBrowserArmState(),
+  });
+
   try {
     // --- System prompt LLM-first conversacional (PR2) ---
     // Montagem dinâmica via buildChatSystemPrompt: usa a base cognitiva da PR1
@@ -3415,9 +3424,10 @@ async function handleChatLLM(request, env) {
     // como envelope estrutural, sem sufocar a fala natural.
     const ownerName = env.OWNER || "usuário";
 
-    // --- Núcleo Cognitivo Runtime (PR1+PR2) ---
+    // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4) ---
     // System prompt completo: base institucional + tom conversacional + contexto dinâmico
-    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context });
+    // + awareness operacional real (PR4)
+    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness });
 
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
@@ -3569,6 +3579,13 @@ async function handleChatLLM(request, env) {
         session_id: session_id || null,
         pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
         arbitration: arbitrationDecision,
+        operational_awareness: {
+          browser_status:    operationalAwareness.browser.status,
+          browser_can_act:   operationalAwareness.browser.can_act,
+          executor_configured: operationalAwareness.executor.configured,
+          approval_mode:     operationalAwareness.approval.mode,
+          human_gate_active: operationalAwareness.approval.human_gate_active,
+        },
       },
     });
   } catch (err) {
@@ -3592,6 +3609,14 @@ async function handleChatLLM(request, env) {
               ? "planner_forced_level_BC"
               : "planner_blocked_level_A",
           } : null,
+          // Include operational awareness even on LLM failure — computed before try block
+          operational_awareness: {
+            browser_status:      operationalAwareness.browser.status,
+            browser_can_act:     operationalAwareness.browser.can_act,
+            executor_configured: operationalAwareness.executor.configured,
+            approval_mode:       operationalAwareness.approval.mode,
+            human_gate_active:   operationalAwareness.approval.human_gate_active,
+          },
         },
       },
       500
