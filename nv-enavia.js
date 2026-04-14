@@ -3268,6 +3268,9 @@ async function handleChatLLM(request, env) {
 
   try {
     // --- Detecção de intenção de plano ---
+    // NOTE: Simple substring matching is an intentional Phase 1 trade-off.
+    // False positives (e.g. "não quero plano") are acceptable at this stage —
+    // the planner only produces supplementary data alongside the LLM reply.
     const _planSignals = [
       "gere um plano", "gerar plano", "montar plano", "monte um plano",
       "crie um plano", "criar plano", "estruture um plano", "planejar",
@@ -3307,9 +3310,12 @@ Contexto: você está operando dentro do painel da ${systemName}, ambiente de ge
     ];
 
     // --- Chamada LLM ---
+    // Max tokens capped at 1200 to balance response quality with Cloudflare Worker
+    // CPU time limits (~30s). Increase if moving to Unbound or Durable Objects.
+    const CHAT_LLM_MAX_TOKENS = 1200;
     const llmResult = await callChatModel(env, llmMessages, {
       temperature: 0.5,
-      max_tokens: 1200,
+      max_tokens: CHAT_LLM_MAX_TOKENS,
     });
 
     const reply = llmResult.text;
