@@ -30,6 +30,7 @@ import {
   BROWSER_ARM_ID,
   BROWSER_EXTERNAL_BASE,
   BROWSER_ARM_STATE_SHAPE,
+  validateSuggestion,
 } from "./schema/browser-arm-contract.js";
 
 // ---------------------------------------------------------------------------
@@ -4056,7 +4057,7 @@ const BROWSER_EXECUTOR_PAYLOAD_SHAPE = {
 // ---------------------------------------------------------------------------
 const BROWSER_EXECUTOR_RESPONSE_SHAPE = {
   required_fields: ["ok", "execution_status", "action"],
-  optional_fields: ["target_url", "result_summary", "evidence", "error", "message"],
+  optional_fields: ["target_url", "result_summary", "evidence", "error", "message", "suggestions"],
 };
 
 // ---------------------------------------------------------------------------
@@ -4077,6 +4078,55 @@ let _browserArmSuggestions = [];
 // Singleton — one Browser Arm per deployment, no per-contract scope.
 // Uses the same ENAVIA_BRAIN KV binding as all other persistent state.
 const KV_KEY_BROWSER_ARM_STATE = "browser-arm:state";
+
+// ---------------------------------------------------------------------------
+// buildSuggestionFromEnforcement(enforcement)
+//
+// Builds a canonical suggestion object from an enforcement block result when
+// enforcement.suggestion_required is true.
+//
+// This is the real runtime source of suggestions: when the enforcement layer
+// blocks an action that requires user permission/scope expansion, it signals
+// that a suggestion must be created. This function materialises that signal
+// into a SUGGESTION_SHAPE-compliant object that gets stored in
+// _browserArmSuggestions and persisted to KV.
+// ---------------------------------------------------------------------------
+function buildSuggestionFromEnforcement(enforcement) {
+  const levelDefs = {
+    blocked_out_of_scope: {
+      type: "capability",
+      benefit: "Permitir esta ação expande a capacidade operacional do Browser Arm com escopo aprovado.",
+      missing_requirement: "Aprovação explícita de escopo para a ação solicitada.",
+      expected_impact: "Execução da ação bloqueada após aprovação de escopo.",
+    },
+    blocked_not_browser_arm: {
+      type: "integration",
+      benefit: "Roteamento correto da ação para o braço especializado adequado aumenta a eficiência.",
+      missing_requirement: "Identificação e habilitação do braço correto para esta ação.",
+      expected_impact: "Execução da ação pelo braço especializado adequado.",
+    },
+    blocked_conditional_not_met: {
+      type: "capability",
+      benefit: "Permite execução de ação condicionada com justificativa e permissão explícita do usuário.",
+      missing_requirement: "Justificativa válida e permissão do usuário para a ação condicionada.",
+      expected_impact: "Execução controlada da ação condicionada após aprovação.",
+    },
+  };
+  const def = levelDefs[enforcement.level] || {
+    type: "capability",
+    benefit: "Revisão do bloqueio pode revelar oportunidade de expansão segura do escopo.",
+    missing_requirement: "Revisão do escopo e das permissões necessárias.",
+    expected_impact: "Desbloqueio controlado da ação após revisão.",
+  };
+  return {
+    type: def.type,
+    discovery: enforcement.reason,
+    benefit: def.benefit,
+    missing_requirement: def.missing_requirement,
+    expected_impact: def.expected_impact,
+    permission_needed: true,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // persistBrowserArmState(env)
@@ -4323,6 +4373,15 @@ async function executeBrowserArmAction({
       block_reason: enforcement.reason,
       suggestion_required: enforcement.suggestion_required || false,
     };
+    // ── When the enforcement requires a suggestion, build a real canonical
+    //    suggestion from the block context and store in the suggestions buffer.
+    //    This is the real runtime source of suggestions (not manual injection).
+    if (enforcement.suggestion_required) {
+      const suggestion = buildSuggestionFromEnforcement(enforcement);
+      if (validateSuggestion(suggestion).valid) {
+        _browserArmSuggestions = [suggestion];
+      }
+    }
     // ── Persist to KV — survives worker restart ──
     await persistBrowserArmState(env);
 
@@ -4399,6 +4458,18 @@ async function executeBrowserArmAction({
     block_reason: null,
     suggestion_required: false,
   };
+  // ── Capture real suggestions returned by the external browser executor ──
+  // The executor may return a suggestions[] array in its response when it
+  // discovers capabilities or optimisations during browsing. Only valid,
+  // canonical suggestions (per SUGGESTION_SHAPE) are accepted.
+  if (bridgeResult.ok) {
+    const exSuggestions = bridgeResult.data?.suggestions;
+    if (Array.isArray(exSuggestions) && exSuggestions.length > 0) {
+      _browserArmSuggestions = exSuggestions.filter(
+        (s) => validateSuggestion(s).valid,
+      );
+    }
+  }
   // ── Persist to KV — survives worker restart ──
   await persistBrowserArmState(env);
 
@@ -4677,6 +4748,7 @@ export {
   // P25-PR4+ — KV persistence helpers (exported for testing)
   persistBrowserArmState,
   rehydrateBrowserArmState,
+  buildSuggestionFromEnforcement,
   KV_KEY_BROWSER_ARM_STATE,
   // P25-PR2 — Bridge internals (exported for testing)
   buildBrowserExecutorPayload,
