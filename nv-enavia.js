@@ -14,6 +14,9 @@ import {
   handleGitHubPrAction,
   handleRequestMergeApproval,
   handleApproveMerge,
+  // P25 — Browser Arm
+  handleBrowserArmAction,
+  getBrowserArmState,
 } from "./contract-executor.js";
 
 import { classifyRequest } from "./schema/planner-classifier.js";
@@ -5505,6 +5508,23 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       if (method === "POST" && path === "/github-pr/approve-merge") {
         const result = await handleApproveMerge(request, env);
         return jsonResponse(result.body, result.status);
+      }
+
+      // ============================================================
+      // 🌐 P25 — Browser Arm Runtime Endpoints
+      // Separate from Cloudflare executor and GitHub arm (P24).
+      // Operates on external navigation/search/visual operations.
+      // ============================================================
+
+      // POST /browser-arm/action → Execute a Browser Arm action with enforcement
+      if (method === "POST" && path === "/browser-arm/action") {
+        const result = await handleBrowserArmAction(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
+      // GET /browser-arm/state → Get current Browser Arm state
+      if (method === "GET" && path === "/browser-arm/state") {
+        return jsonResponse(getBrowserArmState(), 200);
       }
 
       // ============================================================

@@ -25,6 +25,12 @@ import {
   GITHUB_PR_ARM_ID,
   MERGE_STATUS,
 } from "./schema/github-pr-arm-contract.js";
+import {
+  enforceBrowserArm,
+  BROWSER_ARM_ID,
+  BROWSER_EXTERNAL_BASE,
+  BROWSER_ARM_STATE_SHAPE,
+} from "./schema/browser-arm-contract.js";
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -4017,8 +4023,151 @@ async function handleApproveMerge(request) {
 }
 
 // ============================================================================
-// Exports
+// 🌐 P25 — Browser Arm Runtime Functions
+//
+// Separate from Cloudflare executor (executeCurrentMicroPr) and GitHub arm (P24).
+// This is the minimal runtime wiring for the Browser Arm contract.
+// Does NOT implement full browser execution — only contract enforcement layer.
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// executeBrowserArmAction({ action, scope_approved, gates_context,
+//                           justification, user_permission,
+//                           drift_detected, regression_detected })
+//
+// Runtime entry point for any Browser Arm action.
+// Calls enforceBrowserArm() first; if blocked, returns immediately.
+// If allowed, returns the enforcement result with execution_status.
+//
+// This is the P25 equivalent of executeGitHubPrAction() for P24.
+// ---------------------------------------------------------------------------
+function executeBrowserArmAction({
+  action,
+  scope_approved,
+  gates_context,
+  justification = null,
+  user_permission = false,
+  drift_detected = false,
+  regression_detected = false,
+} = {}) {
+  const enforcement = enforceBrowserArm({
+    action,
+    scope_approved,
+    gates_context,
+    justification,
+    user_permission,
+    drift_detected,
+    regression_detected,
+  });
+
+  if (!enforcement.allowed) {
+    return {
+      ok: false,
+      error: "BROWSER_ARM_BLOCKED",
+      message: enforcement.reason,
+      enforcement,
+      suggestion_required: enforcement.suggestion_required || false,
+    };
+  }
+
+  return {
+    ok: true,
+    execution_status: "executed",
+    action: enforcement.action,
+    arm_id: enforcement.arm_id,
+    external_base: BROWSER_EXTERNAL_BASE,
+    enforcement,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getBrowserArmState()
+//
+// Returns the current canonical state of the Browser Arm.
+// Minimal implementation: returns the initial state shape.
+// Future: read from KV or in-memory state.
+// ---------------------------------------------------------------------------
+function getBrowserArmState() {
+  return {
+    ok: true,
+    ...BROWSER_ARM_STATE_SHAPE.initial_state,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleBrowserArmAction(request, env)
+//
+// Route handler for POST /browser-arm/action.
+// Extracts enforcement fields from request body and dispatches
+// to executeBrowserArmAction().
+// ---------------------------------------------------------------------------
+async function handleBrowserArmAction(request, _env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return {
+      status: 400,
+      body: { ok: false, error: "INVALID_JSON", message: "Body deve ser JSON válido." },
+    };
+  }
+
+  const {
+    action,
+    scope_approved,
+    gates_context,
+    justification = null,
+    user_permission = false,
+    drift_detected = false,
+    regression_detected = false,
+  } = body;
+
+  if (!action || typeof action !== "string") {
+    return {
+      status: 400,
+      body: { ok: false, error: "MISSING_ACTION", message: "'action' é obrigatório." },
+    };
+  }
+
+  // scope_approved must be explicitly provided as boolean — no implicit authorization
+  if (typeof scope_approved !== "boolean") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "MISSING_SCOPE_APPROVED",
+        message: "'scope_approved' é obrigatório e deve ser boolean. O runtime não assume autorização implícita.",
+      },
+    };
+  }
+
+  // gates_context must be explicitly provided — no fabricated gates
+  if (!gates_context || typeof gates_context !== "object") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "MISSING_GATES_CONTEXT",
+        message: "'gates_context' é obrigatório e deve ser um objeto com os gates P23. O runtime não fabrica gates implicitamente.",
+      },
+    };
+  }
+
+  const result = executeBrowserArmAction({
+    action,
+    scope_approved,
+    gates_context,
+    justification,
+    user_permission,
+    drift_detected,
+    regression_detected,
+  });
+
+  return {
+    status: result.ok ? 200 : 403,
+    body: result,
+  };
+}
 export {
   // Global State Machine
   VALID_STATUSES,
@@ -4109,4 +4258,8 @@ export {
   handleGitHubPrAction,
   handleRequestMergeApproval,
   handleApproveMerge,
+  // 🌐 P25 — Browser Arm Runtime (separate from Cloudflare executor and GitHub arm)
+  executeBrowserArmAction,
+  handleBrowserArmAction,
+  getBrowserArmState,
 };
