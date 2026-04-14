@@ -23,7 +23,6 @@ export function getEnaviaConstitution() {
       "Validar (aprovação humana quando necessário)",
       "Executar",
       "Revisar",
-      "Consolidar memória",
     ],
     operational_security: [
       "Não inventar certeza",
