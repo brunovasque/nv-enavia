@@ -28,6 +28,7 @@ import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
 import { writeMemory } from "./schema/memory-storage.js";
 import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
 import { searchRelevantMemory } from "./schema/memory-read.js";
+import { buildCognitivePromptBlock } from "./schema/enavia-cognitive-runtime.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -3293,9 +3294,14 @@ async function handleChatLLM(request, env) {
     //   use_planner — true only when the user is clearly requesting a structured
     //                 plan, action breakdown, or task organisation
     const ownerName = env.OWNER || "usuário";
-    const systemName = env.SYSTEM_NAME || "ENAVIA";
 
-    const chatSystemPrompt = `Você é a ${systemName}, assistente inteligente da NV Imóveis.
+    // --- Núcleo Cognitivo Runtime (PR1) ---
+    // Injeta identidade canônica, capacidades reais e guardrails no prompt.
+    const cognitiveBlock = buildCognitivePromptBlock({ ownerName });
+
+    const chatSystemPrompt = `${cognitiveBlock}
+
+Você está no painel da ENAVIA, ambiente de gestão da NV Imóveis.
 
 Responda SEMPRE em JSON válido, sem markdown, sem texto fora do JSON. Formato obrigatório:
 {"reply":"<sua resposta em português>","use_planner":<true ou false>}
@@ -3306,8 +3312,6 @@ Regras para o campo reply:
 - Se o usuário pedir algo técnico ou estruturado, responda de forma completa e direta.
 - Fale sempre em português do Brasil.
 - Nunca use templates rígidos, campos como "next_action" ou "reason" como fala.
-- O nome do operador é ${ownerName}.
-- Você está no painel da ${systemName}, ambiente de gestão da NV Imóveis.
 
 Regras para o campo use_planner (boolean):
 - true: apenas quando o usuário pede explicitamente um plano de ação estruturado, lista de etapas, ou organização de tarefa.
