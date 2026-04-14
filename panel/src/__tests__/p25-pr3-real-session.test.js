@@ -117,13 +117,27 @@ describe("P25-PR3 — BrowserExecutorPanel real render", () => {
     expect(html).not.toContain("novnc-viewport-empty");
   });
 
-  it("6b. noVNC overlay de standby aparece quando sem sessão (complementa, não substitui)", () => {
+  it("6b. noVNC overlay no estado inicial (SSR) mostra 'Conectando' — sem contradição", () => {
     const html = renderPanel();
-    // "Sem sessão ativa" should appear as overlay text, not as viewport replacement
-    expect(html).toContain("Sem sessão ativa");
+    // In SSR/loading state, onLoad hasn't fired → overlay shows "Conectando"
+    // NOT "Sem sessão ativa" on top of a potentially live viewport.
+    // In real browser: transitions to "Viewport ativo · arm em standby" after onLoad fires.
+    expect(html).toContain("Conectando ao viewport");
     expect(html).toContain("novnc-session-overlay");
-    // iframe is still present alongside the overlay
+    // iframe is always present alongside the overlay
     expect(html).toContain("novnc-iframe");
+    // "Sem sessão ativa" must NOT be in the viewport overlay area
+    // (it only appears when iframe genuinely fails to load)
+    expect(html).not.toContain("Viewport indisponível");
+  });
+
+  it("6c. overlay NÃO diz 'Sem sessão ativa' no estado de carregamento (sem contradição)", () => {
+    const html = renderPanel();
+    // The contradiction "viewport visible + Sem sessão ativa" must never occur.
+    // "Sem sessão ativa" as overlay text only when iframeStatus === "error".
+    // In SSR (loading state), the overlay shows "Conectando ao viewport" — no contradiction.
+    const noContradiction = !html.includes("Viewport indisponível");
+    expect(noContradiction).toBe(true);
   });
 
   it("10. sem demo switcher no painel", () => {
@@ -132,8 +146,11 @@ describe("P25-PR3 — BrowserExecutorPanel real render", () => {
     expect(html).not.toContain("aria-label=\"Estado do browser (demo)\"");
   });
 
-  it("painel exibe 'Sem sessão ativa — standby' no subtítulo", () => {
+  it("painel exibe 'Sem sessão ativa — standby' no subtítulo quando viewport não conectado", () => {
     const html = renderPanel();
+    // In SSR, viewportStatus starts as "loading" (not "connected"),
+    // so header subtitle still shows "Sem sessão ativa — standby" (honest).
+    // In real browser: changes to "Viewport ativo · arm em standby" after iframe loads.
     expect(html).toContain("Sem sessão ativa — standby");
   });
 

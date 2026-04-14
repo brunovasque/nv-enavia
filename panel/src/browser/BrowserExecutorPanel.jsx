@@ -17,6 +17,7 @@
 // Regra de honestidade: campo ausente = "sem dado disponível". Nunca inventar.
 // ============================================================================
 
+import { useState } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
 
 // ── Canonical noVNC URL ───────────────────────────────────────────────────
@@ -86,22 +87,64 @@ const DEFAULT_STATUS_META = STATUS_META[BROWSER_SESSION_STATUS.SEM_SESSAO];
 //
 // REGRA: o viewport é SOBERANO.
 // O iframe é SEMPRE renderizado — independente de session.active.
-// O estado "sem sessão" aparece como overlay/badge complementar,
-// nunca como substituto do viewport real.
 //
-function NoVncViewport({ session }) {
+// A contradição "viewport carregado + estado 'Sem sessão ativa'" é evitada
+// rastreando o estado de carregamento real do iframe:
+//
+//   iframeStatus = "loading"   → overlay: "Conectando…" (aguardando resposta)
+//   iframeStatus = "connected" → overlay: "Arm em standby" quando !active
+//                                sem overlay quando active
+//   iframeStatus = "error"     → overlay: "Viewport indisponível" (genuíno)
+//
+// O overlay "Sem sessão ativa" (frase principal) SÓ aparece quando o iframe
+// realmente não carregou — nunca sobreposto a um viewport vivo.
+//
+function NoVncViewport({ session, onStatusChange }) {
   const isActive = session?.active === true;
   const noVncUrl = NOVNC_BASE_URL;
+
+  // Track the real load state of the iframe.
+  // "loading"   — initial, awaiting onLoad/onError from the browser
+  // "connected" — iframe loaded: viewport is accessible (VNC may or may not be active)
+  // "error"     — iframe failed to load: genuinely no viewport available
+  const [iframeStatus, setIframeStatus] = useState("loading");
+
+  function handleLoad() {
+    setIframeStatus("connected");
+    onStatusChange?.("connected");
+  }
+  function handleError() {
+    setIframeStatus("error");
+    onStatusChange?.("error");
+  }
+
+  // Overlay text and presence depend on the REAL iframe state.
+  // When the viewport is connected (even in arm standby), we do NOT say "Sem sessão ativa"
+  // — that would be a lie. We say "Arm em standby" to be honest about BOTH truths.
+  const showOverlay = iframeStatus !== "connected" || !isActive;
+  const overlayIcon =
+    iframeStatus === "error"     ? "⚠" :
+    iframeStatus === "connected" ? "◉" : "◎";
+  const overlayText =
+    iframeStatus === "error"
+      ? "Viewport indisponível"
+      : iframeStatus === "connected" && !isActive
+      ? "Viewport ativo · arm em standby"
+      : "Conectando ao viewport…";
 
   return (
     <div style={s.viewportContainer} data-testid="novnc-viewport">
       <div style={s.viewportHeader}>
         <span style={s.viewportHeaderIcon} aria-hidden="true">🖥️</span>
         <span style={s.viewportHeaderTitle}>noVNC — Browser Executor</span>
-        {isActive ? (
+        {isActive && iframeStatus === "connected" ? (
           <span style={s.viewportLiveBadge}>AO VIVO</span>
+        ) : iframeStatus === "error" ? (
+          <span style={s.viewportErrorBadge}>INDISPONÍVEL</span>
         ) : (
-          <span style={s.viewportStandbyBadge}>STANDBY</span>
+          <span style={s.viewportStandbyBadge}>
+            {iframeStatus === "connected" ? "STANDBY" : "CONECTANDO"}
+          </span>
         )}
       </div>
 
@@ -113,12 +156,18 @@ function NoVncViewport({ session }) {
           style={s.viewportIframe}
           sandbox="allow-scripts allow-forms"
           data-testid="novnc-iframe"
+          onLoad={handleLoad}
+          onError={handleError}
         />
-        {/* When not active: status overlay — complements, does NOT replace */}
-        {!isActive && (
+        {/* Overlay only when needed:
+            - loading  → "Conectando…" (we don't know yet)
+            - connected + !active → "Viewport ativo · arm em standby" (no contradiction)
+            - error → "Viewport indisponível" (honest: no viewport)
+            - connected + active → NO overlay (clear view) */}
+        {showOverlay && (
           <div style={s.viewportOverlay} data-testid="novnc-session-overlay">
-            <span style={s.viewportOverlayIcon} aria-hidden="true">◎</span>
-            <span style={s.viewportOverlayText}>Sem sessão ativa</span>
+            <span style={s.viewportOverlayIcon} aria-hidden="true">{overlayIcon}</span>
+            <span style={s.viewportOverlayText}>{overlayText}</span>
           </div>
         )}
       </div>
@@ -338,6 +387,11 @@ export default function BrowserExecutorPanel() {
   const hasError = sessionStatus === BROWSER_SESSION_STATUS.ERRO
                 || sessionStatus === BROWSER_SESSION_STATUS.BLOQUEADO;
 
+  // Track the real iframe load state so header/body stay coherent with the viewport.
+  // This resolves the contradiction: iframe connected ≠ "Sem sessão ativa" as main truth.
+  const [viewportStatus, setViewportStatus] = useState("loading");
+  const viewportConnected = viewportStatus === "connected";
+
   // Source label for the indicator
   const isUnconfigured = source === "unconfigured";
   const isUnreachable  = source === "unreachable";
@@ -349,6 +403,15 @@ export default function BrowserExecutorPanel() {
     ? `Fonte: /browser-arm/state · Atualizado: ${formatTs(lastUpdated)}`
     : "Consultando /browser-arm/state…";
 
+  // Header subtitle: uses combined truth of arm state + viewport load state.
+  // When viewport is connected but arm is idle → "Viewport ativo · arm em standby"
+  // (not "Sem sessão ativa" — that would contradict the loaded iframe)
+  const headerSub = isActive
+    ? `Sessão ${session?.sessionId ?? "—"} · ${session?.operationalDomain ?? "—"}/*`
+    : viewportConnected
+    ? "Viewport ativo · arm em standby"
+    : "Sem sessão ativa — standby";
+
   return (
     <div style={s.page}>
       {/* Header */}
@@ -358,11 +421,7 @@ export default function BrowserExecutorPanel() {
             <span style={s.headerMark} aria-hidden="true">◆</span>
             <div>
               <p style={s.headerTitle}>Browser Executor — Painel Real</p>
-              <p style={s.headerSub}>
-                {isActive
-                  ? `Sessão ${session?.sessionId ?? "—"} · ${session?.operationalDomain ?? "—"}/*`
-                  : "Sem sessão ativa — standby"}
-              </p>
+              <p style={s.headerSub} data-testid="header-sub">{headerSub}</p>
             </div>
           </div>
 
@@ -423,7 +482,8 @@ export default function BrowserExecutorPanel() {
 
       {/* noVNC Viewport — ALWAYS rendered once loading is done */}
       {/* Viewport is sovereign: iframe present regardless of session.active */}
-      {!loading && <NoVncViewport session={session} />}
+      {/* onStatusChange lifts iframe load state up so header/body stay coherent */}
+      {!loading && <NoVncViewport session={session} onStatusChange={setViewportStatus} />}
 
       {/* Body — always shown; sidebar shows state, main shows metadata or idle info */}
       {!loading && (
@@ -642,6 +702,16 @@ const s = {
     color: "var(--text-muted)",
     background: "rgba(100,116,139,0.10)",
     border: "1px solid rgba(100,116,139,0.25)",
+    padding: "2px 8px",
+    borderRadius: "4px",
+  },
+  viewportErrorBadge: {
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1px",
+    color: "#EF4444",
+    background: "rgba(239,68,68,0.10)",
+    border: "1px solid rgba(239,68,68,0.30)",
     padding: "2px 8px",
     borderRadius: "4px",
   },
