@@ -893,7 +893,7 @@ async function callChatModel(env, messages, options = {}) {
     model,
     messages,
     temperature: options.temperature ?? 0.2,
-    max_tokens: options.max_tokens ?? 1600,
+    max_completion_tokens: options.max_completion_tokens ?? options.max_tokens ?? 1600,
     top_p: options.top_p ?? 1,
     // response_format is forwarded when set (e.g. { type: "json_object" } for
     // structured output). Omitted entirely when not provided to stay compatible
