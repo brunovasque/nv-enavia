@@ -21,11 +21,12 @@ import { useState } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
 
 // ── Canonical noVNC URL ───────────────────────────────────────────────────
-// The noVNC viewer is served by the browser executor infrastructure.
-// VITE_NOVNC_URL can override. Default: the run domain /novnc path.
+// Points to the standard noVNC viewer page (vnc.html) so the iframe serves
+// the native Connect button and full noVNC UI — not a directory listing.
+// VITE_NOVNC_URL overrides the full URL (should include /vnc.html if needed).
 const NOVNC_BASE_URL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_NOVNC_URL) ||
-  "https://run.nv-imoveis.com/novnc";
+  "https://run.nv-imoveis.com/novnc/vnc.html";
 
 // ── Status metadata ────────────────────────────────────────────────────────
 
@@ -150,7 +151,7 @@ function NoVncViewport({ session, onStatusChange }) {
           src={noVncUrl}
           title="noVNC — Browser Executor"
           style={s.viewportIframe}
-          sandbox="allow-scripts allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           data-testid="novnc-iframe"
           onLoad={handleLoad}
           onError={handleError}
@@ -716,7 +717,7 @@ const s = {
   },
   viewportIframe: {
     width: "100%",
-    height: "320px",
+    height: "480px",
     border: "none",
     display: "block",
     background: "#0a0f14",
