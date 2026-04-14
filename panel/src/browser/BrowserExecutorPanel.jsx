@@ -534,7 +534,8 @@ const s = {
     flexDirection: "column",
     gap: "12px",
     height: "100%",
-    overflow: "hidden",
+    overflowY: "auto",
+    overflowX: "hidden",
     padding: "4px 0 0",
   },
 
@@ -721,7 +722,7 @@ const s = {
   },
   viewportIframe: {
     width: "100%",
-    height: "480px",
+    height: "680px",
     border: "none",
     display: "block",
     background: "#0a0f14",
@@ -760,7 +761,6 @@ const s = {
     gap: "16px",
     flex: 1,
     minHeight: 0,
-    overflow: "hidden",
   },
   main: {
     flex: 1,
