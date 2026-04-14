@@ -52,6 +52,76 @@ export async function fetchExecution(opts = {}) {
   }
 }
 
+// ── P24 — approveMerge ────────────────────────────────────────────────────
+//
+// Calls POST /github-pr/approve-merge — the formal merge approval button in
+// the panel.
+//
+// REGRA: O painel NÃO fabrica/afirma readiness gates (contract_rechecked,
+// phase_validated, no_regression, diff_reviewed, summary_reviewed).
+// Esses critérios são soberanos do runtime/backend.
+//
+// O painel envia apenas:
+//   - merge_gate: o objeto de estado do gate já emitido/validado pelo backend
+//   - approval_status: "approved" (a única asserção humana)
+//
+// O backend confirma que o estado real está apto antes de retornar approved.
+//
+// Mock mode: simulates an approved_for_merge response.
+// Real mode: calls the actual worker route.
+
+/**
+ * Send formal merge approval for the current PR/execution.
+ *
+ * @param {object} params
+ * @param {object} params.merge_gate - The merge_gate state object received from the backend
+ * @returns {Promise<import("../contracts.js").ResponseEnvelope>}
+ */
+export async function approveMerge({ merge_gate }) {
+  const t0 = Date.now();
+  const { mode } = getApiConfig();
+
+  if (mode !== "real") {
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      ok: true,
+      data: {
+        ok: true,
+        merge_status: "approved_for_merge",
+        can_merge: true,
+        message: "Merge aprovado formalmente (mock).",
+        summary_for_merge: merge_gate?.summary_for_merge ?? null,
+        reason_merge_ok: merge_gate?.reason_merge_ok ?? null,
+      },
+      meta: { durationMs: Date.now() - t0 },
+    };
+  }
+
+  try {
+    const res = await apiClient.request("/github-pr/approve-merge", {
+      method: "POST",
+      body: {
+        merge_gate,
+        approval_status: "approved",
+      },
+    });
+
+    if (!res.ok) {
+      return normalizeError(
+        {
+          code: ERROR_CODES.BRIDGE_SEND_FAILURE,
+          message: res.data?.message ?? "Falha ao aprovar merge.",
+        },
+        "github-pr",
+      );
+    }
+
+    return { ok: true, data: res.data, meta: { durationMs: Date.now() - t0 } };
+  } catch (err) {
+    return normalizeError(err, "github-pr");
+  }
+}
+
 // ── P14 — postDecision ────────────────────────────────────────────────────
 //
 // Records a human decision (approved | rejected) linked to a canonical execution.

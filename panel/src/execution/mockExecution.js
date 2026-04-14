@@ -609,5 +609,13 @@ Memória: 3 entradas de contexto consolidadas`,
         timestamp: "2026-04-12T01:53:15Z",
       },
     ],
+    // P24 — merge gate state (awaiting_formal_approval = bloco de approval visível no painel)
+    merge_gate: {
+      merge_status: "awaiting_formal_approval",
+      summary_for_merge: "Plano de execução gerado, validado e entregue — 4 etapas concluídas sem regressão.",
+      reason_merge_ok: "Diff revisado, contrato reconferido, sem drift, sem regressão — apto para merge em main.",
+      approval_status: "pending",
+      can_merge: false,
+    },
   },
 };
