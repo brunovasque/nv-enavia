@@ -108,11 +108,22 @@ describe("P25-PR3 — BrowserExecutorPanel real render", () => {
     expect(html).toContain("Fonte não configurada");
   });
 
-  it("6. noVNC viewport empty state aparece quando sem sessão", () => {
+  it("6. noVNC iframe SEMPRE renderizado — viewport é soberano (não substituto)", () => {
     const html = renderPanel();
-    // Should show empty viewport, not live iframe
+    // iframe must be present even in sem_sessao state
+    expect(html).toContain("novnc-iframe");
     expect(html).toContain("noVNC");
+    // Old empty placeholder must NOT appear
+    expect(html).not.toContain("novnc-viewport-empty");
+  });
+
+  it("6b. noVNC overlay de standby aparece quando sem sessão (complementa, não substitui)", () => {
+    const html = renderPanel();
+    // "Sem sessão ativa" should appear as overlay text, not as viewport replacement
     expect(html).toContain("Sem sessão ativa");
+    expect(html).toContain("novnc-session-overlay");
+    // iframe is still present alongside the overlay
+    expect(html).toContain("novnc-iframe");
   });
 
   it("10. sem demo switcher no painel", () => {

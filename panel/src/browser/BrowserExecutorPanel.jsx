@@ -83,37 +83,45 @@ const STATUS_META = {
 const DEFAULT_STATUS_META = STATUS_META[BROWSER_SESSION_STATUS.SEM_SESSAO];
 
 // ── noVNC Viewport ────────────────────────────────────────────────────────
-
+//
+// REGRA: o viewport é SOBERANO.
+// O iframe é SEMPRE renderizado — independente de session.active.
+// O estado "sem sessão" aparece como overlay/badge complementar,
+// nunca como substituto do viewport real.
+//
 function NoVncViewport({ session }) {
   const isActive = session?.active === true;
   const noVncUrl = NOVNC_BASE_URL;
 
-  if (!isActive) {
-    return (
-      <div style={s.viewportEmpty} data-testid="novnc-viewport-empty">
-        <span style={s.viewportEmptyIcon} aria-hidden="true">🖥️</span>
-        <p style={s.viewportEmptyTitle}>noVNC — Sem sessão ativa</p>
-        <p style={s.viewportEmptyDesc}>
-          O viewport noVNC estará disponível quando houver uma sessão real do Browser Executor.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div style={s.viewportContainer} data-testid="novnc-viewport-active">
+    <div style={s.viewportContainer} data-testid="novnc-viewport">
       <div style={s.viewportHeader}>
         <span style={s.viewportHeaderIcon} aria-hidden="true">🖥️</span>
-        <span style={s.viewportHeaderTitle}>noVNC — Sessão ao vivo</span>
-        <span style={s.viewportLiveBadge}>AO VIVO</span>
+        <span style={s.viewportHeaderTitle}>noVNC — Browser Executor</span>
+        {isActive ? (
+          <span style={s.viewportLiveBadge}>AO VIVO</span>
+        ) : (
+          <span style={s.viewportStandbyBadge}>STANDBY</span>
+        )}
       </div>
-      <iframe
-        src={noVncUrl}
-        title="noVNC — Sessão ao vivo do Browser Executor"
-        style={s.viewportIframe}
-        sandbox="allow-scripts allow-forms"
-        data-testid="novnc-iframe"
-      />
+
+      {/* iframe always rendered — viewport is sovereign */}
+      <div style={s.viewportFrame}>
+        <iframe
+          src={noVncUrl}
+          title="noVNC — Browser Executor"
+          style={s.viewportIframe}
+          sandbox="allow-scripts allow-forms"
+          data-testid="novnc-iframe"
+        />
+        {/* When not active: status overlay — complements, does NOT replace */}
+        {!isActive && (
+          <div style={s.viewportOverlay} data-testid="novnc-session-overlay">
+            <span style={s.viewportOverlayIcon} aria-hidden="true">◎</span>
+            <span style={s.viewportOverlayText}>Sem sessão ativa</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -413,26 +421,40 @@ export default function BrowserExecutorPanel() {
       {/* Loading */}
       {loading && !session && <LoadingState />}
 
-      {/* noVNC Viewport — always shown, handles active/empty states internally */}
+      {/* noVNC Viewport — ALWAYS rendered once loading is done */}
+      {/* Viewport is sovereign: iframe present regardless of session.active */}
       {!loading && <NoVncViewport session={session} />}
 
-      {/* Idle fills the rest */}
-      {!loading && !isActive && (
-        <BrowserIdleState domain={session?.operationalDomain} />
-      )}
-
-      {/* Active session body */}
-      {!loading && isActive && (
+      {/* Body — always shown; sidebar shows state, main shows metadata or idle info */}
+      {!loading && (
         <div style={s.body}>
           {/* Main column */}
           <div style={s.main}>
             {/* Error / blocker banner */}
-            {hasError && session?.error && (
+            {isActive && hasError && session?.error && (
               <BrowserErrorCard error={session.error} />
             )}
 
-            {/* Session metadata card */}
-            <SessionMetadataCard session={session} />
+            {/* Session metadata when active */}
+            {isActive && <SessionMetadataCard session={session} />}
+
+            {/* Idle info when not active — "sem sessão" is metadata, not a viewport replacement */}
+            {!isActive && (
+              <div style={s.idleInfo} data-testid="browser-idle-info">
+                <span style={s.idleInfoIcon} aria-hidden="true">◎</span>
+                <p style={s.idleInfoTitle}>Nenhuma sessão ativa</p>
+                <p style={s.idleInfoDesc}>
+                  O Browser Executor está em standby. Quando uma sessão for iniciada,
+                  os dados de navegação aparecerão aqui e o noVNC mostrará a sessão ao vivo.
+                </p>
+                <div style={s.idleDomain}>
+                  <span style={s.idleDomainLabel}>Domínio operacional</span>
+                  <span style={s.idleDomainValue}>
+                    {session?.operationalDomain || "run.nv-imoveis.com"}/*
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -613,6 +635,20 @@ const s = {
     padding: "2px 8px",
     borderRadius: "4px",
   },
+  viewportStandbyBadge: {
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1px",
+    color: "var(--text-muted)",
+    background: "rgba(100,116,139,0.10)",
+    border: "1px solid rgba(100,116,139,0.25)",
+    padding: "2px 8px",
+    borderRadius: "4px",
+  },
+  // viewportFrame wraps iframe + overlay (position:relative for overlay)
+  viewportFrame: {
+    position: "relative",
+  },
   viewportIframe: {
     width: "100%",
     height: "320px",
@@ -620,33 +656,32 @@ const s = {
     display: "block",
     background: "#0a0f14",
   },
-  viewportEmpty: {
+  // Overlay: complements the viewport — does NOT replace it
+  viewportOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    padding: "32px 24px",
-    background: "var(--bg-surface)",
-    border: "1px solid var(--border-light)",
-    borderRadius: "var(--radius-lg)",
-    textAlign: "center",
-    flexShrink: 0,
+    background: "rgba(10,15,20,0.60)",
+    pointerEvents: "none",
   },
-  viewportEmptyIcon: {
+  viewportOverlayIcon: {
     fontSize: "28px",
-    opacity: 0.3,
-  },
-  viewportEmptyTitle: {
-    fontSize: "13px",
-    fontWeight: 700,
-    color: "var(--text-secondary)",
-  },
-  viewportEmptyDesc: {
-    fontSize: "12px",
     color: "var(--text-muted)",
-    lineHeight: 1.5,
-    maxWidth: "380px",
+    opacity: 0.6,
+  },
+  viewportOverlayText: {
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+    letterSpacing: "0.5px",
+    fontFamily: "var(--font-mono)",
   },
 
   // Body layout
@@ -677,7 +712,7 @@ const s = {
     overflowY: "auto",
   },
 
-  // Idle state
+  // Idle state (used by LoadingState)
   idleState: {
     display: "flex",
     flexDirection: "column",
@@ -703,6 +738,35 @@ const s = {
     color: "var(--text-muted)",
     lineHeight: 1.6,
     maxWidth: "400px",
+  },
+
+  // Idle info card — inline within body when not active
+  // "sem sessão" is shown here as metadata, not as viewport replacement
+  idleInfo: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    padding: "20px 24px",
+    background: "var(--bg-surface)",
+    border: "1px solid var(--border-light)",
+    borderRadius: "var(--radius-lg)",
+    flexShrink: 0,
+  },
+  idleInfoIcon: {
+    fontSize: "22px",
+    color: "var(--text-muted)",
+    opacity: 0.4,
+    alignSelf: "flex-start",
+  },
+  idleInfoTitle: {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "var(--text-secondary)",
+  },
+  idleInfoDesc: {
+    fontSize: "12px",
+    color: "var(--text-muted)",
+    lineHeight: 1.6,
   },
   idleDomain: {
     marginTop: "8px",
