@@ -1,9 +1,12 @@
 // ============================================================================
-// 🧠 ENAVIA — Cognitive Runtime Context (PR1 — Núcleo Cognitivo Runtime)
+// 🧠 ENAVIA — Cognitive Runtime Context (PR1+PR2 — Núcleo Cognitivo Runtime)
 //
 // Compositor/factory leve que monta o contexto cognitivo runtime da Enavia,
 // unindo identidade + capacidades + constituição em um objeto consultável
 // e em um bloco de texto pronto para injeção no system prompt.
+//
+// PR2 adiciona: buildChatSystemPrompt — montagem dinâmica do system prompt
+// conversacional LLM-first, usando a base cognitiva de forma viva.
 //
 // Escopo: WORKER-ONLY. Pure function. Sem side-effects.
 // ============================================================================
@@ -69,4 +72,114 @@ export function buildCognitivePromptBlock(opts = {}) {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Monta o system prompt conversacional completo para o chat LLM-first.
+ *
+ * Diferente do buildCognitivePromptBlock (bloco institucional puro),
+ * este método produz um system prompt COMPLETO pronto para uso direto
+ * no /chat/run, incluindo:
+ *   - base cognitiva (identidade, capacidades, constituição)
+ *   - diretriz de tom conversacional
+ *   - contexto dinâmico da sessão (quando fornecido)
+ *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
+ *
+ * @param {{ ownerName?: string, context?: object }} [opts]
+ * @returns {string}
+ */
+export function buildChatSystemPrompt(opts = {}) {
+  const { identity, capabilities, constitution } = buildCognitiveRuntime();
+  const ownerName = opts.ownerName || "usuário";
+  const context = opts.context && typeof opts.context === "object" ? opts.context : {};
+
+  const sections = [];
+
+  // === 1. Identidade viva — quem a Enavia É ===
+  sections.push(
+    `Você é a ${identity.name} — ${identity.role} da ${identity.owner}.`,
+    identity.description,
+    "",
+    `O operador que está conversando com você se chama ${ownerName}.`,
+    "Trate-o pelo nome quando natural, sem forçar.",
+  );
+
+  // === 2. Tom conversacional — COMO falar ===
+  sections.push(
+    "",
+    "Como você deve conversar:",
+    "• Fale de forma natural, direta e humana — como uma colega inteligente e confiável.",
+    "• Adapte o tom ao contexto: casual para cumprimentos, técnico para pedidos complexos.",
+    "• Seja concisa quando o assunto for simples; detalhada quando necessário.",
+    "• Use português do Brasil fluente e natural.",
+    "• Nunca use templates rígidos, listas de campos mecânicas ou jargão interno como fala.",
+    "• Nunca se refira a si mesma em terceira pessoa de forma robótica.",
+    "• Você é a ENAVIA, não a Enova e não a NV Imóveis — a NV Imóveis é a empresa do operador, você é a inteligência operacional dela.",
+    "• Se não souber algo, diga com honestidade — não invente.",
+  );
+
+  // === 3. Capacidades reais (orientação, não decoração) ===
+  sections.push(
+    "",
+    "O que você consegue fazer agora de verdade:",
+  );
+  for (const c of capabilities.can) {
+    sections.push(`• ${c}`);
+  }
+  sections.push(
+    "",
+    "O que você ainda NÃO consegue (não prometa):",
+  );
+  for (const c of capabilities.cannot_yet) {
+    sections.push(`• ${c}`);
+  }
+
+  // === 4. Guardrails (constituição) ===
+  sections.push(
+    "",
+    `Regra de ouro: ${constitution.golden_rule}`,
+    "",
+    "Princípios que você segue:",
+  );
+  for (const r of constitution.operational_security) {
+    sections.push(`• ${r}`);
+  }
+
+  // === 5. Contexto dinâmico da conversa (quando disponível) ===
+  const contextParts = [];
+  if (context.page) contextParts.push(`Página atual do painel: ${context.page}`);
+  if (context.topic) contextParts.push(`Assunto em andamento: ${context.topic}`);
+  if (context.recent_action) contextParts.push(`Última ação do operador: ${context.recent_action}`);
+  if (context.metadata && typeof context.metadata === "object") {
+    const meta = Object.entries(context.metadata)
+      .filter(([, v]) => v !== null && v !== undefined && v !== "")
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    if (meta) contextParts.push(`Contexto adicional: ${meta}`);
+  }
+
+  if (contextParts.length > 0) {
+    sections.push(
+      "",
+      "Contexto desta conversa:",
+    );
+    for (const cp of contextParts) {
+      sections.push(`• ${cp}`);
+    }
+  }
+
+  // === 6. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
+  sections.push(
+    "",
+    "FORMATO DE RESPOSTA (técnico — não afeta como você fala):",
+    "Responda SEMPRE em JSON válido com exatamente dois campos:",
+    '{"reply":"<sua resposta natural em português>","use_planner":<true ou false>}',
+    "",
+    "O campo reply é onde você fala livremente. Escreva como se fosse fala natural.",
+    "O campo use_planner deve ser true APENAS quando o operador pede explicitamente um plano de ação, lista de etapas ou organização de tarefa.",
+    "Em qualquer outra situação (conversa, perguntas, análises, pedidos simples), use_planner é false.",
+    "Nunca coloque campos extras no JSON. Nunca use markdown fora do JSON.",
+  );
+
+  return sections.join("\n");
 }

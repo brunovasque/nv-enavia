@@ -28,7 +28,7 @@ import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
 import { writeMemory } from "./schema/memory-storage.js";
 import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
 import { searchRelevantMemory } from "./schema/memory-read.js";
-import { buildCognitivePromptBlock } from "./schema/enavia-cognitive-runtime.js";
+import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -3286,36 +3286,16 @@ async function handleChatLLM(request, env) {
   }
 
   try {
-    // --- System prompt LLM-first com sinal estruturado ---
-    // The LLM is the sole decision-maker for whether the planner tool is needed.
-    // No substring lists — the model reads the user's full intent and returns a
-    // small JSON object: { reply, use_planner }.
-    //   reply       — the free-form conversational response shown to the user
-    //   use_planner — true only when the user is clearly requesting a structured
-    //                 plan, action breakdown, or task organisation
+    // --- System prompt LLM-first conversacional (PR2) ---
+    // Montagem dinâmica via buildChatSystemPrompt: usa a base cognitiva da PR1
+    // (identidade, capacidades, constituição) de forma viva, com tom conversacional
+    // e contexto dinâmico da sessão. O contrato JSON {reply, use_planner} é mantido
+    // como envelope estrutural, sem sufocar a fala natural.
     const ownerName = env.OWNER || "usuário";
 
-    // --- Núcleo Cognitivo Runtime (PR1) ---
-    // Injeta identidade canônica, capacidades reais e guardrails no prompt.
-    const cognitiveBlock = buildCognitivePromptBlock({ ownerName });
-
-    const chatSystemPrompt = `${cognitiveBlock}
-
-Você está no painel da ENAVIA, ambiente de gestão da NV Imóveis.
-
-Responda SEMPRE em JSON válido, sem markdown, sem texto fora do JSON. Formato obrigatório:
-{"reply":"<sua resposta em português>","use_planner":<true ou false>}
-
-Regras para o campo reply:
-- Responda de forma natural, clara e humana.
-- Se o usuário disser algo casual (oi, tudo bem, etc.), responda naturalmente.
-- Se o usuário pedir algo técnico ou estruturado, responda de forma completa e direta.
-- Fale sempre em português do Brasil.
-- Nunca use templates rígidos, campos como "next_action" ou "reason" como fala.
-
-Regras para o campo use_planner (boolean):
-- true: apenas quando o usuário pede explicitamente um plano de ação estruturado, lista de etapas, ou organização de tarefa.
-- false: em qualquer outra situação (conversa livre, perguntas, análises, pedidos simples).`;
+    // --- Núcleo Cognitivo Runtime (PR1+PR2) ---
+    // System prompt completo: base institucional + tom conversacional + contexto dinâmico
+    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context });
 
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
@@ -3323,14 +3303,13 @@ Regras para o campo use_planner (boolean):
     ];
 
     // --- Chamada LLM com resposta estruturada ---
-    // Max tokens capped at 1200 to balance response quality with Cloudflare Worker
-    // CPU time limits (~30s). Increase if moving to Unbound or Durable Objects.
+    // Max tokens raised to 1600 for richer conversational replies.
     // response_format is intentionally omitted: not all model versions (including
     // gpt-5.x) accept the json_object parameter. The system prompt already mandates
     // JSON output, and the JSON.parse block below falls back gracefully to plain text.
-    const CHAT_LLM_MAX_TOKENS = 1200;
+    const CHAT_LLM_MAX_TOKENS = 1600;
     const llmResult = await callChatModel(env, llmMessages, {
-      temperature: 0.5,
+      temperature: 0.6,
       max_tokens: CHAT_LLM_MAX_TOKENS,
     });
 
