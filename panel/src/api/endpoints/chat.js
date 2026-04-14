@@ -5,13 +5,11 @@
 // Returns ResponseEnvelope (SuccessEnvelope | ErrorEnvelope) as defined in
 // contracts.js. Mock mode handled inline — no external fixture file needed.
 //
-// Real mode: posts to /planner/run. The backend returns a structured planner
-// payload, NOT a ready-made chat text. The chat content displayed to the user
-// is derived locally from response.planner.canonicalPlan.chat_reply — the
-// conversational surface field added to PM6. next_action is an internal
-// operational directive for the executor and is NOT used for chat display.
-// The raw response.planner is returned as plannerSnapshot so the caller can
-// pass it to plannerStore for persistence as-is.
+// LLM-first mode: posts to /chat/run. The backend returns a free-form LLM
+// reply in `response.reply`, plus an optional `response.planner` snapshot
+// when the planner was invoked as an internal tool.
+// The chat content displayed to the user is the `reply` field directly —
+// no derivation from deterministic planner fields.
 // ============================================================================
 
 import { getApiConfig }                from "../config.js";
@@ -62,39 +60,12 @@ async function mockChatSend(text, t0) {
 }
 
 /**
- * Derive a human-readable chat text from the structured planner response.
- *
- * TRANSPARENCY: the backend /planner/run does NOT return a chat-ready text in
- * a root field. This function derives the chat bubble content from real backend
- * fields in priority order:
- *   1. canonicalPlan.chat_reply (PM6 conversational surface) — preferred
- *   2. canonicalPlan.reason (classification reasoning from PM4) — fallback
- *   3. Generic acknowledgement — last resort
- *
- * NOTE: canonicalPlan.next_action is an internal operational directive for the
- * executor and is NOT used for chat display.
- *
- * @param {object} planner - raw response.planner from /planner/run
- * @returns {string}
- */
-function _deriveChatContent(planner) {
-  const cp = planner?.canonicalPlan;
-  if (typeof cp?.chat_reply === "string" && cp.chat_reply.length > 0) {
-    return cp.chat_reply;
-  }
-  if (typeof cp?.reason === "string" && cp.reason.length > 0) {
-    return cp.reason;
-  }
-  return "Instrução recebida e processada pelo planner. Consulte o plano gerado na aba Plano.";
-}
-
-/**
  * Send a chat message and receive an Enavia response.
  *
- * In real mode, posts to /planner/run. The response includes:
+ * In real mode, posts to /chat/run (LLM-first). The response includes:
  *   - data: ChatResponse shape (role, content, timestamp, sessionId)
- *     where content is derived from planner.canonicalPlan.next_action
- *   - plannerSnapshot: raw response.planner for storage in plannerStore
+ *     where content is the LLM's free-form reply
+ *   - plannerSnapshot: raw response.planner when the planner was used as tool
  *
  * @param {string} text
  * @param {object} [opts]
@@ -107,27 +78,24 @@ export async function chatSend(text, opts = {}) {
   if (mode !== "real") return mockChatSend(text, t0);
 
   try {
-    const res = await apiClient.request("/planner/run", {
+    const res = await apiClient.request("/chat/run", {
       method: "POST",
       body: { message: text, session_id: getSessionId() },
       ...opts,
     });
 
     if (!res.ok || !res.data?.ok) {
-      // Extract error message from backend response — may be in .error or .detail.
-      // Validate it's a string before using; fall back to generic message.
       const rawErr = res.data?.error ?? res.data?.detail;
-      const errMsg = typeof rawErr === "string" ? rawErr : "Falha no pipeline do planner.";
+      const errMsg = typeof rawErr === "string" ? rawErr : "Falha na conversa LLM-first.";
       return normalizeError(
         { code: ERROR_CODES.PLANNER_UNAVAILABLE, message: errMsg },
         "chat",
       );
     }
 
-    const planner = res.data.planner;
-
-    // Derive chat content transparently from real backend fields.
-    const content = _deriveChatContent(planner);
+    // LLM-first: reply comes directly from response.reply
+    const content = res.data.reply || "Instrução recebida. Processando.";
+    const planner = res.data.planner || null;
     const sessionId = getSessionId();
 
     const data = mapChatResponse(
@@ -145,7 +113,7 @@ export async function chatSend(text, opts = {}) {
     return {
       ok: true,
       data,
-      plannerSnapshot: planner ?? null,
+      plannerSnapshot: planner,
       meta: { durationMs: Date.now() - t0 },
     };
   } catch (err) {
