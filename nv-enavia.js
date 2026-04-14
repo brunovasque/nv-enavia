@@ -3319,6 +3319,38 @@ async function handleChatLLM(request, env) {
   const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
   const context = body.context && typeof body.context === "object" ? body.context : {};
 
+  // -------------------------------------------------------------------------
+  // PR3 — Arbitration pre-check (deterministic, runs before LLM call)
+  //
+  // PM4 classifier (classifyRequest) is used as a deterministic gate on the
+  // incoming message. This gives an auditable pre-signal that works regardless
+  // of what the LLM decides via use_planner.
+  //
+  // Rule:
+  //   Level A (simple / operational) → planner MUST NOT activate.
+  //     Even if the LLM returns use_planner=true for a trivial message,
+  //     the PM4 gate blocks it. Conversation wins.
+  //   Level B (tactical) / C (complex/strategic) → planner MAY activate
+  //     if and only if the LLM also requests it.
+  //
+  // This creates a two-signal gate:  LLM + PM4 must both agree for planner.
+  // Either signal can veto activation.  PM4 veto prevents over-triggering on
+  // simple conversation; LLM veto prevents under-triggering on nuanced intent.
+  // -------------------------------------------------------------------------
+  let pm4Arbitration = null;
+  try {
+    const pm4Classification = classifyRequest({ text: message, context });
+    pm4Arbitration = {
+      level:           pm4Classification.complexity_level,
+      category:        pm4Classification.category,
+      signals:         pm4Classification.signals,
+      allows_planner:  pm4Classification.complexity_level !== "A",
+    };
+  } catch (pm4Err) {
+    // PM4 failure is non-critical — fall through to LLM-only decision
+    logNV("⚠️ [CHAT/LLM] PM4 pre-check falhou (não crítico)", { error: String(pm4Err) });
+  }
+
   // Guard: API key must be configured — return 503 (not 500) with a clear message.
   if (!env.OPENAI_API_KEY) {
     return jsonResponse(
@@ -3385,13 +3417,46 @@ async function handleChatLLM(request, env) {
     // superfície dominante, é sinal de leak — o reply é sanitizado.
     reply = _sanitizeChatReply(reply);
 
-    logNV("🗣️ [CHAT/LLM] LLM respondeu", { use_planner: wantsPlan, session_id });
+    // --- PR3: Arbitration Gate — dois sinais obrigatórios (PM4 + LLM) ---
+    // Para o planner ativar, AMBOS os sinais devem concordar:
+    //   1. LLM decidiu use_planner=true (julgamento conversacional)
+    //   2. PM4 classificou o pedido como nível B ou C (pedido não-trivial)
+    //
+    // Se apenas o LLM quer planner mas PM4 diz nível A (simples):
+    //   → bloqueado. Conversa ganha.
+    // Se PM4 diz B/C mas o LLM não quer planner:
+    //   → bloqueado. LLM tem palavra final na conversa.
+    // Se nenhum quer planner:
+    //   → não ativa (path mais frequente — conversa casual).
+    const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : true;
+    const shouldActivatePlanner = wantsPlan && pm4AllowsPlanner;
 
-    // --- Planner como ferramenta interna (decisão do LLM) ---
+    // Auditoria da decisão de arbitration — provável sem LLM real
+    const arbitrationDecision = {
+      pm4_level:            pm4Arbitration?.level        || null,
+      pm4_category:         pm4Arbitration?.category     || null,
+      pm4_signals:          pm4Arbitration?.signals      || [],
+      pm4_allows_planner:   pm4AllowsPlanner,
+      llm_requested_planner: wantsPlan,
+      final_decision:       shouldActivatePlanner
+        ? "planner_activated"
+        : !wantsPlan
+          ? "planner_not_requested"
+          : "planner_blocked_level_A",
+    };
+
+    logNV("🗣️ [CHAT/LLM] LLM respondeu", {
+      use_planner: wantsPlan,
+      pm4_allows: pm4AllowsPlanner,
+      final: arbitrationDecision.final_decision,
+      session_id,
+    });
+
+    // --- Planner como ferramenta interna (gate: PM4 + LLM) ---
     let plannerSnapshot = null;
     let plannerUsed = false;
 
-    if (wantsPlan) {
+    if (shouldActivatePlanner) {
       try {
         const classification = classifyRequest({ text: message, context });
         const envelope = buildOutputEnvelope(classification, { text: message });
@@ -3420,7 +3485,7 @@ async function handleChatLLM(request, env) {
 
         logNV("🔧 [CHAT/LLM] Planner acionado como ferramenta interna", {
           session_id,
-          level: classification.level,
+          level: classification.complexity_level,
         });
       } catch (planErr) {
         logNV("⚠️ [CHAT/LLM] Planner falhou como tool (não crítico)", {
@@ -3443,6 +3508,7 @@ async function handleChatLLM(request, env) {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
+        arbitration: arbitrationDecision,
       },
     });
   } catch (err) {
@@ -3457,6 +3523,10 @@ async function handleChatLLM(request, env) {
         detail: String(err),
         telemetry: {
           duration_ms: Date.now() - startedAt,
+          // Include PM4 pre-check result even on LLM failure — it's deterministic
+          arbitration: pm4Arbitration
+            ? { pm4_level: pm4Arbitration.level, pm4_allows_planner: pm4Arbitration.allows_planner }
+            : null,
         },
       },
       500
@@ -4137,6 +4207,14 @@ if (request.method === "GET") {
             duration_ms: "number",
             session_id: "string | null",
             pipeline: "string — 'LLM-only' ou 'LLM + PM4→PM9'",
+            arbitration: {
+              pm4_level: "string — 'A' | 'B' | 'C' (nível PM4 do pedido)",
+              pm4_category: "string — 'simple' | 'tactical' | 'complex'",
+              pm4_signals: "string[] — sinais detectados pelo PM4",
+              pm4_allows_planner: "boolean — PM4 permite planner (false se nível A)",
+              llm_requested_planner: "boolean — LLM retornou use_planner=true",
+              final_decision: "string — 'planner_activated' | 'planner_not_requested' | 'planner_blocked_level_A'",
+            },
           },
         },
       },
