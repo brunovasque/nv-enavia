@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useNotificationStore } from "./notifications/notificationStore";
 
 const NAV_ITEMS = [
   { path: "/chat",      label: "Chat",    icon: "💬" },
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ collapsed }) {
   const { pathname } = useLocation();
+  const { unreadCount } = useNotificationStore();
 
   return (
     <aside
@@ -52,6 +54,16 @@ export default function Sidebar({ collapsed }) {
               )}
               {isBrowserItem && !collapsed && (
                 <span style={styles.browserBadge}>CORE</span>
+              )}
+              {/* P25-PR5: unread notification badge — real events only */}
+              {isBrowserItem && unreadCount > 0 && (
+                <span
+                  style={styles.notifBadge}
+                  data-testid="browser-notif-badge"
+                  title={`${unreadCount} notificação(ões) do Browser Arm`}
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
               )}
             </NavLink>
           );
@@ -159,6 +171,19 @@ const styles = {
     padding: "2px 6px",
     borderRadius: "4px",
     border: "1px solid var(--color-primary-border)",
+  },
+  notifBadge: {
+    marginLeft: "4px",
+    fontSize: "9px",
+    fontWeight: 700,
+    color: "#fff",
+    background: "#EF4444",
+    padding: "2px 5px",
+    borderRadius: "10px",
+    minWidth: "16px",
+    textAlign: "center",
+    lineHeight: 1.4,
+    flexShrink: 0,
   },
   footer: {
     padding: "12px 16px",
