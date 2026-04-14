@@ -32,6 +32,64 @@ import {
   BROWSER_ARM_STATE_SHAPE,
   validateSuggestion,
 } from "./schema/browser-arm-contract.js";
+// 🛡️ P26-PR2 — Security Supervisor (enforcement real)
+import {
+  evaluateSensitiveAction,
+  DECISION as SUPERVISOR_DECISION,
+  REASON_CODE as SUPERVISOR_REASON_CODE,
+} from "./schema/security-supervisor.js";
+
+// ---------------------------------------------------------------------------
+// 🛡️ P26-PR2 — _runSupervisorGate(context)
+//
+// Ponto canônico e único de enforcement do Supervisor de Segurança.
+// Chamado obrigatoriamente antes de qualquer ação sensível real.
+//
+// Retorna:
+//   { pass: true, supervisorDecision }  → ação pode prosseguir
+//   { pass: false, supervisorDecision } → ação bloqueada ou exige revisão
+//
+// Quando pass === false, o caller deve usar _buildSupervisorBlockResponse()
+// para devolver a resposta HTTP estruturada e auditável.
+// ---------------------------------------------------------------------------
+function _runSupervisorGate(context) {
+  const supervisorDecision = evaluateSensitiveAction(context);
+  if (supervisorDecision.decision === SUPERVISOR_DECISION.ALLOW) {
+    return { pass: true, supervisorDecision };
+  }
+  return { pass: false, supervisorDecision };
+}
+
+// ---------------------------------------------------------------------------
+// 🛡️ P26-PR2 — _buildSupervisorBlockResponse(supervisorDecision)
+//
+// Constrói resposta de bloqueio/revisão humana estruturada e auditável.
+// Compatível com o shape de erro já existente no contract-executor.
+// ---------------------------------------------------------------------------
+function _buildSupervisorBlockResponse(supervisorDecision) {
+  const errorCode = supervisorDecision.decision === SUPERVISOR_DECISION.NEEDS_HUMAN_REVIEW
+    ? "SUPERVISOR_NEEDS_HUMAN_REVIEW"
+    : "SUPERVISOR_BLOCKED";
+
+  return {
+    ok: false,
+    error: errorCode,
+    message: supervisorDecision.reason_text,
+    supervisor_enforcement: {
+      allowed: supervisorDecision.allowed,
+      decision: supervisorDecision.decision,
+      reason_code: supervisorDecision.reason_code,
+      reason_text: supervisorDecision.reason_text,
+      risk_level: supervisorDecision.risk_level,
+      requires_human_approval: supervisorDecision.requires_human_approval,
+      scope_valid: supervisorDecision.scope_valid,
+      autonomy_valid: supervisorDecision.autonomy_valid,
+      evidence_sufficient: supervisorDecision.evidence_sufficient,
+      timestamp: supervisorDecision.timestamp,
+      supervisor_version: supervisorDecision.supervisor_version,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // KV Key Prefixes
@@ -2321,35 +2379,38 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     };
   }
 
-  // 🛡️ P23 — Autonomy Constitution Enforcement (runtime gate)
-  // Validates action against the autonomy contract BEFORE any execution begins.
-  // Subordinate to schema/CONSTITUIÇÃO; enforced by schema/autonomy-contract.js.
-  // Placed after Gate 1+2 so we have current_task and task status as inputs.
-  // Authorization is derived from task being in_progress (startTask was called = human OK).
-  const constitutionCheck = enforceConstitution({
+  // 🛡️ P26-PR2 — Security Supervisor Enforcement (supersedes direct P23 call)
+  // The supervisor delegates to enforceConstitution (P23) internally,
+  // plus evaluates scope, risk, evidence, and arm checks.
+  // This replaces the previous direct enforceConstitution call to avoid
+  // double-evaluation while adding the full supervisor gate.
+  const supervisorGatesContext = {
+    scope_defined:                       !!(state.scope),
+    environment_defined:                 true,
+    risk_assessed:                       true,
+    authorization_present_when_required: task.status === "in_progress",
+    observability_preserved:             true,
+    evidence_available_when_required:    true,
+  };
+  const supervisorGate = _runSupervisorGate({
     action: "execute_in_test_within_scope",
     environment: "TEST",
     scope_approved: !!(state.scope),
-    gates_context: {
-      scope_defined:                       !!(state.scope),
-      environment_defined:                 true,
-      risk_assessed:                       true,
-      authorization_present_when_required: task.status === "in_progress",
-      observability_preserved:             true,
-      evidence_available_when_required:    true,
-    },
+    gates_context: supervisorGatesContext,
+    evidence_sufficient: true,
   });
 
-  if (!constitutionCheck.allowed) {
+  if (!supervisorGate.pass) {
+    const blockResp = _buildSupervisorBlockResponse(supervisorGate.supervisorDecision);
     return {
-      ok: false,
-      error: "CONSTITUTION_BLOCKED",
-      message: constitutionCheck.reason,
+      ...blockResp,
+      // Backwards-compatible: keep constitution_enforcement shape for callers
+      // that already handle it. The supervisor_enforcement field is additive.
       constitution_enforcement: {
-        allowed: constitutionCheck.allowed,
-        blocked: constitutionCheck.blocked,
-        level: constitutionCheck.level,
-        reason: constitutionCheck.reason,
+        allowed: false,
+        blocked: true,
+        level: supervisorGate.supervisorDecision.reason_code,
+        reason: supervisorGate.supervisorDecision.reason_text,
       },
     };
   }
@@ -3703,6 +3764,7 @@ function executeGitHubPrAction({
   drift_detected = false,
   regression_detected = false,
 } = {}) {
+  // Run arm-specific enforcement first (pure, no side effects)
   const enforcement = enforceGitHubPrArm({
     action,
     scope_approved,
@@ -3711,13 +3773,36 @@ function executeGitHubPrAction({
     regression_detected,
   });
 
+  // 🛡️ P26-PR2 — Security Supervisor gate (consolidated decision ABOVE arm)
+  // Passes arm_check_result so the supervisor can factor in the arm's assessment.
+  const supervisorGate = _runSupervisorGate({
+    action,
+    environment: "TEST",
+    scope_approved: scope_approved === true,
+    gates_context: gates_context || {},
+    evidence_sufficient: true,
+    arm_id: GITHUB_PR_ARM_ID,
+    arm_check_result: {
+      allowed: enforcement.allowed,
+      reason: enforcement.reason,
+      arm_id: enforcement.arm_id,
+    },
+  });
+
+  // If arm blocked → preserve existing block path (backwards-compatible)
   if (!enforcement.allowed) {
     return {
       ok: false,
       error: "GITHUB_PR_ARM_BLOCKED",
       message: enforcement.reason,
       enforcement,
+      supervisor_enforcement: supervisorGate.supervisorDecision,
     };
+  }
+
+  // If arm allowed but supervisor blocked → new supervisor block path
+  if (!supervisorGate.pass) {
+    return _buildSupervisorBlockResponse(supervisorGate.supervisorDecision);
   }
 
   return {
@@ -4353,6 +4438,7 @@ async function executeBrowserArmAction({
   execution_context = null,
   env = null,
 } = {}) {
+  // Run arm-specific enforcement first (pure, no side effects)
   const enforcement = enforceBrowserArm({
     action,
     scope_approved,
@@ -4363,6 +4449,23 @@ async function executeBrowserArmAction({
     regression_detected,
   });
 
+  // 🛡️ P26-PR2 — Security Supervisor gate (consolidated decision ABOVE arm)
+  // Passes arm_check_result so the supervisor can factor in the arm's assessment.
+  const supervisorGate = _runSupervisorGate({
+    action,
+    environment: "TEST",
+    scope_approved: scope_approved === true,
+    gates_context: gates_context || {},
+    evidence_sufficient: true,
+    arm_id: BROWSER_ARM_ID,
+    arm_check_result: {
+      allowed: enforcement.allowed,
+      reason: enforcement.reason,
+      arm_id: enforcement.arm_id,
+    },
+  });
+
+  // If arm blocked → preserve existing block path (backwards-compatible state management)
   if (!enforcement.allowed) {
     // ── Update in-memory state so /browser-arm/state reflects the block ──
     _browserArmLastExecution = {
@@ -4398,7 +4501,13 @@ async function executeBrowserArmAction({
       message: enforcement.reason,
       enforcement,
       suggestion_required: enforcement.suggestion_required || false,
+      supervisor_enforcement: supervisorGate.supervisorDecision,
     };
+  }
+
+  // 🛡️ P26-PR2 — If arm allowed but supervisor blocked → new supervisor block path
+  if (!supervisorGate.pass) {
+    return _buildSupervisorBlockResponse(supervisorGate.supervisorDecision);
   }
 
   // ── Resolve BROWSER_EXECUTOR_URL ──
@@ -4763,4 +4872,7 @@ export {
   callBrowserExecutor,
   BROWSER_EXECUTOR_PAYLOAD_SHAPE,
   BROWSER_EXECUTOR_RESPONSE_SHAPE,
+  // 🛡️ P26-PR2 — Security Supervisor enforcement (re-exported for testing/auditing)
+  SUPERVISOR_DECISION,
+  SUPERVISOR_REASON_CODE,
 };
