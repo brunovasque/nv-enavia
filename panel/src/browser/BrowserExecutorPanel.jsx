@@ -32,11 +32,12 @@
 // Regra de honestidade: campo ausente = "sem dado disponível". Nunca inventar.
 // ============================================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useBrowserSession, BROWSER_SESSION_STATUS } from "./useBrowserSession";
 import { useBrowserNotifications } from "../notifications/useBrowserNotifications";
 import NotificationToast from "../notifications/NotificationToast";
 import { markAllRead } from "../notifications/notificationStore";
+import { grantBrowserArmPermission, GRANTABLE_BLOCK_LEVELS } from "../api/endpoints/browserSession";
 
 // ── Canonical noVNC URL ───────────────────────────────────────────────────
 // Confirmed canonical endpoint: browser.nv-imoveis.com/novnc/vnc.html?autoconnect=1
@@ -275,17 +276,29 @@ function OperationalFeedCard({ session }) {
   );
 }
 
-// ── Permission / Block Card (P25-PR4) ─────────────────────────────────────
+// ── Permission / Block Card (P25-PR4 / P25-PR6) ───────────────────────────
 // Shows when the Browser Arm is blocked by enforcement (scope, permission, etc).
 // Data comes from real enforcement result stored in /browser-arm/state.
-// Does NOT implement approval UX — only displays the real block state.
 //
-function PermissionBlockCard({ block, error }) {
+// P25-PR6 adds an honest grant action for grantable block levels:
+//   - "blocked_out_of_scope"        → user can grant scope + permission
+//   - "blocked_conditional_not_met" → user can grant user_permission
+//   - Other levels: informational only — no action button (no placebo)
+//
+// onGrant     — callback invoked when user clicks grant button
+// isGranting  — true while the grant POST is in flight
+// grantResult — { ok, error? } from the last grant attempt, or null
+//
+function PermissionBlockCard({ block, error, onGrant, isGranting, grantResult }) {
   if (!block && !error?.recoverable) return null;
 
   const reason = block?.reason || error?.message || "Motivo não disponível";
   const level = block?.level || error?.code || null;
   const needsPermission = block?.suggestionRequired === true;
+
+  // Show the grant button only for block levels that user permission can actually fix.
+  // For other levels (drift, regression, wrong arm, P23 gates) a button would be a placebo.
+  const isGrantable = needsPermission && level != null && GRANTABLE_BLOCK_LEVELS.includes(level);
 
   return (
     <div style={s.blockCard} data-testid="permission-block-card">
@@ -303,6 +316,37 @@ function PermissionBlockCard({ block, error }) {
           <span style={s.blockPermissionText}>
             A Enavia precisa de permissão do usuário para prosseguir com esta ação.
           </span>
+        </div>
+      )}
+
+      {/* P25-PR6: Grant action — only for grantable blocks, never a placebo */}
+      {isGrantable && (
+        <div style={s.blockGrantRow} data-testid="block-grant-row">
+          <button
+            style={{
+              ...s.blockGrantBtn,
+              ...(isGranting ? s.blockGrantBtnDisabled : {}),
+            }}
+            onClick={onGrant}
+            disabled={isGranting}
+            data-testid="block-grant-btn"
+            aria-label="Conceder permissão ao Browser Arm para prosseguir"
+          >
+            {isGranting ? "Concedendo…" : "Conceder permissão"}
+          </button>
+
+          {/* Honest result feedback — success or real error */}
+          {grantResult && !isGranting && (
+            grantResult.ok ? (
+              <span style={s.blockGrantOk} data-testid="block-grant-ok">
+                ✓ Permissão concedida — aguardando atualização do estado.
+              </span>
+            ) : (
+              <span style={s.blockGrantErr} data-testid="block-grant-err">
+                ✕ {grantResult.error?.message || "Falha ao conceder permissão."}
+              </span>
+            )
+          )}
         </div>
       )}
     </div>
@@ -474,11 +518,15 @@ function formatTs(iso) {
 // ── Main component ─────────────────────────────────────────────────────────
 
 /**
- * BrowserExecutorPanel — P25-PR3
+ * BrowserExecutorPanel — P25-PR3 / P25-PR6
  *
  * Painel real do Browser Executor.
  * noVNC = viewport ao vivo. Painel = estado real + metadados reais.
  * Sem demo switcher. Sem mock fixo. Sessão real ou "sem sessão" honesto.
+ *
+ * P25-PR6: grant workflow — honesto e cirúrgico.
+ * O botão "Conceder permissão" aparece SOMENTE para bloqueios que user_permission
+ * pode realmente resolver. Sem placebo para bloqueios irresolvíveis pelo usuário.
  */
 export default function BrowserExecutorPanel() {
   const { session, loading, error, source, refresh, lastUpdated } = useBrowserSession();
@@ -492,6 +540,34 @@ export default function BrowserExecutorPanel() {
   useEffect(() => {
     markAllRead();
   }, []);
+
+  // P25-PR6: grant permission state
+  const [isGranting, setIsGranting] = useState(false);
+  const [grantResult, setGrantResult] = useState(null);
+
+  // P25-PR6: handle user clicking "Conceder permissão" in PermissionBlockCard.
+  // Sends POST /browser-arm/action with user_permission: true.
+  // On success: refreshes session state (clears the block if enforcement passed).
+  // On failure: surfaces the real error — no fake success.
+  const handleGrant = useCallback(async () => {
+    if (!session?.currentAction || !session?.block) return;
+    setIsGranting(true);
+    setGrantResult(null);
+    const result = await grantBrowserArmPermission(
+      session.currentAction,
+      session.block.level,
+    );
+    setGrantResult(result);
+    setIsGranting(false);
+    if (result.ok) {
+      refresh();
+    }
+  }, [session, refresh]);
+
+  // Reset grant result when the block state changes (new poll cycle clears or updates it).
+  useEffect(() => {
+    setGrantResult(null);
+  }, [session?.block]);
 
   const sessionStatus = session?.sessionStatus || BROWSER_SESSION_STATUS.SEM_SESSAO;
   const meta = STATUS_META[sessionStatus] || DEFAULT_STATUS_META;
@@ -607,9 +683,16 @@ export default function BrowserExecutorPanel() {
               <BrowserErrorCard error={session.error} />
             )}
 
-            {/* Permission / block card — shown when arm is blocked (P25-PR4) */}
+            {/* Permission / block card — shown when arm is blocked (P25-PR4 / P25-PR6) */}
+            {/* P25-PR6: grant workflow wired here — onGrant/isGranting/grantResult */}
             {(session?.block || (hasError && session?.error?.recoverable)) && (
-              <PermissionBlockCard block={session.block} error={session.error} />
+              <PermissionBlockCard
+                block={session.block}
+                error={session.error}
+                onGrant={handleGrant}
+                isGranting={isGranting}
+                grantResult={grantResult}
+              />
             )}
 
             {/* Operational feed — real data from /browser-arm/state (P25-PR4) */}
@@ -1244,7 +1327,40 @@ const s = {
     fontWeight: 500,
   },
 
-  // ── Suggestions card (P25-PR4) ──────────────────────────────────────────
+  // ── Grant row (P25-PR6) ─────────────────────────────────────────────────
+  blockGrantRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    marginTop: "10px",
+  },
+  blockGrantBtn: {
+    alignSelf: "flex-start",
+    padding: "8px 16px",
+    background: "rgba(245,158,11,0.15)",
+    border: "1px solid rgba(245,158,11,0.50)",
+    borderRadius: "var(--radius-md)",
+    color: "#F59E0B",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "opacity 0.15s",
+  },
+  blockGrantBtnDisabled: {
+    opacity: 0.55,
+    cursor: "not-allowed",
+  },
+  blockGrantOk: {
+    fontSize: "11px",
+    color: "#10B981",
+    fontWeight: 500,
+  },
+  blockGrantErr: {
+    fontSize: "11px",
+    color: "#EF4444",
+    fontWeight: 500,
+  },
+
   suggestionsCard: {
     background: "var(--bg-surface)",
     border: "1px solid rgba(139,92,246,0.25)",
