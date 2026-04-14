@@ -143,16 +143,16 @@ describe("P25-PR5 — notificationStore", () => {
     clearAllToasts();
   });
 
-  it("1. addNotificationEvent incrementa unreadCount", () => {
-    // We read current snapshot directly through a synchronous check
-    const before = (() => {
-      let count = 0;
-      const unsub = useNotificationStore.toString(); // just verifying export
-      addNotificationEvent("block", "Bloqueio teste");
-      return count;
-    })();
-    expect(before).toBe(0); // before was 0 (reset by markAllRead)
-    // Re-import to read current store state
+  it("1. addNotificationEvent incrementa unreadCount (verificado via render)", async () => {
+    // After calling addNotificationEvent, NotificationToast should render the toast
+    addNotificationEvent("block", "Evento real de bloqueio");
+    const mod = await import("../notifications/NotificationToast.jsx");
+    const Toast = mod.default;
+    const html = renderToStaticMarkup(
+      createElement(MemoryRouter, {}, createElement(Toast))
+    );
+    expect(html).toContain("notification-toast-block");
+    expect(html).toContain("Evento real de bloqueio");
   });
 
   it("2. addNotificationEvent retorna id crescente", () => {

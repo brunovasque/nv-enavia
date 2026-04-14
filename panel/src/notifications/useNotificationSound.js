@@ -24,9 +24,8 @@ let _audioCtx = null;
 function _getAudioContext() {
   if (_audioCtx) return _audioCtx;
   try {
-    const Ctx = typeof AudioContext !== "undefined"
-      ? AudioContext
-      : (typeof window !== "undefined" ? window.webkitAudioContext : null);
+    const Ctx = (typeof AudioContext !== "undefined" ? AudioContext : null)
+      || (typeof window !== "undefined" ? window.webkitAudioContext : null);
     if (!Ctx) return null;
     _audioCtx = new Ctx();
   } catch {
