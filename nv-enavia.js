@@ -3256,6 +3256,11 @@ const _PLANNER_LEAK_PATTERNS = [
   /\bneeds_formal_contract\b/i,
 ];
 
+// Threshold: 3+ distinct mechanical terms in reply = planner leak.
+// A casual mention of "reason" in natural text is fine; a dump of
+// next_action + reason + scope_summary is a mechanical leak.
+const _PLANNER_LEAK_THRESHOLD = 3;
+
 function _sanitizeChatReply(reply) {
   if (!reply || typeof reply !== "string") return reply;
 
@@ -3266,9 +3271,7 @@ function _sanitizeChatReply(reply) {
   }
 
   // Threshold: 3+ distinct mechanical terms = planner leak
-  // (a casual mention of "reason" in natural text is fine; a dump of
-  // next_action + reason + scope_summary is a mechanical leak)
-  if (leakCount >= 3) {
+  if (leakCount >= _PLANNER_LEAK_THRESHOLD) {
     return "Entendido. Vou organizar isso internamente e te respondo em seguida.";
   }
 
