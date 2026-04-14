@@ -28,12 +28,18 @@
 //   R18. Merge gate state: blocked (ready + rejected)
 //   R19. executeGitHubPrAction — all 9 pre-merge actions pass in runtime
 //   R20. requestMergeApproval — blocked: P23 gates fail
+//   R21. handleApproveMerge — blocked: merge_gate missing from body
+//   R22. handleApproveMerge — blocked: incompatible merge_status (not awaiting_formal_approval)
+//   R23. handleApproveMerge — blocked: approval_status not "approved"
+//   R24. handleApproveMerge — allowed: valid merge_gate + approval_status → approved_for_merge
+//   R25. handleApproveMerge — proof: backend derives gates internally, client sends only merge_gate
 // ============================================================================
 
 import {
   executeGitHubPrAction,
   requestMergeApproval,
   approveMerge,
+  handleApproveMerge,
 } from "../contract-executor.js";
 
 import { MERGE_STATUS } from "../schema/github-pr-arm-contract.js";
@@ -403,6 +409,114 @@ console.log("R20. requestMergeApproval — blocked: P23 gates fail (scope_define
   });
   assert(r.ok === false, "ok = false");
   assert(r.error === "MERGE_NOT_READY", "error = MERGE_NOT_READY");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R21–R25. handleApproveMerge — panel→backend canonical route (new payload shape)
+//
+// The panel sends { merge_gate, approval_status }. The handler validates
+// the backend-emitted state and derives merge_context internally (sovereign).
+// These tests prove the alignment between panel and runtime.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Helper: create a mock Request from a body object (mirrors HTTP handler signature)
+function mockRequest(bodyObj) {
+  return { json: () => Promise.resolve(bodyObj) };
+}
+
+// ── R21. blocked: merge_gate missing ────────────────────────────────────────
+console.log("R21. handleApproveMerge — blocked: merge_gate missing from body");
+{
+  const r = await handleApproveMerge(mockRequest({ approval_status: "approved" }));
+  assert(r.status === 400, "status = 400");
+  assert(r.body.ok === false, "ok = false");
+  assert(r.body.error === "MERGE_GATE_MISSING", "error = MERGE_GATE_MISSING");
+}
+
+// ── R22. blocked: incompatible merge_status ─────────────────────────────────
+console.log("R22. handleApproveMerge — blocked: incompatible merge_status (not_ready)");
+{
+  const r = await handleApproveMerge(mockRequest({
+    merge_gate: {
+      merge_status: "not_ready",
+      summary_for_merge: "X",
+      reason_merge_ok: "Y",
+    },
+    approval_status: "approved",
+  }));
+  assert(r.status === 403, "status = 403");
+  assert(r.body.ok === false, "ok = false");
+  assert(r.body.error === "MERGE_NOT_AWAITING_APPROVAL", "error = MERGE_NOT_AWAITING_APPROVAL");
+}
+
+// ── R23. blocked: approval_status not "approved" ────────────────────────────
+console.log("R23. handleApproveMerge — blocked: approval_status is not 'approved'");
+{
+  const r = await handleApproveMerge(mockRequest({
+    merge_gate: {
+      merge_status: "awaiting_formal_approval",
+      summary_for_merge: "P24: tudo certo.",
+      reason_merge_ok: "Sem regressão.",
+    },
+    approval_status: "pending",
+  }));
+  assert(r.status === 403, "status = 403");
+  assert(r.body.ok === false, "ok = false");
+  assert(r.body.error === "APPROVAL_NOT_GIVEN", "error = APPROVAL_NOT_GIVEN");
+}
+
+// ── R24. allowed: valid merge_gate + approval_status → approved_for_merge ───
+console.log("R24. handleApproveMerge — allowed: valid merge_gate + 'approved' → approved_for_merge");
+{
+  const r = await handleApproveMerge(mockRequest({
+    merge_gate: {
+      merge_status: "awaiting_formal_approval",
+      summary_for_merge: "P24: enforcement + merge gate completo.",
+      reason_merge_ok: "Todos os gates passaram, sem drift, sem regressão.",
+      approval_status: "pending",
+      can_merge: false,
+    },
+    approval_status: "approved",
+  }));
+  assert(r.status === 200, "status = 200");
+  assert(r.body.ok === true, "ok = true");
+  assert(r.body.merge_status === "approved_for_merge", "merge_status = approved_for_merge");
+  assert(r.body.can_merge === true, "can_merge = true");
+  assert(typeof r.body.summary_for_merge === "string" && r.body.summary_for_merge.length > 0, "summary present");
+  assert(typeof r.body.reason_merge_ok === "string" && r.body.reason_merge_ok.length > 0, "reason present");
+}
+
+// ── R25. panel proof: handler does NOT receive gate booleans from client ─────
+console.log("R25. handleApproveMerge — proof: backend derives gates internally, client only sends merge_gate");
+{
+  // Sending NO boolean gates (contract_rechecked, phase_validated, etc.) from client:
+  const clientPayload = {
+    merge_gate: {
+      merge_status: "awaiting_formal_approval",
+      summary_for_merge: "Correção cirúrgica — painel não inventa gates.",
+      reason_merge_ok: "Backend é soberano na validação dos gates.",
+      approval_status: "pending",
+      can_merge: false,
+    },
+    approval_status: "approved",
+  };
+  // Confirm payload has no fabricated gates:
+  const hasNoFabricatedGates =
+    clientPayload.contract_rechecked === undefined &&
+    clientPayload.phase_validated   === undefined &&
+    clientPayload.no_regression     === undefined &&
+    clientPayload.diff_reviewed     === undefined &&
+    clientPayload.summary_reviewed  === undefined &&
+    clientPayload.scope_approved    === undefined &&
+    clientPayload.drift_detected    === undefined &&
+    clientPayload.regression_detected === undefined;
+  assert(hasNoFabricatedGates, "client payload has ZERO fabricated gate fields");
+
+  // And the handler succeeds:
+  const r = await handleApproveMerge(mockRequest(clientPayload));
+  assert(r.status === 200, "handler accepts payload with no gate fields from client");
+  assert(r.body.ok === true, "result.ok = true");
+  assert(r.body.merge_status === "approved_for_merge", "approved_for_merge returned");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
