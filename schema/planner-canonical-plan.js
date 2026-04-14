@@ -168,6 +168,7 @@ function _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_huma
     ],
     needs_human_approval,
     next_action: "Executar a ação identificada diretamente e confirmar conclusão.",
+    chat_reply: "Recebido. Processando sua solicitação.",
     reason,
   };
 }
@@ -202,6 +203,7 @@ function _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_huma
     ],
     needs_human_approval,
     next_action: "Revisar as etapas planejadas, validar dependências e aguardar confirmação para iniciar.",
+    chat_reply: "Entendido. Estruturando as etapas táticas para sua solicitação.",
     reason,
   };
 }
@@ -238,6 +240,7 @@ function _buildPlanC({ plan_type, output_mode, objective, risk_level, reason }) 
     ],
     needs_human_approval: true,
     next_action: "Submeter este plano para revisão e aprovação humana formal antes de qualquer execução.",
+    chat_reply: "Recebido. Esta demanda requer planejamento formal — preparando plano para revisão e aprovação.",
     reason,
   };
 }

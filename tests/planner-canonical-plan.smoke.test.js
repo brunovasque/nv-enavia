@@ -307,6 +307,7 @@ async function runTests() {
     "acceptance_criteria",
     "needs_human_approval",
     "next_action",
+    "chat_reply",
     "reason",
   ];
 
