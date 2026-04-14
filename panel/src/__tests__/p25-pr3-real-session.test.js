@@ -3,7 +3,7 @@
 //
 // Verifica acceptance criteria do P25-PR3:
 //   1. BrowserExecutorPanel renderiza sem crash (usa sessão real via hook)
-//   2. Estado idle exibe "Nenhuma sessão ativa" (honesto)
+//   2. Estado idle exibe "Arm em standby" — linguagem unificada
 //   3. Domínio operacional run.nv-imoveis.com aparece
 //   4. Título do painel é "Painel Real" (não mais "Painel Explicativo")
 //   5. Fonte real indicada — /browser-arm/state
@@ -82,9 +82,9 @@ describe("P25-PR3 — BrowserExecutorPanel real render", () => {
     expect(() => renderPanel()).not.toThrow();
   });
 
-  it("2. estado idle exibe 'Nenhuma sessão ativa' (honesto)", () => {
+  it("2. estado idle exibe 'Arm em standby' — linguagem unificada com header e sidebar", () => {
     const html = renderPanel();
-    expect(html).toContain("Nenhuma sessão ativa");
+    expect(html).toContain("Arm em standby");
   });
 
   it("3. domínio operacional run.nv-imoveis.com aparece", () => {

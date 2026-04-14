@@ -118,18 +118,14 @@ function NoVncViewport({ session, onStatusChange }) {
     onStatusChange?.("error");
   }
 
-  // Overlay text and presence depend on the REAL iframe state.
-  // When the viewport is connected (even in arm standby), we do NOT say "Sem sessão ativa"
-  // — that would be a lie. We say "Arm em standby" to be honest about BOTH truths.
-  const showOverlay = iframeStatus !== "connected" || !isActive;
-  const overlayIcon =
-    iframeStatus === "error"     ? "⚠" :
-    iframeStatus === "connected" ? "◉" : "◎";
+  // Overlay only when we genuinely don't know or can't reach the viewport.
+  // When connected (arm active OR standby), the viewport shows cleanly — no text in center.
+  // The header badge ("STANDBY" / "AO VIVO" / "CONECTANDO") is the sole status indicator.
+  const showOverlay = iframeStatus === "loading" || iframeStatus === "error";
+  const overlayIcon = iframeStatus === "error" ? "⚠" : "◎";
   const overlayText =
     iframeStatus === "error"
       ? "Viewport indisponível"
-      : iframeStatus === "connected" && !isActive
-      ? "Viewport ativo · arm em standby"
       : "Conectando ao viewport…";
 
   return (
@@ -335,7 +331,7 @@ function SessionSidebarCard({ session }) {
           <span style={s.noVncNoteText}>
             {isActive
               ? "Sessão ao vivo visível no viewport noVNC acima."
-              : "noVNC ativará quando houver sessão real do browser executor."}
+              : "Arm em standby · aguardando sessão ativa."}
           </span>
         </div>
       </div>
@@ -498,14 +494,13 @@ export default function BrowserExecutorPanel() {
             {/* Session metadata when active */}
             {isActive && <SessionMetadataCard session={session} />}
 
-            {/* Idle info when not active — "sem sessão" is metadata, not a viewport replacement */}
+            {/* Idle info when not active — shows arm state, coherent with header + viewport badge */}
             {!isActive && (
               <div style={s.idleInfo} data-testid="browser-idle-info">
                 <span style={s.idleInfoIcon} aria-hidden="true">◎</span>
-                <p style={s.idleInfoTitle}>Nenhuma sessão ativa</p>
+                <p style={s.idleInfoTitle}>Arm em standby</p>
                 <p style={s.idleInfoDesc}>
-                  O Browser Executor está em standby. Quando uma sessão for iniciada,
-                  os dados de navegação aparecerão aqui e o noVNC mostrará a sessão ao vivo.
+                  Nenhuma sessão de browser ativa. O viewport noVNC acima continua visível.
                 </p>
                 <div style={s.idleDomain}>
                   <span style={s.idleDomainLabel}>Domínio operacional</span>

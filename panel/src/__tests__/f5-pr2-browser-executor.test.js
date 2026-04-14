@@ -78,7 +78,7 @@ describe("F5-PR2 — BrowserExecutorPanel render", () => {
 
   it("6. estado idle exibe mensagem de standby honesta", () => {
     const html = renderPanel();
-    expect(html).toContain("Nenhuma sessão ativa");
+    expect(html).toContain("Arm em standby");
   });
 
   it("7. estado idle exibe domínio operacional run.nv-imoveis.com/*", () => {
