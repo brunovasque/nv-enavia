@@ -4067,6 +4067,13 @@ const BROWSER_EXECUTOR_RESPONSE_SHAPE = {
 let _browserArmLastExecution = null;
 
 // ---------------------------------------------------------------------------
+// In-memory suggestions buffer for Browser Arm.
+// Populated when the runtime or executor returns suggestions following
+// the canonical SUGGESTION_SHAPE. Reset on worker restart.
+// ---------------------------------------------------------------------------
+let _browserArmSuggestions = [];
+
+// ---------------------------------------------------------------------------
 // buildBrowserExecutorPayload({ action, params, execution_context })
 //
 // Builds the canonical payload to send to the external browser executor.
@@ -4234,6 +4241,23 @@ async function executeBrowserArmAction({
   });
 
   if (!enforcement.allowed) {
+    // ── Update in-memory state so /browser-arm/state reflects the block ──
+    _browserArmLastExecution = {
+      action,
+      timestamp: new Date().toISOString(),
+      request_id: null,
+      ok: false,
+      execution_status: "blocked",
+      error_type: "BROWSER_ARM_BLOCKED",
+      error_message: enforcement.reason,
+      target_url: null,
+      result_summary: null,
+      blocked: true,
+      block_level: enforcement.level || null,
+      block_reason: enforcement.reason,
+      suggestion_required: enforcement.suggestion_required || false,
+    };
+
     return {
       ok: false,
       error: "BROWSER_ARM_BLOCKED",
@@ -4281,6 +4305,12 @@ async function executeBrowserArmAction({
       : "failed",
     error_type: bridgeResult.error_type,
     error_message: bridgeResult.message,
+    target_url: (bridgeResult.ok && bridgeResult.data?.target_url) || null,
+    result_summary: (bridgeResult.ok && bridgeResult.data?.result_summary) || null,
+    blocked: false,
+    block_level: null,
+    block_reason: null,
+    suggestion_required: false,
   };
 
   if (!bridgeResult.ok) {
@@ -4325,7 +4355,9 @@ function getBrowserArmState() {
   const base = { ...BROWSER_ARM_STATE_SHAPE.initial_state };
 
   if (_browserArmLastExecution) {
-    base.status = _browserArmLastExecution.ok ? "active" : "error";
+    base.status = _browserArmLastExecution.blocked
+      ? "disabled"
+      : _browserArmLastExecution.ok ? "active" : "error";
     base.last_action = _browserArmLastExecution.action;
     base.last_action_ts = _browserArmLastExecution.timestamp;
     base.last_execution = {
@@ -4334,8 +4366,25 @@ function getBrowserArmState() {
       request_id: _browserArmLastExecution.request_id,
       error_type: _browserArmLastExecution.error_type || null,
       error_message: _browserArmLastExecution.error_message || null,
+      target_url: _browserArmLastExecution.target_url || null,
+      result_summary: _browserArmLastExecution.result_summary || null,
     };
+    // Block/permission state — real enforcement data
+    if (_browserArmLastExecution.blocked) {
+      base.block = {
+        blocked: true,
+        level: _browserArmLastExecution.block_level || null,
+        reason: _browserArmLastExecution.block_reason || null,
+        suggestion_required: _browserArmLastExecution.suggestion_required || false,
+      };
+    }
   }
+
+  // Suggestions — real array, empty when none exist.
+  // Populated only when the runtime registers suggestions via the canonical shape.
+  base.suggestions = _browserArmSuggestions.length > 0
+    ? _browserArmSuggestions.slice()
+    : [];
 
   return {
     ok: true,
@@ -4350,6 +4399,7 @@ function getBrowserArmState() {
 // ---------------------------------------------------------------------------
 function resetBrowserArmState() {
   _browserArmLastExecution = null;
+  _browserArmSuggestions = [];
 }
 
 // ---------------------------------------------------------------------------

@@ -11,11 +11,14 @@
 // If the real source is unavailable, it returns an honest error envelope.
 // The panel may show "sem sessão" or "fonte indisponível" but never fake idle.
 //
-// Real backend shape for last_execution (P25-PR2):
-//   { ok, execution_status, request_id, error_type, error_message }
+// Real backend shape for last_execution (P25-PR2 + PR4):
+//   { ok, execution_status, request_id, error_type, error_message, target_url, result_summary }
 //
-// Fields NOT present in backend (and therefore NOT mapped here):
-//   target_url, result_summary, evidence
+// Block state (P25-PR4):
+//   armState.block: { blocked, level, reason, suggestion_required }
+//
+// Suggestions (P25-PR4):
+//   armState.suggestions: Array<{ type, discovery, benefit, missing_requirement, expected_impact, permission_needed }>
 //
 // Domínio operacional: run.nv-imoveis.com/*
 // ============================================================================
@@ -72,12 +75,11 @@ function mapArmStatusToSessionStatus(armState) {
 
 // ── Normalize the raw arm state into a panel-consumable session object ────
 //
-// Fields mapped here MUST exist in the real backend shape:
-//   armState:        { ok, arm_id, status, external_base, last_action, last_action_ts, last_execution }
-//   last_execution:  { ok, execution_status, request_id, error_type, error_message }
-//
-// Fields NOT mapped (not present in backend — do not fabricate):
-//   target_url, result_summary, evidence
+// Fields mapped here come from the real backend shape:
+//   armState:        { ok, arm_id, status, external_base, last_action, last_action_ts, last_execution, block, suggestions }
+//   last_execution:  { ok, execution_status, request_id, error_type, error_message, target_url, result_summary }
+//   block:           { blocked, level, reason, suggestion_required } (when action was blocked)
+//   suggestions:     Array<{ type, discovery, benefit, ... }> (canonical suggestion shape)
 //
 function normalizeSessionFromArm(armState) {
   if (!armState?.ok) {
@@ -88,7 +90,11 @@ function normalizeSessionFromArm(armState) {
       operationalDomain: armState?.external_base?.host || "run.nv-imoveis.com",
       currentAction: null,
       executionStatus: null,
+      targetUrl: null,
+      resultSummary: null,
       error: null,
+      block: null,
+      suggestions: [],
       lastActionTs: null,
       raw: armState,
     };
@@ -99,6 +105,21 @@ function normalizeSessionFromArm(armState) {
   const exec = armState.last_execution || {};
   const extBase = armState.external_base || {};
 
+  // Block/permission state — only from real enforcement data
+  const blockData = armState.block && armState.block.blocked
+    ? {
+        blocked: true,
+        level: armState.block.level || null,
+        reason: armState.block.reason || null,
+        suggestionRequired: armState.block.suggestion_required || false,
+      }
+    : null;
+
+  // Suggestions — real array from runtime, never fabricated
+  const suggestions = Array.isArray(armState.suggestions)
+    ? armState.suggestions
+    : [];
+
   return {
     active: isActive,
     sessionStatus,
@@ -106,6 +127,8 @@ function normalizeSessionFromArm(armState) {
     operationalDomain: extBase.host || "run.nv-imoveis.com",
     currentAction: armState.last_action || null,
     executionStatus: exec.execution_status || null,
+    targetUrl: exec.target_url || null,
+    resultSummary: exec.result_summary || null,
     error: sessionStatus === BROWSER_SESSION_STATUS.ERRO || sessionStatus === BROWSER_SESSION_STATUS.BLOQUEADO
       ? {
           code: exec.error_type || "BROWSER_ERROR",
@@ -113,6 +136,8 @@ function normalizeSessionFromArm(armState) {
           recoverable: sessionStatus === BROWSER_SESSION_STATUS.BLOQUEADO,
         }
       : null,
+    block: blockData,
+    suggestions,
     lastActionTs: armState.last_action_ts || null,
     raw: armState,
   };
