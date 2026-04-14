@@ -895,6 +895,10 @@ async function callChatModel(env, messages, options = {}) {
     temperature: options.temperature ?? 0.2,
     max_tokens: options.max_tokens ?? 1600,
     top_p: options.top_p ?? 1,
+    // response_format is forwarded when set (e.g. { type: "json_object" } for
+    // structured output). Omitted entirely when not provided to stay compatible
+    // with model versions that do not support the parameter.
+    ...(options.response_format ? { response_format: options.response_format } : {}),
   };
 
   logNV("🔁 Chamando modelo:", model);
@@ -3226,6 +3230,186 @@ async function handlePlannerRun(request, env) {
 }
 
 // ============================================================================
+// 💬 CHAT LLM-FIRST — POST /chat/run
+//
+// Rota de conversa livre LLM-first para a aba Chat do painel.
+// A superfície principal da conversa é o LLM — respostas naturais e livres.
+// O planner estruturado (PM4→PM9) fica como ferramenta interna, acionado
+// apenas quando o usuário pede explicitamente um plano ou quando a intenção
+// detectada sugere estruturação.
+//
+// Payload esperado:
+//   { message: string, session_id?: string, context?: object }
+//
+// Retorno:
+//   { ok, system, reply, planner_used, planner?, timestamp, telemetry }
+// ============================================================================
+async function handleChatLLM(request, env) {
+  const startedAt = Date.now();
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return jsonResponse(
+      { ok: false, error: "JSON inválido em /chat/run.", detail: String(err) },
+      400
+    );
+  }
+
+  if (!body || typeof body !== "object") body = {};
+
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!message) {
+    return jsonResponse(
+      { ok: false, error: "'message' é obrigatório e deve ser string não vazia." },
+      400
+    );
+  }
+
+  const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
+  const context = body.context && typeof body.context === "object" ? body.context : {};
+
+  try {
+    // --- System prompt LLM-first com sinal estruturado ---
+    // The LLM is the sole decision-maker for whether the planner tool is needed.
+    // No substring lists — the model reads the user's full intent and returns a
+    // small JSON object: { reply, use_planner }.
+    //   reply       — the free-form conversational response shown to the user
+    //   use_planner — true only when the user is clearly requesting a structured
+    //                 plan, action breakdown, or task organisation
+    const ownerName = env.OWNER || "usuário";
+    const systemName = env.SYSTEM_NAME || "ENAVIA";
+
+    const chatSystemPrompt = `Você é a ${systemName}, assistente inteligente da NV Imóveis.
+
+Responda SEMPRE em JSON válido, sem markdown, sem texto fora do JSON. Formato obrigatório:
+{"reply":"<sua resposta em português>","use_planner":<true ou false>}
+
+Regras para o campo reply:
+- Responda de forma natural, clara e humana.
+- Se o usuário disser algo casual (oi, tudo bem, etc.), responda naturalmente.
+- Se o usuário pedir algo técnico ou estruturado, responda de forma completa e direta.
+- Fale sempre em português do Brasil.
+- Nunca use templates rígidos, campos como "next_action" ou "reason" como fala.
+- O nome do operador é ${ownerName}.
+- Você está no painel da ${systemName}, ambiente de gestão da NV Imóveis.
+
+Regras para o campo use_planner (boolean):
+- true: apenas quando o usuário pede explicitamente um plano de ação estruturado, lista de etapas, ou organização de tarefa.
+- false: em qualquer outra situação (conversa livre, perguntas, análises, pedidos simples).`;
+
+    const llmMessages = [
+      { role: "system", content: chatSystemPrompt },
+      { role: "user", content: message },
+    ];
+
+    // --- Chamada LLM com resposta estruturada ---
+    // Max tokens capped at 1200 to balance response quality with Cloudflare Worker
+    // CPU time limits (~30s). Increase if moving to Unbound or Durable Objects.
+    const CHAT_LLM_MAX_TOKENS = 1200;
+    const llmResult = await callChatModel(env, llmMessages, {
+      temperature: 0.5,
+      max_tokens: CHAT_LLM_MAX_TOKENS,
+      response_format: { type: "json_object" },
+    });
+
+    // Parse the structured response — fall back gracefully if the model returns
+    // plain text (e.g. older model versions that ignore response_format).
+    let reply = "";
+    let wantsPlan = false;
+    try {
+      const parsed = JSON.parse(llmResult.text);
+      reply = typeof parsed.reply === "string" && parsed.reply.length > 0
+        ? parsed.reply
+        : llmResult.text;
+      wantsPlan = parsed.use_planner === true;
+    } catch {
+      // Model returned plain text — use as-is, no planner
+      reply = llmResult.text || "Instrução recebida.";
+      wantsPlan = false;
+    }
+
+    logNV("🗣️ [CHAT/LLM] LLM respondeu", { use_planner: wantsPlan, session_id });
+
+    // --- Planner como ferramenta interna (decisão do LLM) ---
+    let plannerSnapshot = null;
+    let plannerUsed = false;
+
+    if (wantsPlan) {
+      try {
+        const classification = classifyRequest({ text: message, context });
+        const envelope = buildOutputEnvelope(classification, { text: message });
+        const canonicalPlan = buildCanonicalPlan({
+          classification,
+          envelope,
+          input: { text: message },
+        });
+        const gate = evaluateApprovalGate(canonicalPlan);
+        const bridge = buildExecutorBridgePayload({ plan: canonicalPlan, gate });
+        const memoryConsolidation = consolidateMemoryLearning({
+          plan: canonicalPlan,
+          gate,
+          bridge,
+        });
+
+        plannerSnapshot = {
+          classification,
+          canonicalPlan,
+          gate,
+          bridge,
+          memoryConsolidation,
+          outputMode: envelope.output_mode,
+        };
+        plannerUsed = true;
+
+        logNV("🔧 [CHAT/LLM] Planner acionado como ferramenta interna", {
+          session_id,
+          level: classification.level,
+        });
+      } catch (planErr) {
+        logNV("⚠️ [CHAT/LLM] Planner falhou como tool (não crítico)", {
+          error: String(planErr),
+        });
+        // Planner failure is non-critical — the LLM reply is still valid
+      }
+    }
+
+    return jsonResponse({
+      ok: true,
+      system: "ENAVIA-NV-FIRST",
+      mode: "llm-first",
+      reply,
+      planner_used: plannerUsed,
+      ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
+      timestamp: Date.now(),
+      input: message,
+      telemetry: {
+        duration_ms: Date.now() - startedAt,
+        session_id: session_id || null,
+        pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
+      },
+    });
+  } catch (err) {
+    logNV("❌ [CHAT/LLM] Erro fatal:", { error: String(err) });
+    return jsonResponse(
+      {
+        ok: false,
+        system: "ENAVIA-NV-FIRST",
+        mode: "llm-first",
+        timestamp: Date.now(),
+        error: "Falha na conversa LLM-first.",
+        detail: String(err),
+        telemetry: {
+          duration_ms: Date.now() - startedAt,
+        },
+      },
+      500
+    );
+  }
+}
+
+// ============================================================================
 // 🌉 PLANNER BRIDGE — POST /planner/bridge (P12)
 //
 // Recebe o bridge payload canônico (PM8) do painel após aprovação humana (P11)
@@ -3782,6 +3966,19 @@ if (request.method === "POST") {
 }
 
 // ============================================================
+// 💬 CHAT LLM-FIRST — POST /chat/run
+// Conversa livre LLM-first para a aba Chat do painel.
+// Planner disponível como ferramenta interna, não como superfície.
+// ============================================================
+if (request.method === "POST") {
+  const url = new URL(request.url);
+  if (url.pathname === "/chat/run") {
+    const response = await handleChatLLM(request, env);
+    return withCORS(response);
+  }
+}
+
+// ============================================================
 // 🧠 PLANNER RUN — POST /planner/run
 // Pipeline estruturado PM4→PM9 (classificação → plano → gate → bridge → memória)
 // ============================================================
@@ -3855,6 +4052,40 @@ if (request.method === "GET") {
   if (url.pathname === "/health") {
     const response = await handleGetHealth(env);
     return withCORS(response);
+  }
+}
+
+// GET /chat/run → Schema/contrato da rota (smoke de conectividade)
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/chat/run") {
+    return withCORS(jsonResponse({
+      ok: true,
+      route: "POST /chat/run",
+      description: "Chat LLM-first — conversa livre com planner como ferramenta interna.",
+      schema: {
+        request: {
+          message: "string (obrigatório) — texto do usuário",
+          session_id: "string (opcional) — ID de sessão",
+          context: "object (opcional) — contexto estrutural",
+        },
+        response: {
+          ok: "boolean",
+          system: "string — 'ENAVIA-NV-FIRST'",
+          mode: "string — 'llm-first'",
+          reply: "string — resposta livre do LLM",
+          planner_used: "boolean — se o planner foi acionado internamente",
+          planner: "object (opcional) — snapshot do planner quando acionado",
+          timestamp: "number — epoch ms",
+          input: "string — texto do usuário (echo)",
+          telemetry: {
+            duration_ms: "number",
+            session_id: "string | null",
+            pipeline: "string — 'LLM-only' ou 'LLM + PM4→PM9'",
+          },
+        },
+      },
+    }));
   }
 }
 

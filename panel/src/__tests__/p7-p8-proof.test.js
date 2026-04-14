@@ -2,8 +2,8 @@
 // ENAVIA Panel — P7/P8 integration proof (13-item evidence)
 //
 // These tests replace the need for a live backend by:
-//   1. Mocking fetch() to return a structurally complete synthetic /planner/run
-//      response (all 6 canonical fields present — matches backend contract).
+//   1. Mocking fetch() to return a structurally complete synthetic /chat/run
+//      response (LLM-first reply + optional planner snapshot).
 //   2. Verifying every behavioural contract in the chain:
 //      transport → endpoint → store → mapper → card shapes.
 //   3. Verifying rehydration (P9) and EmptyState (mode=real, no snapshot).
@@ -20,8 +20,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Canonical synthetic backend response ─────────────────────────────────────
-// Mirrors the exact shape that /planner/run returns — all 6 canonical fields.
-// This is NOT a mock fixture — it is the documented backend contract payload.
+// Mirrors the planner snapshot shape returned inside /chat/run when the planner
+// is used as an internal tool. This is the same 6-field structure as before.
 
 const SYNTHETIC_BACKEND_PLANNER = {
   classification: {
@@ -63,10 +63,16 @@ const SYNTHETIC_BACKEND_PLANNER = {
   outputMode: "structured_plan",
 };
 
-// Full /planner/run HTTP response envelope
+// Full /chat/run HTTP response envelope (LLM-first mode)
 const SYNTHETIC_BACKEND_RESPONSE = {
   ok: true,
+  system: "ENAVIA-NV-FIRST",
+  mode: "llm-first",
+  reply: "Entendido. Vou estruturar o pipeline tático conforme solicitado.",
+  planner_used: true,
   planner: SYNTHETIC_BACKEND_PLANNER,
+  timestamp: Date.now(),
+  input: "Ativar pipeline tático",
 };
 
 // ── Helper: stub import.meta.env for mode=real ────────────────────────────────
@@ -90,12 +96,12 @@ function mockFetch(responseBody = SYNTHETIC_BACKEND_RESPONSE, status = 200) {
 }
 
 // =============================================================================
-// ITEM 1 — Request routes to /planner/run in mode=real
-// ITEM 2 — Response arrives with planner.* (all 6 canonical fields)
+// ITEM 1 — Request routes to /chat/run in mode=real (LLM-first)
+// ITEM 2 — Response arrives with planner.* when planner was used as tool
 // ITEM 12 — Mock is NOT sovereign in mode=real (fetch is called, not MockTransport)
 // =============================================================================
 
-describe("ITEM 1+2+12 — chatSend() routes to /planner/run and returns planner.*", () => {
+describe("ITEM 1+2+12 — chatSend() routes to /chat/run and returns LLM reply + planner.*", () => {
   beforeEach(() => {
     stubRealMode();
   });
@@ -105,7 +111,7 @@ describe("ITEM 1+2+12 — chatSend() routes to /planner/run and returns planner.
     vi.resetModules();
   });
 
-  it("calls fetch() with POST /planner/run (NOT MockTransport path)", async () => {
+  it("calls fetch() with POST /chat/run (NOT MockTransport path)", async () => {
     const fetchMock = mockFetch();
 
     // Dynamic import AFTER stubbing env so getApiConfig() sees mode=real.
@@ -118,7 +124,7 @@ describe("ITEM 1+2+12 — chatSend() routes to /planner/run and returns planner.
 
     // ITEM 12: mock path NOT taken — fetch was invoked, meaning real transport ran
     const [calledUrl, calledOpts] = fetchMock.mock.calls[0];
-    expect(calledUrl).toBe("http://test-backend/planner/run");
+    expect(calledUrl).toBe("http://test-backend/chat/run");
     expect(calledOpts.method).toBe("POST");
 
     // Request body includes message and session_id
@@ -127,7 +133,7 @@ describe("ITEM 1+2+12 — chatSend() routes to /planner/run and returns planner.
     expect(body).toHaveProperty("session_id");
   });
 
-  it("returns plannerSnapshot with all 6 canonical planner.* fields", async () => {
+  it("returns plannerSnapshot with all 6 canonical planner.* fields when planner was used", async () => {
     mockFetch();
     const { chatSend } = await import("../api/endpoints/chat.js");
 
@@ -144,18 +150,38 @@ describe("ITEM 1+2+12 — chatSend() routes to /planner/run and returns planner.
     expect(result.plannerSnapshot.outputMode).toBe("structured_plan");
   });
 
-  it("derives chat content from canonicalPlan.chat_reply (conversational surface, not next_action)", async () => {
+  it("chat content comes from LLM reply field directly (LLM-first, not derived from planner)", async () => {
     mockFetch();
     const { chatSend } = await import("../api/endpoints/chat.js");
 
     const result = await chatSend("Ativar pipeline tático");
 
-    // Chat text is derived locally from chat_reply (conversational surface).
-    // next_action is an internal operational directive — NOT displayed to user.
+    // Chat text is the LLM's free-form reply — NOT derived from canonicalPlan fields.
     expect(result.ok).toBe(true);
     expect(result.data.content).toBe(
-      SYNTHETIC_BACKEND_PLANNER.canonicalPlan.chat_reply
+      SYNTHETIC_BACKEND_RESPONSE.reply
     );
+  });
+
+  it("returns null plannerSnapshot when planner was NOT used as tool", async () => {
+    // Simulate a simple conversational response (no planner invoked)
+    const simpleResponse = {
+      ok: true,
+      system: "ENAVIA-NV-FIRST",
+      mode: "llm-first",
+      reply: "Oi! Como posso ajudar?",
+      planner_used: false,
+      timestamp: Date.now(),
+      input: "oi",
+    };
+    mockFetch(simpleResponse);
+    const { chatSend } = await import("../api/endpoints/chat.js");
+
+    const result = await chatSend("oi");
+
+    expect(result.ok).toBe(true);
+    expect(result.data.content).toBe("Oi! Como posso ajudar?");
+    expect(result.plannerSnapshot).toBeNull();
   });
 });
 
