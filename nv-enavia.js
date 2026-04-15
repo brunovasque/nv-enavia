@@ -10,6 +10,8 @@ import {
   handleCompleteTask,
   handleCloseFinalContract,
   readExecEvent,
+  // Macro2-F5 — Functional logs
+  readFunctionalLogs,
   // P24 — GitHub/PR Arm
   handleGitHubPrAction,
   handleRequestMergeApproval,
@@ -3901,8 +3903,9 @@ async function handleGetExecution(env) {
 
     // PR2 — read real exec_event via readExecEvent (canonical PR1 source)
     let execEvent = null;
+    let latestContractId = null;
     try {
-      const latestContractId = await env.ENAVIA_BRAIN.get("execution:exec_event:latest_contract_id");
+      latestContractId = await env.ENAVIA_BRAIN.get("execution:exec_event:latest_contract_id");
       if (latestContractId) {
         execEvent = await readExecEvent(env, latestContractId);
       }
@@ -3910,10 +3913,47 @@ async function handleGetExecution(env) {
       logNV("⚠️ [GET /execution] Falha não-crítica ao ler exec_event (trilha retornada sem ele)", { error: String(evErr) });
     }
 
+    // Macro2-F5 — read real functional logs from KV
+    let functionalLogs = [];
+    try {
+      if (latestContractId) {
+        functionalLogs = await readFunctionalLogs(env, latestContractId);
+      }
+    } catch (flErr) {
+      logNV("⚠️ [GET /execution] Falha não-crítica ao ler functional logs", { error: String(flErr) });
+    }
+
     // Merge trail + exec_event into a single execution object
-    const execution = (trail || execEvent)
-      ? { ...(trail ?? {}), ...(execEvent ? { exec_event: execEvent } : {}) }
-      : null;
+    // Macro2-F5: Surface enriched fields (metrics, executionSummary, result,
+    // functionalLogs) at top level so the panel can read them directly.
+    // Backward compatible: if exec_event has no enriched fields, these default to null/[].
+    let execution = null;
+    if (trail || execEvent) {
+      execution = { ...(trail ?? {}), ...(execEvent ? { exec_event: execEvent } : {}) };
+
+      // Macro2-F5 — Surface enrichment fields at top level for panel consumption
+      if (execEvent) {
+        if (execEvent.metrics && !execution.metrics) {
+          execution.metrics = execEvent.metrics;
+        }
+        if (execEvent.executionSummary && !execution.executionSummary) {
+          execution.executionSummary = execEvent.executionSummary;
+        }
+        if (execEvent.result && !execution.result) {
+          execution.result = execEvent.result;
+        }
+        // Map exec_event.status_atual to execution.status for panel compatibility
+        if (execEvent.status_atual && !execution.status) {
+          const statusMap = { running: "RUNNING", success: "COMPLETED", failed: "FAILED" };
+          execution.status = statusMap[execEvent.status_atual] || execEvent.status_atual;
+        }
+      }
+
+      // Macro2-F5 — Always surface functionalLogs (empty array if none)
+      if (!execution.functionalLogs) {
+        execution.functionalLogs = functionalLogs.length > 0 ? functionalLogs : [];
+      }
+    }
 
     return jsonResponse({ ok: true, execution });
   } catch (err) {

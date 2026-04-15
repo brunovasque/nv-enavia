@@ -1,0 +1,602 @@
+// ============================================================================
+// 🧪 Smoke Tests — Macro2-F5: Enriched exec_event + Functional Logs
+//
+// Run: node tests/macro2-f5-enrichment.smoke.test.js
+//
+// Proves that:
+//   1. exec_event contains real metrics, executionSummary, result after execution
+//   2. Functional logs are emitted and persisted in KV during the cycle
+//   3. GET /execution returns enriched fields at top level
+//   4. Backward compatibility: old exec_events without enrichment don't break
+//   5. Empty KV returns safe defaults
+// ============================================================================
+
+import worker from "../nv-enavia.js";
+import {
+  handleCreateContract,
+  advanceContractPhase,
+  startTask,
+  executeCurrentMicroPr,
+  readExecEvent,
+  buildExecEvent,
+  readFunctionalLogs,
+  appendFunctionalLog,
+  KV_SUFFIX_EXEC_EVENT,
+  KV_SUFFIX_FUNCTIONAL_LOGS,
+  KV_SUFFIX_FLOG_ENTRY,
+  MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
+} from "../contract-executor.js";
+
+let passed = 0;
+let failed = 0;
+
+function assert(condition, name) {
+  if (condition) {
+    console.log(`  ✅ ${name}`);
+    passed++;
+  } else {
+    console.error(`  ❌ ${name}`);
+    failed++;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mock KV store (includes list with cursor pagination, matching CF KV API)
+// ---------------------------------------------------------------------------
+function createMockKV() {
+  const store = {};
+  const LIST_PAGE_SIZE = 1000; // default page size for mock (CF KV default is 1000)
+  return {
+    async get(key, type) {
+      const val = store[key] ?? null;
+      if (type === "json" && val !== null) {
+        try { return JSON.parse(val); } catch { return null; }
+      }
+      return val;
+    },
+    async put(key, value) { store[key] = value; },
+    async list({ prefix = "", limit, cursor: cursorIn } = {}) {
+      const all = Object.keys(store)
+        .filter(k => k.startsWith(prefix))
+        .sort();  // alphabetical = chronological (timestamp is leading key segment)
+      const pageSize = limit || LIST_PAGE_SIZE;
+      const startIdx = cursorIn ? parseInt(cursorIn, 10) : 0;
+      const page = all.slice(startIdx, startIdx + pageSize);
+      const endIdx = startIdx + page.length;
+      const complete = endIdx >= all.length;
+      const result = {
+        keys: page.map(name => ({ name })),
+        list_complete: complete,
+      };
+      if (!complete) result.cursor = String(endIdx);
+      return result;
+    },
+    _store: store,
+  };
+}
+
+function mockRequest(body) {
+  return { async json() { return body; } };
+}
+
+const BASE_PAYLOAD = {
+  version: "v1",
+  operator: "test-macro2-f5",
+  goal: "Prove enriched exec_event and functional logs",
+  scope: {
+    workers: ["nv-enavia"],
+    routes: ["/test-route"],
+    environments: ["TEST", "PROD"],
+  },
+  definition_of_done: [
+    "enriched exec_event with metrics/summary/result",
+    "functional logs persisted",
+  ],
+};
+
+async function setupReadyContract(contractId) {
+  const env = { ENAVIA_BRAIN: createMockKV() };
+  const req = mockRequest({ ...BASE_PAYLOAD, contract_id: contractId });
+  await handleCreateContract(req, env);
+  await advanceContractPhase(env, contractId);
+  await startTask(env, contractId, "task_001");
+  return { env, contractId };
+}
+
+async function getExecution(kv) {
+  const env = { ENAVIA_BRAIN: kv };
+  const req = new Request("https://test.enavia.io/execution", { method: "GET" });
+  const res = await worker.fetch(req, env);
+  return { status: res.status, body: await res.json() };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+async function runTests() {
+
+  // ── Group 1: SUCCESS → exec_event has real metrics/executionSummary/result ──
+  console.log("\nGroup 1: SUCCESS — exec_event has real metrics, executionSummary, result");
+  {
+    const { env, contractId } = await setupReadyContract("macro2_f5_g1");
+    const result = await executeCurrentMicroPr(env, contractId, {
+      evidence: ["Smoke test passed", "Endpoint OK"],
+    });
+
+    assert(result.ok === true, "G1: execution success");
+
+    const event = await readExecEvent(env, contractId);
+    assert(event !== null, "G1: exec_event present");
+
+    // metrics
+    assert(event.metrics !== null && typeof event.metrics === "object", "G1: metrics is object");
+    assert(typeof event.metrics.stepsTotal === "number", "G1: metrics.stepsTotal is number");
+    assert(typeof event.metrics.stepsDone  === "number", "G1: metrics.stepsDone is number");
+    assert(typeof event.metrics.elapsedMs  === "number", "G1: metrics.elapsedMs is number");
+    assert(event.metrics.elapsedMs >= 0, "G1: metrics.elapsedMs >= 0");
+
+    // executionSummary — hardened: only provably real fields
+    assert(event.executionSummary !== null && typeof event.executionSummary === "object", "G1: executionSummary is object");
+    assert(event.executionSummary.finalStatus === "success", "G1: executionSummary.finalStatus = success");
+    assert(typeof event.executionSummary.hadBlock === "boolean", "G1: hadBlock is boolean");
+    assert(typeof event.executionSummary.taskId === "string", "G1: taskId is string (provable)");
+    assert(typeof event.executionSummary.microPrId === "string", "G1: microPrId is string (provable)");
+    assert(typeof event.executionSummary.evidenceCount === "number", "G1: evidenceCount is number (provable)");
+    // Removed heuristic fields (hadBrowserNavigation, hadCodeChange, hadHumanReview, hadBridgeDispatch)
+    assert(!("hadBrowserNavigation" in event.executionSummary), "G1: hadBrowserNavigation removed (heuristic)");
+    assert(!("hadCodeChange" in event.executionSummary), "G1: hadCodeChange removed (heuristic)");
+    assert(!("hadHumanReview" in event.executionSummary), "G1: hadHumanReview removed (heuristic)");
+    assert(!("hadBridgeDispatch" in event.executionSummary), "G1: hadBridgeDispatch removed (heuristic)");
+
+    // result
+    assert(event.result !== null && typeof event.result === "object", "G1: result is object");
+    assert(typeof event.result.summary === "string" && event.result.summary.length > 0, "G1: result.summary is non-empty string");
+    assert(event.result.status === "success", "G1: result.status = success");
+
+    // Original 6 canonical fields still present
+    assert("status_atual"   in event, "G1: status_atual still present");
+    assert("arquivo_atual"  in event, "G1: arquivo_atual still present");
+    assert("bloco_atual"    in event, "G1: bloco_atual still present");
+    assert("operacao_atual" in event, "G1: operacao_atual still present");
+    assert("motivo_curto"   in event, "G1: motivo_curto still present");
+    assert("patch_atual"    in event, "G1: patch_atual still present");
+  }
+
+  // ── Group 2: FAILED → exec_event has real metrics/summary/result with failure ──
+  console.log("\nGroup 2: FAILED — exec_event has real failure data");
+  {
+    const { env, contractId } = await setupReadyContract("macro2_f5_g2");
+    const result = await executeCurrentMicroPr(env, contractId, {
+      simulate_failure: {
+        code: "TIMEOUT",
+        message: "Worker timeout after 30s",
+        classification: "in_scope",
+      },
+    });
+
+    assert(result.ok === false, "G2: execution failed");
+
+    const event = await readExecEvent(env, contractId);
+    assert(event !== null, "G2: exec_event present");
+    assert(event.metrics !== null, "G2: metrics present");
+    assert(event.metrics.elapsedMs >= 0, "G2: metrics.elapsedMs >= 0");
+    assert(event.executionSummary !== null, "G2: executionSummary present");
+    assert(event.executionSummary.finalStatus === "failed", "G2: executionSummary.finalStatus = failed");
+    assert(event.result !== null, "G2: result present");
+    assert(event.result.status === "failed", "G2: result.status = failed");
+    assert(event.result.summary.includes("falhou"), "G2: result.summary mentions failure");
+    assert(event.result.summary.includes("task_001"), "G2: result.summary mentions task id");
+  }
+
+  // ── Group 3: Functional logs emitted during cycle ──
+  console.log("\nGroup 3: Functional logs emitted during execution cycle");
+  {
+    const { env, contractId } = await setupReadyContract("macro2_f5_g3");
+    await executeCurrentMicroPr(env, contractId, {
+      evidence: ["Log test evidence"],
+    });
+
+    const logs = await readFunctionalLogs(env, contractId);
+    assert(Array.isArray(logs), "G3: functional logs is array");
+    assert(logs.length >= 2, `G3: at least 2 functional logs emitted (got ${logs.length})`);
+
+    // Each log has the expected shape
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      assert(typeof log.id === "string", `G3: log[${i}].id is string`);
+      assert(["decisao", "bloqueio", "consolidacao"].includes(log.type), `G3: log[${i}].type is valid type`);
+      assert(typeof log.label === "string" && log.label.length > 0, `G3: log[${i}].label is non-empty`);
+      assert(typeof log.message === "string" && log.message.length > 0, `G3: log[${i}].message is non-empty`);
+      assert(typeof log.timestamp === "string", `G3: log[${i}].timestamp is string`);
+    }
+
+    // First log should be decisao (start), last should be consolidacao (success)
+    assert(logs[0].type === "decisao", "G3: first log is decisao (start)");
+    assert(logs[logs.length - 1].type === "consolidacao", "G3: last log is consolidacao (success)");
+  }
+
+  // ── Group 4: Functional logs on failure include bloqueio ──
+  console.log("\nGroup 4: Functional logs include bloqueio on failure");
+  {
+    const { env, contractId } = await setupReadyContract("macro2_f5_g4");
+    await executeCurrentMicroPr(env, contractId, {
+      simulate_failure: {
+        code: "FAIL",
+        message: "Simulated failure for log test",
+        classification: "in_scope",
+      },
+    });
+
+    const logs = await readFunctionalLogs(env, contractId);
+    assert(logs.length >= 2, `G4: at least 2 logs emitted on failure (got ${logs.length})`);
+
+    const hasBloqueio = logs.some(l => l.type === "bloqueio");
+    assert(hasBloqueio, "G4: at least one bloqueio log on failure");
+
+    const hasDecisao = logs.some(l => l.type === "decisao");
+    assert(hasDecisao, "G4: decisao log present (start)");
+  }
+
+  // ── Group 5: GET /execution returns enriched fields at top level ──
+  console.log("\nGroup 5: GET /execution returns enriched fields at top level");
+  {
+    const kv = createMockKV();
+    const contractId = "macro2_f5_g5";
+    const env = { ENAVIA_BRAIN: kv };
+
+    // Setup contract and execute
+    const req = mockRequest({ ...BASE_PAYLOAD, contract_id: contractId });
+    await handleCreateContract(req, env);
+    await advanceContractPhase(env, contractId);
+    await startTask(env, contractId, "task_001");
+    await executeCurrentMicroPr(env, contractId, {
+      evidence: ["GET /execution enrichment test"],
+    });
+
+    const { status, body } = await getExecution(kv);
+
+    assert(status === 200, "G5: HTTP 200");
+    assert(body.ok === true, "G5: body.ok = true");
+    assert(body.execution !== null, "G5: execution not null");
+
+    // Top-level fields surfaced from exec_event
+    assert(body.execution.metrics !== null, "G5: execution.metrics present at top level");
+    assert(typeof body.execution.metrics.stepsTotal === "number", "G5: metrics.stepsTotal at top level");
+    assert(typeof body.execution.metrics.stepsDone === "number", "G5: metrics.stepsDone at top level");
+    assert(typeof body.execution.metrics.elapsedMs === "number", "G5: metrics.elapsedMs at top level");
+
+    assert(body.execution.executionSummary !== null, "G5: executionSummary present at top level");
+    assert(body.execution.executionSummary.finalStatus === "success", "G5: executionSummary.finalStatus at top level");
+
+    assert(body.execution.result !== null, "G5: result present at top level");
+    assert(typeof body.execution.result.summary === "string", "G5: result.summary at top level");
+
+    // functionalLogs at top level
+    assert(Array.isArray(body.execution.functionalLogs), "G5: functionalLogs is array at top level");
+    assert(body.execution.functionalLogs.length >= 2, `G5: functionalLogs has entries (got ${body.execution.functionalLogs.length})`);
+
+    // status mapped
+    assert(body.execution.status === "COMPLETED", `G5: execution.status mapped to COMPLETED (got ${body.execution.status})`);
+
+    // exec_event still present (backward compat)
+    assert(body.execution.exec_event !== null, "G5: exec_event still present in response");
+  }
+
+  // ── Group 6: Backward compatibility — old exec_event without enrichment ──
+  console.log("\nGroup 6: Backward compatibility — old exec_event without enrichment fields");
+  {
+    const kv = createMockKV();
+    const contractId = "macro2_f5_g6_compat";
+
+    // Old-style exec_event (only 6 fields, no metrics/summary/result)
+    const oldExecEvent = {
+      status_atual:   "success",
+      arquivo_atual:  "old-file.js",
+      bloco_atual:    "task_old",
+      operacao_atual: "Old operation",
+      motivo_curto:   null,
+      patch_atual:    "micro_pr_old",
+      emitted_at:     "2026-01-01T00:00:00.000Z",
+    };
+
+    const eventKey = `contract:${contractId}:exec_event`;
+    await kv.put(eventKey, JSON.stringify(oldExecEvent));
+    await kv.put("execution:exec_event:latest_contract_id", contractId);
+
+    const { status, body } = await getExecution(kv);
+
+    assert(status === 200, "G6: HTTP 200 with old exec_event");
+    assert(body.ok === true, "G6: body.ok = true");
+    assert(body.execution !== null, "G6: execution not null");
+
+    // exec_event present
+    assert(body.execution.exec_event !== null, "G6: exec_event present");
+    assert(body.execution.exec_event.status_atual === "success", "G6: old fields preserved");
+
+    // Enrichment fields default to null/undefined (not crash)
+    assert(body.execution.metrics === undefined || body.execution.metrics === null,
+      "G6: metrics absent or null for old exec_event (no crash)");
+    assert(body.execution.executionSummary === undefined || body.execution.executionSummary === null,
+      "G6: executionSummary absent or null for old exec_event (no crash)");
+
+    // functionalLogs defaults to empty array
+    assert(Array.isArray(body.execution.functionalLogs), "G6: functionalLogs defaults to empty array");
+    assert(body.execution.functionalLogs.length === 0, "G6: functionalLogs empty for old exec_event");
+  }
+
+  // ── Group 7: Empty KV → execution null (no crash) ──
+  console.log("\nGroup 7: Empty KV → execution null (no crash)");
+  {
+    const kv = createMockKV();
+    const { status, body } = await getExecution(kv);
+
+    assert(status === 200, "G7: HTTP 200 with empty KV");
+    assert(body.ok === true, "G7: body.ok = true");
+    assert(body.execution === null, "G7: execution = null with empty KV");
+  }
+
+  // ── Group 8: buildExecEvent backward compat — called without enrichment ──
+  console.log("\nGroup 8: buildExecEvent backward compat — called without enrichment");
+  {
+    const handoff = {
+      target_files: ["file.js"],
+      source_task: "task_x",
+      objective: "Test objective",
+    };
+
+    // Call without 5th argument — old-style
+    const event = buildExecEvent("running", handoff, "mpr_x", null);
+
+    assert(event.status_atual === "running", "G8: status_atual correct");
+    assert(event.arquivo_atual === "file.js", "G8: arquivo_atual correct");
+    assert(event.metrics === null, "G8: metrics defaults to null when no enrichment");
+    assert(event.executionSummary === null, "G8: executionSummary defaults to null");
+    assert(event.result === null, "G8: result defaults to null");
+  }
+
+  // ── Group 9: readFunctionalLogs with no logs → empty array ──
+  console.log("\nGroup 9: readFunctionalLogs on empty KV → empty array");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const logs = await readFunctionalLogs(env, "nonexistent");
+    assert(Array.isArray(logs), "G9: result is array");
+    assert(logs.length === 0, "G9: empty array when no logs");
+  }
+
+  // ── Group 10: appendFunctionalLog + readFunctionalLogs round-trip (ts+rand key model) ──
+  console.log("\nGroup 10: appendFunctionalLog + readFunctionalLogs round-trip (ts+rand keys)");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "roundtrip_test";
+
+    await appendFunctionalLog(env, cid, {
+      id: "fl_test_1", type: "decisao", label: "Test log", message: "Test message", timestamp: "2026-01-01T00:00:00Z",
+    });
+    await appendFunctionalLog(env, cid, {
+      id: "fl_test_2", type: "bloqueio", label: "Block log", message: "Block message", timestamp: "2026-01-01T00:01:00Z",
+    });
+
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 2, "G10: 2 logs after 2 appends");
+    assert(logs[0].id === "fl_test_1", "G10: first log preserved");
+    assert(logs[1].id === "fl_test_2", "G10: second log preserved");
+    assert(logs[0].type === "decisao", "G10: type preserved");
+    assert(logs[1].type === "bloqueio", "G10: type preserved for second");
+
+    // Verify keys are timestamp+seq+rand (not sequential counter-based flog:0, flog:1)
+    const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
+    assert(flogKeys.length === 2, "G10: 2 individual flog keys in store");
+    // Keys should have the ts_seq_rand format (not purely numeric like "0" or "1")
+    const allTimestampBased = flogKeys.every(k => /contract:[^:]+:flog:\d+_\d+_[0-9a-f]+$/.test(k));
+    assert(allTimestampBased, "G10: all flog keys use ts+seq+rand format (not counter slot)");
+    // No flog_count key should exist (counter model removed)
+    assert(env.ENAVIA_BRAIN._store[`contract:${cid}:flog_count`] === undefined,
+      "G10: no flog_count key — counter model fully removed");
+  }
+
+  // ── Group 11: Cap returns LATEST N logs (most recent), not oldest ──
+  console.log("\nGroup 11: Cap returns latest N logs (MAX_FUNCTIONAL_LOGS_PER_CONTRACT)");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "cap_test";
+    const totalWrites = MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 5;
+
+    // Write MAX + 5 logs with increasing timestamps to guarantee key order
+    for (let i = 0; i < totalWrites; i++) {
+      const ts = 1700000000000 + i * 1000; // deterministic increasing timestamps
+      const key = `contract:${cid}:flog:${ts}_${i}_abcd`;
+      await env.ENAVIA_BRAIN.put(key, JSON.stringify({
+        id: `fl_cap_${i}`, type: "decisao", label: `Log ${i}`, message: `Msg ${i}`, timestamp: new Date(ts).toISOString(),
+      }));
+    }
+
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
+      `G11: read returns at most ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${logs.length})`);
+
+    // Verify we got the LATEST logs, not the oldest
+    // With totalWrites=55 and cap=50, we should get logs 5..54 (the last 50)
+    const firstReturnedId = logs[0].id;
+    const lastReturnedId = logs[logs.length - 1].id;
+    assert(firstReturnedId === "fl_cap_5",
+      `G11: first returned log is fl_cap_5 (oldest among latest 50), got ${firstReturnedId}`);
+    assert(lastReturnedId === `fl_cap_${totalWrites - 1}`,
+      `G11: last returned log is fl_cap_${totalWrites - 1} (most recent), got ${lastReturnedId}`);
+
+    // Verify chronological ascending order in the returned array
+    for (let i = 1; i < logs.length; i++) {
+      const prevNum = parseInt(logs[i-1].id.split("_")[2], 10);
+      const currNum = parseInt(logs[i].id.split("_")[2], 10);
+      assert(currNum > prevNum, `G11: logs[${i}] (${currNum}) > logs[${i-1}] (${prevNum}) — ascending order`);
+    }
+
+    // All entries were written — cap is at read time only
+    const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
+    assert(flogKeys.length === totalWrites,
+      `G11: all ${totalWrites} entries written (cap is read-time only, got ${flogKeys.length})`);
+  }
+
+  // ── Group 12: Legacy single-array backward compat in readFunctionalLogs ──
+  console.log("\nGroup 12: Legacy single-array backward compat in readFunctionalLogs");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "legacy_test";
+
+    // Write old-style single array directly to legacy key
+    const legacyKey = `contract:${cid}:functional_logs`;
+    const legacyLogs = [
+      { id: "fl_old_1", type: "decisao", label: "Old log", message: "Old msg", timestamp: "2025-12-01T00:00:00Z" },
+      { id: "fl_old_2", type: "consolidacao", label: "Old consolidation", message: "Old consolidation msg", timestamp: "2025-12-01T00:01:00Z" },
+    ];
+    await env.ENAVIA_BRAIN.put(legacyKey, JSON.stringify(legacyLogs));
+
+    // No :flog: prefix keys → readFunctionalLogs should fallback to legacy key
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 2, "G12: legacy logs read via fallback");
+    assert(logs[0].id === "fl_old_1", "G12: legacy first log preserved");
+    assert(logs[1].id === "fl_old_2", "G12: legacy second log preserved");
+  }
+
+  // ── Group 13: executionSummary hardened — removed heuristic fields in FAILED path ──
+  console.log("\nGroup 13: executionSummary hardened — failure path has provable fields only");
+  {
+    const { env, contractId } = await setupReadyContract("macro2_f5_g13");
+    await executeCurrentMicroPr(env, contractId, {
+      simulate_failure: {
+        code: "OOS_ERROR",
+        message: "Out of scope error",
+        classification: "out_of_scope",
+      },
+    });
+
+    const event = await readExecEvent(env, contractId);
+    assert(event.executionSummary.hadBlock === true, "G13: hadBlock=true for out_of_scope classification (provable)");
+    assert(event.executionSummary.taskId === "task_001", "G13: taskId = task_001 (provable)");
+    assert(typeof event.executionSummary.evidenceCount === "number", "G13: evidenceCount is number");
+    assert(!("hadBrowserNavigation" in event.executionSummary), "G13: hadBrowserNavigation removed");
+    assert(!("hadCodeChange" in event.executionSummary), "G13: hadCodeChange removed");
+    assert(!("hadHumanReview" in event.executionSummary), "G13: hadHumanReview removed");
+    assert(!("hadBridgeDispatch" in event.executionSummary), "G13: hadBridgeDispatch removed");
+  }
+
+  // ── Group 14: Concurrent appends produce distinct keys — no slot collision ──
+  console.log("\nGroup 14: Concurrent appends — no slot collision (ts+rand keys)");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "concurrent_test";
+
+    // Run 5 appends concurrently — each must produce a distinct key
+    await Promise.all([
+      appendFunctionalLog(env, cid, { id: "fl_c1", type: "decisao",    label: "C1", message: "Msg C1", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c2", type: "bloqueio",   label: "C2", message: "Msg C2", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c3", type: "decisao",    label: "C3", message: "Msg C3", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c4", type: "consolidacao", label: "C4", message: "Msg C4", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c5", type: "decisao",    label: "C5", message: "Msg C5", timestamp: new Date().toISOString() }),
+    ]);
+
+    // All 5 must be present — no overwrite
+    const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
+    assert(flogKeys.length === 5, `G14: all 5 concurrent appends persisted — no collision (got ${flogKeys.length})`);
+
+    // All keys must be distinct
+    const uniqueKeys = new Set(flogKeys);
+    assert(uniqueKeys.size === 5, "G14: all 5 flog keys are distinct");
+
+    // Read returns all 5 in stable order
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 5, `G14: readFunctionalLogs returns all 5 logs (got ${logs.length})`);
+
+    // All original log ids are present (none lost)
+    const ids = new Set(logs.map(l => l.id));
+    assert(ids.has("fl_c1"), "G14: fl_c1 preserved");
+    assert(ids.has("fl_c2"), "G14: fl_c2 preserved");
+    assert(ids.has("fl_c3"), "G14: fl_c3 preserved");
+    assert(ids.has("fl_c4"), "G14: fl_c4 preserved");
+    assert(ids.has("fl_c5"), "G14: fl_c5 preserved");
+
+    // No counter key — counter model fully absent
+    assert(env.ENAVIA_BRAIN._store[`contract:${cid}:flog_count`] === undefined,
+      "G14: no flog_count key in store — counter model not used");
+  }
+
+  // ── Group 15: >50 logs via appendFunctionalLog → read returns latest N in chronological order ──
+  console.log("\nGroup 15: >50 appended logs → readFunctionalLogs returns latest N, chronological");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "latest_n_test";
+    const totalWrites = MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 10; // 60 total
+
+    // Write 60 logs sequentially with deterministic keys for verifiable ordering
+    for (let i = 0; i < totalWrites; i++) {
+      const ts = 1700000000000 + i * 100; // increasing timestamps (100ms apart)
+      const key = `contract:${cid}:flog:${ts}_${i}_f00f`;
+      await env.ENAVIA_BRAIN.put(key, JSON.stringify({
+        id: `fl_latest_${i}`, type: "decisao", label: `Append ${i}`, message: `Msg ${i}`,
+        timestamp: new Date(ts).toISOString(),
+      }));
+    }
+
+    const logs = await readFunctionalLogs(env, cid);
+
+    // Must return exactly MAX (50), not 60
+    assert(logs.length === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
+      `G15: returns ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} logs (got ${logs.length})`);
+
+    // Must be the LATEST 50 (indices 10..59), not the oldest (0..49)
+    assert(logs[0].id === "fl_latest_10",
+      `G15: first log is fl_latest_10 (oldest among latest 50), got ${logs[0].id}`);
+    assert(logs[logs.length - 1].id === "fl_latest_59",
+      `G15: last log is fl_latest_59 (most recent), got ${logs[logs.length - 1].id}`);
+
+    // Chronological ascending order in the output
+    for (let i = 1; i < logs.length; i++) {
+      const prev = new Date(logs[i-1].timestamp).getTime();
+      const curr = new Date(logs[i].timestamp).getTime();
+      assert(curr >= prev, `G15: logs[${i}] timestamp >= logs[${i-1}] — stable ascending order`);
+    }
+
+    // None of the oldest 10 should appear
+    const returnedIds = new Set(logs.map(l => l.id));
+    for (let i = 0; i < 10; i++) {
+      assert(!returnedIds.has(`fl_latest_${i}`),
+        `G15: fl_latest_${i} (old) not in returned set — correctly excluded`);
+    }
+  }
+
+  // ── Group 16: readFunctionalLogs stable order for ≤ N logs (no truncation) ──
+  console.log("\nGroup 16: ≤50 logs → all returned in stable chronological order");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "stable_order_test";
+
+    // Write exactly 5 logs
+    for (let i = 0; i < 5; i++) {
+      const ts = 1700000000000 + i * 500;
+      const key = `contract:${cid}:flog:${ts}_${i}_beef`;
+      await env.ENAVIA_BRAIN.put(key, JSON.stringify({
+        id: `fl_ord_${i}`, type: "decisao", label: `Ord ${i}`, message: `Msg ${i}`,
+        timestamp: new Date(ts).toISOString(),
+      }));
+    }
+
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 5, `G16: all 5 logs returned (got ${logs.length})`);
+    assert(logs[0].id === "fl_ord_0", `G16: first is fl_ord_0 (got ${logs[0].id})`);
+    assert(logs[4].id === "fl_ord_4", `G16: last is fl_ord_4 (got ${logs[4].id})`);
+  }
+
+  // ── Summary ──
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`Results: ${passed} passed, ${failed} failed`);
+  console.log(`${"=".repeat(60)}\n`);
+
+  if (failed > 0) {
+    process.exit(1);
+  }
+}
+
+runTests().catch((err) => {
+  console.error("❌ Unhandled error:", err);
+  process.exit(1);
+});

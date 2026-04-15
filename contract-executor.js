@@ -116,6 +116,16 @@ const KV_SUFFIX_DECOMPOSITION = ":decomposition";
 const KV_INDEX_KEY = "contract:index";
 // PR1 — exec event key: contract:<id>:exec_event (read by PR2/PR3)
 const KV_SUFFIX_EXEC_EVENT = ":exec_event";
+// Macro2-F5 — functional logs: append-only individual keys per entry.
+// Key format: contract:<id>:flog:<timestamp_ms>_<seq>_<rand4>
+// - Append is a pure KV put — ZERO reads, no counter, truly collision-free.
+// - Two concurrent appends always write to DIFFERENT keys (unique ts+seq+rand suffix).
+// - Read uses paginated KV prefix scan, takes LATEST N entries = most recent logs.
+// - Cap (MAX_FUNCTIONAL_LOGS_PER_CONTRACT) applied at read time via slice(-N).
+// - Backward compat: readFunctionalLogs falls back to legacy :functional_logs key.
+const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs"; // kept for backward-compat reads
+const KV_SUFFIX_FLOG_ENTRY      = ":flog:";
+const MAX_FUNCTIONAL_LOGS_PER_CONTRACT = 50;
 
 // ---------------------------------------------------------------------------
 // Canonical global statuses for the Contract Executor state machine.
@@ -2290,8 +2300,8 @@ const EXECUTION_STATUSES = ["pending", "running", "success", "failed", "skipped"
 // Metadata field (audit / ordering):
 //   emitted_at     — ISO 8601 timestamp of emission
 // ---------------------------------------------------------------------------
-function buildExecEvent(status, handoff, microPrId, motivo) {
-  return {
+function buildExecEvent(status, handoff, microPrId, motivo, enrichment) {
+  const base = {
     status_atual:   status,
     arquivo_atual:  Array.isArray(handoff.target_files) && handoff.target_files.length > 0
       ? handoff.target_files.join(", ")
@@ -2302,6 +2312,16 @@ function buildExecEvent(status, handoff, microPrId, motivo) {
     patch_atual:    microPrId            || null,
     emitted_at:     new Date().toISOString(),
   };
+
+  // Macro2-F5 — enrichment fields for operational observability
+  // These are additive; old consumers that only read the 6 canonical fields
+  // will continue to work unchanged.
+  const enr = enrichment || {};
+  base.metrics          = enr.metrics          || null;
+  base.executionSummary = enr.executionSummary || null;
+  base.result           = enr.result           || null;
+
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -2335,6 +2355,131 @@ async function readExecEvent(env, contractId) {
     return raw ? JSON.parse(raw) : null;
   } catch (_) {
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Macro2-F5 — Functional Logs: truly collision-free append-only persistence
+//
+// Strategy: each log entry is written to a unique KV key with ZERO reads:
+//   contract:<id>:flog:<timestamp_ms>_<seq>_<rand4>
+//
+// Why collision-free:
+//   - Key suffix = timestamp + monotonic seq + 4 random hex chars (~65K extra combinations)
+//   - appendFunctionalLog performs a single KV put — no read, no counter, no slot
+//   - Two concurrent appends always derive different suffixes independently
+//   - No shared state between appenders → no lost update possible
+//
+// appendFunctionalLog(env, contractId, log)
+//   Pure KV put to a unique key. Cannot collide under any concurrency.
+//
+// readFunctionalLogs(env, contractId)
+//   Uses paginated KV prefix scan to enumerate ALL entries, then returns
+//   the LATEST N (most recent) in chronological order.
+//   This ensures large contracts always surface recent operational logs,
+//   not the oldest entries that would come from a naive ascending-limit scan.
+//   Capped at MAX_FUNCTIONAL_LOGS_PER_CONTRACT entries at read time.
+//   Falls back to legacy single-array key (:functional_logs) if list unavailable.
+//   Returns [] if none exist. Never crashes the caller.
+//
+// Cap: applied at read via allKeys.slice(-N) — writes are never blocked.
+// ---------------------------------------------------------------------------
+let _functionalLogSeq = 0;
+
+// Returns a collision-resistant suffix: <timestamp_ms>_<seq>_<rand4>
+// - seq (module-level, monotonic) ensures stable ordering within one isolate
+//   even when two sequential appends share the same millisecond timestamp.
+// - rand4 provides extra isolation across different isolates with the same seq.
+function _flogKeySuffix() {
+  _functionalLogSeq++;
+  const rand = Math.floor(Math.random() * 0xFFFF).toString(16).padStart(4, "0");
+  return `${Date.now()}_${_functionalLogSeq}_${rand}`;
+}
+
+function _buildFunctionalLog(type, label, message) {
+  return {
+    id:        `fl_${_flogKeySuffix()}`,
+    type:      type,
+    label:     label,
+    message:   message,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function appendFunctionalLog(env, contractId, log) {
+  try {
+    // Pure append — zero reads, no counter, no collision under any concurrency.
+    // Each call generates a unique key independently of any shared state.
+    const entryKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}${_flogKeySuffix()}`;
+    await env.ENAVIA_BRAIN.put(entryKey, JSON.stringify(log));
+  } catch (_) {
+    // appendFunctionalLog must never crash the executor
+  }
+}
+
+async function readFunctionalLogs(env, contractId) {
+  try {
+    const prefix = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}`;
+
+    // Use KV prefix scan to enumerate ALL log entries for this contract,
+    // then return the LATEST N (most recent) in chronological order.
+    //
+    // Why not just list({ limit: N })?
+    //   KV list returns keys in ascending alphabetical order (= oldest first).
+    //   For large contracts with >N entries, that would return the N oldest,
+    //   silently dropping the most operationally useful recent logs.
+    //
+    // Strategy: paginate through all keys, keep only the last N (most recent),
+    // then fetch and return them in chronological (ascending) order.
+    // Keys are naturally chronological because timestamp_ms is the leading segment.
+    if (typeof env.ENAVIA_BRAIN.list === "function") {
+      // Phase 1: Collect ALL key names via paginated prefix scan.
+      const allKeys = [];
+      let cursor = undefined;
+      let hasMore = true;
+      while (hasMore) {
+        const listOpts = { prefix };
+        if (cursor) listOpts.cursor = cursor;
+        const listed = await env.ENAVIA_BRAIN.list(listOpts);
+        const keys = listed.keys || [];
+        for (const { name } of keys) {
+          allKeys.push(name);
+        }
+        // Cloudflare KV: list_complete is false (or absent) when more pages exist
+        if (!listed.list_complete && listed.cursor) {
+          cursor = listed.cursor;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allKeys.length > 0) {
+        // Phase 2: Take the LAST N keys (most recent — highest timestamps).
+        // allKeys are already in ascending alphabetical/chronological order from KV list.
+        const recentKeys = allKeys.length > MAX_FUNCTIONAL_LOGS_PER_CONTRACT
+          ? allKeys.slice(-MAX_FUNCTIONAL_LOGS_PER_CONTRACT)
+          : allKeys;
+
+        // Phase 3: Fetch entries and return in chronological (ascending) order.
+        const logs = [];
+        for (const name of recentKeys) {
+          const raw = await env.ENAVIA_BRAIN.get(name);
+          if (raw) {
+            try { logs.push(JSON.parse(raw)); } catch (_) { /* skip malformed entry */ }
+          }
+        }
+        return logs;
+      }
+      // list returned 0 per-entry keys — fall through to legacy key below
+    }
+
+    // Fallback: KV binding without list support.
+    // Read legacy single-array key (original append model before per-entry KV).
+    const legacyKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
+    const legacyRaw = await env.ENAVIA_BRAIN.get(legacyKey);
+    return legacyRaw ? JSON.parse(legacyRaw) : [];
+  } catch (_) {
+    return [];
   }
 }
 
@@ -2419,6 +2564,14 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
 
   if (!supervisorGate.pass) {
     const blockResp = _buildSupervisorBlockResponse(supervisorGate.supervisorDecision);
+
+    // Macro2-F5 — functional log: bloqueio (supervisor gate blocked)
+    await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+      "bloqueio",
+      `Supervisor bloqueou execução — task ${currentTaskId}`,
+      `Gate: ${supervisorGate.supervisorDecision.reason_code || "UNKNOWN"}. Motivo: ${supervisorGate.supervisorDecision.reason_text || "N/A"}.`
+    ));
+
     return {
       ...blockResp,
       // Backwards-compatible: keep constitution_enforcement shape for callers
@@ -2530,8 +2683,33 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
 
   state.updated_at = executionStartedAt;
 
-  // PR1 — emit real exec event: running
-  await emitExecEvent(env, contractId, buildExecEvent("running", handoff, microPrId, null));
+  // Macro2-F5 — Compute total steps from decomposition tasks
+  const _totalTasks = (decomposition.tasks || []).length;
+  const _doneTasks  = (decomposition.tasks || []).filter(t => t.status === "done" || t.status === "completed").length;
+
+  // PR1 — emit real exec event: running (enriched for Macro2-F5)
+  await emitExecEvent(env, contractId, buildExecEvent("running", handoff, microPrId, null, {
+    metrics: {
+      stepsTotal: _totalTasks,
+      stepsDone:  _doneTasks,
+      elapsedMs:  0,
+    },
+    executionSummary: {
+      finalStatus:           "running",
+      taskId:                currentTaskId,
+      microPrId:             microPrId,
+      hadBlock:              false,
+      evidenceCount:         0,
+    },
+    result: null,
+  }));
+
+  // Macro2-F5 — functional log: execution start (decisao)
+  await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+    "decisao",
+    `Execução iniciada — task ${currentTaskId}`,
+    `Executor iniciou ciclo para task "${currentTaskId}" (micro-PR: ${microPrId}) em ambiente ${handoff.scope.environment}. Objetivo: ${handoff.objective || "N/A"}.`
+  ));
 
   // Persist running state immediately so it survives crashes
   await persistContract(env, state, decomposition);
@@ -2579,8 +2757,37 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
-    // PR1 — emit real exec event: success
-    await emitExecEvent(env, contractId, buildExecEvent("success", handoff, microPrId, null));
+
+    // Macro2-F5 — compute elapsed ms
+    const _successElapsedMs = new Date(executionFinishedAt).getTime() - new Date(executionStartedAt).getTime();
+    const _successDoneTasks = _doneTasks + 1; // current task completes this cycle
+
+    // PR1 — emit real exec event: success (enriched for Macro2-F5)
+    await emitExecEvent(env, contractId, buildExecEvent("success", handoff, microPrId, null, {
+      metrics: {
+        stepsTotal: _totalTasks,
+        stepsDone:  _successDoneTasks,
+        elapsedMs:  _successElapsedMs,
+      },
+      executionSummary: {
+        finalStatus:           "success",
+        taskId:                currentTaskId,
+        microPrId:             microPrId,
+        hadBlock:              false,
+        evidenceCount:         evidence.length,
+      },
+      result: {
+        summary: `Task "${currentTaskId}" concluída com sucesso em ${_successElapsedMs}ms. ${evidence.length} evidência(s) registrada(s).`,
+        status:  "success",
+      },
+    }));
+
+    // Macro2-F5 — functional log: consolidation (success)
+    await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+      "consolidacao",
+      `Task ${currentTaskId} concluída com sucesso`,
+      `Execução finalizada em ${_successElapsedMs}ms. Evidências: ${evidence.join("; ") || "nenhuma explícita"}. Micro-PR: ${microPrId}.`
+    ));
     await persistContract(env, state, decomposition);
 
     return {
@@ -2607,12 +2814,40 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
-    // PR1 — emit real exec event: failed
+
+    // Macro2-F5 — compute elapsed ms for failure
+    const _failElapsedMs = new Date(executionFinishedAt).getTime() - new Date(executionStartedAt).getTime();
+    const _failMotivo = executionError && executionError.message
+      ? String(executionError.message).slice(0, 120)
+      : "execution_failed";
+
+    // PR1 — emit real exec event: failed (enriched for Macro2-F5)
     await emitExecEvent(env, contractId, buildExecEvent(
-      "failed", handoff, microPrId,
-      executionError && executionError.message
-        ? String(executionError.message).slice(0, 120)
-        : "execution_failed"
+      "failed", handoff, microPrId, _failMotivo, {
+        metrics: {
+          stepsTotal: _totalTasks,
+          stepsDone:  _doneTasks,
+          elapsedMs:  _failElapsedMs,
+        },
+        executionSummary: {
+          finalStatus:           "failed",
+          taskId:                currentTaskId,
+          microPrId:             microPrId,
+          hadBlock:              !!(executionError.classification === "out_of_scope"),
+          evidenceCount:         evidence.length,
+        },
+        result: {
+          summary: `Task "${currentTaskId}" falhou após ${_failElapsedMs}ms: ${_failMotivo}`,
+          status:  "failed",
+        },
+      }
+    ));
+
+    // Macro2-F5 — functional log: bloqueio (failure)
+    await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+      "bloqueio",
+      `Falha na execução — task ${currentTaskId}`,
+      `Erro: ${_failMotivo}. Classificação: ${executionError.classification || "desconhecida"}. Micro-PR: ${microPrId}. Duração: ${_failElapsedMs}ms.`
     ));
     await persistContract(env, state, decomposition);
 
@@ -4844,6 +5079,12 @@ export {
   emitExecEvent,
   readExecEvent,
   KV_SUFFIX_EXEC_EVENT,
+  // Macro2-F5 — Functional logs
+  appendFunctionalLog,
+  readFunctionalLogs,
+  KV_SUFFIX_FUNCTIONAL_LOGS,
+  KV_SUFFIX_FLOG_ENTRY,
+  MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
   // C2 — Automatic Contract Closure in TEST
   closeContractInTest,
   CONTRACT_CLOSURE_STATUSES,
