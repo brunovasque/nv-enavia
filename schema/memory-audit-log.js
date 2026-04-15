@@ -133,7 +133,7 @@ async function emitAuditEvent(event, env) {
 
   const now = new Date().toISOString();
   const event_id = event.event_id ||
-    ("aev-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7));
+    ("aev-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9));
 
   const record = {
     event_id,

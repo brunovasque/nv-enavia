@@ -151,7 +151,7 @@ export default function MemoryAuditPanel() {
               <span style={s.colSummary} title={item.summary}>
                 {item.summary}
               </span>
-              <span style={{ ...s.colTs, fontFamily: "var(--font-mono)", fontSize: "10px" }}>
+              <span style={s.colTsMono}>
                 {formatTs(item.timestamp)}
               </span>
             </div>
@@ -269,6 +269,7 @@ const s = {
   colSource: { flex: "0 0 80px" },
   colSummary: { flex: 2, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   colTs: { flex: "0 0 130px", textAlign: "right" },
+  colTsMono: { flex: "0 0 130px", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: "10px" },
   monoText: {
     fontFamily: "var(--font-mono)",
     fontSize: "10px",
