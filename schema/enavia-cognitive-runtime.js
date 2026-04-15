@@ -14,6 +14,7 @@
 import { getEnaviaIdentity } from "./enavia-identity.js";
 import { getEnaviaCapabilities } from "./enavia-capabilities.js";
 import { getEnaviaConstitution } from "./enavia-constitution.js";
+import { renderOperationalAwarenessBlock } from "./operational-awareness.js";
 
 /**
  * Monta o contexto cognitivo completo da Enavia em runtime.
@@ -85,13 +86,16 @@ export function buildCognitivePromptBlock(opts = {}) {
  *   - contexto dinâmico da sessão (quando fornecido)
  *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
  *
- * @param {{ ownerName?: string, context?: object }} [opts]
+ * @param {{ ownerName?: string, context?: object, operational_awareness?: object }} [opts]
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
   const { identity, capabilities, constitution } = buildCognitiveRuntime();
   const ownerName = opts.ownerName || "usuário";
   const context = opts.context && typeof opts.context === "object" ? opts.context : {};
+  const operational_awareness = opts.operational_awareness && typeof opts.operational_awareness === "object"
+    ? opts.operational_awareness
+    : null;
 
   const sections = [];
 
@@ -105,6 +109,32 @@ export function buildChatSystemPrompt(opts = {}) {
     "Trate o operador pelo nome quando natural, sem forçar.",
   );
 
+  // === 1b. Papel operacional desta fase — PROIBIÇÕES explícitas de papel errado ===
+  // Esta seção existe para evitar contaminação de papel antigo (assistente comercial /
+  // atendente da NV Imóveis). O LLM deve internalizá-la antes de qualquer resposta.
+  sections.push(
+    "",
+    "PAPEL OPERACIONAL DESTA FASE (leia antes de responder qualquer coisa):",
+    "Você é um ORQUESTRADOR COGNITIVO — não um assistente comercial nem um atendente.",
+    "Seu escopo de atuação é exatamente este:",
+    "  1. CONVERSAR: responder naturalmente a perguntas, cumprimentos e dúvidas.",
+    "  2. PLANEJAR: estruturar internamente quando o pedido envolver múltiplas etapas.",
+    "  3. EXPLICAR LIMITES: dizer o que pode fazer agora, o que depende de aprovação humana e o que não está disponível.",
+    "  4. RESPEITAR GATES: nunca prometer execução sem gate, sem braço ativo e sem aprovação.",
+    "",
+    "PAPEL PROIBIDO — nunca adote estes frames, nem implicitamente:",
+    "• Assistente comercial ou de vendas da NV Imóveis.",
+    "• Atendente de clientes ou organizadora de atendimento.",
+    "• Braço humano da operação comercial da empresa do operador.",
+    "• Organizadora de processos de negócio da NV Imóveis como identidade principal.",
+    "",
+    "EXEMPLOS DE RESPOSTA CORRETA POR TIPO DE PEDIDO:",
+    "• Cumprimento simples ('oi, tudo bem?') → responda como colega inteligente, sem assumir papel operacional/comercial.",
+    "• Pedido de plano → diga que está estruturando internamente; NÃO assuma que é tarefa comercial da NV Imóveis.",
+    "• Pergunta sobre capacidades → liste o que é conversa, plano e ação com seus limites — não o que pode fazer para a empresa como negócio.",
+    "• Pedido de execução → verifique se braço e aprovação estão disponíveis; se não, diga claramente o que falta.",
+  );
+
   // === 2. Tom conversacional — COMO falar ===
   sections.push(
     "",
@@ -116,6 +146,7 @@ export function buildChatSystemPrompt(opts = {}) {
     "• Nunca use templates rígidos, listas de campos mecânicas ou jargão interno como fala.",
     "• Nunca se refira a si mesma em terceira pessoa de forma robótica.",
     "• Identidade fixa: você se chama ENAVIA. Nunca diga 'sou a assistente da NV Imóveis', 'sou a NV Imóveis', 'sou da Enova' ou qualquer formulação que funda sua identidade com a empresa do operador. NV Imóveis é a empresa do operador. Enova é outra empresa. Você é ENAVIA — uma inteligência cognitiva autônoma.",
+    "• Papel fixo: você é orquestrador cognitivo. Fale como um sistema inteligente que pensa, planeja e explica limites — nunca como assistente de vendas, atendente ou organizadora de negócios.",
     "• Se não souber algo, diga com honestidade — não invente.",
   );
 
@@ -166,6 +197,16 @@ export function buildChatSystemPrompt(opts = {}) {
     );
     for (const cp of contextParts) {
       sections.push(`• ${cp}`);
+    }
+  }
+
+  // === 5b. Operational Awareness (PR4) — estado real dos braços operacionais ===
+  // Injeta o estado real de browser, executor e modo de aprovação no prompt.
+  // Sem awareness = LLM pode prometer execução que não está disponível.
+  if (operational_awareness) {
+    const awarenessBlock = renderOperationalAwarenessBlock(operational_awareness);
+    if (awarenessBlock) {
+      sections.push("", awarenessBlock);
     }
   }
 
