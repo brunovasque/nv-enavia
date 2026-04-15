@@ -23,6 +23,9 @@ import {
   appendFunctionalLog,
   KV_SUFFIX_EXEC_EVENT,
   KV_SUFFIX_FUNCTIONAL_LOGS,
+  KV_SUFFIX_FLOG_ENTRY,
+  KV_SUFFIX_FLOG_COUNT,
+  MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
 } from "../contract-executor.js";
 
 let passed = 0;
@@ -117,13 +120,18 @@ async function runTests() {
     assert(typeof event.metrics.elapsedMs  === "number", "G1: metrics.elapsedMs is number");
     assert(event.metrics.elapsedMs >= 0, "G1: metrics.elapsedMs >= 0");
 
-    // executionSummary
+    // executionSummary — hardened: only provably real fields
     assert(event.executionSummary !== null && typeof event.executionSummary === "object", "G1: executionSummary is object");
     assert(event.executionSummary.finalStatus === "success", "G1: executionSummary.finalStatus = success");
-    assert(typeof event.executionSummary.hadBrowserNavigation === "boolean", "G1: hadBrowserNavigation is boolean");
-    assert(typeof event.executionSummary.hadCodeChange === "boolean", "G1: hadCodeChange is boolean");
     assert(typeof event.executionSummary.hadBlock === "boolean", "G1: hadBlock is boolean");
-    assert(typeof event.executionSummary.hadBridgeDispatch === "boolean", "G1: hadBridgeDispatch is boolean");
+    assert(typeof event.executionSummary.taskId === "string", "G1: taskId is string (provable)");
+    assert(typeof event.executionSummary.microPrId === "string", "G1: microPrId is string (provable)");
+    assert(typeof event.executionSummary.evidenceCount === "number", "G1: evidenceCount is number (provable)");
+    // Removed heuristic fields (hadBrowserNavigation, hadCodeChange, hadHumanReview, hadBridgeDispatch)
+    assert(!("hadBrowserNavigation" in event.executionSummary), "G1: hadBrowserNavigation removed (heuristic)");
+    assert(!("hadCodeChange" in event.executionSummary), "G1: hadCodeChange removed (heuristic)");
+    assert(!("hadHumanReview" in event.executionSummary), "G1: hadHumanReview removed (heuristic)");
+    assert(!("hadBridgeDispatch" in event.executionSummary), "G1: hadBridgeDispatch removed (heuristic)");
 
     // result
     assert(event.result !== null && typeof event.result === "object", "G1: result is object");
@@ -340,8 +348,8 @@ async function runTests() {
     assert(logs.length === 0, "G9: empty array when no logs");
   }
 
-  // ── Group 10: appendFunctionalLog + readFunctionalLogs round-trip ──
-  console.log("\nGroup 10: appendFunctionalLog + readFunctionalLogs round-trip");
+  // ── Group 10: appendFunctionalLog + readFunctionalLogs round-trip (per-entry model) ──
+  console.log("\nGroup 10: appendFunctionalLog + readFunctionalLogs round-trip (per-entry)");
   {
     const env = { ENAVIA_BRAIN: createMockKV() };
     const cid = "roundtrip_test";
@@ -359,6 +367,84 @@ async function runTests() {
     assert(logs[1].id === "fl_test_2", "G10: second log preserved");
     assert(logs[0].type === "decisao", "G10: type preserved");
     assert(logs[1].type === "bloqueio", "G10: type preserved for second");
+
+    // Verify per-entry KV keys were written (not single array)
+    const countKey = `contract:${cid}:flog_count`;
+    const count = await env.ENAVIA_BRAIN.get(countKey);
+    assert(count === "2", `G10: flog_count = 2 (per-entry model, got ${count})`);
+
+    const entry0Key = `contract:${cid}:flog:0`;
+    const entry0 = await env.ENAVIA_BRAIN.get(entry0Key);
+    assert(entry0 !== null, "G10: flog:0 exists as individual key");
+    const parsed0 = JSON.parse(entry0);
+    assert(parsed0.id === "fl_test_1", "G10: flog:0 contains first log");
+  }
+
+  // ── Group 11: Per-entry cap is enforced (MAX_FUNCTIONAL_LOGS_PER_CONTRACT) ──
+  console.log("\nGroup 11: Per-entry cap enforced (MAX_FUNCTIONAL_LOGS_PER_CONTRACT)");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "cap_test";
+
+    // Write MAX + 5 logs — only MAX should be persisted
+    for (let i = 0; i < MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 5; i++) {
+      await appendFunctionalLog(env, cid, {
+        id: `fl_cap_${i}`, type: "decisao", label: `Log ${i}`, message: `Msg ${i}`, timestamp: new Date().toISOString(),
+      });
+    }
+
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
+      `G11: capped at ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${logs.length})`);
+
+    // Verify the counter stopped at MAX
+    const countKey = `contract:${cid}:flog_count`;
+    const count = parseInt(await env.ENAVIA_BRAIN.get(countKey), 10);
+    assert(count === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
+      `G11: flog_count capped at ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${count})`);
+  }
+
+  // ── Group 12: Legacy single-array backward compat in readFunctionalLogs ──
+  console.log("\nGroup 12: Legacy single-array backward compat in readFunctionalLogs");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "legacy_test";
+
+    // Write old-style single array directly to legacy key
+    const legacyKey = `contract:${cid}:functional_logs`;
+    const legacyLogs = [
+      { id: "fl_old_1", type: "decisao", label: "Old log", message: "Old msg", timestamp: "2025-12-01T00:00:00Z" },
+      { id: "fl_old_2", type: "consolidacao", label: "Old consolidation", message: "Old consolidation msg", timestamp: "2025-12-01T00:01:00Z" },
+    ];
+    await env.ENAVIA_BRAIN.put(legacyKey, JSON.stringify(legacyLogs));
+
+    // No flog_count key → readFunctionalLogs should fallback to legacy key
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 2, "G12: legacy logs read via fallback");
+    assert(logs[0].id === "fl_old_1", "G12: legacy first log preserved");
+    assert(logs[1].id === "fl_old_2", "G12: legacy second log preserved");
+  }
+
+  // ── Group 13: executionSummary hardened — removed heuristic fields in FAILED path ──
+  console.log("\nGroup 13: executionSummary hardened — failure path has provable fields only");
+  {
+    const { env, contractId } = await setupReadyContract("macro2_f5_g13");
+    await executeCurrentMicroPr(env, contractId, {
+      simulate_failure: {
+        code: "OOS_ERROR",
+        message: "Out of scope error",
+        classification: "out_of_scope",
+      },
+    });
+
+    const event = await readExecEvent(env, contractId);
+    assert(event.executionSummary.hadBlock === true, "G13: hadBlock=true for out_of_scope classification (provable)");
+    assert(event.executionSummary.taskId === "task_001", "G13: taskId = task_001 (provable)");
+    assert(typeof event.executionSummary.evidenceCount === "number", "G13: evidenceCount is number");
+    assert(!("hadBrowserNavigation" in event.executionSummary), "G13: hadBrowserNavigation removed");
+    assert(!("hadCodeChange" in event.executionSummary), "G13: hadCodeChange removed");
+    assert(!("hadHumanReview" in event.executionSummary), "G13: hadHumanReview removed");
+    assert(!("hadBridgeDispatch" in event.executionSummary), "G13: hadBridgeDispatch removed");
   }
 
   // ── Summary ──

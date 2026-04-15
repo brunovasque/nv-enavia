@@ -116,8 +116,15 @@ const KV_SUFFIX_DECOMPOSITION = ":decomposition";
 const KV_INDEX_KEY = "contract:index";
 // PR1 — exec event key: contract:<id>:exec_event (read by PR2/PR3)
 const KV_SUFFIX_EXEC_EVENT = ":exec_event";
-// Macro2-F5 — functional logs key: contract:<id>:functional_logs
-const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs";
+// Macro2-F5 — functional logs: append-only individual keys per entry.
+// Each log entry: contract:<id>:flog:<seq> (0-indexed).
+// Counter:        contract:<id>:flog_count
+// Cap:            MAX_FUNCTIONAL_LOGS_PER_CONTRACT (hard limit per contract)
+// This avoids the read-modify-write race of a single-array KV key.
+const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs"; // kept for backward-compat reads
+const KV_SUFFIX_FLOG_ENTRY = ":flog:";
+const KV_SUFFIX_FLOG_COUNT = ":flog_count";
+const MAX_FUNCTIONAL_LOGS_PER_CONTRACT = 50;
 
 // ---------------------------------------------------------------------------
 // Canonical global statuses for the Contract Executor state machine.
@@ -2351,18 +2358,29 @@ async function readExecEvent(env, contractId) {
 }
 
 // ---------------------------------------------------------------------------
-// Macro2-F5 — Functional Logs: persist / append / read
+// Macro2-F5 — Functional Logs: append-only per-entry persistence
 //
-//   appendFunctionalLog(env, contractId, log)
-//     Appends a single log entry to the functional_logs array persisted
-//     in KV under contract:<id>:functional_logs.
-//     Each log entry: { id, type, label, message, timestamp }
+// Strategy: Each log entry is written to its own KV key:
+//   contract:<id>:flog:<seq>  — individual log entry (JSON)
+//   contract:<id>:flog_count  — integer counter of total entries
 //
-//   readFunctionalLogs(env, contractId)
-//     Reads the persisted functional_logs array from KV.
-//     Returns [] if none exist.
+// appendFunctionalLog(env, contractId, log)
+//   Writes a single log entry to a NEW key (no read-modify-write).
+//   Increments the counter atomically per write.
+//   Respects MAX_FUNCTIONAL_LOGS_PER_CONTRACT — silently drops if cap reached.
 //
-//   Failures are swallowed — logs must never crash the executor.
+// readFunctionalLogs(env, contractId)
+//   Reads the counter, then fetches each entry individually.
+//   Falls back to legacy single-array key for backward compatibility.
+//   Returns [] if none exist. Always returns sorted by seq (insertion order).
+//
+// Why this is safer than a single array:
+//   - No read-modify-write: each append is a single KV put (no parse → push → put)
+//   - No lost update: concurrent appends write to different keys
+//   - Capped: MAX_FUNCTIONAL_LOGS_PER_CONTRACT prevents unbounded growth
+//   - Ordered: seq-based keys preserve insertion order
+//
+// Failures are swallowed — logs must never crash the executor.
 // ---------------------------------------------------------------------------
 let _functionalLogSeq = 0;
 
@@ -2379,11 +2397,16 @@ function _buildFunctionalLog(type, label, message) {
 
 async function appendFunctionalLog(env, contractId, log) {
   try {
-    const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
-    const raw = await env.ENAVIA_BRAIN.get(key);
-    const logs = raw ? JSON.parse(raw) : [];
-    logs.push(log);
-    await env.ENAVIA_BRAIN.put(key, JSON.stringify(logs));
+    const countKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_COUNT}`;
+    const rawCount = await env.ENAVIA_BRAIN.get(countKey);
+    const count = rawCount ? parseInt(rawCount, 10) : 0;
+
+    // Cap: silently drop if limit reached
+    if (count >= MAX_FUNCTIONAL_LOGS_PER_CONTRACT) return;
+
+    const entryKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}${count}`;
+    await env.ENAVIA_BRAIN.put(entryKey, JSON.stringify(log));
+    await env.ENAVIA_BRAIN.put(countKey, String(count + 1));
   } catch (_) {
     // appendFunctionalLog must never crash the executor
   }
@@ -2391,9 +2414,28 @@ async function appendFunctionalLog(env, contractId, log) {
 
 async function readFunctionalLogs(env, contractId) {
   try {
-    const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
-    const raw = await env.ENAVIA_BRAIN.get(key);
-    return raw ? JSON.parse(raw) : [];
+    // Try new per-entry model first
+    const countKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_COUNT}`;
+    const rawCount = await env.ENAVIA_BRAIN.get(countKey);
+    const count = rawCount ? parseInt(rawCount, 10) : 0;
+
+    if (count > 0) {
+      const logs = [];
+      const limit = Math.min(count, MAX_FUNCTIONAL_LOGS_PER_CONTRACT);
+      for (let i = 0; i < limit; i++) {
+        const entryKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}${i}`;
+        const raw = await env.ENAVIA_BRAIN.get(entryKey);
+        if (raw) {
+          try { logs.push(JSON.parse(raw)); } catch (_) { /* skip malformed */ }
+        }
+      }
+      return logs;
+    }
+
+    // Fallback: try legacy single-array key for backward compatibility
+    const legacyKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
+    const legacyRaw = await env.ENAVIA_BRAIN.get(legacyKey);
+    return legacyRaw ? JSON.parse(legacyRaw) : [];
   } catch (_) {
     return [];
   }
@@ -2612,11 +2654,10 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     },
     executionSummary: {
       finalStatus:           "running",
-      hadBrowserNavigation:  false,
-      hadCodeChange:         false,
+      taskId:                currentTaskId,
+      microPrId:             microPrId,
       hadBlock:              false,
-      hadHumanReview:        false,
-      hadBridgeDispatch:     !!(handoff.scope && handoff.scope.workers && handoff.scope.workers.length > 0),
+      evidenceCount:         0,
     },
     result: null,
   }));
@@ -2688,11 +2729,10 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
       },
       executionSummary: {
         finalStatus:           "success",
-        hadBrowserNavigation:  false,
-        hadCodeChange:         !!(evidence.length > 0),
+        taskId:                currentTaskId,
+        microPrId:             microPrId,
         hadBlock:              false,
-        hadHumanReview:        false,
-        hadBridgeDispatch:     !!(handoff.scope && handoff.scope.workers && handoff.scope.workers.length > 0),
+        evidenceCount:         evidence.length,
       },
       result: {
         summary: `Task "${currentTaskId}" concluída com sucesso em ${_successElapsedMs}ms. ${evidence.length} evidência(s) registrada(s).`,
@@ -2749,11 +2789,10 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
         },
         executionSummary: {
           finalStatus:           "failed",
-          hadBrowserNavigation:  false,
-          hadCodeChange:         false,
+          taskId:                currentTaskId,
+          microPrId:             microPrId,
           hadBlock:              !!(executionError.classification === "out_of_scope"),
-          hadHumanReview:        false,
-          hadBridgeDispatch:     !!(handoff.scope && handoff.scope.workers && handoff.scope.workers.length > 0),
+          evidenceCount:         evidence.length,
         },
         result: {
           summary: `Task "${currentTaskId}" falhou após ${_failElapsedMs}ms: ${_failMotivo}`,
@@ -5002,6 +5041,9 @@ export {
   appendFunctionalLog,
   readFunctionalLogs,
   KV_SUFFIX_FUNCTIONAL_LOGS,
+  KV_SUFFIX_FLOG_ENTRY,
+  KV_SUFFIX_FLOG_COUNT,
+  MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
   // C2 — Automatic Contract Closure in TEST
   closeContractInTest,
   CONTRACT_CLOSURE_STATUSES,
