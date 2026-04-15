@@ -9,6 +9,7 @@ import MemoryEntryList from "../memory/MemoryEntryList";
 import EmptyMemoryState from "../memory/EmptyMemoryState";
 import MemoryInUseCard from "../memory/MemoryInUseCard";
 import ManualMemoryPanel from "../memory/ManualMemoryPanel";
+import LearningCandidatesPanel from "../memory/LearningCandidatesPanel";
 
 export default function MemoryPage() {
   const [currentState, setCurrentState] = useState(MEMORY_STATES.POPULATED);
@@ -91,6 +92,9 @@ export default function MemoryPage() {
 
       {/* PR4: Manual Memory Panel — operator CRUD for manual instructions */}
       <ManualMemoryPanel />
+
+      {/* PR5: Learning Candidates Panel — controlled learning with human approval */}
+      <LearningCandidatesPanel />
 
       {/* Empty state */}
       {!hasMemory ? (
