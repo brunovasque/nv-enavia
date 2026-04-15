@@ -204,7 +204,8 @@ async function readActiveContractState(env, contractId) {
     try {
       const current = JSON.parse(currentRaw);
       targetId = current.contract_id;
-    } catch (_) {
+    } catch (e) {
+      console.error("[contract-active-state] Failed to parse active contract key:", e.message);
       return null;
     }
   }
@@ -217,7 +218,8 @@ async function readActiveContractState(env, contractId) {
 
   try {
     return JSON.parse(raw);
-  } catch (_) {
+  } catch (e) {
+    console.error("[contract-active-state] Failed to parse state for", targetId, ":", e.message);
     return null;
   }
 }
@@ -307,13 +309,16 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
   // headings as "clause" even when content is about payment/penalty/etc.)
   if (ctx.block_types && Array.isArray(ctx.block_types) && ctx.block_types.length > 0) {
     const typeSet = new Set(ctx.block_types.map((t) => t.toLowerCase()));
+    // Pre-compile regexes for each type
+    const typeRegexes = [...typeSet].map((t) => new RegExp(escapeRegex(t), "i"));
     matched = allBlocks.filter((b) => {
       if (typeSet.has(b.block_type)) return true;
       // Also match by content signals and heading keywords
-      for (const t of typeSet) {
-        const rx = new RegExp(escapeRegex(t), "i");
+      for (let i = 0; i < typeRegexes.length; i++) {
+        const rx = typeRegexes[i];
         if ((b.heading && rx.test(b.heading)) || rx.test(b.content.slice(0, 500))) return true;
         // Check block signals for the type
+        const t = [...typeSet][i];
         if (b.signals) {
           const signalKey = TYPE_TO_SIGNAL[t];
           if (signalKey && b.signals[signalKey] && b.signals[signalKey].length > 0) return true;
@@ -328,13 +333,14 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
   if (matched.length === 0 && ctx.phase) {
     const phaseKey = ctx.phase.toLowerCase();
     const phaseKeywords = PHASE_KEYWORDS[phaseKey] || [phaseKey];
+    // Pre-compile regexes for phase keywords
+    const phaseRegexes = phaseKeywords.map((kw) => new RegExp(escapeRegex(kw), "i"));
 
     matched = allBlocks.filter((b) => {
       // Match by block_type
       if (b.block_type === phaseKey) return true;
       // Match by heading or content keywords
-      for (const kw of phaseKeywords) {
-        const rx = new RegExp(escapeRegex(kw), "i");
+      for (const rx of phaseRegexes) {
         if ((b.heading && rx.test(b.heading)) || rx.test(b.content.slice(0, 500))) return true;
       }
       // Match by signals
@@ -420,8 +426,9 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
       state.last_resolution_at = new Date().toISOString();
       await env.ENAVIA_BRAIN.put(stateKey, JSON.stringify(state));
     }
-  } catch (_) {
+  } catch (e) {
     // Non-blocking — state update failure does not break resolution
+    console.error("[contract-active-state] Non-blocking state update failed:", e.message);
   }
 
   return {
@@ -467,8 +474,8 @@ async function refreshCanonicalSummary(env, contractId) {
       state.summary_canonic = summary;
       state.summary_refreshed_at = new Date().toISOString();
       await env.ENAVIA_BRAIN.put(stateKey, JSON.stringify(state));
-    } catch (_) {
-      // If parse fails, just return the summary without updating state
+    } catch (e) {
+      console.error("[contract-active-state] Failed to update state during summary refresh:", e.message);
     }
   }
 
