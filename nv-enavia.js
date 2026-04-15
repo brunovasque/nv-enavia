@@ -880,20 +880,54 @@ function buildMessages(brain, userMessage) {
 // ---------------------------------------------------------------------------
 // 🤖 callChatModel(env, messages, options)
 // Faz a chamada ao modelo da OpenAI (ou compatível)
+//
+// PR8 — Hardening:
+//   • Timeout de 25 s via AbortController — evita travar o Worker até o limite do Cloudflare.
+//   • Fallback de modelo: se o modelo configurado retornar 404 (model_not_found) ou
+//     400 relacionado a model, tenta automaticamente com _LLM_FALLBACK_MODEL.
+//   • res.json() protegido — erro claro se a API retornar body não-JSON.
+//   • choices vazio/content vazio detectado explicitamente com erro descritivo.
 // ---------------------------------------------------------------------------
+
+// Timeout padrão para chamadas LLM (ms). Mantido baixo o suficiente para caber
+// dentro do limite de execução do Cloudflare Workers (30 s CPU wall).
+const _LLM_CALL_TIMEOUT_MS = 25000;
+
+// Modelo de fallback usado automaticamente se o modelo primário não for encontrado
+// (HTTP 404) ou retornar erro relacionado a model inválido (HTTP 400 + "model").
+const _LLM_FALLBACK_MODEL = "gpt-4.1-mini";
+
+async function _callModelOnce(model, apiKey, body, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...body, model }),
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callChatModel(env, messages, options = {}) {
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY não configurada no Worker ENAVIA NV-FIRST.");
   }
 
-  const model =
+  const primaryModel =
     env.OPENAI_MODEL ||
     env.NV_OPENAI_MODEL ||
     "gpt-4.1-mini";
 
   const body = {
-    model,
     messages,
     temperature: options.temperature ?? 0.2,
     max_completion_tokens: options.max_completion_tokens ?? options.max_tokens ?? 1600,
@@ -904,31 +938,86 @@ async function callChatModel(env, messages, options = {}) {
     ...(options.response_format ? { response_format: options.response_format } : {}),
   };
 
-  logNV("🔁 Chamando modelo:", model);
+  logNV("🔁 Chamando modelo:", primaryModel);
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  // PR8: wrap fetch in AbortController for timeout protection
+  let res;
+  try {
+    res = await _callModelOnce(primaryModel, apiKey, body, _LLM_CALL_TIMEOUT_MS);
+  } catch (fetchErr) {
+    if (fetchErr?.name === "AbortError") {
+      throw new Error(
+        `[TIMEOUT] Chamada ao modelo LLM expirou após ${_LLM_CALL_TIMEOUT_MS / 1000}s (modelo: ${primaryModel}).`,
+      );
+    }
+    throw new Error(
+      `[NETWORK] Falha de rede na chamada ao modelo LLM (modelo: ${primaryModel}): ${String(fetchErr)}`,
+    );
+  }
+
+  // PR8: Model fallback — if the primary model is not found or yields a
+  // model-related 400/404, retry once with _LLM_FALLBACK_MODEL before failing.
+  if (!res.ok) {
+    const shouldFallback =
+      primaryModel !== _LLM_FALLBACK_MODEL &&
+      (res.status === 404 ||
+        (res.status === 400 &&
+          (await res.clone().text().catch(() => "")).toLowerCase().includes("model")));
+
+    if (shouldFallback) {
+      logNV(`⚠️ Modelo '${primaryModel}' indisponível (HTTP ${res.status}) — tentando fallback '${_LLM_FALLBACK_MODEL}'`);
+      try {
+        res = await _callModelOnce(_LLM_FALLBACK_MODEL, apiKey, body, _LLM_CALL_TIMEOUT_MS);
+      } catch (fallbackErr) {
+        if (fallbackErr?.name === "AbortError") {
+          throw new Error(
+            `[TIMEOUT] Chamada ao modelo fallback '${_LLM_FALLBACK_MODEL}' expirou após ${_LLM_CALL_TIMEOUT_MS / 1000}s.`,
+          );
+        }
+        throw new Error(
+          `[NETWORK] Falha de rede na chamada ao modelo fallback '${_LLM_FALLBACK_MODEL}': ${String(fallbackErr)}`,
+        );
+      }
+    }
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     logNV("❌ Erro na chamada ao modelo:", res.status, detail.slice(0, 400));
     throw new Error(
-      `Falha na chamada ao modelo → HTTP ${res.status} — ${detail.slice(
-        0,
-        400,
-      )}`,
+      `[HTTP_${res.status}] Falha na chamada ao modelo (modelo: ${primaryModel}) → HTTP ${res.status} — ${detail.slice(0, 400)}`,
     );
   }
 
-  const data = await res.json();
+  // PR8: guard res.json() — OpenAI may return a non-JSON body in edge cases
+  let data;
+  try {
+    data = await res.json();
+  } catch (jsonErr) {
+    throw new Error(
+      `[INVALID_JSON] Resposta do modelo não é JSON válido (modelo: ${primaryModel}): ${String(jsonErr)}`,
+    );
+  }
+
+  // PR8: guard empty choices — content policy refusal or empty completion
   const choice = data.choices?.[0];
-  const content = choice?.message?.content || "";
+  if (!choice) {
+    const finishReason = data.choices?.length === 0 ? "choices array vazio" : "choices ausente";
+    logNV("⚠️ Modelo retornou choices vazio/ausente:", { finishReason, model: primaryModel });
+    throw new Error(
+      `[EMPTY_RESPONSE] Modelo retornou resposta sem choices utilizáveis (modelo: ${primaryModel}, motivo: ${finishReason}).`,
+    );
+  }
+
+  const content = choice?.message?.content ?? "";
+  if (!content) {
+    // finish_reason "content_filter" é o caso mais comum; log para diagnóstico
+    const finishReason = choice?.finish_reason || "desconhecido";
+    logNV("⚠️ Modelo retornou content vazio:", { finishReason, model: primaryModel });
+    throw new Error(
+      `[EMPTY_CONTENT] Modelo retornou content vazio (modelo: ${primaryModel}, finish_reason: ${finishReason}). Possível filtro de conteúdo.`,
+    );
+  }
 
   logNV("✔ Resposta do modelo recebida com sucesso.");
 
@@ -3668,15 +3757,50 @@ async function handleChatLLM(request, env) {
       },
     });
   } catch (err) {
-    logNV("❌ [CHAT/LLM] Erro fatal:", { error: String(err) });
+    // PR8: Classify the error type for clear, actionable error messages and
+    // appropriate HTTP status codes. Operators can distinguish timeout from
+    // rate limit from generic model failure without reading raw stack traces.
+    const errStr = String(err);
+    let httpStatus = 500;
+    let errorCode = "LLM_ERROR";
+    let errorMsg = "Falha na conversa LLM-first.";
+
+    if (errStr.includes("[TIMEOUT]") || err?.name === "AbortError") {
+      httpStatus = 504;
+      errorCode = "LLM_TIMEOUT";
+      errorMsg = `Timeout na chamada ao modelo LLM (>${_LLM_CALL_TIMEOUT_MS / 1000}s). Tente novamente.`;
+    } else if (errStr.includes("[HTTP_429]") || errStr.toLowerCase().includes("rate limit")) {
+      httpStatus = 503;
+      errorCode = "LLM_RATE_LIMIT";
+      errorMsg = "Serviço LLM temporariamente indisponível: limite de requisições atingido. Tente novamente em alguns instantes.";
+    } else if (errStr.includes("[HTTP_5") || errStr.includes("[HTTP_503]") || errStr.includes("[HTTP_502]")) {
+      httpStatus = 503;
+      errorCode = "LLM_UNAVAILABLE";
+      errorMsg = "Serviço LLM temporariamente indisponível. Tente novamente em alguns instantes.";
+    } else if (errStr.includes("[NETWORK]")) {
+      httpStatus = 503;
+      errorCode = "LLM_NETWORK_ERROR";
+      errorMsg = "Falha de rede ao chamar o serviço LLM. Verifique conectividade e tente novamente.";
+    } else if (errStr.includes("[EMPTY_RESPONSE]") || errStr.includes("[EMPTY_CONTENT]")) {
+      httpStatus = 502;
+      errorCode = "LLM_EMPTY_RESPONSE";
+      errorMsg = "Modelo LLM retornou resposta vazia ou sem conteúdo utilizável. Possível filtro de conteúdo ou falha no modelo.";
+    } else if (errStr.includes("[INVALID_JSON]")) {
+      httpStatus = 502;
+      errorCode = "LLM_INVALID_RESPONSE";
+      errorMsg = "Modelo LLM retornou resposta em formato inválido (não-JSON). Tente novamente.";
+    }
+
+    logNV("❌ [CHAT/LLM] Erro fatal:", { error: errStr, errorCode, httpStatus });
     return jsonResponse(
       {
         ok: false,
         system: "ENAVIA-NV-FIRST",
         mode: "llm-first",
         timestamp: Date.now(),
-        error: "Falha na conversa LLM-first.",
-        detail: String(err),
+        error: errorMsg,
+        error_code: errorCode,
+        detail: errStr,
         telemetry: {
           duration_ms: Date.now() - startedAt,
           // PR7: continuity_active and pipeline are derivable before LLM call — include on failure
@@ -3704,7 +3828,7 @@ async function handleChatLLM(request, env) {
           },
         },
       },
-      500
+      httpStatus
     );
   }
 }
