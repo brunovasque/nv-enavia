@@ -54,6 +54,18 @@ const MEMORY_TYPES = {
   CANONICAL_RULES:     "canonical_rules",
   OPERATIONAL_HISTORY: "operational_history",
   LIVE_CONTEXT:        "live_context",
+  // ---------------------------------------------------------------------------
+  // PR2 — Tipos canônicos do contrato PR1 (aliases semânticos)
+  //
+  // Estes tipos mapeiam diretamente os 5 tipos canônicos definidos no contrato
+  // ENAVIA_MEMORY_CONTRACT_V1.md (PR1 §1). Convivem com os tipos originais
+  // para preservar compatibilidade total com código existente.
+  // ---------------------------------------------------------------------------
+  CONVERSA_ATUAL:         "conversa_atual",
+  MEMORIA_LONGA:          "memoria_longa",
+  MEMORIA_MANUAL:         "memoria_manual",
+  APRENDIZADO_VALIDADO:   "aprendizado_validado",
+  MEMORIA_TEMPORARIA:     "memoria_temporaria",
 };
 
 // ---------------------------------------------------------------------------
@@ -71,6 +83,8 @@ const MEMORY_STATUS = {
   SUPERSEDED: "superseded",
   EXPIRED:    "expired",
   CANONICAL:  "canonical",
+  // PR2 — Nível "bloqueado" do contrato PR1 §2.4: suporte real no schema
+  BLOCKED:    "blocked",
 };
 
 // ---------------------------------------------------------------------------
@@ -103,6 +117,8 @@ const MEMORY_CONFIDENCE = {
   MEDIUM:     "medium",
   LOW:        "low",
   UNVERIFIED: "unverified",
+  // PR2 — Nível "bloqueado" do contrato PR1 §2.4 / §8.8: valor real de confidence
+  BLOCKED:    "blocked",
 };
 
 // ---------------------------------------------------------------------------
@@ -125,6 +141,8 @@ const MEMORY_FLAGS = {
   IS_CANONICAL:  "is_canonical",
   IS_SUPERSEDED: "is_superseded",
   IS_EXPIRED:    "is_expired",
+  // PR2 — Flag "bloqueado" do contrato PR1 §8.8: suporte real no schema
+  IS_BLOCKED:    "is_blocked",
 };
 
 // ---------------------------------------------------------------------------
@@ -250,6 +268,16 @@ function validateMemoryObject(obj) {
     } else if (Number.isNaN(Date.parse(obj.expires_at))) {
       errors.push("'expires_at' must be a valid ISO 8601 date string");
     }
+  }
+
+  // PR2 — memoria_temporaria DEVE ter expires_at (contrato PR1 §5.1, §6.1)
+  if (
+    obj.memory_type === MEMORY_TYPES.MEMORIA_TEMPORARIA &&
+    (obj.expires_at === null || obj.expires_at === undefined)
+  ) {
+    errors.push(
+      "'expires_at' is required for memory_type 'memoria_temporaria'"
+    );
   }
 
   // flags — deve ser array cujos itens pertencem ao enum MEMORY_FLAGS

@@ -74,6 +74,8 @@ const INACTIVE_STATUSES = new Set([
   MEMORY_STATUS.ARCHIVED,
   MEMORY_STATUS.EXPIRED,
   MEMORY_STATUS.SUPERSEDED,
+  // PR2 — bloqueado: excluído de qualquer pipeline de leitura (contrato PR1 §4.2)
+  MEMORY_STATUS.BLOCKED,
 ]);
 
 // Priority ordering — lower number = higher priority in results

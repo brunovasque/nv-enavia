@@ -74,14 +74,14 @@ async function runTests() {
   // -------------------------------------------------------------------------
   console.log("Group 1: Enum integrity");
 
-  assert(Object.values(MEMORY_TYPES).length === 5, "MEMORY_TYPES has exactly 5 values");
+  assert(Object.values(MEMORY_TYPES).length === 10, "MEMORY_TYPES has exactly 10 values (5 original + 5 canonical PR2)");
   assert(MEMORY_TYPES.USER_PROFILE        === "user_profile",        "MEMORY_TYPES.USER_PROFILE");
   assert(MEMORY_TYPES.PROJECT             === "project",             "MEMORY_TYPES.PROJECT");
   assert(MEMORY_TYPES.CANONICAL_RULES     === "canonical_rules",     "MEMORY_TYPES.CANONICAL_RULES");
   assert(MEMORY_TYPES.OPERATIONAL_HISTORY === "operational_history", "MEMORY_TYPES.OPERATIONAL_HISTORY");
   assert(MEMORY_TYPES.LIVE_CONTEXT        === "live_context",        "MEMORY_TYPES.LIVE_CONTEXT");
 
-  assert(Object.values(MEMORY_STATUS).length === 5, "MEMORY_STATUS has exactly 5 values");
+  assert(Object.values(MEMORY_STATUS).length === 6, "MEMORY_STATUS has exactly 6 values (5 original + blocked PR2)");
   assert(MEMORY_STATUS.ACTIVE     === "active",     "MEMORY_STATUS.ACTIVE");
   assert(MEMORY_STATUS.ARCHIVED   === "archived",   "MEMORY_STATUS.ARCHIVED");
   assert(MEMORY_STATUS.SUPERSEDED === "superseded", "MEMORY_STATUS.SUPERSEDED");
@@ -94,7 +94,7 @@ async function runTests() {
   assert(MEMORY_PRIORITY.MEDIUM   === "medium",   "MEMORY_PRIORITY.MEDIUM");
   assert(MEMORY_PRIORITY.LOW      === "low",      "MEMORY_PRIORITY.LOW");
 
-  assert(Object.values(MEMORY_CONFIDENCE).length === 5, "MEMORY_CONFIDENCE has exactly 5 values");
+  assert(Object.values(MEMORY_CONFIDENCE).length === 6, "MEMORY_CONFIDENCE has exactly 6 values (5 original + blocked PR2)");
   assert(MEMORY_CONFIDENCE.CONFIRMED  === "confirmed",  "MEMORY_CONFIDENCE.CONFIRMED");
   assert(MEMORY_CONFIDENCE.HIGH       === "high",       "MEMORY_CONFIDENCE.HIGH");
   assert(MEMORY_CONFIDENCE.MEDIUM     === "medium",     "MEMORY_CONFIDENCE.MEDIUM");
@@ -108,10 +108,11 @@ async function runTests() {
   assert(ENTITY_TYPES.OPERATION === "operation", "ENTITY_TYPES.OPERATION");
   assert(ENTITY_TYPES.CONTEXT   === "context",   "ENTITY_TYPES.CONTEXT");
 
-  assert(Object.keys(MEMORY_FLAGS).length === 3,         "MEMORY_FLAGS has exactly 3 keys");
+  assert(Object.keys(MEMORY_FLAGS).length === 4,         "MEMORY_FLAGS has exactly 4 keys (3 original + is_blocked PR2)");
   assert(MEMORY_FLAGS.IS_CANONICAL  === "is_canonical",  "MEMORY_FLAGS.IS_CANONICAL");
   assert(MEMORY_FLAGS.IS_SUPERSEDED === "is_superseded", "MEMORY_FLAGS.IS_SUPERSEDED");
   assert(MEMORY_FLAGS.IS_EXPIRED    === "is_expired",    "MEMORY_FLAGS.IS_EXPIRED");
+  assert(MEMORY_FLAGS.IS_BLOCKED    === "is_blocked",    "MEMORY_FLAGS.IS_BLOCKED");
 
   // -------------------------------------------------------------------------
   // Group 2: Canonical shape integrity

@@ -27,6 +27,9 @@
 
 import {
   validateMemoryObject,
+  MEMORY_STATUS,
+  MEMORY_CONFIDENCE,
+  MEMORY_FLAGS,
 } from "./memory-schema.js";
 
 // ---------------------------------------------------------------------------
@@ -79,6 +82,18 @@ async function writeMemory(memoryObj, env) {
 
   const { memory_id } = memoryObj;
 
+  // PR2 — Rejeitar escrita de memória bloqueada (contrato PR1 §5.2 regra 3):
+  // Se confidence é "blocked" ou status é "blocked", rejeitar
+  if (
+    memoryObj.confidence === MEMORY_CONFIDENCE.BLOCKED ||
+    memoryObj.status === MEMORY_STATUS.BLOCKED
+  ) {
+    return {
+      ok: false,
+      error: "cannot write memory with blocked confidence or status",
+    };
+  }
+
   // Reject duplicate — do not allow overwrite via write
   const existing = await env.ENAVIA_BRAIN.get(memoryKey(memory_id));
   if (existing !== null) {
@@ -114,7 +129,30 @@ async function readMemoryById(memory_id, env) {
   const raw = await env.ENAVIA_BRAIN.get(memoryKey(memory_id));
   if (raw === null) return null;
   try {
-    return JSON.parse(raw);
+    const record = JSON.parse(raw);
+
+    // PR2 — Auto-expiração em leitura (contrato PR1 §6.3):
+    // Se expires_at está no passado e status não é já expired/blocked/archived,
+    // marca automaticamente como expired e persiste a mudança.
+    if (
+      record.expires_at &&
+      typeof record.expires_at === "string" &&
+      record.status !== MEMORY_STATUS.EXPIRED &&
+      record.status !== MEMORY_STATUS.BLOCKED &&
+      record.status !== MEMORY_STATUS.ARCHIVED
+    ) {
+      const expiresTime = Date.parse(record.expires_at);
+      if (!Number.isNaN(expiresTime) && expiresTime < Date.now()) {
+        record.status = MEMORY_STATUS.EXPIRED;
+        record.updated_at = new Date().toISOString();
+        if (Array.isArray(record.flags) && !record.flags.includes(MEMORY_FLAGS.IS_EXPIRED)) {
+          record.flags.push(MEMORY_FLAGS.IS_EXPIRED);
+        }
+        await env.ENAVIA_BRAIN.put(memoryKey(memory_id), JSON.stringify(record));
+      }
+    }
+
+    return record;
   } catch (_e) {
     return null;
   }
@@ -257,6 +295,99 @@ async function supersedeMemory(memory_id, replacementMemoryOrId, meta, env) {
 }
 
 // ---------------------------------------------------------------------------
+// invalidateMemory(memory_id, meta, env)
+//
+// PR2 — Invalidação de memória (contrato PR1 §2.4 / problema statement).
+// Marca a memória como expired + sets flag IS_EXPIRED.
+// Preserva registro completo para auditoria (nunca deleta).
+//
+// Parameters:
+//   meta (optional) — plain object; merged into content_structured._meta
+//
+// Returns:
+//   { ok: true,  memory_id, record }     — on success
+//   { ok: false, error: string }         — on missing record
+// ---------------------------------------------------------------------------
+async function invalidateMemory(memory_id, meta, env) {
+  const existing = await readMemoryById(memory_id, env);
+  if (existing === null) {
+    return { ok: false, error: `memory_id '${memory_id}' not found` };
+  }
+
+  const updatedContentStructured = Object.assign({}, existing.content_structured);
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    updatedContentStructured._meta = Object.assign(
+      {},
+      updatedContentStructured._meta || {},
+      meta
+    );
+  }
+
+  const flags = Array.isArray(existing.flags) ? [...existing.flags] : [];
+  if (!flags.includes(MEMORY_FLAGS.IS_EXPIRED)) {
+    flags.push(MEMORY_FLAGS.IS_EXPIRED);
+  }
+
+  const invalidated = Object.assign({}, existing, {
+    status:             MEMORY_STATUS.EXPIRED,
+    updated_at:         new Date().toISOString(),
+    content_structured: updatedContentStructured,
+    flags,
+  });
+
+  await env.ENAVIA_BRAIN.put(memoryKey(memory_id), JSON.stringify(invalidated));
+  return { ok: true, memory_id, record: invalidated };
+}
+
+// ---------------------------------------------------------------------------
+// blockMemory(memory_id, meta, env)
+//
+// PR2 — Bloqueio de memória (contrato PR1 §2.4).
+// Marca status como "blocked", confidence como "blocked", flag IS_BLOCKED.
+// Memória bloqueada permanece no storage para auditoria (nunca deletada).
+// Memória bloqueada é excluída de qualquer pipeline de retrieval (PR3).
+// Só pode ser desbloqueada por ação humana explícita.
+//
+// Parameters:
+//   meta (optional) — plain object; merged into content_structured._meta
+//
+// Returns:
+//   { ok: true,  memory_id, record }     — on success
+//   { ok: false, error: string }         — on missing record
+// ---------------------------------------------------------------------------
+async function blockMemory(memory_id, meta, env) {
+  const existing = await readMemoryById(memory_id, env);
+  if (existing === null) {
+    return { ok: false, error: `memory_id '${memory_id}' not found` };
+  }
+
+  const updatedContentStructured = Object.assign({}, existing.content_structured);
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    updatedContentStructured._meta = Object.assign(
+      {},
+      updatedContentStructured._meta || {},
+      meta
+    );
+  }
+
+  const flags = Array.isArray(existing.flags) ? [...existing.flags] : [];
+  if (!flags.includes(MEMORY_FLAGS.IS_BLOCKED)) {
+    flags.push(MEMORY_FLAGS.IS_BLOCKED);
+  }
+
+  const blocked = Object.assign({}, existing, {
+    status:             MEMORY_STATUS.BLOCKED,
+    confidence:         MEMORY_CONFIDENCE.BLOCKED,
+    updated_at:         new Date().toISOString(),
+    content_structured: updatedContentStructured,
+    flags,
+  });
+
+  await env.ENAVIA_BRAIN.put(memoryKey(memory_id), JSON.stringify(blocked));
+  return { ok: true, memory_id, record: blocked };
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 export {
@@ -265,4 +396,6 @@ export {
   updateMemory,
   archiveMemory,
   supersedeMemory,
+  invalidateMemory,
+  blockMemory,
 };
