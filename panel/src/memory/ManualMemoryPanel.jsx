@@ -264,6 +264,7 @@ export default function ManualMemoryPanel() {
             <span style={s.colSmall}>Tipo/Fonte</span>
             <span style={s.colSmall}>Confiança</span>
             <span style={s.colSmall}>Status</span>
+            <span style={s.colSmall}>Criado</span>
             <span style={s.colSmall}>Atualizado</span>
             <span style={s.colSmall}>Tags</span>
             <span style={s.colActions}>Ações</span>
@@ -284,6 +285,9 @@ export default function ManualMemoryPanel() {
                 <span style={s.colSmall}>{item.confidence}</span>
                 <span style={s.colSmall}>
                   <StatusBadge status={item.status} />
+                </span>
+                <span style={{ ...s.colSmall, fontFamily: "var(--font-mono)", fontSize: "10px" }}>
+                  {formatTs(item.created_at)}
                 </span>
                 <span style={{ ...s.colSmall, fontFamily: "var(--font-mono)", fontSize: "10px" }}>
                   {formatTs(item.updated_at)}
