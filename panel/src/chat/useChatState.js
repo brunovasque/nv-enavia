@@ -12,6 +12,28 @@ const SEED_MESSAGES = [
 // Gap between seeded messages to simulate a past conversation (1.5 minutes apart).
 const SEED_INTERVAL_MS = 90000;
 
+// PR5: Build conversation history for LLM context continuity.
+// Converts panel messages to the format expected by /chat/run.
+// Limits: max 20 messages, max 4000 chars total.
+const _PR5_MAX_HISTORY = 20;
+const _PR5_MAX_CHARS = 4000;
+
+function _buildConversationHistory(msgs) {
+  if (!Array.isArray(msgs) || msgs.length === 0) return [];
+  const result = [];
+  let totalChars = 0;
+  const recent = msgs.slice(-_PR5_MAX_HISTORY);
+  for (const msg of recent) {
+    const role = msg.role === "user" ? "user" : "assistant";
+    const content = typeof msg.content === "string" ? msg.content.trim() : "";
+    if (!content) continue;
+    if (totalChars + content.length > _PR5_MAX_CHARS) break;
+    totalChars += content.length;
+    result.push({ role, content });
+  }
+  return result;
+}
+
 let _counter = 0;
 function uid() {
   return `msg-${++_counter}-${Date.now()}`;
@@ -40,14 +62,24 @@ export function useChatState() {
   const sendingRef = useRef(false);
   // Tracks the last trimmed text successfully dispatched — used by retryMessage.
   const lastSentRef = useRef(null);
+  // PR5: Stores conversation history snapshot for the current send cycle.
+  // Updated in sendMessage before adding the new user message.
+  // Persists across send→retry so retryMessage uses the same history.
+  const historyRef = useRef([]);
 
   // HTTP-only layer: calls chatSend(), handles response, updates state.
   // Does NOT add a user message bubble — that is the caller's responsibility.
   // Called by sendMessage (after adding the bubble) and by retryMessage (no new bubble).
   const _doHttpSend = useCallback(async (trimmed) => {
+    // PR5: Forward conversation history for LLM context continuity
+    const chatOpts = {};
+    if (historyRef.current.length > 0) {
+      chatOpts.conversation_history = historyRef.current;
+    }
+
     let result;
     try {
-      result = await chatSend(trimmed);
+      result = await chatSend(trimmed, chatOpts);
     } catch (err) {
       const envelope = normalizeError(err, "chat");
       setError(envelope.error.message);
@@ -79,13 +111,18 @@ export function useChatState() {
       lastSentRef.current = trimmed;
       setError(null);
 
+      // PR5: Snapshot conversation history BEFORE adding the new user message.
+      // This ensures the history sent to the LLM doesn't include the current
+      // message (which is sent separately as the primary `message` field).
+      historyRef.current = _buildConversationHistory(messages);
+
       const userMsg = makeMsg("user", trimmed);
       setMessages((prev) => [...prev, userMsg]);
       setThinking(true);
 
       await _doHttpSend(trimmed);
     },
-    [_doHttpSend],
+    [_doHttpSend, messages],
   );
 
   // Retries the last failed send.

@@ -78,9 +78,15 @@ export async function chatSend(text, opts = {}) {
   if (mode !== "real") return mockChatSend(text, t0);
 
   try {
+    const reqBody = { message: text, session_id: getSessionId() };
+    // PR5: Forward conversation history when provided by caller
+    if (Array.isArray(opts.conversation_history) && opts.conversation_history.length > 0) {
+      reqBody.conversation_history = opts.conversation_history;
+    }
+
     const res = await apiClient.request("/chat/run", {
       method: "POST",
-      body: { message: text, session_id: getSessionId() },
+      body: reqBody,
       ...opts,
     });
 
