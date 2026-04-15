@@ -24,7 +24,6 @@ import {
   KV_SUFFIX_EXEC_EVENT,
   KV_SUFFIX_FUNCTIONAL_LOGS,
   KV_SUFFIX_FLOG_ENTRY,
-  KV_SUFFIX_FLOG_COUNT,
   MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
 } from "../contract-executor.js";
 
@@ -42,7 +41,7 @@ function assert(condition, name) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock KV store
+// Mock KV store (includes list for prefix scan, matching CF KV API)
 // ---------------------------------------------------------------------------
 function createMockKV() {
   const store = {};
@@ -55,6 +54,14 @@ function createMockKV() {
       return val;
     },
     async put(key, value) { store[key] = value; },
+    async list({ prefix = "", limit = 1000 } = {}) {
+      const keys = Object.keys(store)
+        .filter(k => k.startsWith(prefix))
+        .sort()  // alphabetical = chronological (timestamp is leading key segment)
+        .slice(0, limit)
+        .map(name => ({ name }));
+      return { keys, list_complete: keys.length < limit };
+    },
     _store: store,
   };
 }
@@ -348,8 +355,8 @@ async function runTests() {
     assert(logs.length === 0, "G9: empty array when no logs");
   }
 
-  // ── Group 10: appendFunctionalLog + readFunctionalLogs round-trip (per-entry model) ──
-  console.log("\nGroup 10: appendFunctionalLog + readFunctionalLogs round-trip (per-entry)");
+  // ── Group 10: appendFunctionalLog + readFunctionalLogs round-trip (ts+rand key model) ──
+  console.log("\nGroup 10: appendFunctionalLog + readFunctionalLogs round-trip (ts+rand keys)");
   {
     const env = { ENAVIA_BRAIN: createMockKV() };
     const cid = "roundtrip_test";
@@ -368,26 +375,26 @@ async function runTests() {
     assert(logs[0].type === "decisao", "G10: type preserved");
     assert(logs[1].type === "bloqueio", "G10: type preserved for second");
 
-    // Verify per-entry KV keys were written (not single array)
-    const countKey = `contract:${cid}:flog_count`;
-    const count = await env.ENAVIA_BRAIN.get(countKey);
-    assert(count === "2", `G10: flog_count = 2 (per-entry model, got ${count})`);
-
-    const entry0Key = `contract:${cid}:flog:0`;
-    const entry0 = await env.ENAVIA_BRAIN.get(entry0Key);
-    assert(entry0 !== null, "G10: flog:0 exists as individual key");
-    const parsed0 = JSON.parse(entry0);
-    assert(parsed0.id === "fl_test_1", "G10: flog:0 contains first log");
+    // Verify keys are timestamp+seq+rand (not sequential counter-based flog:0, flog:1)
+    const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
+    assert(flogKeys.length === 2, "G10: 2 individual flog keys in store");
+    // Keys should have the ts_seq_rand format (not purely numeric like "0" or "1")
+    const allTimestampBased = flogKeys.every(k => /contract:[^:]+:flog:\d+_\d+_[0-9a-f]+$/.test(k));
+    assert(allTimestampBased, "G10: all flog keys use ts+seq+rand format (not counter slot)");
+    // No flog_count key should exist (counter model removed)
+    assert(env.ENAVIA_BRAIN._store[`contract:${cid}:flog_count`] === undefined,
+      "G10: no flog_count key — counter model fully removed");
   }
 
-  // ── Group 11: Per-entry cap is enforced (MAX_FUNCTIONAL_LOGS_PER_CONTRACT) ──
-  console.log("\nGroup 11: Per-entry cap enforced (MAX_FUNCTIONAL_LOGS_PER_CONTRACT)");
+  // ── Group 11: Cap enforced at read time (all entries written, only MAX returned) ──
+  console.log("\nGroup 11: Cap enforced at read time (MAX_FUNCTIONAL_LOGS_PER_CONTRACT)");
   {
     const env = { ENAVIA_BRAIN: createMockKV() };
     const cid = "cap_test";
+    const totalWrites = MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 5;
 
-    // Write MAX + 5 logs — only MAX should be persisted
-    for (let i = 0; i < MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 5; i++) {
+    // Write MAX + 5 logs — all are written (no write cap), read returns only MAX
+    for (let i = 0; i < totalWrites; i++) {
       await appendFunctionalLog(env, cid, {
         id: `fl_cap_${i}`, type: "decisao", label: `Log ${i}`, message: `Msg ${i}`, timestamp: new Date().toISOString(),
       });
@@ -395,13 +402,12 @@ async function runTests() {
 
     const logs = await readFunctionalLogs(env, cid);
     assert(logs.length === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
-      `G11: capped at ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${logs.length})`);
+      `G11: read returns at most ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${logs.length})`);
 
-    // Verify the counter stopped at MAX
-    const countKey = `contract:${cid}:flog_count`;
-    const count = parseInt(await env.ENAVIA_BRAIN.get(countKey), 10);
-    assert(count === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
-      `G11: flog_count capped at ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${count})`);
+    // All entries were written — cap is at read time only
+    const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
+    assert(flogKeys.length === totalWrites,
+      `G11: all ${totalWrites} entries written (cap is read-time only, got ${flogKeys.length})`);
   }
 
   // ── Group 12: Legacy single-array backward compat in readFunctionalLogs ──
@@ -418,7 +424,7 @@ async function runTests() {
     ];
     await env.ENAVIA_BRAIN.put(legacyKey, JSON.stringify(legacyLogs));
 
-    // No flog_count key → readFunctionalLogs should fallback to legacy key
+    // No :flog: prefix keys → readFunctionalLogs should fallback to legacy key
     const logs = await readFunctionalLogs(env, cid);
     assert(logs.length === 2, "G12: legacy logs read via fallback");
     assert(logs[0].id === "fl_old_1", "G12: legacy first log preserved");
@@ -445,6 +451,46 @@ async function runTests() {
     assert(!("hadCodeChange" in event.executionSummary), "G13: hadCodeChange removed");
     assert(!("hadHumanReview" in event.executionSummary), "G13: hadHumanReview removed");
     assert(!("hadBridgeDispatch" in event.executionSummary), "G13: hadBridgeDispatch removed");
+  }
+
+  // ── Group 14: Concurrent appends produce distinct keys — no slot collision ──
+  console.log("\nGroup 14: Concurrent appends — no slot collision (ts+rand keys)");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "concurrent_test";
+
+    // Run 5 appends concurrently — each must produce a distinct key
+    await Promise.all([
+      appendFunctionalLog(env, cid, { id: "fl_c1", type: "decisao",    label: "C1", message: "Msg C1", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c2", type: "bloqueio",   label: "C2", message: "Msg C2", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c3", type: "decisao",    label: "C3", message: "Msg C3", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c4", type: "consolidacao", label: "C4", message: "Msg C4", timestamp: new Date().toISOString() }),
+      appendFunctionalLog(env, cid, { id: "fl_c5", type: "decisao",    label: "C5", message: "Msg C5", timestamp: new Date().toISOString() }),
+    ]);
+
+    // All 5 must be present — no overwrite
+    const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
+    assert(flogKeys.length === 5, `G14: all 5 concurrent appends persisted — no collision (got ${flogKeys.length})`);
+
+    // All keys must be distinct
+    const uniqueKeys = new Set(flogKeys);
+    assert(uniqueKeys.size === 5, "G14: all 5 flog keys are distinct");
+
+    // Read returns all 5 in stable order
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 5, `G14: readFunctionalLogs returns all 5 logs (got ${logs.length})`);
+
+    // All original log ids are present (none lost)
+    const ids = new Set(logs.map(l => l.id));
+    assert(ids.has("fl_c1"), "G14: fl_c1 preserved");
+    assert(ids.has("fl_c2"), "G14: fl_c2 preserved");
+    assert(ids.has("fl_c3"), "G14: fl_c3 preserved");
+    assert(ids.has("fl_c4"), "G14: fl_c4 preserved");
+    assert(ids.has("fl_c5"), "G14: fl_c5 preserved");
+
+    // No counter key — counter model fully absent
+    assert(env.ENAVIA_BRAIN._store[`contract:${cid}:flog_count`] === undefined,
+      "G14: no flog_count key in store — counter model not used");
   }
 
   // ── Summary ──

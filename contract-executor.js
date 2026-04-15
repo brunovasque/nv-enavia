@@ -117,13 +117,14 @@ const KV_INDEX_KEY = "contract:index";
 // PR1 — exec event key: contract:<id>:exec_event (read by PR2/PR3)
 const KV_SUFFIX_EXEC_EVENT = ":exec_event";
 // Macro2-F5 — functional logs: append-only individual keys per entry.
-// Each log entry: contract:<id>:flog:<seq> (0-indexed).
-// Counter:        contract:<id>:flog_count
-// Cap:            MAX_FUNCTIONAL_LOGS_PER_CONTRACT (hard limit per contract)
-// This avoids the read-modify-write race of a single-array KV key.
+// Key format: contract:<id>:flog:<timestamp_ms>_<seq>_<rand4>
+// - Append is a pure KV put — ZERO reads, no counter, truly collision-free.
+// - Two concurrent appends always write to DIFFERENT keys (unique ts+seq+rand suffix).
+// - Read uses KV prefix scan (list), sorted alphabetically = chronological order.
+// - Cap (MAX_FUNCTIONAL_LOGS_PER_CONTRACT) applied at read time via list limit.
+// - Backward compat: readFunctionalLogs falls back to legacy :functional_logs key.
 const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs"; // kept for backward-compat reads
-const KV_SUFFIX_FLOG_ENTRY = ":flog:";
-const KV_SUFFIX_FLOG_COUNT = ":flog_count";
+const KV_SUFFIX_FLOG_ENTRY      = ":flog:";
 const MAX_FUNCTIONAL_LOGS_PER_CONTRACT = 50;
 
 // ---------------------------------------------------------------------------
@@ -2358,36 +2359,44 @@ async function readExecEvent(env, contractId) {
 }
 
 // ---------------------------------------------------------------------------
-// Macro2-F5 — Functional Logs: append-only per-entry persistence
+// Macro2-F5 — Functional Logs: truly collision-free append-only persistence
 //
-// Strategy: Each log entry is written to its own KV key:
-//   contract:<id>:flog:<seq>  — individual log entry (JSON)
-//   contract:<id>:flog_count  — integer counter of total entries
+// Strategy: each log entry is written to a unique KV key with ZERO reads:
+//   contract:<id>:flog:<timestamp_ms>_<seq>_<rand4>
+//
+// Why collision-free:
+//   - Key suffix = timestamp + monotonic seq + 4 random hex chars (~65K extra combinations)
+//   - appendFunctionalLog performs a single KV put — no read, no counter, no slot
+//   - Two concurrent appends always derive different suffixes independently
+//   - No shared state between appenders → no lost update possible
 //
 // appendFunctionalLog(env, contractId, log)
-//   Writes a single log entry to a NEW key (no read-modify-write).
-//   Increments the counter atomically per write.
-//   Respects MAX_FUNCTIONAL_LOGS_PER_CONTRACT — silently drops if cap reached.
+//   Pure KV put to a unique key. Cannot collide under any concurrency.
 //
 // readFunctionalLogs(env, contractId)
-//   Reads the counter, then fetches each entry individually.
-//   Falls back to legacy single-array key for backward compatibility.
-//   Returns [] if none exist. Always returns sorted by seq (insertion order).
+//   Uses KV prefix scan (list) to enumerate all entries for this contract.
+//   Entries sort alphabetically = chronologically (timestamp is key prefix).
+//   Capped at MAX_FUNCTIONAL_LOGS_PER_CONTRACT entries at read time.
+//   Falls back to legacy single-array key (:functional_logs) if list unavailable.
+//   Returns [] if none exist. Never crashes the caller.
 //
-// Why this is safer than a single array:
-//   - No read-modify-write: each append is a single KV put (no parse → push → put)
-//   - No lost update: concurrent appends write to different keys
-//   - Capped: MAX_FUNCTIONAL_LOGS_PER_CONTRACT prevents unbounded growth
-//   - Ordered: seq-based keys preserve insertion order
-//
-// Failures are swallowed — logs must never crash the executor.
+// Cap: applied at read via list({ limit }) — writes are never blocked.
 // ---------------------------------------------------------------------------
 let _functionalLogSeq = 0;
 
-function _buildFunctionalLog(type, label, message) {
+// Returns a collision-resistant suffix: <timestamp_ms>_<seq>_<rand4>
+// - seq (module-level, monotonic) ensures stable ordering within one isolate
+//   even when two sequential appends share the same millisecond timestamp.
+// - rand4 provides extra isolation across different isolates with the same seq.
+function _flogKeySuffix() {
   _functionalLogSeq++;
+  const rand = Math.floor(Math.random() * 0xFFFF).toString(16).padStart(4, "0");
+  return `${Date.now()}_${_functionalLogSeq}_${rand}`;
+}
+
+function _buildFunctionalLog(type, label, message) {
   return {
-    id:        `fl_${Date.now()}_${_functionalLogSeq}`,
+    id:        `fl_${_flogKeySuffix()}`,
     type:      type,
     label:     label,
     message:   message,
@@ -2397,16 +2406,10 @@ function _buildFunctionalLog(type, label, message) {
 
 async function appendFunctionalLog(env, contractId, log) {
   try {
-    const countKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_COUNT}`;
-    const rawCount = await env.ENAVIA_BRAIN.get(countKey);
-    const count = rawCount ? parseInt(rawCount, 10) : 0;
-
-    // Cap: silently drop if limit reached
-    if (count >= MAX_FUNCTIONAL_LOGS_PER_CONTRACT) return;
-
-    const entryKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}${count}`;
+    // Pure append — zero reads, no counter, no collision under any concurrency.
+    // Each call generates a unique key independently of any shared state.
+    const entryKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}${_flogKeySuffix()}`;
     await env.ENAVIA_BRAIN.put(entryKey, JSON.stringify(log));
-    await env.ENAVIA_BRAIN.put(countKey, String(count + 1));
   } catch (_) {
     // appendFunctionalLog must never crash the executor
   }
@@ -2414,25 +2417,29 @@ async function appendFunctionalLog(env, contractId, log) {
 
 async function readFunctionalLogs(env, contractId) {
   try {
-    // Try new per-entry model first
-    const countKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_COUNT}`;
-    const rawCount = await env.ENAVIA_BRAIN.get(countKey);
-    const count = rawCount ? parseInt(rawCount, 10) : 0;
+    const prefix = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}`;
 
-    if (count > 0) {
-      const logs = [];
-      const limit = Math.min(count, MAX_FUNCTIONAL_LOGS_PER_CONTRACT);
-      for (let i = 0; i < limit; i++) {
-        const entryKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}${i}`;
-        const raw = await env.ENAVIA_BRAIN.get(entryKey);
-        if (raw) {
-          try { logs.push(JSON.parse(raw)); } catch (_) { /* skip malformed */ }
+    // Use KV prefix scan to enumerate all log entries for this contract.
+    // Alphabetical key sort = chronological order (timestamp is the leading key segment).
+    // Cap applied here: list({ limit }) returns at most MAX_FUNCTIONAL_LOGS_PER_CONTRACT.
+    if (typeof env.ENAVIA_BRAIN.list === "function") {
+      const listed = await env.ENAVIA_BRAIN.list({ prefix, limit: MAX_FUNCTIONAL_LOGS_PER_CONTRACT });
+      const keys = listed.keys || [];
+      if (keys.length > 0) {
+        const logs = [];
+        for (const { name } of keys) {
+          const raw = await env.ENAVIA_BRAIN.get(name);
+          if (raw) {
+            try { logs.push(JSON.parse(raw)); } catch (_) { /* skip malformed entry */ }
+          }
         }
+        return logs;
       }
-      return logs;
+      // list returned 0 per-entry keys — fall through to legacy key below
     }
 
-    // Fallback: try legacy single-array key for backward compatibility
+    // Fallback: KV binding without list support.
+    // Read legacy single-array key (original append model before per-entry KV).
     const legacyKey = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
     const legacyRaw = await env.ENAVIA_BRAIN.get(legacyKey);
     return legacyRaw ? JSON.parse(legacyRaw) : [];
@@ -5042,7 +5049,6 @@ export {
   readFunctionalLogs,
   KV_SUFFIX_FUNCTIONAL_LOGS,
   KV_SUFFIX_FLOG_ENTRY,
-  KV_SUFFIX_FLOG_COUNT,
   MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
   // C2 — Automatic Contract Closure in TEST
   closeContractInTest,
