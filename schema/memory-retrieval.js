@@ -49,7 +49,9 @@ import {
 // Staleness threshold: 30 days without update (PR1 §6.2)
 const STALENESS_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Maximum items per block to prevent context overflow
+// Maximum items per block to prevent context overflow.
+// Each block (current_context, historical_memory, manual_instructions,
+// validated_learning) is capped to this limit after ranking/sorting.
 const MAX_ITEMS_PER_BLOCK = 10;
 
 // Memory types that map to each block
@@ -95,7 +97,7 @@ function _isStale(mem, now) {
   if (mem.confidence === MEMORY_CONFIDENCE.CONFIRMED) return false;
 
   const updatedAt = mem.updated_at ? Date.parse(mem.updated_at) : 0;
-  if (Number.isNaN(updatedAt) || updatedAt === 0) return true; // no valid date = stale
+  if (Number.isNaN(updatedAt) || updatedAt === 0) return true; // no valid date → treat as stale (data quality issue)
 
   return (now - updatedAt) > STALENESS_THRESHOLD_MS;
 }

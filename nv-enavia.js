@@ -3214,7 +3214,7 @@ async function handlePlannerRun(request, env) {
     // PR3 — Retrieval Pipeline: separação explícita entre blocos de memória
     // Leitura estruturada com classificação, ranking, recência e regra de conflito.
     // Fire-and-forget defensivo: erros não derrubam o pipeline.
-    let retrievalResult = { ok: false, error: "not executed" };
+    let retrievalResult = { ok: false, error: "retrieval skipped: ENAVIA_BRAIN binding not available" };
     if (env && env.ENAVIA_BRAIN) {
       try {
         retrievalResult = await buildRetrievalContext(context, env);
@@ -3577,7 +3577,7 @@ async function handleChatLLM(request, env) {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
     // Leitura de memória estruturada com separação explícita de blocos.
     // Fire-and-forget defensivo: erros não derrubam a conversa.
-    let chatRetrievalResult = { ok: false, error: "not executed" };
+    let chatRetrievalResult = { ok: false, error: "retrieval skipped: ENAVIA_BRAIN binding not available" };
     if (env && env.ENAVIA_BRAIN) {
       try {
         chatRetrievalResult = await buildRetrievalContext(context, env);

@@ -474,6 +474,16 @@ async function runTests() {
       "project → historical_memory"
     );
 
+    // Mixed-case source normalization
+    ok(
+      _classifyMemory({ memory_type: MEMORY_TYPES.OPERATIONAL_HISTORY, source: "Panel" }) === "manual_instructions",
+      "source=Panel (mixed case) → manual_instructions"
+    );
+    ok(
+      _classifyMemory({ memory_type: MEMORY_TYPES.OPERATIONAL_HISTORY, source: "OPERADOR" }) === "manual_instructions",
+      "source=OPERADOR (uppercase) → manual_instructions"
+    );
+
     // _sortByRanking tests
     const items = [
       { _pr3_combined: 0.3, _pr3_relevance: 2, _pr3_recency: 0.1 },
