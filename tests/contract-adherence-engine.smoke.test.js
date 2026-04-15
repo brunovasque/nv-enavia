@@ -30,6 +30,12 @@
 //   20. Contrato longo com múltiplos blocos não fica decidido só pelo top summary
 //   21. Scope A e scope B continuam isolados (integração longa)
 //   22. PR1 e PR2 seguem sem regressão
+//   23. Signal-level match — only related signal triggers evidence
+//   24. Unrelated signal in same block → no false violation
+//   25. matched_rules precision — no inflation from block-level overlap
+//   26. Deploy + approval still works (no regression from signal fix)
+//   27. Phase regression still works (no regression from signal fix)
+//   28. PR1 + PR2 + PR3 sanity after signal-level fix
 // ============================================================================
 
 import {
@@ -704,6 +710,226 @@ assert(resultBlocksOnly.matched_rules.some(r => r.source === "block"),
   "T20: evidence source is 'block', not 'summary'");
 assert(resultBlocksOnly.matched_rules.every(r => r.source !== "summary"),
   "T20: NO evidence from summary (it was empty)");
+
+// ---------------------------------------------------------------------------
+// Test 23: Signal-level match — block with 2+ distinct signals, action
+// relates to only 1. Only the matching signal should appear as strong evidence.
+// ---------------------------------------------------------------------------
+console.log("\nTest 23: Signal-level match — only related signal triggers evidence");
+
+const multiSignalBlock = [
+  {
+    block_id: "blk_multi_01",
+    index: 0,
+    heading: "CLÁUSULA GERAL",
+    block_type: "obligation",
+    content: "Regras variadas do contrato aplicáveis ao projeto.",
+    signals: {
+      hard_rules: [
+        "proibido alterar produção sem aprovação formal expressa",
+        "obrigatório manter registro completo de auditoria interna",
+      ],
+      approval_points: [],
+      blocking_points: [],
+      acceptance_criteria: [],
+    },
+  },
+];
+
+const ctxMultiSignal = {
+  ok: true, contract_id: "ctr_multi_signal", ready_for_pr3: true,
+  active_state: { current_phase_hint: null },
+  summary: { detected_phases: [], hard_rules_top: [], blocking_points_top: [],
+             approval_points_top: [], approval_points_count: 0, blocks_count: 1 },
+  resolution_ctx: { strategy: "phase" },
+  relevant_blocks: multiSignalBlock,
+};
+
+// Action about production/approval — should match signal 1 only
+const resultMultiSignal = evaluateContractAdherence({
+  scope: "default",
+  contractContext: ctxMultiSignal,
+  candidateAction: {
+    intent: "alterar dados de produção com aprovação do gestor",
+    action_type: "modify",
+    target: "production",
+  },
+});
+
+const strongHitsT23 = resultMultiSignal.matched_rules.filter(
+  r => r.source === "block" && r.category === "hard_rule"
+);
+const blockWeakHitsT23 = resultMultiSignal.matched_rules.filter(
+  r => (r.source === "block_weak" || r.source === "block_no_overlap") && r.category === "hard_rule"
+);
+
+assert(strongHitsT23.length >= 1,
+  "T23: at least 1 signal produces strong evidence");
+assert(strongHitsT23.some(h => h.rule.includes("produção") || h.rule.includes("aprovação")),
+  "T23: strong evidence is the production/approval signal, not the audit signal");
+// The audit signal ("auditoria interna") should NOT have strong evidence for this action
+const auditStrongHits = strongHitsT23.filter(h => h.rule.includes("auditoria"));
+assert(auditStrongHits.length === 0,
+  "T23: audit signal does NOT trigger strong evidence for production action");
+
+// ---------------------------------------------------------------------------
+// Test 24: Unrelated signal in same block does NOT generate violation
+// ---------------------------------------------------------------------------
+console.log("\nTest 24: Unrelated signal in same block → no false violation");
+
+// Action specifically about audit — should NOT trigger production-related violation
+const resultAuditAction = evaluateContractAdherence({
+  scope: "default",
+  contractContext: ctxMultiSignal,
+  candidateAction: {
+    intent: "revisar registros completos de auditoria interna do sistema",
+    action_type: "execute",
+  },
+});
+
+const prodViolationsT24 = resultAuditAction.violations.filter(
+  v => v.type === "hard_rule" && v.description.includes("produção")
+);
+
+assert(prodViolationsT24.length === 0,
+  "T24: production rule does NOT generate violation for audit-only action");
+
+// The audit signal should have evidence (strong or weak depending on overlap)
+const auditRulesT24 = resultAuditAction.matched_rules.filter(
+  r => r.rule.includes("auditoria")
+);
+assert(auditRulesT24.length >= 1,
+  "T24: audit signal IS recognized as relevant for audit action");
+
+// ---------------------------------------------------------------------------
+// Test 25: matched_rules do NOT inflate from block-level overlap reuse
+// ---------------------------------------------------------------------------
+console.log("\nTest 25: matched_rules precision — no inflation from block-level overlap");
+
+// Use a block where heading has many keywords that could inflate unrelated signals
+const inflationBlock = [
+  {
+    block_id: "blk_inflate_01",
+    index: 0,
+    heading: "CLÁUSULA DE DEPLOY EM PRODUÇÃO",
+    block_type: "obligation",
+    content: "Regras de deploy e produção com validação de testes e aprovação do comitê.",
+    signals: {
+      hard_rules: [
+        "deploy somente após testes completos de integração aprovados",
+        "manter backup completo antes de qualquer migração de dados",
+      ],
+      approval_points: [],
+      blocking_points: [],
+      acceptance_criteria: [],
+    },
+  },
+];
+
+const ctxInflation = {
+  ok: true, contract_id: "ctr_inflate", ready_for_pr3: true,
+  active_state: { current_phase_hint: null },
+  summary: { detected_phases: [], hard_rules_top: [], blocking_points_top: [],
+             approval_points_top: [], approval_points_count: 0, blocks_count: 1 },
+  resolution_ctx: { strategy: "phase" },
+  relevant_blocks: inflationBlock,
+};
+
+// Action about migration/backup — heading has "deploy" and "produção" which
+// would have inflated both signals in the old block-level approach
+const resultInflation = evaluateContractAdherence({
+  scope: "default",
+  contractContext: ctxInflation,
+  candidateAction: {
+    intent: "migração completa de dados com backup prévio",
+    action_type: "execute",
+  },
+});
+
+// The deploy signal ("deploy somente após testes...") should NOT get strong
+// violation from an action about migration/backup
+const deployViolationsT25 = resultInflation.violations.filter(
+  v => v.type === "hard_rule" && v.description.includes("deploy")
+);
+assert(deployViolationsT25.length === 0,
+  "T25: deploy signal does NOT generate violation for migration action");
+
+// The backup/migration signal should have evidence
+const backupRulesT25 = resultInflation.matched_rules.filter(
+  r => r.rule.includes("backup") || r.rule.includes("migração")
+);
+assert(backupRulesT25.length >= 1,
+  "T25: backup/migration signal IS recognized for migration action");
+
+// ---------------------------------------------------------------------------
+// Test 26: Existing deploy/approval/blocking tests still work after signal fix
+// ---------------------------------------------------------------------------
+console.log("\nTest 26: Deploy + approval still works (no regression from signal fix)");
+
+const resultDeployStillWorks = evaluateContractAdherence({
+  scope: "default",
+  contractContext: contractContextFull,
+  candidateAction: {
+    intent: "deploy completo para produção com release final",
+    phase: "deploy",
+    action_type: "deploy",
+    target: "production",
+  },
+});
+
+assert(resultDeployStillWorks.decision === DECISION.BLOCK,
+  "T26: deploy → still BLOCK");
+assert(resultDeployStillWorks.requires_human_approval === true,
+  "T26: deploy → still requires_human_approval = true");
+
+// ---------------------------------------------------------------------------
+// Test 27: Phase regression still works (no regression from signal fix)
+// ---------------------------------------------------------------------------
+console.log("\nTest 27: Phase regression still works (no regression)");
+
+const resultPhaseRegrT27 = evaluateContractAdherence({
+  scope: "default",
+  contractContext: contractContextFull,
+  candidateAction: {
+    intent: "replanejar arquitetura inicial",
+    phase: "planning",
+    action_type: "modify",
+  },
+});
+
+assert(resultPhaseRegrT27.decision === DECISION.BLOCK,
+  "T27: phase regression → still BLOCK");
+assert(resultPhaseRegrT27.reason_code === REASON_CODE.BLOCK_PHASE_ORDER,
+  "T27: reason_code = BLOCK_PHASE_ORDER");
+
+// ---------------------------------------------------------------------------
+// Test 28: PR1 + PR2 + PR3 no regression (quick sanity)
+// ---------------------------------------------------------------------------
+console.log("\nTest 28: PR1 + PR2 + PR3 sanity after signal-level fix");
+
+// Ação aderente stays ALLOW
+const resultSanityAllow = evaluateContractAdherence({
+  scope: "default",
+  contractContext: contractContextFull,
+  candidateAction: {
+    intent: "implementar nova funcionalidade de relatórios",
+    phase: "implementation",
+    action_type: "execute",
+  },
+});
+assert(resultSanityAllow.decision === DECISION.ALLOW || resultSanityAllow.decision === DECISION.WARN,
+  "T28: adherent action → ALLOW or WARN (not BLOCK)");
+
+// No contract stays WARN
+const resultSanityNoContract = evaluateContractAdherence({
+  scope: "default",
+  contractContext: null,
+  candidateAction: { intent: "test" },
+});
+assert(resultSanityNoContract.decision === DECISION.WARN,
+  "T28: no contract → WARN (fail safe)");
+assert(resultSanityNoContract.reason_code === REASON_CODE.ERROR_NO_CONTRACT,
+  "T28: reason = ERROR_NO_CONTRACT");
 
 // ---------------------------------------------------------------------------
 // Test 11 + 21 + 22: Async integration tests

@@ -130,32 +130,51 @@ function _textContains(text, keywords) {
 // Scans real contract blocks for structural signals in a given category.
 // Returns matched evidence from blocks (block_id, heading, signal text).
 // This is the primary evidence source — uses PR1 ingestion signals directly.
+//
+// Match precision: overlap is computed per SIGNAL TEXT individually.
+// Block heading/content serves as secondary context only — it does NOT
+// inflate the overlap score for unrelated signals within the same block.
 // ---------------------------------------------------------------------------
 function _scanBlocksForSignals(blocks, category, actionSummary) {
   const matched = [];
   if (!blocks || blocks.length === 0) return matched;
-  const normAction = _normalize(actionSummary);
+
+  // Deduplicate action keywords — actionSummary may repeat words from
+  // intent + action_type + target (e.g., "deploy" appearing twice).
+  const actionWords = [...new Set(_extractKeywords(actionSummary))];
+  if (actionWords.length === 0) return matched;
 
   for (const block of blocks) {
     if (!block.signals || !block.signals[category]) continue;
     if (block.signals[category].length === 0) continue;
 
-    // Block has signals in this category — check content overlap with action
-    const blockText = _normalize(
-      (block.heading || "") + " " + (block.content || "").slice(0, MAX_BLOCK_CONTENT_LENGTH)
-    );
-    const actionWords = _extractKeywords(actionSummary);
-    const blockWords = _extractKeywords(blockText);
-    const overlap = actionWords.filter(w => blockWords.includes(w));
+    // Pre-compute block context keywords (heading only — lightweight context)
+    const headingWords = [...new Set(_extractKeywords(block.heading || ""))];
 
     for (const signal of block.signals[category]) {
+      const signalText = typeof signal === "string" ? signal : JSON.stringify(signal);
+
+      // Primary: overlap between action and the signal's own text
+      const signalWords = [...new Set(_extractKeywords(signalText))];
+      const signalOverlap = actionWords.filter(w => signalWords.includes(w));
+
+      // Secondary: heading context adds at most 1 bonus keyword if heading
+      // matches but signal alone doesn't meet threshold. This prevents
+      // block-level text from dominating unrelated signals.
+      const headingBonus = headingWords.filter(
+        w => actionWords.includes(w) && !signalOverlap.includes(w)
+      );
+      const contextOverlap = signalOverlap.concat(
+        headingBonus.length > 0 ? [headingBonus[0]] : []
+      );
+
       matched.push({
-        signal: typeof signal === "string" ? signal : JSON.stringify(signal),
+        signal: signalText,
         block_id: block.block_id,
         heading: block.heading || null,
         block_type: block.block_type || null,
-        content_overlap: overlap,
-        overlap_count: overlap.length,
+        content_overlap: contextOverlap,
+        overlap_count: contextOverlap.length,
       });
     }
   }
