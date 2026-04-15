@@ -3278,7 +3278,7 @@ function _sanitizeChatReply(reply) {
 
   // Threshold: 3+ distinct mechanical terms = planner leak
   if (leakCount >= _PLANNER_LEAK_THRESHOLD) {
-    return "Entendido. Posso detalhar isso — o que você quer saber especificamente?";
+    return "Entendido. Estou com isso — pode continuar.";
   }
 
   return reply;
