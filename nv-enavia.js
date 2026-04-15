@@ -34,6 +34,7 @@ import { searchRelevantMemory, searchMemory } from "./schema/memory-read.js";
 import { buildRetrievalContext, buildRetrievalSummary } from "./schema/memory-retrieval.js";
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
+import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -6467,6 +6468,97 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       }
 
       // ============================================================
+      // 🎓 PR5 — Learning Candidates (Aprendizado Controlado)
+      // ============================================================
+
+      // GET /memory/learning — List learning candidates
+      if (method === "GET" && path === "/memory/learning") {
+        try {
+          const url = new URL(request.url);
+          const statusFilter = url.searchParams.get("status") || undefined;
+          const filters = statusFilter ? { status: statusFilter } : {};
+          const result = await listLearningCandidates(env, filters);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 500);
+          }
+          return jsonResponse({ ok: true, items: result.items, count: result.count });
+        } catch (err) {
+          logNV("❌ [GET /memory/learning] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // POST /memory/learning — Register a learning candidate (pending)
+      if (method === "POST" && path === "/memory/learning") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const result = await registerLearningCandidate({
+            candidate_id:       body.candidate_id,
+            title:              body.title,
+            content_structured: body.content_structured || (body.content ? { text: body.content } : undefined),
+            source:             body.source || "panel",
+            confidence:         body.confidence || "medium",
+            priority:           body.priority || "medium",
+            tags:               Array.isArray(body.tags) ? body.tags : [],
+          }, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 400);
+          }
+          return jsonResponse({ ok: true, candidate_id: result.candidate_id, record: result.record }, 201);
+        } catch (err) {
+          logNV("❌ [POST /memory/learning] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // POST /memory/learning/approve — Approve a learning candidate (human approval)
+      if (method === "POST" && path === "/memory/learning/approve") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const candidateId = body.candidate_id;
+          if (!candidateId) {
+            return jsonResponse({ ok: false, error: "candidate_id is required" }, 400);
+          }
+          const result = await approveLearningCandidate(candidateId, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 400);
+          }
+          return jsonResponse({
+            ok: true,
+            candidate_id: result.candidate_id,
+            promoted_memory_id: result.promoted_memory_id,
+            candidate: result.candidate,
+          });
+        } catch (err) {
+          logNV("❌ [POST /memory/learning/approve] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // POST /memory/learning/reject — Reject a learning candidate (human rejection)
+      if (method === "POST" && path === "/memory/learning/reject") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const candidateId = body.candidate_id;
+          if (!candidateId) {
+            return jsonResponse({ ok: false, error: "candidate_id is required" }, 400);
+          }
+          const result = await rejectLearningCandidate(candidateId, body.reason, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 400);
+          }
+          return jsonResponse({
+            ok: true,
+            candidate_id: result.candidate_id,
+            candidate: result.candidate,
+          });
+        } catch (err) {
+          logNV("❌ [POST /memory/learning/reject] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // ============================================================
       // 🧠 GET /memory — Estado da memória persistida no KV
       // Painel: aba Memória. Contrato: mapMemoryResponse(raw).
       // ============================================================
@@ -6622,7 +6714,11 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /memory/manual  → PR4: Criar memória manual",
             "  • PATCH /memory/manual → PR4: Editar memória manual",
             "  • POST /memory/manual/block → PR4: Bloquear memória manual",
-            "  • POST /memory/manual/invalidate → PR4: Invalidar/expirar memória manual"
+            "  • POST /memory/manual/invalidate → PR4: Invalidar/expirar memória manual",
+            "  • GET  /memory/learning  → PR5: Listar candidatos de aprendizado",
+            "  • POST /memory/learning  → PR5: Registrar candidato de aprendizado",
+            "  • POST /memory/learning/approve → PR5: Aprovar candidato (promoção para memória validada)",
+            "  • POST /memory/learning/reject  → PR5: Rejeitar candidato"
           ].join("\n"),
           { status: 200 }
         ));
