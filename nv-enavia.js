@@ -6394,7 +6394,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
           const patch = {};
           if (body.title !== undefined)              patch.title = body.title;
           if (body.content_structured !== undefined)  patch.content_structured = body.content_structured;
-          if (body.content !== undefined)             patch.content_structured = { text: body.content };
+          else if (body.content !== undefined)        patch.content_structured = { text: body.content };
           if (body.priority !== undefined)            patch.priority = body.priority;
           if (body.confidence !== undefined)          patch.confidence = body.confidence;
           if (body.status !== undefined)              patch.status = body.status;
