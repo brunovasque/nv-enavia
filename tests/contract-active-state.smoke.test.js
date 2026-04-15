@@ -28,6 +28,9 @@ import {
   getActiveContractContext,
   KV_PREFIX_ACTIVE_STATE,
   KV_ACTIVE_CONTRACT_KEY,
+  KV_ACTIVE_CURRENT_PREFIX,
+  KV_DEFAULT_SCOPE,
+  KV_SUFFIX_RESOLUTION_CTX,
 } from "../schema/contract-active-state.js";
 
 import {
@@ -132,6 +135,8 @@ console.log("1. Activate ingested contract → success");
   assert(result.active_state.summary_canonic !== null, "summary_canonic is present");
   assert(result.active_state.version === "v1", "version is v1");
   assert(result.active_state.metadata.operator === "test", "operator preserved");
+  assert(result.active_state.metadata.scope === "default", "scope defaults to 'default'");
+  assert(!("relevant_block_ids" in result.active_state), "relevant_block_ids NOT in core state (lives in resolution_ctx)");
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +291,7 @@ console.log("\n9. Canonical summary with empty/missing data");
 // ---------------------------------------------------------------------------
 // 10. readActiveContractState reads persisted state
 // ---------------------------------------------------------------------------
-console.log("\n10. readActiveContractState reads persisted state");
+console.log("\n10. readActiveContractState reads persisted state (scoped)");
 {
   const kv = createMockKV();
   const env = { ENAVIA_BRAIN: kv };
@@ -299,10 +304,15 @@ console.log("\n10. readActiveContractState reads persisted state");
   assert(state.contract_id === "ctr_007", "contract_id matches");
   assert(state.summary_canonic !== null, "summary is present");
 
-  // Read current (no ID)
+  // Read current (no ID) — uses default scope
   const current = await readActiveContractState(env);
-  assert(current !== null, "current active contract is returned");
+  assert(current !== null, "current active contract is returned via default scope");
   assert(current.contract_id === "ctr_007", "current contract_id matches");
+
+  // Verify scoped key exists in KV
+  const scopedKey = `${KV_ACTIVE_CURRENT_PREFIX}${KV_DEFAULT_SCOPE}`;
+  assert(kv._store[scopedKey] !== undefined, "scoped current key exists in KV");
+  assert(kv._store["contract_active_state:current"] === undefined, "old global 'current' key does NOT exist");
 
   // Read non-existent
   const nothing = await readActiveContractState(env, "ctr_nonexistent");
@@ -319,11 +329,16 @@ console.log("\n11. getActiveContractContext returns runtime-friendly context");
   await ingestLongContract(env, "ctr_008", MULTI_SECTION_CONTRACT);
   await activateIngestedContract(env, "ctr_008");
 
+  // Resolve some blocks first to populate resolution_ctx
+  await resolveRelevantContractBlocks(env, "ctr_008", { phase: "payment" });
+
   const ctx = await getActiveContractContext(env);
   assert(ctx.ok, "context ok");
   assert(ctx.contract_id === "ctr_008", "contract_id present");
   assert(ctx.active_state !== null, "active_state present");
   assert(ctx.summary !== null, "summary present");
+  assert(ctx.resolution_ctx !== null, "resolution_ctx present after resolve");
+  assert(ctx.resolution_ctx.strategy === "phase", "resolution_ctx.strategy is phase");
   assert(ctx.ready_for_pr3 === true, "ready_for_pr3 is true");
 
   // No active contract
@@ -332,6 +347,7 @@ console.log("\n11. getActiveContractContext returns runtime-friendly context");
   const ctx2 = await getActiveContractContext(env2);
   assert(ctx2.ok, "empty context still ok");
   assert(ctx2.contract_id === null, "no contract_id");
+  assert(ctx2.resolution_ctx === null, "no resolution_ctx");
   assert(ctx2.ready_for_pr3 === false, "not ready for PR3");
 }
 
@@ -392,7 +408,7 @@ console.log("\n14. Resolve blocks for non-ingested contract → safe failure");
 // ---------------------------------------------------------------------------
 // 15. Active state updates relevant_block_ids after resolution
 // ---------------------------------------------------------------------------
-console.log("\n15. Active state updates relevant_block_ids after resolution");
+console.log("\n15. Resolution context persisted as separate subartefact");
 {
   const kv = createMockKV();
   const env = { ENAVIA_BRAIN: kv };
@@ -402,12 +418,71 @@ console.log("\n15. Active state updates relevant_block_ids after resolution");
   // Resolve by phase
   await resolveRelevantContractBlocks(env, "ctr_011", { phase: "payment", taskId: "task_42" });
 
-  // Read state — should have updated relevant_block_ids
+  // Verify resolution context subartefact exists separately
+  const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}ctr_011${KV_SUFFIX_RESOLUTION_CTX}`;
+  assert(kv._store[resCtxKey] !== undefined, "resolution_ctx subartefact key exists in KV");
+
+  const resCtx = JSON.parse(kv._store[resCtxKey]);
+  assert(resCtx.contract_id === "ctr_011", "resolution_ctx.contract_id matches");
+  assert(Array.isArray(resCtx.relevant_block_ids), "resolution_ctx.relevant_block_ids is array");
+  assert(resCtx.relevant_block_ids.length > 0, "resolution_ctx has block IDs after resolution");
+  assert(resCtx.current_phase_hint === "payment", "resolution_ctx.current_phase_hint is payment");
+  assert(resCtx.last_task_id === "task_42", "resolution_ctx.last_task_id is task_42");
+  assert(resCtx.strategy === "phase", "resolution_ctx.strategy is phase");
+  assert(typeof resCtx.resolved_at === "string", "resolution_ctx.resolved_at is set");
+
+  // Verify core state was NOT overwritten by resolution
+  const coreStateKey = `${KV_PREFIX_ACTIVE_STATE}ctr_011`;
+  const coreState = JSON.parse(kv._store[coreStateKey]);
+  assert(!("relevant_block_ids" in coreState), "core state does NOT contain relevant_block_ids");
+  assert(!("last_resolution_at" in coreState), "core state does NOT contain last_resolution_at");
+
+  // Read via readActiveContractState — should merge resolution_ctx
   const state = await readActiveContractState(env, "ctr_011");
-  assert(Array.isArray(state.relevant_block_ids), "relevant_block_ids is array");
-  assert(state.relevant_block_ids.length > 0, "relevant_block_ids populated after resolution");
-  assert(state.current_phase_hint === "payment", "phase_hint updated");
-  assert(state.last_task_id === "task_42", "last_task_id updated");
+  assert(Array.isArray(state.relevant_block_ids), "merged state has relevant_block_ids");
+  assert(state.relevant_block_ids.length > 0, "merged state relevant_block_ids populated");
+  assert(state.current_phase_hint === "payment", "merged phase_hint updated");
+  assert(state.last_task_id === "task_42", "merged last_task_id updated");
+}
+
+// ---------------------------------------------------------------------------
+// 16. Scoped activation isolates parallel contexts
+// ---------------------------------------------------------------------------
+console.log("\n16. Scoped activation isolates parallel contexts");
+{
+  const kv = createMockKV();
+  const env = { ENAVIA_BRAIN: kv };
+  await ingestLongContract(env, "ctr_A", MULTI_SECTION_CONTRACT);
+  await ingestLongContract(env, "ctr_B", MULTI_SECTION_CONTRACT);
+
+  // Activate ctr_A in scope "exec_1"
+  await activateIngestedContract(env, "ctr_A", { scope: "exec_1" });
+  // Activate ctr_B in scope "exec_2"
+  await activateIngestedContract(env, "ctr_B", { scope: "exec_2" });
+
+  // Read from scope "exec_1" → should get ctr_A
+  const stateA = await readActiveContractState(env, null, { scope: "exec_1" });
+  assert(stateA !== null, "scope exec_1 has active state");
+  assert(stateA.contract_id === "ctr_A", "scope exec_1 → ctr_A");
+
+  // Read from scope "exec_2" → should get ctr_B
+  const stateB = await readActiveContractState(env, null, { scope: "exec_2" });
+  assert(stateB !== null, "scope exec_2 has active state");
+  assert(stateB.contract_id === "ctr_B", "scope exec_2 → ctr_B");
+
+  // Default scope should be empty (neither was activated with default scope)
+  const stateDefault = await readActiveContractState(env);
+  assert(stateDefault === null, "default scope has no active contract");
+
+  // getActiveContractContext with scope
+  const ctxA = await getActiveContractContext(env, { scope: "exec_1" });
+  assert(ctxA.ok, "context exec_1 ok");
+  assert(ctxA.contract_id === "ctr_A", "context exec_1 → ctr_A");
+  assert(ctxA.ready_for_pr3 === true, "exec_1 ready for PR3");
+
+  const ctxB = await getActiveContractContext(env, { scope: "exec_2" });
+  assert(ctxB.ok, "context exec_2 ok");
+  assert(ctxB.contract_id === "ctr_B", "context exec_2 → ctr_B");
 }
 
 // ===========================================================================

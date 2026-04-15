@@ -28,7 +28,18 @@ import {
 // KV Key Constants — Canonical prefixes for active contract state
 // ---------------------------------------------------------------------------
 const KV_PREFIX_ACTIVE_STATE = "contract_active_state:";
-const KV_ACTIVE_CONTRACT_KEY = "contract_active_state:current";
+// Scoped current key: contract_active_state:current:<scope>
+// Default scope is "default". Callers can pass a scope to isolate
+// parallel contexts/executions without ambiguity.
+const KV_ACTIVE_CURRENT_PREFIX = "contract_active_state:current:";
+const KV_DEFAULT_SCOPE = "default";
+// Resolution context subartefact suffix — persisted separately from
+// the main active state so block resolution never overwrites the core state.
+const KV_SUFFIX_RESOLUTION_CTX = ":resolution_ctx";
+
+// Kept for backward-compat re-export (tests may reference it).
+// New code should use KV_ACTIVE_CURRENT_PREFIX + scope.
+const KV_ACTIVE_CONTRACT_KEY = `${KV_ACTIVE_CURRENT_PREFIX}${KV_DEFAULT_SCOPE}`;
 
 // ---------------------------------------------------------------------------
 // buildCanonicalSummary(structure, blocks)
@@ -115,7 +126,8 @@ function _emptySummary() {
 // Parameters:
 //   env        — Cloudflare Workers env (must have ENAVIA_BRAIN KV binding)
 //   contractId — Contract ID to activate
-//   opts       — Optional { phase_hint, task_id, operator }
+//   opts       — Optional { phase_hint, task_id, operator, scope }
+//                scope defaults to "default"; use to isolate parallel contexts
 //
 // Returns: {
 //   ok: boolean,
@@ -145,36 +157,39 @@ async function activateIngestedContract(env, contractId, opts) {
   }
 
   const options = opts || {};
+  const scope = options.scope || KV_DEFAULT_SCOPE;
   const now = new Date().toISOString();
 
   // Build canonical summary from real data
   const summary = buildCanonicalSummary(ingestion.structure, ingestion.blocks);
 
-  // Build active state artifact
+  // Build active state artifact (core — no resolution context here)
   const activeState = {
     contract_id: contractId,
     activated_at: now,
     current_phase_hint: options.phase_hint || null,
     last_task_id: options.task_id || null,
-    relevant_block_ids: [],
     summary_canonic: summary,
     metadata: {
       operator: options.operator || null,
       ingested_at: ingestion.index.ingested_at || null,
       blocks_count: ingestion.index.blocks_count || 0,
       activation_source: "activateIngestedContract",
+      scope,
     },
     version: "v1",
   };
 
-  // Persist active state
+  // Persist active state (core)
   const stateKey = `${KV_PREFIX_ACTIVE_STATE}${contractId}`;
   await env.ENAVIA_BRAIN.put(stateKey, JSON.stringify(activeState));
 
-  // Set as current active contract
-  await env.ENAVIA_BRAIN.put(KV_ACTIVE_CONTRACT_KEY, JSON.stringify({
+  // Set as current active contract — scoped by scope
+  const currentKey = `${KV_ACTIVE_CURRENT_PREFIX}${scope}`;
+  await env.ENAVIA_BRAIN.put(currentKey, JSON.stringify({
     contract_id: contractId,
     activated_at: now,
+    scope,
   }));
 
   return {
@@ -185,21 +200,27 @@ async function activateIngestedContract(env, contractId, opts) {
 }
 
 // ---------------------------------------------------------------------------
-// readActiveContractState(env, contractId)
+// readActiveContractState(env, contractId, opts)
 //
 // Reads the persisted active state for a contract.
-// If contractId is omitted, reads the current active contract.
+// If contractId is omitted, reads the current active contract for the given scope.
+// Merges the resolution context subartefact into the returned state for convenience.
 //
-// Returns: active state object or null if none exists.
+// Parameters:
+//   opts — Optional { scope } (default: "default")
+//
+// Returns: active state object (with resolution_ctx merged) or null if none exists.
 // ---------------------------------------------------------------------------
-async function readActiveContractState(env, contractId) {
+async function readActiveContractState(env, contractId, opts) {
   if (!env || !env.ENAVIA_BRAIN) return null;
 
   let targetId = contractId;
+  const scope = (opts && opts.scope) || KV_DEFAULT_SCOPE;
 
-  // If no contractId specified, read current active contract
+  // If no contractId specified, read current active contract for this scope
   if (!targetId) {
-    const currentRaw = await env.ENAVIA_BRAIN.get(KV_ACTIVE_CONTRACT_KEY);
+    const currentKey = `${KV_ACTIVE_CURRENT_PREFIX}${scope}`;
+    const currentRaw = await env.ENAVIA_BRAIN.get(currentKey);
     if (!currentRaw) return null;
     try {
       const current = JSON.parse(currentRaw);
@@ -216,12 +237,34 @@ async function readActiveContractState(env, contractId) {
   const raw = await env.ENAVIA_BRAIN.get(stateKey);
   if (!raw) return null;
 
+  let state;
   try {
-    return JSON.parse(raw);
+    state = JSON.parse(raw);
   } catch (e) {
     console.error("[contract-active-state] Failed to parse state for", targetId, ":", e.message);
     return null;
   }
+
+  // Merge resolution context subartefact (if exists) for convenience
+  const resCtxKey = `${stateKey}${KV_SUFFIX_RESOLUTION_CTX}`;
+  const resCtxRaw = await env.ENAVIA_BRAIN.get(resCtxKey);
+  if (resCtxRaw) {
+    try {
+      const resCtx = JSON.parse(resCtxRaw);
+      state.relevant_block_ids = resCtx.relevant_block_ids || [];
+      state.current_phase_hint = resCtx.current_phase_hint ?? state.current_phase_hint;
+      state.last_task_id = resCtx.last_task_id ?? state.last_task_id;
+      state.last_resolution_at = resCtx.resolved_at || null;
+      state.resolution_strategy = resCtx.strategy || null;
+    } catch (e) {
+      console.error("[contract-active-state] Failed to parse resolution context for", targetId, ":", e.message);
+    }
+  } else {
+    // No resolution yet — provide safe defaults
+    state.relevant_block_ids = state.relevant_block_ids || [];
+  }
+
+  return state;
 }
 
 // ---------------------------------------------------------------------------
@@ -414,21 +457,24 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
   // Apply limit
   const result = matched.slice(0, limit);
 
-  // Update active state with relevant block IDs (non-blocking)
+  // Persist resolution context as a separate subartefact (never overwrites core state)
   try {
-    const stateKey = `${KV_PREFIX_ACTIVE_STATE}${contractId}`;
-    const raw = await env.ENAVIA_BRAIN.get(stateKey);
-    if (raw) {
-      const state = JSON.parse(raw);
-      state.relevant_block_ids = result.map((b) => b.block_id);
-      if (ctx.phase) state.current_phase_hint = ctx.phase;
-      if (ctx.taskId) state.last_task_id = ctx.taskId;
-      state.last_resolution_at = new Date().toISOString();
-      await env.ENAVIA_BRAIN.put(stateKey, JSON.stringify(state));
-    }
+    const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${contractId}${KV_SUFFIX_RESOLUTION_CTX}`;
+    const resolutionCtx = {
+      contract_id: contractId,
+      relevant_block_ids: result.map((b) => b.block_id),
+      current_phase_hint: ctx.phase || null,
+      last_task_id: ctx.taskId || null,
+      strategy,
+      fallback,
+      matched_count: result.length,
+      total_blocks: allBlocks.length,
+      resolved_at: new Date().toISOString(),
+    };
+    await env.ENAVIA_BRAIN.put(resCtxKey, JSON.stringify(resolutionCtx));
   } catch (e) {
-    // Non-blocking — state update failure does not break resolution
-    console.error("[contract-active-state] Non-blocking state update failed:", e.message);
+    // Non-blocking — resolution context persistence failure does not break resolution
+    console.error("[contract-active-state] Non-blocking resolution context persist failed:", e.message);
   }
 
   return {
@@ -483,27 +529,42 @@ async function refreshCanonicalSummary(env, contractId) {
 }
 
 // ---------------------------------------------------------------------------
-// getActiveContractContext(env)
+// getActiveContractContext(env, opts)
 //
 // Runtime-friendly function: returns everything PR3 needs in one call.
-// Combines active state + canonical summary + current contract ID.
+// Combines active state + canonical summary + resolution context.
+//
+// Parameters:
+//   opts — Optional { scope } (default: "default")
 //
 // Returns: {
 //   ok: boolean,
 //   contract_id: string | null,
 //   active_state: object | null,
 //   summary: object | null,
+//   resolution_ctx: object | null,
 //   ready_for_pr3: boolean
 // }
 // ---------------------------------------------------------------------------
-async function getActiveContractContext(env) {
+async function getActiveContractContext(env, opts) {
   if (!env || !env.ENAVIA_BRAIN) {
-    return { ok: false, contract_id: null, active_state: null, summary: null, ready_for_pr3: false };
+    return { ok: false, contract_id: null, active_state: null, summary: null, resolution_ctx: null, ready_for_pr3: false };
   }
 
-  const state = await readActiveContractState(env);
+  const scope = (opts && opts.scope) || KV_DEFAULT_SCOPE;
+  const state = await readActiveContractState(env, null, { scope });
   if (!state) {
-    return { ok: true, contract_id: null, active_state: null, summary: null, ready_for_pr3: false };
+    return { ok: true, contract_id: null, active_state: null, summary: null, resolution_ctx: null, ready_for_pr3: false };
+  }
+
+  // Read resolution context subartefact
+  let resCtx = null;
+  try {
+    const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${state.contract_id}${KV_SUFFIX_RESOLUTION_CTX}`;
+    const resCtxRaw = await env.ENAVIA_BRAIN.get(resCtxKey);
+    if (resCtxRaw) resCtx = JSON.parse(resCtxRaw);
+  } catch (_) {
+    // resolution context not available — that's ok
   }
 
   return {
@@ -511,6 +572,7 @@ async function getActiveContractContext(env) {
     contract_id: state.contract_id,
     active_state: state,
     summary: state.summary_canonic || null,
+    resolution_ctx: resCtx,
     ready_for_pr3: true,
   };
 }
@@ -543,4 +605,7 @@ export {
   // KV Constants (exported for testing / future PRs)
   KV_PREFIX_ACTIVE_STATE,
   KV_ACTIVE_CONTRACT_KEY,
+  KV_ACTIVE_CURRENT_PREFIX,
+  KV_DEFAULT_SCOPE,
+  KV_SUFFIX_RESOLUTION_CTX,
 };
