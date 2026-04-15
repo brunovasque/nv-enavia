@@ -120,8 +120,8 @@ const KV_SUFFIX_EXEC_EVENT = ":exec_event";
 // Key format: contract:<id>:flog:<timestamp_ms>_<seq>_<rand4>
 // - Append is a pure KV put — ZERO reads, no counter, truly collision-free.
 // - Two concurrent appends always write to DIFFERENT keys (unique ts+seq+rand suffix).
-// - Read uses KV prefix scan (list), sorted alphabetically = chronological order.
-// - Cap (MAX_FUNCTIONAL_LOGS_PER_CONTRACT) applied at read time via list limit.
+// - Read uses paginated KV prefix scan, takes LATEST N entries = most recent logs.
+// - Cap (MAX_FUNCTIONAL_LOGS_PER_CONTRACT) applied at read time via slice(-N).
 // - Backward compat: readFunctionalLogs falls back to legacy :functional_logs key.
 const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs"; // kept for backward-compat reads
 const KV_SUFFIX_FLOG_ENTRY      = ":flog:";
@@ -2374,13 +2374,15 @@ async function readExecEvent(env, contractId) {
 //   Pure KV put to a unique key. Cannot collide under any concurrency.
 //
 // readFunctionalLogs(env, contractId)
-//   Uses KV prefix scan (list) to enumerate all entries for this contract.
-//   Entries sort alphabetically = chronologically (timestamp is key prefix).
+//   Uses paginated KV prefix scan to enumerate ALL entries, then returns
+//   the LATEST N (most recent) in chronological order.
+//   This ensures large contracts always surface recent operational logs,
+//   not the oldest entries that would come from a naive ascending-limit scan.
 //   Capped at MAX_FUNCTIONAL_LOGS_PER_CONTRACT entries at read time.
 //   Falls back to legacy single-array key (:functional_logs) if list unavailable.
 //   Returns [] if none exist. Never crashes the caller.
 //
-// Cap: applied at read via list({ limit }) — writes are never blocked.
+// Cap: applied at read via allKeys.slice(-N) — writes are never blocked.
 // ---------------------------------------------------------------------------
 let _functionalLogSeq = 0;
 
@@ -2419,15 +2421,48 @@ async function readFunctionalLogs(env, contractId) {
   try {
     const prefix = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FLOG_ENTRY}`;
 
-    // Use KV prefix scan to enumerate all log entries for this contract.
-    // Alphabetical key sort = chronological order (timestamp is the leading key segment).
-    // Cap applied here: list({ limit }) returns at most MAX_FUNCTIONAL_LOGS_PER_CONTRACT.
+    // Use KV prefix scan to enumerate ALL log entries for this contract,
+    // then return the LATEST N (most recent) in chronological order.
+    //
+    // Why not just list({ limit: N })?
+    //   KV list returns keys in ascending alphabetical order (= oldest first).
+    //   For large contracts with >N entries, that would return the N oldest,
+    //   silently dropping the most operationally useful recent logs.
+    //
+    // Strategy: paginate through all keys, keep only the last N (most recent),
+    // then fetch and return them in chronological (ascending) order.
+    // Keys are naturally chronological because timestamp_ms is the leading segment.
     if (typeof env.ENAVIA_BRAIN.list === "function") {
-      const listed = await env.ENAVIA_BRAIN.list({ prefix, limit: MAX_FUNCTIONAL_LOGS_PER_CONTRACT });
-      const keys = listed.keys || [];
-      if (keys.length > 0) {
-        const logs = [];
+      // Phase 1: Collect ALL key names via paginated prefix scan.
+      const allKeys = [];
+      let cursor = undefined;
+      let hasMore = true;
+      while (hasMore) {
+        const listOpts = { prefix };
+        if (cursor) listOpts.cursor = cursor;
+        const listed = await env.ENAVIA_BRAIN.list(listOpts);
+        const keys = listed.keys || [];
         for (const { name } of keys) {
+          allKeys.push(name);
+        }
+        // Cloudflare KV: list_complete is false (or absent) when more pages exist
+        if (!listed.list_complete && listed.cursor) {
+          cursor = listed.cursor;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allKeys.length > 0) {
+        // Phase 2: Take the LAST N keys (most recent — highest timestamps).
+        // allKeys are already in ascending alphabetical/chronological order from KV list.
+        const recentKeys = allKeys.length > MAX_FUNCTIONAL_LOGS_PER_CONTRACT
+          ? allKeys.slice(-MAX_FUNCTIONAL_LOGS_PER_CONTRACT)
+          : allKeys;
+
+        // Phase 3: Fetch entries and return in chronological (ascending) order.
+        const logs = [];
+        for (const name of recentKeys) {
           const raw = await env.ENAVIA_BRAIN.get(name);
           if (raw) {
             try { logs.push(JSON.parse(raw)); } catch (_) { /* skip malformed entry */ }

@@ -41,10 +41,11 @@ function assert(condition, name) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock KV store (includes list for prefix scan, matching CF KV API)
+// Mock KV store (includes list with cursor pagination, matching CF KV API)
 // ---------------------------------------------------------------------------
 function createMockKV() {
   const store = {};
+  const LIST_PAGE_SIZE = 1000; // default page size for mock (CF KV default is 1000)
   return {
     async get(key, type) {
       const val = store[key] ?? null;
@@ -54,13 +55,21 @@ function createMockKV() {
       return val;
     },
     async put(key, value) { store[key] = value; },
-    async list({ prefix = "", limit = 1000 } = {}) {
-      const keys = Object.keys(store)
+    async list({ prefix = "", limit, cursor: cursorIn } = {}) {
+      const all = Object.keys(store)
         .filter(k => k.startsWith(prefix))
-        .sort()  // alphabetical = chronological (timestamp is leading key segment)
-        .slice(0, limit)
-        .map(name => ({ name }));
-      return { keys, list_complete: keys.length < limit };
+        .sort();  // alphabetical = chronological (timestamp is leading key segment)
+      const pageSize = limit || LIST_PAGE_SIZE;
+      const startIdx = cursorIn ? parseInt(cursorIn, 10) : 0;
+      const page = all.slice(startIdx, startIdx + pageSize);
+      const endIdx = startIdx + page.length;
+      const complete = endIdx >= all.length;
+      const result = {
+        keys: page.map(name => ({ name })),
+        list_complete: complete,
+      };
+      if (!complete) result.cursor = String(endIdx);
+      return result;
     },
     _store: store,
   };
@@ -386,23 +395,41 @@ async function runTests() {
       "G10: no flog_count key — counter model fully removed");
   }
 
-  // ── Group 11: Cap enforced at read time (all entries written, only MAX returned) ──
-  console.log("\nGroup 11: Cap enforced at read time (MAX_FUNCTIONAL_LOGS_PER_CONTRACT)");
+  // ── Group 11: Cap returns LATEST N logs (most recent), not oldest ──
+  console.log("\nGroup 11: Cap returns latest N logs (MAX_FUNCTIONAL_LOGS_PER_CONTRACT)");
   {
     const env = { ENAVIA_BRAIN: createMockKV() };
     const cid = "cap_test";
     const totalWrites = MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 5;
 
-    // Write MAX + 5 logs — all are written (no write cap), read returns only MAX
+    // Write MAX + 5 logs with increasing timestamps to guarantee key order
     for (let i = 0; i < totalWrites; i++) {
-      await appendFunctionalLog(env, cid, {
-        id: `fl_cap_${i}`, type: "decisao", label: `Log ${i}`, message: `Msg ${i}`, timestamp: new Date().toISOString(),
-      });
+      const ts = 1700000000000 + i * 1000; // deterministic increasing timestamps
+      const key = `contract:${cid}:flog:${ts}_${i}_abcd`;
+      await env.ENAVIA_BRAIN.put(key, JSON.stringify({
+        id: `fl_cap_${i}`, type: "decisao", label: `Log ${i}`, message: `Msg ${i}`, timestamp: new Date(ts).toISOString(),
+      }));
     }
 
     const logs = await readFunctionalLogs(env, cid);
     assert(logs.length === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
       `G11: read returns at most ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} (got ${logs.length})`);
+
+    // Verify we got the LATEST logs, not the oldest
+    // With totalWrites=55 and cap=50, we should get logs 5..54 (the last 50)
+    const firstReturnedId = logs[0].id;
+    const lastReturnedId = logs[logs.length - 1].id;
+    assert(firstReturnedId === "fl_cap_5",
+      `G11: first returned log is fl_cap_5 (oldest among latest 50), got ${firstReturnedId}`);
+    assert(lastReturnedId === `fl_cap_${totalWrites - 1}`,
+      `G11: last returned log is fl_cap_${totalWrites - 1} (most recent), got ${lastReturnedId}`);
+
+    // Verify chronological ascending order in the returned array
+    for (let i = 1; i < logs.length; i++) {
+      const prevNum = parseInt(logs[i-1].id.split("_")[2], 10);
+      const currNum = parseInt(logs[i].id.split("_")[2], 10);
+      assert(currNum > prevNum, `G11: logs[${i}] (${currNum}) > logs[${i-1}] (${prevNum}) — ascending order`);
+    }
 
     // All entries were written — cap is at read time only
     const flogKeys = Object.keys(env.ENAVIA_BRAIN._store).filter(k => k.startsWith(`contract:${cid}:flog:`));
@@ -491,6 +518,72 @@ async function runTests() {
     // No counter key — counter model fully absent
     assert(env.ENAVIA_BRAIN._store[`contract:${cid}:flog_count`] === undefined,
       "G14: no flog_count key in store — counter model not used");
+  }
+
+  // ── Group 15: >50 logs via appendFunctionalLog → read returns latest N in chronological order ──
+  console.log("\nGroup 15: >50 appended logs → readFunctionalLogs returns latest N, chronological");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "latest_n_test";
+    const totalWrites = MAX_FUNCTIONAL_LOGS_PER_CONTRACT + 10; // 60 total
+
+    // Write 60 logs sequentially with deterministic keys for verifiable ordering
+    for (let i = 0; i < totalWrites; i++) {
+      const ts = 1700000000000 + i * 100; // increasing timestamps (100ms apart)
+      const key = `contract:${cid}:flog:${ts}_${i}_f00f`;
+      await env.ENAVIA_BRAIN.put(key, JSON.stringify({
+        id: `fl_latest_${i}`, type: "decisao", label: `Append ${i}`, message: `Msg ${i}`,
+        timestamp: new Date(ts).toISOString(),
+      }));
+    }
+
+    const logs = await readFunctionalLogs(env, cid);
+
+    // Must return exactly MAX (50), not 60
+    assert(logs.length === MAX_FUNCTIONAL_LOGS_PER_CONTRACT,
+      `G15: returns ${MAX_FUNCTIONAL_LOGS_PER_CONTRACT} logs (got ${logs.length})`);
+
+    // Must be the LATEST 50 (indices 10..59), not the oldest (0..49)
+    assert(logs[0].id === "fl_latest_10",
+      `G15: first log is fl_latest_10 (oldest among latest 50), got ${logs[0].id}`);
+    assert(logs[logs.length - 1].id === "fl_latest_59",
+      `G15: last log is fl_latest_59 (most recent), got ${logs[logs.length - 1].id}`);
+
+    // Chronological ascending order in the output
+    for (let i = 1; i < logs.length; i++) {
+      const prev = new Date(logs[i-1].timestamp).getTime();
+      const curr = new Date(logs[i].timestamp).getTime();
+      assert(curr >= prev, `G15: logs[${i}] timestamp >= logs[${i-1}] — stable ascending order`);
+    }
+
+    // None of the oldest 10 should appear
+    const returnedIds = new Set(logs.map(l => l.id));
+    for (let i = 0; i < 10; i++) {
+      assert(!returnedIds.has(`fl_latest_${i}`),
+        `G15: fl_latest_${i} (old) not in returned set — correctly excluded`);
+    }
+  }
+
+  // ── Group 16: readFunctionalLogs stable order for ≤ N logs (no truncation) ──
+  console.log("\nGroup 16: ≤50 logs → all returned in stable chronological order");
+  {
+    const env = { ENAVIA_BRAIN: createMockKV() };
+    const cid = "stable_order_test";
+
+    // Write exactly 5 logs
+    for (let i = 0; i < 5; i++) {
+      const ts = 1700000000000 + i * 500;
+      const key = `contract:${cid}:flog:${ts}_${i}_beef`;
+      await env.ENAVIA_BRAIN.put(key, JSON.stringify({
+        id: `fl_ord_${i}`, type: "decisao", label: `Ord ${i}`, message: `Msg ${i}`,
+        timestamp: new Date(ts).toISOString(),
+      }));
+    }
+
+    const logs = await readFunctionalLogs(env, cid);
+    assert(logs.length === 5, `G16: all 5 logs returned (got ${logs.length})`);
+    assert(logs[0].id === "fl_ord_0", `G16: first is fl_ord_0 (got ${logs[0].id})`);
+    assert(logs[4].id === "fl_ord_4", `G16: last is fl_ord_4 (got ${logs[4].id})`);
   }
 
   // ── Summary ──
