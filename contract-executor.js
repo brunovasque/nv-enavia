@@ -116,6 +116,8 @@ const KV_SUFFIX_DECOMPOSITION = ":decomposition";
 const KV_INDEX_KEY = "contract:index";
 // PR1 — exec event key: contract:<id>:exec_event (read by PR2/PR3)
 const KV_SUFFIX_EXEC_EVENT = ":exec_event";
+// Macro2-F5 — functional logs key: contract:<id>:functional_logs
+const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs";
 
 // ---------------------------------------------------------------------------
 // Canonical global statuses for the Contract Executor state machine.
@@ -2290,8 +2292,8 @@ const EXECUTION_STATUSES = ["pending", "running", "success", "failed", "skipped"
 // Metadata field (audit / ordering):
 //   emitted_at     — ISO 8601 timestamp of emission
 // ---------------------------------------------------------------------------
-function buildExecEvent(status, handoff, microPrId, motivo) {
-  return {
+function buildExecEvent(status, handoff, microPrId, motivo, enrichment) {
+  const base = {
     status_atual:   status,
     arquivo_atual:  Array.isArray(handoff.target_files) && handoff.target_files.length > 0
       ? handoff.target_files.join(", ")
@@ -2302,6 +2304,16 @@ function buildExecEvent(status, handoff, microPrId, motivo) {
     patch_atual:    microPrId            || null,
     emitted_at:     new Date().toISOString(),
   };
+
+  // Macro2-F5 — enrichment fields for operational observability
+  // These are additive; old consumers that only read the 6 canonical fields
+  // will continue to work unchanged.
+  const enr = enrichment || {};
+  base.metrics          = enr.metrics          || null;
+  base.executionSummary = enr.executionSummary || null;
+  base.result           = enr.result           || null;
+
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -2335,6 +2347,55 @@ async function readExecEvent(env, contractId) {
     return raw ? JSON.parse(raw) : null;
   } catch (_) {
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Macro2-F5 — Functional Logs: persist / append / read
+//
+//   appendFunctionalLog(env, contractId, log)
+//     Appends a single log entry to the functional_logs array persisted
+//     in KV under contract:<id>:functional_logs.
+//     Each log entry: { id, type, label, message, timestamp }
+//
+//   readFunctionalLogs(env, contractId)
+//     Reads the persisted functional_logs array from KV.
+//     Returns [] if none exist.
+//
+//   Failures are swallowed — logs must never crash the executor.
+// ---------------------------------------------------------------------------
+let _functionalLogSeq = 0;
+
+function _buildFunctionalLog(type, label, message) {
+  _functionalLogSeq++;
+  return {
+    id:        `fl_${Date.now()}_${_functionalLogSeq}`,
+    type:      type,
+    label:     label,
+    message:   message,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function appendFunctionalLog(env, contractId, log) {
+  try {
+    const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
+    const raw = await env.ENAVIA_BRAIN.get(key);
+    const logs = raw ? JSON.parse(raw) : [];
+    logs.push(log);
+    await env.ENAVIA_BRAIN.put(key, JSON.stringify(logs));
+  } catch (_) {
+    // appendFunctionalLog must never crash the executor
+  }
+}
+
+async function readFunctionalLogs(env, contractId) {
+  try {
+    const key = `${KV_PREFIX_STATE}${contractId}${KV_SUFFIX_FUNCTIONAL_LOGS}`;
+    const raw = await env.ENAVIA_BRAIN.get(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
   }
 }
 
@@ -2419,6 +2480,14 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
 
   if (!supervisorGate.pass) {
     const blockResp = _buildSupervisorBlockResponse(supervisorGate.supervisorDecision);
+
+    // Macro2-F5 — functional log: bloqueio (supervisor gate blocked)
+    await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+      "bloqueio",
+      `Supervisor bloqueou execução — task ${currentTaskId}`,
+      `Gate: ${supervisorGate.supervisorDecision.reason_code || "UNKNOWN"}. Motivo: ${supervisorGate.supervisorDecision.reason_text || "N/A"}.`
+    ));
+
     return {
       ...blockResp,
       // Backwards-compatible: keep constitution_enforcement shape for callers
@@ -2530,8 +2599,34 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
 
   state.updated_at = executionStartedAt;
 
-  // PR1 — emit real exec event: running
-  await emitExecEvent(env, contractId, buildExecEvent("running", handoff, microPrId, null));
+  // Macro2-F5 — Compute total steps from decomposition tasks
+  const _totalTasks = (decomposition.tasks || []).length;
+  const _doneTasks  = (decomposition.tasks || []).filter(t => t.status === "done" || t.status === "completed").length;
+
+  // PR1 — emit real exec event: running (enriched for Macro2-F5)
+  await emitExecEvent(env, contractId, buildExecEvent("running", handoff, microPrId, null, {
+    metrics: {
+      stepsTotal: _totalTasks,
+      stepsDone:  _doneTasks,
+      elapsedMs:  0,
+    },
+    executionSummary: {
+      finalStatus:           "running",
+      hadBrowserNavigation:  false,
+      hadCodeChange:         false,
+      hadBlock:              false,
+      hadHumanReview:        false,
+      hadBridgeDispatch:     !!(handoff.scope && handoff.scope.workers && handoff.scope.workers.length > 0),
+    },
+    result: null,
+  }));
+
+  // Macro2-F5 — functional log: execution start (decisao)
+  await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+    "decisao",
+    `Execução iniciada — task ${currentTaskId}`,
+    `Executor iniciou ciclo para task "${currentTaskId}" (micro-PR: ${microPrId}) em ambiente ${handoff.scope.environment}. Objetivo: ${handoff.objective || "N/A"}.`
+  ));
 
   // Persist running state immediately so it survives crashes
   await persistContract(env, state, decomposition);
@@ -2579,8 +2674,38 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
-    // PR1 — emit real exec event: success
-    await emitExecEvent(env, contractId, buildExecEvent("success", handoff, microPrId, null));
+
+    // Macro2-F5 — compute elapsed ms
+    const _successElapsedMs = new Date(executionFinishedAt).getTime() - new Date(executionStartedAt).getTime();
+    const _successDoneTasks = _doneTasks + 1; // current task completes this cycle
+
+    // PR1 — emit real exec event: success (enriched for Macro2-F5)
+    await emitExecEvent(env, contractId, buildExecEvent("success", handoff, microPrId, null, {
+      metrics: {
+        stepsTotal: _totalTasks,
+        stepsDone:  _successDoneTasks,
+        elapsedMs:  _successElapsedMs,
+      },
+      executionSummary: {
+        finalStatus:           "success",
+        hadBrowserNavigation:  false,
+        hadCodeChange:         !!(evidence.length > 0),
+        hadBlock:              false,
+        hadHumanReview:        false,
+        hadBridgeDispatch:     !!(handoff.scope && handoff.scope.workers && handoff.scope.workers.length > 0),
+      },
+      result: {
+        summary: `Task "${currentTaskId}" concluída com sucesso em ${_successElapsedMs}ms. ${evidence.length} evidência(s) registrada(s).`,
+        status:  "success",
+      },
+    }));
+
+    // Macro2-F5 — functional log: consolidation (success)
+    await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+      "consolidacao",
+      `Task ${currentTaskId} concluída com sucesso`,
+      `Execução finalizada em ${_successElapsedMs}ms. Evidências: ${evidence.join("; ") || "nenhuma explícita"}. Micro-PR: ${microPrId}.`
+    ));
     await persistContract(env, state, decomposition);
 
     return {
@@ -2607,12 +2732,41 @@ async function executeCurrentMicroPr(env, contractId, executionParams) {
     _appendExecutionCycle(state, state.current_execution);
 
     state.updated_at = executionFinishedAt;
-    // PR1 — emit real exec event: failed
+
+    // Macro2-F5 — compute elapsed ms for failure
+    const _failElapsedMs = new Date(executionFinishedAt).getTime() - new Date(executionStartedAt).getTime();
+    const _failMotivo = executionError && executionError.message
+      ? String(executionError.message).slice(0, 120)
+      : "execution_failed";
+
+    // PR1 — emit real exec event: failed (enriched for Macro2-F5)
     await emitExecEvent(env, contractId, buildExecEvent(
-      "failed", handoff, microPrId,
-      executionError && executionError.message
-        ? String(executionError.message).slice(0, 120)
-        : "execution_failed"
+      "failed", handoff, microPrId, _failMotivo, {
+        metrics: {
+          stepsTotal: _totalTasks,
+          stepsDone:  _doneTasks,
+          elapsedMs:  _failElapsedMs,
+        },
+        executionSummary: {
+          finalStatus:           "failed",
+          hadBrowserNavigation:  false,
+          hadCodeChange:         false,
+          hadBlock:              !!(executionError.classification === "out_of_scope"),
+          hadHumanReview:        false,
+          hadBridgeDispatch:     !!(handoff.scope && handoff.scope.workers && handoff.scope.workers.length > 0),
+        },
+        result: {
+          summary: `Task "${currentTaskId}" falhou após ${_failElapsedMs}ms: ${_failMotivo}`,
+          status:  "failed",
+        },
+      }
+    ));
+
+    // Macro2-F5 — functional log: bloqueio (failure)
+    await appendFunctionalLog(env, contractId, _buildFunctionalLog(
+      "bloqueio",
+      `Falha na execução — task ${currentTaskId}`,
+      `Erro: ${_failMotivo}. Classificação: ${executionError.classification || "desconhecida"}. Micro-PR: ${microPrId}. Duração: ${_failElapsedMs}ms.`
     ));
     await persistContract(env, state, decomposition);
 
@@ -4844,6 +4998,10 @@ export {
   emitExecEvent,
   readExecEvent,
   KV_SUFFIX_EXEC_EVENT,
+  // Macro2-F5 — Functional logs
+  appendFunctionalLog,
+  readFunctionalLogs,
+  KV_SUFFIX_FUNCTIONAL_LOGS,
   // C2 — Automatic Contract Closure in TEST
   closeContractInTest,
   CONTRACT_CLOSURE_STATUSES,
