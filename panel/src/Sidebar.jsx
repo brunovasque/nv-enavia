@@ -2,12 +2,13 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useNotificationStore } from "./notifications/notificationStore";
 
 const NAV_ITEMS = [
-  { path: "/chat",      label: "Chat",    icon: "💬" },
-  { path: "/plan",      label: "Plano",   icon: "📋" },
-  { path: "/memory",    label: "Memória", icon: "🧠" },
-  { path: "/execution", label: "Execução", icon: "⚡" },
-  { path: "/health",    label: "Saúde",   icon: "◆", badge: "P22" },
-  { path: "/browser",   label: "Browser", icon: "🌐" },
+  { path: "/chat",      label: "Chat",      icon: "💬" },
+  { path: "/plan",      label: "Plano",     icon: "📋" },
+  { path: "/memory",    label: "Memória",   icon: "🧠" },
+  { path: "/execution", label: "Execução",  icon: "⚡" },
+  { path: "/contract",  label: "Contrato",  icon: "📜" },
+  { path: "/health",    label: "Saúde",     icon: "◆", badge: "P22" },
+  { path: "/browser",   label: "Browser",   icon: "🌐" },
 ];
 
 export default function Sidebar({ collapsed }) {

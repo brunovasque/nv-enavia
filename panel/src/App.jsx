@@ -6,6 +6,7 @@ import MemoryPage from "./pages/MemoryPage";
 import ExecutionPage from "./pages/ExecutionPage";
 import BrowserPage from "./pages/BrowserPage";
 import HealthPage from "./pages/HealthPage";
+import ContractPage from "./pages/ContractPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/plan" element={<PlanPage />} />
         <Route path="/memory" element={<MemoryPage />} />
         <Route path="/execution" element={<ExecutionPage />} />
+        <Route path="/contract" element={<ContractPage />} />
         <Route path="/browser" element={<BrowserPage />} />
         <Route path="/health" element={<HealthPage />} />
       </Route>
