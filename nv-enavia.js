@@ -3249,6 +3249,13 @@ async function handlePlannerRun(request, env) {
 //   planner internally — so the plan structure belongs in plannerSnapshot,
 //   not in the conversational reply surface.
 // ============================================================================
+
+// PR7: Canonical parse mode values for telemetry.llm_parse_mode
+const _LLM_PARSE_MODE = {
+  JSON_PARSED:         "json_parsed",
+  PLAIN_TEXT_FALLBACK: "plain_text_fallback",
+  UNKNOWN:             "unknown",
+};
 const _PLANNER_LEAK_PATTERNS = [
   /\bnext_action\b/i,
   /\breason\b[:=]/i,
@@ -3494,19 +3501,19 @@ async function handleChatLLM(request, env) {
     // PR7: Track whether the LLM returned parseable JSON or plain text.
     // "json_parsed" → structured JSON received; "plain_text_fallback" → model returned raw text,
     // meaning use_planner signal is absent and planner decision falls entirely to PM4.
-    let llmParseMode = "unknown";
+    let llmParseMode = _LLM_PARSE_MODE.UNKNOWN;
     try {
       const parsed = JSON.parse(llmResult.text);
       reply = typeof parsed.reply === "string" && parsed.reply.length > 0
         ? parsed.reply
         : llmResult.text;
       wantsPlan = parsed.use_planner === true;
-      llmParseMode = "json_parsed";
+      llmParseMode = _LLM_PARSE_MODE.JSON_PARSED;
     } catch {
       // Model returned plain text — use as-is, no planner
       reply = llmResult.text || "Instrução recebida.";
       wantsPlan = false;
-      llmParseMode = "plain_text_fallback";
+      llmParseMode = _LLM_PARSE_MODE.PLAIN_TEXT_FALLBACK;
     }
 
     // --- PR3: Tool Arbitration — Sanitização de reply ---
@@ -3635,11 +3642,12 @@ async function handleChatLLM(request, env) {
         conversation_history_length: conversationHistory.length,
         // PR7: whether the LLM returned parseable JSON (json_parsed) or plain text (plain_text_fallback)
         llm_parse_mode: llmParseMode,
-        arbitration: {
-          ...arbitrationDecision,
+        arbitration: (() => {
+          const arb = { ...arbitrationDecision };
           // PR7: track layer-1 sanitization (mechanical term leak) separately from layer-2 (manual plan)
-          ...(replyLayer1Sanitized ? { reply_sanitized_layer1: "mechanical_term_leak_replaced" } : {}),
-        },
+          if (replyLayer1Sanitized) arb.reply_sanitized_layer1 = "mechanical_term_leak_replaced";
+          return arb;
+        })(),
         // PR7: gate decision summary — surfaced here for quick observability without parsing planner object
         ...(plannerSnapshot?.gate ? {
           gate_summary: {
@@ -3676,7 +3684,7 @@ async function handleChatLLM(request, env) {
           conversation_history_length: conversationHistory.length,
           pipeline: pm4Arbitration?.allows_planner ? "LLM + PM4→PM9" : "LLM-only",
           // PR7: llm_parse_mode is unknown on failure (LLM never responded)
-          llm_parse_mode: "unknown",
+          llm_parse_mode: _LLM_PARSE_MODE.UNKNOWN,
           // Include PM4 pre-check result even on LLM failure — it's deterministic
           arbitration: pm4Arbitration ? {
             pm4_level: pm4Arbitration.level,
