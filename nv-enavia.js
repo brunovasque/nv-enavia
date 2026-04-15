@@ -3249,6 +3249,13 @@ async function handlePlannerRun(request, env) {
 //   planner internally — so the plan structure belongs in plannerSnapshot,
 //   not in the conversational reply surface.
 // ============================================================================
+
+// PR7: Canonical parse mode values for telemetry.llm_parse_mode
+const _LLM_PARSE_MODE = {
+  JSON_PARSED:         "json_parsed",
+  PLAIN_TEXT_FALLBACK: "plain_text_fallback",
+  UNKNOWN:             "unknown",
+};
 const _PLANNER_LEAK_PATTERNS = [
   /\bnext_action\b/i,
   /\breason\b[:=]/i,
@@ -3491,23 +3498,32 @@ async function handleChatLLM(request, env) {
     // plain text (e.g. older model versions that ignore response_format).
     let reply = "";
     let wantsPlan = false;
+    // PR7: Track whether the LLM returned parseable JSON or plain text.
+    // "json_parsed" → structured JSON received; "plain_text_fallback" → model returned raw text,
+    // meaning use_planner signal is absent and planner decision falls entirely to PM4.
+    let llmParseMode = _LLM_PARSE_MODE.UNKNOWN;
     try {
       const parsed = JSON.parse(llmResult.text);
       reply = typeof parsed.reply === "string" && parsed.reply.length > 0
         ? parsed.reply
         : llmResult.text;
       wantsPlan = parsed.use_planner === true;
+      llmParseMode = _LLM_PARSE_MODE.JSON_PARSED;
     } catch {
       // Model returned plain text — use as-is, no planner
       reply = llmResult.text || "Instrução recebida.";
       wantsPlan = false;
+      llmParseMode = _LLM_PARSE_MODE.PLAIN_TEXT_FALLBACK;
     }
 
     // --- PR3: Tool Arbitration — Sanitização de reply ---
     // Garante que o reply nunca exponha termos mecânicos do planner como fala
     // principal. Se a resposta contiver termos internos do planner como
     // superfície dominante, é sinal de leak — o reply é sanitizado.
+    // PR7: Track layer-1 sanitization (mechanical term leak) separately from layer-2 (manual plan).
+    const replyBeforeSanitize = reply;
     reply = _sanitizeChatReply(reply);
+    const replyLayer1Sanitized = reply !== replyBeforeSanitize;
 
     // --- PR3: Arbitration Gate — PM4 é autoritativo ---
     //
@@ -3553,6 +3569,8 @@ async function handleChatLLM(request, env) {
     // --- Planner como ferramenta interna (PM4 autoritativo) ---
     let plannerSnapshot = null;
     let plannerUsed = false;
+    // PR7: Track planner failure when it was supposed to run (Level B/C forced)
+    let plannerError = null;
 
     if (shouldActivatePlanner) {
       try {
@@ -3586,8 +3604,9 @@ async function handleChatLLM(request, env) {
           level: classification.complexity_level,
         });
       } catch (planErr) {
+        plannerError = String(planErr);
         logNV("⚠️ [CHAT/LLM] Planner falhou como tool (não crítico)", {
-          error: String(planErr),
+          error: plannerError,
         });
         // Planner failure is non-critical — the LLM reply is still valid
       }
@@ -3618,8 +3637,27 @@ async function handleChatLLM(request, env) {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
+        // PR7: explicit continuity flag — true when conversation history was injected into LLM context
+        continuity_active: conversationHistory.length > 0,
         conversation_history_length: conversationHistory.length,
-        arbitration: arbitrationDecision,
+        // PR7: whether the LLM returned parseable JSON (json_parsed) or plain text (plain_text_fallback)
+        llm_parse_mode: llmParseMode,
+        arbitration: (() => {
+          const arb = { ...arbitrationDecision };
+          // PR7: track layer-1 sanitization (mechanical term leak) separately from layer-2 (manual plan)
+          if (replyLayer1Sanitized) arb.reply_sanitized_layer1 = "mechanical_term_leak_replaced";
+          return arb;
+        })(),
+        // PR7: gate decision summary — surfaced here for quick observability without parsing planner object
+        ...(plannerSnapshot?.gate ? {
+          gate_summary: {
+            gate_status:         plannerSnapshot.gate.gate_status,
+            needs_human_approval: plannerSnapshot.gate.needs_human_approval,
+            can_proceed:         plannerSnapshot.gate.can_proceed,
+          },
+        } : {}),
+        // PR7: planner error when planner was forced (Level B/C) but failed internally
+        ...(plannerError ? { planner_error: plannerError } : {}),
         operational_awareness: {
           browser_status:    operationalAwareness.browser.status,
           browser_can_act:   operationalAwareness.browser.can_act,
@@ -3641,8 +3679,12 @@ async function handleChatLLM(request, env) {
         detail: String(err),
         telemetry: {
           duration_ms: Date.now() - startedAt,
-          // PR5: Include conversation history length even on LLM failure
+          // PR7: continuity_active and pipeline are derivable before LLM call — include on failure
+          continuity_active: conversationHistory.length > 0,
           conversation_history_length: conversationHistory.length,
+          pipeline: pm4Arbitration?.allows_planner ? "LLM + PM4→PM9" : "LLM-only",
+          // PR7: llm_parse_mode is unknown on failure (LLM never responded)
+          llm_parse_mode: _LLM_PARSE_MODE.UNKNOWN,
           // Include PM4 pre-check result even on LLM failure — it's deterministic
           arbitration: pm4Arbitration ? {
             pm4_level: pm4Arbitration.level,
@@ -4341,6 +4383,9 @@ if (request.method === "GET") {
             duration_ms: "number",
             session_id: "string | null",
             pipeline: "string — 'LLM-only' ou 'LLM + PM4→PM9'",
+            continuity_active: "boolean — true se conversation_history foi injetado no contexto LLM (PR7)",
+            conversation_history_length: "number — quantidade de mensagens de histórico injetadas",
+            llm_parse_mode: "string — 'json_parsed' | 'plain_text_fallback' | 'unknown' — se o LLM retornou JSON estruturado ou texto plano (PR7)",
             arbitration: {
               pm4_level: "string — 'A' | 'B' | 'C' (nível PM4 do pedido)",
               pm4_category: "string — 'simple' | 'tactical' | 'complex'",
@@ -4348,7 +4393,17 @@ if (request.method === "GET") {
               pm4_allows_planner: "boolean — PM4 é autoritativo: false bloqueia (A), true força (B/C)",
               llm_requested_planner: "boolean — LLM retornou use_planner=true (advisory only)",
               final_decision: "string — 'planner_activated' | 'planner_forced_level_BC' | 'planner_blocked_level_A'",
-              reply_sanitized: "string (opcional) — 'manual_plan_replaced' se manual plan leak detectado",
+              reply_sanitized: "string (opcional) — 'manual_plan_replaced' se manual plan leak (layer-2) detectado",
+              reply_sanitized_layer1: "string (opcional) — 'mechanical_term_leak_replaced' se leak de termos mecânicos (layer-1) detectado (PR7)",
+            },
+            gate_summary: "object (opcional) — resumo do gate quando planner rodou: { gate_status, needs_human_approval, can_proceed } (PR7)",
+            planner_error: "string (opcional) — erro interno do planner quando forçado (Level B/C) mas falhou (PR7)",
+            operational_awareness: {
+              browser_status: "string — estado do browser arm",
+              browser_can_act: "boolean",
+              executor_configured: "boolean",
+              approval_mode: "string",
+              human_gate_active: "boolean",
             },
           },
         },
