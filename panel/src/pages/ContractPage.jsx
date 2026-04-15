@@ -4,31 +4,36 @@
 // Surface de contrato ativo e rastreio de aderência no painel.
 // Panel-only. Consome dados da API (mock ou real).
 //
+// Runtime-first: the page calls fetchContractSurface() without mock overrides.
+// In mock/dev mode a collapsible dev tool allows cycling through states.
+//
 // Estados visuais:
 //   - loading
 //   - vazio / sem contrato ativo
 //   - contrato ativo com ALLOW
 //   - contrato ativo com WARN
 //   - contrato ativo com BLOCK
-//   - contrato ativo sem decisão recente
+//   - contrato ativo sem decisão recente (ACTIVE_NO_ADHERENCE)
 //   - erro de carregamento
 // ============================================================================
 
 import { useState, useEffect } from "react";
 import { fetchContractSurface, CONTRACT_SURFACE_STATUS } from "../api";
+import { getApiConfig } from "../api/config.js";
 import ActiveContractCard from "../contract/ActiveContractCard";
 import AdherenceGateCard from "../contract/AdherenceGateCard";
 import EvidenceTrailCard from "../contract/EvidenceTrailCard";
 import RelevantBlocksCard from "../contract/RelevantBlocksCard";
 
 // ---------------------------------------------------------------------------
-// State selector — cycles through mock states for demonstration
+// Dev-only state selector — only available in mock mode
 // ---------------------------------------------------------------------------
-const STATES = [
-  { key: CONTRACT_SURFACE_STATUS.ACTIVE_ALLOW,  label: "Ativo + ALLOW" },
-  { key: CONTRACT_SURFACE_STATUS.ACTIVE_WARN,   label: "Ativo + WARN"  },
-  { key: CONTRACT_SURFACE_STATUS.ACTIVE_BLOCK,  label: "Ativo + BLOCK" },
-  { key: CONTRACT_SURFACE_STATUS.NO_CONTRACT,   label: "Sem contrato"  },
+const DEV_STATES = [
+  { key: CONTRACT_SURFACE_STATUS.ACTIVE_ALLOW,         label: "ALLOW" },
+  { key: CONTRACT_SURFACE_STATUS.ACTIVE_WARN,          label: "WARN"  },
+  { key: CONTRACT_SURFACE_STATUS.ACTIVE_BLOCK,         label: "BLOCK" },
+  { key: CONTRACT_SURFACE_STATUS.ACTIVE_NO_ADHERENCE,  label: "Sem decisão" },
+  { key: CONTRACT_SURFACE_STATUS.NO_CONTRACT,           label: "Sem contrato"  },
 ];
 
 // Decision → visual style for top banner
@@ -39,17 +44,24 @@ const DECISION_STYLE = {
 };
 
 export default function ContractPage() {
-  const [surfaceState, setSurfaceState] = useState(CONTRACT_SURFACE_STATUS.ACTIVE_ALLOW);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
+
+  // Dev-only: mock state override (null = use default / runtime flow)
+  const [devMockState, setDevMockState] = useState(null);
+  const isMockMode = getApiConfig().mode !== "real";
 
   useEffect(() => {
     let stale = false;
     setLoading(true);
     setFetchError(null);
 
-    fetchContractSurface({ _mockState: surfaceState }).then((r) => {
+    // Runtime-first: call without _mockState.
+    // Dev tool override: only passes _mockState when explicitly set by dev selector.
+    const opts = devMockState ? { _mockState: devMockState } : {};
+
+    fetchContractSurface(opts).then((r) => {
       if (stale) return;
       if (r.ok) {
         setData(r.data);
@@ -61,7 +73,7 @@ export default function ContractPage() {
     });
 
     return () => { stale = true; };
-  }, [surfaceState]);
+  }, [devMockState]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
@@ -98,25 +110,15 @@ export default function ContractPage() {
   return (
     <div style={s.page} role="main">
 
-      {/* ── Page header + state selector ──────────────────────────────────── */}
+      {/* ── Page header ───────────────────────────────────────────────────── */}
       <div style={s.topRow}>
         <_PageHeader />
-        <div style={s.stateSelector} role="group" aria-label="Estado do contrato">
-          {STATES.map(({ key, label }) => (
-            <button
-              key={key}
-              style={{
-                ...s.stateBtn,
-                ...(surfaceState === key ? s.stateBtnActive : {}),
-              }}
-              onClick={() => setSurfaceState(key)}
-              aria-pressed={surfaceState === key}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
+
+      {/* ── Dev-only mock selector (mock mode only) ───────────────────────── */}
+      {isMockMode && (
+        <_DevStateSelector current={devMockState} onChange={setDevMockState} />
+      )}
 
       {/* ── Decision banner (when there's an active adherence decision) ──── */}
       {hasContract && decisionStyle && (
@@ -193,6 +195,45 @@ function _PageHeader() {
   );
 }
 
+// ── Dev-only state selector ─────────────────────────────────────────────────
+
+function _DevStateSelector({ current, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={s.devPanel} data-testid="dev-state-selector">
+      <button
+        style={s.devToggle}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        {open ? "▾" : "▸"} Mock Dev Tool
+      </button>
+      {open && (
+        <div style={s.devStates} role="group" aria-label="Mock state override">
+          {DEV_STATES.map(({ key, label }) => (
+            <button
+              key={key}
+              style={{
+                ...s.devBtn,
+                ...(current === key ? s.devBtnActive : {}),
+              }}
+              onClick={() => onChange(current === key ? null : key)}
+              aria-pressed={current === key}
+            >
+              {label}
+            </button>
+          ))}
+          {current && (
+            <button style={s.devResetBtn} onClick={() => onChange(null)}>
+              Reset
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = {
@@ -234,29 +275,59 @@ const s = {
     letterSpacing: "0.3px",
   },
 
-  // State selector
-  stateSelector: {
+  // Dev-only mock selector (visible only in mock mode)
+  devPanel: {
+    background: "rgba(245,158,11,0.06)",
+    border: "1px dashed rgba(245,158,11,0.3)",
+    borderRadius: "var(--radius-md)",
+    padding: "6px 10px",
+    flexShrink: 0,
+  },
+  devToggle: {
+    fontSize: "10px",
+    fontWeight: 600,
+    color: "#F59E0B",
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    fontFamily: "var(--font-mono)",
+    padding: "2px 0",
+  },
+  devStates: {
     display: "flex",
     gap: "4px",
     flexWrap: "wrap",
+    marginTop: "6px",
   },
-  stateBtn: {
+  devBtn: {
     fontSize: "10px",
     fontWeight: 500,
     color: "var(--text-muted)",
     background: "var(--bg-surface)",
     border: "1px solid var(--border)",
     borderRadius: "5px",
-    padding: "4px 10px",
+    padding: "3px 8px",
     cursor: "pointer",
     fontFamily: "var(--font-body)",
     transition: "all 0.15s ease",
   },
-  stateBtnActive: {
-    color: "var(--color-primary)",
-    background: "var(--color-primary-glow)",
-    borderColor: "var(--color-primary-border)",
+  devBtnActive: {
+    color: "#F59E0B",
+    background: "rgba(245,158,11,0.10)",
+    borderColor: "rgba(245,158,11,0.28)",
     fontWeight: 700,
+  },
+  devResetBtn: {
+    fontSize: "10px",
+    fontWeight: 500,
+    color: "var(--text-muted)",
+    background: "transparent",
+    border: "1px solid var(--border)",
+    borderRadius: "5px",
+    padding: "3px 8px",
+    cursor: "pointer",
+    fontFamily: "var(--font-body)",
+    textDecoration: "underline",
   },
 
   // Decision banner

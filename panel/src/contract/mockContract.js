@@ -6,17 +6,21 @@
 //   - contract-active-state.js (PR2): active state + canonical summary
 //   - contract-adherence-engine.js (PR3): adherence gate result
 //
-// States: ACTIVE_ALLOW, ACTIVE_WARN, ACTIVE_BLOCK, NO_CONTRACT
+// States: ACTIVE_ALLOW, ACTIVE_WARN, ACTIVE_BLOCK, ACTIVE_NO_ADHERENCE, NO_CONTRACT
+//
+// Usage: mock/dev support only. The runtime page calls fetchContractSurface()
+// without _mockState; mock mode returns the default fixture (ACTIVE_ALLOW).
 // ============================================================================
 
 // ---------------------------------------------------------------------------
 // CONTRACT_SURFACE_STATUS — panel-level status enum
 // ---------------------------------------------------------------------------
 export const CONTRACT_SURFACE_STATUS = {
-  ACTIVE_ALLOW:  "active_allow",
-  ACTIVE_WARN:   "active_warn",
-  ACTIVE_BLOCK:  "active_block",
-  NO_CONTRACT:   "no_contract",
+  ACTIVE_ALLOW:         "active_allow",
+  ACTIVE_WARN:          "active_warn",
+  ACTIVE_BLOCK:         "active_block",
+  ACTIVE_NO_ADHERENCE:  "active_no_adherence",
+  NO_CONTRACT:          "no_contract",
 };
 
 // ---------------------------------------------------------------------------
@@ -203,6 +207,10 @@ export const MOCK_CONTRACT = {
   [CONTRACT_SURFACE_STATUS.ACTIVE_BLOCK]: {
     active_state: MOCK_ACTIVE_STATE,
     adherence: MOCK_ADHERENCE_BLOCK,
+  },
+  [CONTRACT_SURFACE_STATUS.ACTIVE_NO_ADHERENCE]: {
+    active_state: MOCK_ACTIVE_STATE,
+    adherence: null,
   },
   [CONTRACT_SURFACE_STATUS.NO_CONTRACT]: {
     active_state: null,
