@@ -27,6 +27,7 @@ export { chatSend }                          from "./endpoints/chat.js";
 export { fetchPlan,      PLAN_STATUS }       from "./endpoints/plan.js";
 export { fetchExecution, postDecision, approveMerge, EXECUTION_STATUS }  from "./endpoints/execution.js";
 export { fetchMemory,    MEMORY_STATES, MEMORY_FILTERS } from "./endpoints/memory.js";
+export { listManualMemories, createManualMemory, updateManualMemory, blockManualMemory, invalidateManualMemory } from "./endpoints/manualMemory.js";
 export { sendBridge, fetchBridgeStatus }    from "./endpoints/bridge.js";
 export { fetchHealth }                      from "./endpoints/health.js";
 export { fetchBrowserSession, grantBrowserArmPermission, BROWSER_SESSION_STATUS, GRANTABLE_BLOCK_LEVELS } from "./endpoints/browserSession.js";

@@ -28,9 +28,9 @@ import { buildCanonicalPlan } from "./schema/planner-canonical-plan.js";
 import { evaluateApprovalGate } from "./schema/planner-approval-gate.js";
 import { buildExecutorBridgePayload } from "./schema/planner-executor-bridge.js";
 import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
-import { writeMemory } from "./schema/memory-storage.js";
-import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
-import { searchRelevantMemory } from "./schema/memory-read.js";
+import { writeMemory, readMemoryById, updateMemory, blockMemory, invalidateMemory } from "./schema/memory-storage.js";
+import { buildMemoryObject, ENTITY_TYPES, MEMORY_TYPES, MEMORY_STATUS, MEMORY_FLAGS } from "./schema/memory-schema.js";
+import { searchRelevantMemory, searchMemory } from "./schema/memory-read.js";
 import { buildRetrievalContext, buildRetrievalSummary } from "./schema/memory-retrieval.js";
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
@@ -2478,7 +2478,7 @@ function handleCORSPreflight(request) {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, x-session-id",
       "Access-Control-Max-Age": "86400",
     },
@@ -2489,7 +2489,7 @@ function withCORS(response) {
   const headers = new Headers(response.headers);
 
   headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-session-id");
 
   return new Response(response.body, {
@@ -6320,6 +6320,153 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       }
 
       // ============================================================
+      // 📝 PR4 — Manual Memory CRUD routes
+      // ============================================================
+
+      // GET /memory/manual — List all manual memories
+      if (method === "GET" && path === "/memory/manual") {
+        try {
+          const result = await searchMemory(
+            { memory_type: MEMORY_TYPES.MEMORIA_MANUAL, include_inactive: true },
+            env,
+          );
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 500);
+          }
+          return jsonResponse({ ok: true, items: result.results, count: result.count });
+        } catch (err) {
+          logNV("❌ [GET /memory/manual] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // POST /memory/manual — Create manual memory
+      if (method === "POST" && path === "/memory/manual") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const now = new Date().toISOString();
+          const memId = body.memory_id || ("manual-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7));
+          const memObj = buildMemoryObject({
+            memory_id:          memId,
+            memory_type:        MEMORY_TYPES.MEMORIA_MANUAL,
+            entity_type:        body.entity_type || ENTITY_TYPES.RULE,
+            entity_id:          body.entity_id || memId,
+            title:              body.title || "Memória manual sem título",
+            content_structured: body.content_structured || { text: body.content || "" },
+            priority:           body.priority || "high",
+            confidence:         body.confidence || "confirmed",
+            source:             "panel",
+            created_at:         now,
+            updated_at:         now,
+            expires_at:         body.expires_at || null,
+            is_canonical:       body.is_canonical === true,
+            status:             body.status || "active",
+            flags:              Array.isArray(body.flags) ? body.flags : [],
+            tags:               Array.isArray(body.tags) ? body.tags : [],
+          });
+          const result = await writeMemory(memObj, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error, errors: result.errors }, 400);
+          }
+          return jsonResponse({ ok: true, memory_id: result.memory_id, record: result.record }, 201);
+        } catch (err) {
+          logNV("❌ [POST /memory/manual] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // PATCH /memory/manual — Update manual memory
+      if (method === "PATCH" && path === "/memory/manual") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const memId = body.memory_id;
+          if (!memId) {
+            return jsonResponse({ ok: false, error: "memory_id is required" }, 400);
+          }
+          // Only allow patching manual memories
+          const existing = await readMemoryById(memId, env);
+          if (!existing) {
+            return jsonResponse({ ok: false, error: `memory_id '${memId}' not found` }, 404);
+          }
+          if (existing.memory_type !== MEMORY_TYPES.MEMORIA_MANUAL) {
+            return jsonResponse({ ok: false, error: "only memoria_manual can be edited via this route" }, 403);
+          }
+          const patch = {};
+          if (body.title !== undefined)              patch.title = body.title;
+          if (body.content_structured !== undefined)  patch.content_structured = body.content_structured;
+          if (body.content !== undefined)             patch.content_structured = { text: body.content };
+          if (body.priority !== undefined)            patch.priority = body.priority;
+          if (body.confidence !== undefined)          patch.confidence = body.confidence;
+          if (body.status !== undefined)              patch.status = body.status;
+          if (body.tags !== undefined)                patch.tags = body.tags;
+          if (body.flags !== undefined)               patch.flags = body.flags;
+          if (body.expires_at !== undefined)          patch.expires_at = body.expires_at;
+          if (body.is_canonical !== undefined)        patch.is_canonical = body.is_canonical;
+
+          const result = await updateMemory(memId, patch, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error, errors: result.errors }, 400);
+          }
+          return jsonResponse({ ok: true, memory_id: result.memory_id, record: result.record });
+        } catch (err) {
+          logNV("❌ [PATCH /memory/manual] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // POST /memory/manual/block — Block manual memory
+      if (method === "POST" && path === "/memory/manual/block") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const memId = body.memory_id;
+          if (!memId) {
+            return jsonResponse({ ok: false, error: "memory_id is required" }, 400);
+          }
+          const existing = await readMemoryById(memId, env);
+          if (!existing) {
+            return jsonResponse({ ok: false, error: `memory_id '${memId}' not found` }, 404);
+          }
+          if (existing.memory_type !== MEMORY_TYPES.MEMORIA_MANUAL) {
+            return jsonResponse({ ok: false, error: "only memoria_manual can be blocked via this route" }, 403);
+          }
+          const result = await blockMemory(memId, { blocked_by: "panel", blocked_at: new Date().toISOString() }, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 500);
+          }
+          return jsonResponse({ ok: true, memory_id: result.memory_id, record: result.record });
+        } catch (err) {
+          logNV("❌ [POST /memory/manual/block] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // POST /memory/manual/invalidate — Invalidate/expire manual memory
+      if (method === "POST" && path === "/memory/manual/invalidate") {
+        try {
+          const body = await request.json().catch(() => ({}));
+          const memId = body.memory_id;
+          if (!memId) {
+            return jsonResponse({ ok: false, error: "memory_id is required" }, 400);
+          }
+          const existing = await readMemoryById(memId, env);
+          if (!existing) {
+            return jsonResponse({ ok: false, error: `memory_id '${memId}' not found` }, 404);
+          }
+          if (existing.memory_type !== MEMORY_TYPES.MEMORIA_MANUAL) {
+            return jsonResponse({ ok: false, error: "only memoria_manual can be invalidated via this route" }, 403);
+          }
+          const result = await invalidateMemory(memId, { invalidated_by: "panel", invalidated_at: new Date().toISOString() }, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 500);
+          }
+          return jsonResponse({ ok: true, memory_id: result.memory_id, record: result.record });
+        } catch (err) {
+          logNV("❌ [POST /memory/manual/invalidate] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // ============================================================
       // 🧠 GET /memory — Estado da memória persistida no KV
       // Painel: aba Memória. Contrato: mapMemoryResponse(raw).
       // ============================================================
@@ -6470,7 +6617,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • GET  /brain/read     → Ler System Prompt + estado",
             "  • GET  /brain/index    → INDEX completo do cérebro",
             "  • GET  /planner/run    → Schema/contrato da rota POST /planner/run",
-            "  • GET  /memory         → Estado da memória persistida no KV (aba Memória do painel)"
+            "  • GET  /memory         → Estado da memória persistida no KV (aba Memória do painel)",
+            "  • GET  /memory/manual  → PR4: Listar memórias manuais",
+            "  • POST /memory/manual  → PR4: Criar memória manual",
+            "  • PATCH /memory/manual → PR4: Editar memória manual",
+            "  • POST /memory/manual/block → PR4: Bloquear memória manual",
+            "  • POST /memory/manual/invalidate → PR4: Invalidar/expirar memória manual"
           ].join("\n"),
           { status: 200 }
         ));

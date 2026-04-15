@@ -8,6 +8,7 @@ import ConsolidationBlock from "../memory/ConsolidationBlock";
 import MemoryEntryList from "../memory/MemoryEntryList";
 import EmptyMemoryState from "../memory/EmptyMemoryState";
 import MemoryInUseCard from "../memory/MemoryInUseCard";
+import ManualMemoryPanel from "../memory/ManualMemoryPanel";
 
 export default function MemoryPage() {
   const [currentState, setCurrentState] = useState(MEMORY_STATES.POPULATED);
@@ -87,6 +88,9 @@ export default function MemoryPage() {
 
       {/* P18-PR1: Memory-in-use visibility card — always rendered */}
       <MemoryInUseCard memory={memory} />
+
+      {/* PR4: Manual Memory Panel — operator CRUD for manual instructions */}
+      <ManualMemoryPanel />
 
       {/* Empty state */}
       {!hasMemory ? (
