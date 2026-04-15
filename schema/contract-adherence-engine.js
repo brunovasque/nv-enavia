@@ -497,16 +497,22 @@ function evaluateContractAdherence({ scope, contractContext, candidateAction } =
       reasonCode = REASON_CODE.WARN_PHASE_AMBIGUOUS;
       reasonText = phaseViolations[0].description;
     }
-  } else if (notes.length > 0 && violations.length === 0 && matchedRules.filter(r => r.match_strength === "weak" && r.category !== "acceptance_criteria").length >= 2) {
-    // Partial evidence — multiple weak signals suggest ambiguity
-    decision = DECISION.WARN;
-    reasonCode = REASON_CODE.WARN_PARTIAL_EVIDENCE;
-    reasonText = "Action has partial overlap with contract constraints. Review before proceeding.";
-  } else if (matchedRules.length === 0 && notes.length === 0 && summary.blocks_count === 0) {
-    // No evidence at all — contract may be empty or not loaded
-    decision = DECISION.WARN;
-    reasonCode = REASON_CODE.WARN_NO_STRONG_MATCH;
-    reasonText = "Contract has no structural signals. Cannot confirm adherence with confidence.";
+  } else {
+    const weakNonAcceptanceMatches = matchedRules.filter(
+      r => r.match_strength === "weak" && r.category !== "acceptance_criteria"
+    ).length;
+
+    if (notes.length > 0 && violations.length === 0 && weakNonAcceptanceMatches >= 2) {
+      // Partial evidence — multiple weak signals suggest ambiguity
+      decision = DECISION.WARN;
+      reasonCode = REASON_CODE.WARN_PARTIAL_EVIDENCE;
+      reasonText = "Action has partial overlap with contract constraints. Review before proceeding.";
+    } else if (matchedRules.length === 0 && notes.length === 0 && summary.blocks_count === 0) {
+      // No evidence at all — contract may be empty or not loaded
+      decision = DECISION.WARN;
+      reasonCode = REASON_CODE.WARN_NO_STRONG_MATCH;
+      reasonText = "Contract has no structural signals. Cannot confirm adherence with confidence.";
+    }
   }
 
   return {
