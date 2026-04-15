@@ -180,8 +180,8 @@ async function activateIngestedContract(env, contractId, opts) {
     version: "v1",
   };
 
-  // Persist active state (core)
-  const stateKey = `${KV_PREFIX_ACTIVE_STATE}${contractId}`;
+  // Persist active state (core) — keyed by scope:contractId for full isolation
+  const stateKey = `${KV_PREFIX_ACTIVE_STATE}${scope}:${contractId}`;
   await env.ENAVIA_BRAIN.put(stateKey, JSON.stringify(activeState));
 
   // Set as current active contract — scoped by scope
@@ -233,7 +233,8 @@ async function readActiveContractState(env, contractId, opts) {
 
   if (!targetId) return null;
 
-  const stateKey = `${KV_PREFIX_ACTIVE_STATE}${targetId}`;
+  // State key is scoped: contract_active_state:<scope>:<contractId>
+  const stateKey = `${KV_PREFIX_ACTIVE_STATE}${scope}:${targetId}`;
   const raw = await env.ENAVIA_BRAIN.get(stateKey);
   if (!raw) return null;
 
@@ -344,6 +345,7 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
   const ctx = context || {};
   const allBlocks = ingestion.blocks;
   const limit = ctx.limit || 10;
+  const scope = ctx.scope || KV_DEFAULT_SCOPE;
   let matched = [];
   let strategy = "none";
 
@@ -458,8 +460,9 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
   const result = matched.slice(0, limit);
 
   // Persist resolution context as a separate subartefact (never overwrites core state)
+  // Key is scoped: contract_active_state:<scope>:<contractId>:resolution_ctx
   try {
-    const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${contractId}${KV_SUFFIX_RESOLUTION_CTX}`;
+    const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${scope}:${contractId}${KV_SUFFIX_RESOLUTION_CTX}`;
     const resolutionCtx = {
       contract_id: contractId,
       relevant_block_ids: result.map((b) => b.block_id),
@@ -489,14 +492,17 @@ async function resolveRelevantContractBlocks(env, contractId, context) {
 }
 
 // ---------------------------------------------------------------------------
-// refreshCanonicalSummary(env, contractId)
+// refreshCanonicalSummary(env, contractId, opts)
 //
 // Re-generates and persists the canonical summary for an active contract.
 // Useful when ingestion data has been updated or to ensure consistency.
 //
+// Parameters:
+//   opts — Optional { scope } (default: "default")
+//
 // Returns: { ok, summary } or { ok: false, error }
 // ---------------------------------------------------------------------------
-async function refreshCanonicalSummary(env, contractId) {
+async function refreshCanonicalSummary(env, contractId, opts) {
   if (!contractId || typeof contractId !== "string") {
     return { ok: false, error: "INVALID_CONTRACT_ID" };
   }
@@ -510,9 +516,10 @@ async function refreshCanonicalSummary(env, contractId) {
   }
 
   const summary = buildCanonicalSummary(ingestion.structure, ingestion.blocks);
+  const scope = (opts && opts.scope) || KV_DEFAULT_SCOPE;
 
-  // Update the active state with refreshed summary
-  const stateKey = `${KV_PREFIX_ACTIVE_STATE}${contractId}`;
+  // Update the active state with refreshed summary — key is scoped
+  const stateKey = `${KV_PREFIX_ACTIVE_STATE}${scope}:${contractId}`;
   const raw = await env.ENAVIA_BRAIN.get(stateKey);
   if (raw) {
     try {
@@ -557,10 +564,10 @@ async function getActiveContractContext(env, opts) {
     return { ok: true, contract_id: null, active_state: null, summary: null, resolution_ctx: null, ready_for_pr3: false };
   }
 
-  // Read resolution context subartefact
+  // Read resolution context subartefact — key is scoped
   let resCtx = null;
   try {
-    const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${state.contract_id}${KV_SUFFIX_RESOLUTION_CTX}`;
+    const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${scope}:${state.contract_id}${KV_SUFFIX_RESOLUTION_CTX}`;
     const resCtxRaw = await env.ENAVIA_BRAIN.get(resCtxKey);
     if (resCtxRaw) resCtx = JSON.parse(resCtxRaw);
   } catch (_) {

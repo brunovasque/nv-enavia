@@ -418,8 +418,8 @@ console.log("\n15. Resolution context persisted as separate subartefact");
   // Resolve by phase
   await resolveRelevantContractBlocks(env, "ctr_011", { phase: "payment", taskId: "task_42" });
 
-  // Verify resolution context subartefact exists separately
-  const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}ctr_011${KV_SUFFIX_RESOLUTION_CTX}`;
+  // Verify resolution context subartefact exists separately — key is scoped
+  const resCtxKey = `${KV_PREFIX_ACTIVE_STATE}${KV_DEFAULT_SCOPE}:ctr_011${KV_SUFFIX_RESOLUTION_CTX}`;
   assert(kv._store[resCtxKey] !== undefined, "resolution_ctx subartefact key exists in KV");
 
   const resCtx = JSON.parse(kv._store[resCtxKey]);
@@ -431,8 +431,8 @@ console.log("\n15. Resolution context persisted as separate subartefact");
   assert(resCtx.strategy === "phase", "resolution_ctx.strategy is phase");
   assert(typeof resCtx.resolved_at === "string", "resolution_ctx.resolved_at is set");
 
-  // Verify core state was NOT overwritten by resolution
-  const coreStateKey = `${KV_PREFIX_ACTIVE_STATE}ctr_011`;
+  // Verify core state was NOT overwritten by resolution — key is scoped
+  const coreStateKey = `${KV_PREFIX_ACTIVE_STATE}${KV_DEFAULT_SCOPE}:ctr_011`;
   const coreState = JSON.parse(kv._store[coreStateKey]);
   assert(!("relevant_block_ids" in coreState), "core state does NOT contain relevant_block_ids");
   assert(!("last_resolution_at" in coreState), "core state does NOT contain last_resolution_at");
@@ -446,7 +446,7 @@ console.log("\n15. Resolution context persisted as separate subartefact");
 }
 
 // ---------------------------------------------------------------------------
-// 16. Scoped activation isolates parallel contexts
+// 16. Scoped activation isolates parallel contexts (different contracts)
 // ---------------------------------------------------------------------------
 console.log("\n16. Scoped activation isolates parallel contexts");
 {
@@ -483,6 +483,57 @@ console.log("\n16. Scoped activation isolates parallel contexts");
   const ctxB = await getActiveContractContext(env, { scope: "exec_2" });
   assert(ctxB.ok, "context exec_2 ok");
   assert(ctxB.contract_id === "ctr_B", "context exec_2 → ctr_B");
+}
+
+// ---------------------------------------------------------------------------
+// 17. Same contract in two scopes does NOT share core state or resolution_ctx
+// ---------------------------------------------------------------------------
+console.log("\n17. Same contract in two scopes is fully isolated");
+{
+  const kv = createMockKV();
+  const env = { ENAVIA_BRAIN: kv };
+  await ingestLongContract(env, "ctr_X", MULTI_SECTION_CONTRACT);
+
+  // Activate the SAME contract in two different scopes with different options
+  await activateIngestedContract(env, "ctr_X", { scope: "scopeA", operator: "alice", phase_hint: "payment" });
+  await activateIngestedContract(env, "ctr_X", { scope: "scopeB", operator: "bob",   phase_hint: "termination" });
+
+  // Read state from each scope — must be independent
+  const stA = await readActiveContractState(env, null, { scope: "scopeA" });
+  const stB = await readActiveContractState(env, null, { scope: "scopeB" });
+  assert(stA !== null, "scopeA has active state for ctr_X");
+  assert(stB !== null, "scopeB has active state for ctr_X");
+  assert(stA.contract_id === "ctr_X", "scopeA state is for ctr_X");
+  assert(stB.contract_id === "ctr_X", "scopeB state is for ctr_X");
+  assert(stA.metadata.operator === "alice", "scopeA operator is alice");
+  assert(stB.metadata.operator === "bob",   "scopeB operator is bob");
+  assert(stA.current_phase_hint === "payment",     "scopeA phase_hint is payment");
+  assert(stB.current_phase_hint === "termination", "scopeB phase_hint is termination");
+
+  // Verify scoped KV keys are independent (not the same key)
+  const keyA = `${KV_PREFIX_ACTIVE_STATE}scopeA:ctr_X`;
+  const keyB = `${KV_PREFIX_ACTIVE_STATE}scopeB:ctr_X`;
+  assert(kv._store[keyA] !== undefined, "scopeA has its own KV key");
+  assert(kv._store[keyB] !== undefined, "scopeB has its own KV key");
+  assert(kv._store[keyA] !== kv._store[keyB], "scopeA and scopeB KV values are distinct");
+
+  // Resolve blocks in scopeA — must not affect scopeB
+  await resolveRelevantContractBlocks(env, "ctr_X", { phase: "payment", scope: "scopeA" });
+  await resolveRelevantContractBlocks(env, "ctr_X", { phase: "termination", scope: "scopeB" });
+
+  const ctxA = await getActiveContractContext(env, { scope: "scopeA" });
+  const ctxB = await getActiveContractContext(env, { scope: "scopeB" });
+  assert(ctxA.resolution_ctx !== null, "scopeA has resolution_ctx");
+  assert(ctxB.resolution_ctx !== null, "scopeB has resolution_ctx");
+  assert(ctxA.resolution_ctx.current_phase_hint === "payment",     "scopeA resolution_ctx.phase is payment");
+  assert(ctxB.resolution_ctx.current_phase_hint === "termination", "scopeB resolution_ctx.phase is termination");
+
+  // Resolution context keys are also independent
+  const resKeyA = `${KV_PREFIX_ACTIVE_STATE}scopeA:ctr_X${KV_SUFFIX_RESOLUTION_CTX}`;
+  const resKeyB = `${KV_PREFIX_ACTIVE_STATE}scopeB:ctr_X${KV_SUFFIX_RESOLUTION_CTX}`;
+  assert(kv._store[resKeyA] !== undefined, "scopeA has its own resolution_ctx key");
+  assert(kv._store[resKeyB] !== undefined, "scopeB has its own resolution_ctx key");
+  assert(kv._store[resKeyA] !== kv._store[resKeyB], "scopeA and scopeB resolution_ctx values are distinct");
 }
 
 // ===========================================================================
