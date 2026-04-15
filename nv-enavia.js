@@ -31,6 +31,7 @@ import { consolidateMemoryLearning } from "./schema/memory-consolidation.js";
 import { writeMemory } from "./schema/memory-storage.js";
 import { buildMemoryObject, ENTITY_TYPES } from "./schema/memory-schema.js";
 import { searchRelevantMemory } from "./schema/memory-read.js";
+import { buildRetrievalContext, buildRetrievalSummary } from "./schema/memory-retrieval.js";
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
 
@@ -3210,9 +3211,23 @@ async function handlePlannerRun(request, env) {
         : [],
     };
 
-    // plannerContext = contexto original enriquecido com resumo de memória.
+    // PR3 — Retrieval Pipeline: separação explícita entre blocos de memória
+    // Leitura estruturada com classificação, ranking, recência e regra de conflito.
+    // Fire-and-forget defensivo: erros não derrubam o pipeline.
+    let retrievalResult = { ok: false, error: "retrieval skipped: ENAVIA_BRAIN binding not available" };
+    if (env && env.ENAVIA_BRAIN) {
+      try {
+        retrievalResult = await buildRetrievalContext(context, env);
+      } catch (retErr) {
+        retrievalResult = { ok: false, error: String(retErr) };
+      }
+    }
+    const retrieval_context = buildRetrievalSummary(retrievalResult);
+
+    // plannerContext = contexto original enriquecido com resumo de memória (P16/P17)
+    // + retrieval_context (PR3 — separação explícita de blocos).
     // PM4 recebe este contexto; sinais de memória estão estruturalmente presentes.
-    const plannerContext = { ...context, memory_context };
+    const plannerContext = { ...context, memory_context, retrieval_context };
 
     // PM4 — Classificação (recebe plannerContext enriquecido)
     const classification = classifyRequest({ text: message, context: plannerContext });
@@ -3297,6 +3312,7 @@ async function handlePlannerRun(request, env) {
       input: message,
       planner: {
         memoryContext: memory_context,
+        retrievalContext: retrieval_context, // PR3 — separação explícita de blocos
         classification,
         canonicalPlan,
         gate,
@@ -3307,8 +3323,9 @@ async function handlePlannerRun(request, env) {
       telemetry: {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
-        pipeline: "PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15",
+        pipeline: "PR3→PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15",
         memory_read: memoryReadAudit,
+        retrieval: retrieval_context, // PR3 — auditoria de retrieval
         consolidation_persisted,
       },
     });
@@ -3557,6 +3574,19 @@ async function handleChatLLM(request, env) {
   });
 
   try {
+    // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
+    // Leitura de memória estruturada com separação explícita de blocos.
+    // Fire-and-forget defensivo: erros não derrubam a conversa.
+    let chatRetrievalResult = { ok: false, error: "retrieval skipped: ENAVIA_BRAIN binding not available" };
+    if (env && env.ENAVIA_BRAIN) {
+      try {
+        chatRetrievalResult = await buildRetrievalContext(context, env);
+      } catch (retErr) {
+        chatRetrievalResult = { ok: false, error: String(retErr) };
+      }
+    }
+    const chatRetrievalSummary = buildRetrievalSummary(chatRetrievalResult);
+
     // --- System prompt LLM-first conversacional (PR2) ---
     // Montagem dinâmica via buildChatSystemPrompt: usa a base cognitiva da PR1
     // (identidade, capacidades, constituição) de forma viva, com tom conversacional
@@ -3572,8 +3602,44 @@ async function handleChatLLM(request, env) {
     // --- PR5: Inject conversation history between system and current message ---
     // This gives the LLM real context of the ongoing conversation.
     // conversationHistory is pre-validated and budget-limited above.
+
+    // --- PR3: Build memory context block for LLM (if retrieval produced results) ---
+    // Injected as a system message between system prompt and conversation history.
+    // Validated learning and manual instructions get priority.
+    // Historical memory marked as reference-only is explicitly labeled.
+    const _pr3MemoryBlock = [];
+    if (chatRetrievalSummary.applied && chatRetrievalSummary.total_memories_read > 0) {
+      const parts = [];
+      if (chatRetrievalSummary.validated_learning.count > 0) {
+        parts.push(`[APRENDIZADO VALIDADO — ${chatRetrievalSummary.validated_learning.count} item(s)]`);
+        for (const item of chatRetrievalSummary.validated_learning.items) {
+          parts.push(`  • ${item.title} (${item.memory_type})`);
+        }
+      }
+      if (chatRetrievalSummary.manual_instructions.count > 0) {
+        parts.push(`[INSTRUÇÕES MANUAIS — ${chatRetrievalSummary.manual_instructions.count} item(s)]`);
+        for (const item of chatRetrievalSummary.manual_instructions.items) {
+          parts.push(`  • ${item.title} (${item.memory_type})`);
+        }
+      }
+      if (chatRetrievalSummary.historical_memory.count > 0) {
+        parts.push(`[MEMÓRIA HISTÓRICA — ${chatRetrievalSummary.historical_memory.count} item(s), ${chatRetrievalSummary.historical_memory.reference_only_count} referência apenas]`);
+        for (const item of chatRetrievalSummary.historical_memory.items) {
+          const label = item.is_reference ? " (REFERÊNCIA HISTÓRICA — não usar como verdade)" : "";
+          parts.push(`  • ${item.title} (${item.memory_type})${label}`);
+        }
+      }
+      if (parts.length > 0) {
+        _pr3MemoryBlock.push({
+          role: "system",
+          content: `MEMÓRIA RECUPERADA (PR3):\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`,
+        });
+      }
+    }
+
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
+      ..._pr3MemoryBlock,
       ...conversationHistory,
       { role: "user", content: message },
     ];
@@ -3733,7 +3799,9 @@ async function handleChatLLM(request, env) {
       telemetry: {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
-        pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
+        pipeline: plannerUsed ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
+        // PR3: retrieval context summary (separação de blocos explícita)
+        retrieval: chatRetrievalSummary,
         // PR7: explicit continuity flag — true when conversation history was injected into LLM context
         continuity_active: conversationHistory.length > 0,
         conversation_history_length: conversationHistory.length,
@@ -3814,7 +3882,7 @@ async function handleChatLLM(request, env) {
           // PR7: continuity_active and pipeline are derivable before LLM call — include on failure
           continuity_active: conversationHistory.length > 0,
           conversation_history_length: conversationHistory.length,
-          pipeline: pm4Arbitration?.allows_planner ? "LLM + PM4→PM9" : "LLM-only",
+          pipeline: pm4Arbitration?.allows_planner ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
           // PR7: llm_parse_mode is unknown on failure (LLM never responded)
           llm_parse_mode: _LLM_PARSE_MODE.UNKNOWN,
           // Include PM4 pre-check result even on LLM failure — it's deterministic

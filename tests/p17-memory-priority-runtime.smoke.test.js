@@ -324,8 +324,8 @@ async function runTests() {
   assert(typeof r5.json.telemetry.memory_read.consulted === "boolean", "memory_read.consulted é boolean (P16 intacto)");
   assert(
     typeof r5.json.telemetry.pipeline === "string" &&
-    r5.json.telemetry.pipeline.startsWith("PM3"),
-    "telemetry.pipeline começa com PM3 (P16 intacto)"
+    r5.json.telemetry.pipeline.includes("PM3"),
+    "telemetry.pipeline inclui PM3 (P16 intacto)"
   );
 
   // ---- Summary ----
