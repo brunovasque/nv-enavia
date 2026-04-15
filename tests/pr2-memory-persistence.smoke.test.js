@@ -436,8 +436,90 @@ async function runTests() {
     assert(typeof mem.updated_at === "string",         "campo: updated_at presente");
     assert(typeof mem.is_canonical === "boolean",      "campo: is_canonical presente");
     assert(Array.isArray(mem.flags),                   "campo: flags presente");
+    assert(Array.isArray(mem.tags),                    "campo: tags presente");
     // expires_at pode ser null
     assert(mem.expires_at === null || typeof mem.expires_at === "string", "campo: expires_at presente (null ou string)");
+  }
+
+  // -------------------------------------------------------------------------
+  // Group 14: tags — suporte real no schema, validação e persistência
+  // -------------------------------------------------------------------------
+  console.log("\nGroup 14: tags — suporte real");
+
+  // tags vazio por default
+  {
+    const mem = makeValidMemory();
+    assert(Array.isArray(mem.tags),  "tags: default é array");
+    assert(mem.tags.length === 0,    "tags: default é array vazio");
+  }
+
+  // tags com valores válidos persiste e lê corretamente
+  {
+    const env = makeKVMock();
+    const mem = makeValidMemory({
+      memory_id: "mem_tags_persist",
+      tags:      ["usuario", "perfil", "projeto-enavia"],
+    });
+    const v = validateMemoryObject(mem);
+    assert(v.valid === true, "tags: objeto com tags válidas valida corretamente");
+
+    const res = await writeMemory(mem, env);
+    assert(res.ok === true, "tags: writeMemory com tags válidas succeeds");
+
+    const read = await readMemoryById("mem_tags_persist", env);
+    assert(read !== null, "tags: record persisted");
+    assert(Array.isArray(read.tags), "tags: campo tags presente no registro lido");
+    assert(read.tags.length === 3, "tags: todas as tags preservadas");
+    assert(read.tags.includes("usuario"), "tags: valor 'usuario' preservado");
+    assert(read.tags.includes("projeto-enavia"), "tags: valor 'projeto-enavia' preservado");
+  }
+
+  // tags persistem após updateMemory
+  {
+    const env = makeKVMock();
+    const mem = makeValidMemory({
+      memory_id: "mem_tags_upd",
+      tags:      ["inicial"],
+    });
+    await writeMemory(mem, env);
+    const res = await updateMemory("mem_tags_upd", { tags: ["inicial", "adicionada"] }, env);
+    assert(res.ok === true, "tags: updateMemory com tags succeeds");
+    assert(res.record.tags.includes("adicionada"), "tags: nova tag presente após update");
+
+    const read = await readMemoryById("mem_tags_upd", env);
+    assert(read.tags.length === 2, "tags: tags atualizadas persistidas em KV");
+  }
+
+  // rejeita tags com item não-string
+  {
+    const mem = Object.assign(makeValidMemory(), { tags: ["valida", 42] });
+    const v = validateMemoryObject(mem);
+    assert(v.valid === false, "tags: rejeita array com item não-string");
+    assert(v.errors.some(e => e.includes("tags")), "tags: erro menciona 'tags'");
+  }
+
+  // rejeita tags com string vazia
+  {
+    const mem = Object.assign(makeValidMemory(), { tags: ["valida", ""] });
+    const v = validateMemoryObject(mem);
+    assert(v.valid === false, "tags: rejeita array com string vazia");
+  }
+
+  // rejeita tags não-array
+  {
+    const mem = Object.assign(makeValidMemory(), { tags: "não-array" });
+    const v = validateMemoryObject(mem);
+    assert(v.valid === false, "tags: rejeita valor não-array");
+    assert(v.errors.some(e => e.includes("tags")), "tags: erro menciona 'tags'");
+  }
+
+  // tags isoladas entre objetos construídos
+  {
+    const obj1 = makeValidMemory({ memory_id: "tags_iso_a" });
+    const obj2 = makeValidMemory({ memory_id: "tags_iso_b" });
+    assert(obj1.tags !== obj2.tags, "tags: arrays distintos entre instâncias");
+    obj1.tags.push("x");
+    assert(obj2.tags.length === 0,  "tags: mutação de obj1.tags não afeta obj2");
   }
 
   // ---- Summary ----

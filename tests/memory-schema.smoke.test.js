@@ -123,7 +123,7 @@ async function runTests() {
     "memory_id", "memory_type", "entity_type", "entity_id",
     "title", "content_structured", "priority", "confidence",
     "source", "created_at", "updated_at", "expires_at",
-    "is_canonical", "status", "flags",
+    "is_canonical", "status", "flags", "tags",
   ];
   for (const field of requiredFields) {
     assert(field in MEMORY_CANONICAL_SHAPE, `shape has '${field}'`);
@@ -133,6 +133,7 @@ async function runTests() {
   assert(MEMORY_CANONICAL_SHAPE.is_canonical === false,    "shape default is_canonical=false");
   assert(MEMORY_CANONICAL_SHAPE.status       === "active", "shape default status=active");
   assert(Array.isArray(MEMORY_CANONICAL_SHAPE.flags),      "shape default flags=[]");
+  assert(Array.isArray(MEMORY_CANONICAL_SHAPE.tags),       "shape default tags=[]");
 
   // -------------------------------------------------------------------------
   // Group 3: Valid objects — one per memory type (5 blocks)
@@ -372,6 +373,7 @@ async function runTests() {
     assert(obj.is_canonical     === false,                  "applies default is_canonical=false");
     assert(obj.status           === "active",               "applies default status=active");
     assert(Array.isArray(obj.flags),                        "applies default flags=[]");
+    assert(Array.isArray(obj.tags),                         "applies default tags=[]");
     assert(obj.expires_at       === null,                   "applies default expires_at=null");
   }
 
@@ -390,6 +392,15 @@ async function runTests() {
     assert(obj2.flags.length === 0, "mutating obj1.flags does not affect obj2.flags");
   }
 
+  // two objects built without explicit tags must not share the same array reference
+  {
+    const obj1 = buildMemoryObject({ memory_id: "mem_tags_iso_1" });
+    const obj2 = buildMemoryObject({ memory_id: "mem_tags_iso_2" });
+    assert(obj1.tags !== obj2.tags, "each buildMemoryObject call produces a distinct tags array");
+    obj1.tags.push("project");
+    assert(obj2.tags.length === 0, "mutating obj1.tags does not affect obj2.tags");
+  }
+
   // object built with explicit flags array must get a copy, not the same reference
   {
     const inputFlags = [MEMORY_FLAGS.IS_CANONICAL];
@@ -397,6 +408,15 @@ async function runTests() {
     assert(obj.flags !== inputFlags, "buildMemoryObject copies the provided flags array");
     inputFlags.push(MEMORY_FLAGS.IS_EXPIRED);
     assert(obj.flags.length === 1, "mutating original flags input does not affect built object");
+  }
+
+  // object built with explicit tags array must get a copy, not the same reference
+  {
+    const inputTags = ["user", "profile"];
+    const obj = buildMemoryObject({ memory_id: "mem_iso_4", tags: inputTags });
+    assert(obj.tags !== inputTags, "buildMemoryObject copies the provided tags array");
+    inputTags.push("extra");
+    assert(obj.tags.length === 2, "mutating original tags input does not affect built object");
   }
 
   // -------------------------------------------------------------------------

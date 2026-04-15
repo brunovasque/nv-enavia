@@ -167,6 +167,8 @@ const MEMORY_CANONICAL_SHAPE = {
   is_canonical:       false,    // boolean
   status:             "active", // MEMORY_STATUS value
   flags:              [],       // array de MEMORY_FLAGS strings
+  // PR2 — campo mínimo contratual: tags (array de strings livres para categorização)
+  tags:               [],       // string[] — default []
 };
 
 // ---------------------------------------------------------------------------
@@ -294,6 +296,18 @@ function validateMemoryObject(obj) {
     }
   }
 
+  // PR2 — tags: campo mínimo contratual — array de strings livres
+  if (!Array.isArray(obj.tags)) {
+    errors.push("'tags' must be an array");
+  } else {
+    for (const tag of obj.tags) {
+      if (typeof tag !== "string" || tag.trim() === "") {
+        errors.push("'tags' must contain only non-empty strings");
+        break;
+      }
+    }
+  }
+
   return errors.length === 0 ? { valid: true } : { valid: false, errors };
 }
 
@@ -306,6 +320,7 @@ function validateMemoryObject(obj) {
 function buildMemoryObject(partial) {
   return Object.assign({}, MEMORY_CANONICAL_SHAPE, partial, {
     flags: Array.isArray(partial && partial.flags) ? [...partial.flags] : [],
+    tags:  Array.isArray(partial && partial.tags)  ? [...partial.tags]  : [],
   });
 }
 
