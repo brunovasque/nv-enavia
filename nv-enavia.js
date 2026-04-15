@@ -958,11 +958,17 @@ async function callChatModel(env, messages, options = {}) {
   // PR8: Model fallback — if the primary model is not found or yields a
   // model-related 400/404, retry once with _LLM_FALLBACK_MODEL before failing.
   if (!res.ok) {
-    const shouldFallback =
-      primaryModel !== _LLM_FALLBACK_MODEL &&
-      (res.status === 404 ||
-        (res.status === 400 &&
-          (await res.clone().text().catch(() => "")).toLowerCase().includes("model")));
+    let shouldFallback = false;
+    if (primaryModel !== _LLM_FALLBACK_MODEL) {
+      if (res.status === 404) {
+        shouldFallback = true;
+      } else if (res.status === 400) {
+        // Read at most 500 bytes to check for a model-related error message,
+        // avoiding buffering large error bodies just for the heuristic check.
+        const snippet = (await res.clone().text().catch(() => "")).slice(0, 500).toLowerCase();
+        shouldFallback = snippet.includes("model");
+      }
+    }
 
     if (shouldFallback) {
       logNV(`⚠️ Modelo '${primaryModel}' indisponível (HTTP ${res.status}) — tentando fallback '${_LLM_FALLBACK_MODEL}'`);

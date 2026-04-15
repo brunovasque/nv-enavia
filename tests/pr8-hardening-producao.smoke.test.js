@@ -41,8 +41,13 @@ const _originalFetch = globalThis.fetch;
 
 function mockFetch(handler) {
   globalThis.fetch = async (url, opts) => {
-    if (String(url).includes("api.openai.com")) {
-      return handler(url, opts);
+    try {
+      const parsed = new URL(String(url));
+      if (parsed.hostname === "api.openai.com") {
+        return handler(url, opts);
+      }
+    } catch {
+      // invalid URL — fall through to original fetch
     }
     return _originalFetch(url, opts);
   };
@@ -101,25 +106,10 @@ async function runTests() {
   // -------------------------------------------------------------------------
   console.log("Cenário 1: Timeout na chamada LLM → 504 LLM_TIMEOUT");
   {
-    // Mock: AbortController vai cancelar antes de 25s porque configuramos
-    // um timeout muito curto no stub env (via opção interna não exposta).
-    // Simulamos diretamente: a promise de fetch nunca resolve até ser abortada.
-    mockFetch((_url, opts) => {
-      return new Promise((_resolve, reject) => {
-        opts.signal?.addEventListener("abort", () => {
-          const err = new Error("The operation was aborted.");
-          err.name = "AbortError";
-          reject(err);
-        });
-        // Intencionalmente não resolve — vai esperar o abort
-      });
-    });
-
-    // Stub env com timeout muito baixo (1 ms) para forçar timeout rápido nos testes
-    const envWithShortTimeout = { ...stubEnv };
-
-    // Patch _LLM_CALL_TIMEOUT_MS para 1ms via eval não é possível em ESM.
-    // Alternativa: usar um fetch que dispara AbortError imediatamente.
+    // Simulamos AbortError imediatamente — sem esperar os 25s reais do Worker.
+    // O AbortController do _callModelOnce vai rejeitar a promise com AbortError
+    // antes que o setTimeout real de 25s dispare, porque aqui simulamos a rejeição
+    // após 1ms (o AbortError vem do mock, não do timer real).
     mockFetch((_url, opts) => {
       return new Promise((_resolve, reject) => {
         // Dispara o abort signal após 1ms via a signal já presente
@@ -131,6 +121,7 @@ async function runTests() {
       });
     });
 
+    const envWithShortTimeout = { ...stubEnv };
     const res = await callWorker("POST", "/chat/run", { message: "timeout test" }, envWithShortTimeout);
     restoreFetch();
 
