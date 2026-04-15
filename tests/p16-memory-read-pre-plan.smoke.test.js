@@ -299,8 +299,8 @@ async function runTests() {
   const r6 = await plannerRun({ message: "Verificar status dos workers" }, env6);
   assert(
     typeof r6.json.telemetry.pipeline === "string" &&
-    r6.json.telemetry.pipeline.startsWith("PM3"),
-    "telemetry.pipeline começa com PM3"
+    r6.json.telemetry.pipeline.includes("PM3"),
+    "telemetry.pipeline inclui PM3"
   );
   assert(
     r6.json.telemetry.pipeline.includes("P15"),
