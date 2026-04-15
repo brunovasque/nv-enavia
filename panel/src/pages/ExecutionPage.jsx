@@ -19,6 +19,7 @@ import FunctionalLogsCard from "../execution/FunctionalLogsCard";
 import OperationalAuditCard from "../execution/OperationalAuditCard";
 
 import MergeGateCard from "../execution/MergeGateCard";
+import SupervisorEnforcementBlock from "../execution/SupervisorEnforcementBlock";
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
 
@@ -159,6 +160,13 @@ export default function ExecutionPage() {
             {/* Error/blocked banner */}
             {hasError && execution?.error && (
               <ErrorBlock error={execution.error} status={currentState} />
+            )}
+
+            {/* P26-PR3 — Resultado do Supervisor de Segurança */}
+            {execution?.supervisor_enforcement && (
+              <SupervisorEnforcementBlock
+                supervisorEnforcement={execution.supervisor_enforcement}
+              />
             )}
 
             {/* Completed: result hero */}

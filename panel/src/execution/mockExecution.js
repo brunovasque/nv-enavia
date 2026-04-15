@@ -400,6 +400,19 @@ export const MOCK_EXECUTIONS = {
         timestamp: "2026-04-12T01:52:10Z",
       },
     ],
+    // P26-PR3 — Supervisor de Segurança (demo/mock — não é runtime real)
+    supervisor_enforcement: {
+      decision:                "needs_human_review",
+      reason_code:             "SCOPE_BOUNDARY_RISK",
+      reason_text:             "Operação próxima ao limite de escopo — revisão humana necessária antes de prosseguir.",
+      risk_level:              "medium",
+      requires_human_approval: true,
+      scope_valid:             true,
+      autonomy_valid:          true,
+      evidence_sufficient:     false,
+      timestamp:               "2026-04-12T01:52:10Z",
+      supervisor_version:      "1.0.0",
+    },
   },
 
   [EXECUTION_STATUS.BLOCKED]: {
@@ -442,6 +455,19 @@ export const MOCK_EXECUTIONS = {
         timestamp: "2026-04-12T03:48:04Z",
       },
     ],
+    // P26-PR3 — Supervisor de Segurança (demo/mock — não é runtime real)
+    supervisor_enforcement: {
+      decision:                "block",
+      reason_code:             "AUTONOMY_LIMIT_EXCEEDED",
+      reason_text:             "Ação excede limites de autonomia configurados para este plano — requer aprovação humana explícita.",
+      risk_level:              "high",
+      requires_human_approval: true,
+      scope_valid:             false,
+      autonomy_valid:          false,
+      evidence_sufficient:     true,
+      timestamp:               "2026-04-12T03:48:02Z",
+      supervisor_version:      "1.0.0",
+    },
   },
 
   [EXECUTION_STATUS.FAILED]: {
@@ -484,6 +510,19 @@ export const MOCK_EXECUTIONS = {
         timestamp: "2026-04-12T01:52:20Z",
       },
     ],
+    // P26-PR3 — Supervisor de Segurança (demo/mock — não é runtime real)
+    supervisor_enforcement: {
+      decision:                "block",
+      reason_code:             "EVIDENCE_INSUFFICIENT",
+      reason_text:             "Dados insuficientes do fornecedor logístico — execução bloqueada por falta de evidência suficiente.",
+      risk_level:              "high",
+      requires_human_approval: true,
+      scope_valid:             true,
+      autonomy_valid:          true,
+      evidence_sufficient:     false,
+      timestamp:               "2026-04-12T01:52:18Z",
+      supervisor_version:      "1.0.0",
+    },
   },
 
   [EXECUTION_STATUS.COMPLETED]: {
@@ -616,6 +655,19 @@ Memória: 3 entradas de contexto consolidadas`,
       reason_merge_ok: "Diff revisado, contrato reconferido, sem drift, sem regressão — apto para merge em main.",
       approval_status: "pending",
       can_merge: false,
+    },
+    // P26-PR3 — Supervisor de Segurança (demo/mock — não é runtime real)
+    supervisor_enforcement: {
+      decision:                "allow",
+      reason_code:             "EVIDENCE_GATE_PASSED",
+      reason_text:             "Evidências verificadas, escopo válido e limites de autonomia respeitados.",
+      risk_level:              "low",
+      requires_human_approval: false,
+      scope_valid:             true,
+      autonomy_valid:          true,
+      evidence_sufficient:     true,
+      timestamp:               "2026-04-12T01:51:28Z",
+      supervisor_version:      "1.0.0",
     },
   },
 };
