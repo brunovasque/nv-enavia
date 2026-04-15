@@ -716,8 +716,8 @@ async function runTests() {
     assert(contractKeys.length === 0,
       "no contract:* KV keys accessed by PM3 read pipeline");
 
-    // Only memory:* keys in store
-    const nonMemoryKeys = accessedKeys.filter(k => !k.startsWith("memory:"));
+    // Only memory:* and audit:memory:* keys in store (no contract:* or other)
+    const nonMemoryKeys = accessedKeys.filter(k => !k.startsWith("memory:") && !k.startsWith("audit:memory:"));
     assert(nonMemoryKeys.length === 0,
       "only memory:* KV keys present in store after PM3 operations");
 

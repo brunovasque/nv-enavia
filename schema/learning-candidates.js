@@ -47,6 +47,12 @@ import {
 
 import { writeMemory } from "./memory-storage.js";
 
+import {
+  emitAuditEvent,
+  AUDIT_EVENT_TYPES,
+  AUDIT_TARGET_TYPES,
+} from "./memory-audit-log.js";
+
 // ---------------------------------------------------------------------------
 // KV Key Helpers
 // ---------------------------------------------------------------------------
@@ -152,6 +158,17 @@ async function registerLearningCandidate(candidate, env) {
     index.push(id);
     await _writeIndex(index, env);
   }
+
+  // PR6 — Audit trail: candidate registered
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.CANDIDATE_REGISTERED,
+      target_type: AUDIT_TARGET_TYPES.LEARNING_CANDIDATE,
+      target_id:   id,
+      source:      record.source || "system",
+      summary:     `Candidato de aprendizado registrado: ${record.title}`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
 
   return { ok: true, candidate_id: id, record };
 }
@@ -297,6 +314,18 @@ async function approveLearningCandidate(id, env) {
 
   await env.ENAVIA_BRAIN.put(_candidateKey(id), JSON.stringify(candidate));
 
+  // PR6 — Audit trail: candidate approved with link to promoted memory
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.CANDIDATE_APPROVED,
+      target_type: AUDIT_TARGET_TYPES.LEARNING_CANDIDATE,
+      target_id:   id,
+      related_id:  memoryId,
+      source:      "learning_approved",
+      summary:     `Candidato aprovado: ${candidate.title} → memória promovida: ${memoryId}`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
+
   return {
     ok: true,
     candidate_id: id,
@@ -339,6 +368,17 @@ async function rejectLearningCandidate(id, reason, env) {
   candidate.rejection_reason = typeof reason === "string" && reason.trim() ? reason.trim() : null;
 
   await env.ENAVIA_BRAIN.put(_candidateKey(id), JSON.stringify(candidate));
+
+  // PR6 — Audit trail: candidate rejected
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.CANDIDATE_REJECTED,
+      target_type: AUDIT_TARGET_TYPES.LEARNING_CANDIDATE,
+      target_id:   id,
+      source:      "learning_rejected",
+      summary:     `Candidato rejeitado: ${candidate.title}${candidate.rejection_reason ? ` — motivo: ${candidate.rejection_reason}` : ""}`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
 
   return { ok: true, candidate_id: id, candidate };
 }

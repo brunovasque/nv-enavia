@@ -35,6 +35,7 @@ import { buildRetrievalContext, buildRetrievalSummary } from "./schema/memory-re
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
+import { listAuditEvents } from "./schema/memory-audit-log.js";
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -6559,6 +6560,34 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       }
 
       // ============================================================
+      // 📋 PR6 — Memory Audit Trail (Telemetria / Auditoria)
+      // ============================================================
+
+      // GET /memory/audit — List audit events with optional filters
+      if (method === "GET" && path === "/memory/audit") {
+        try {
+          const url = new URL(request.url);
+          const filters = {};
+          const eventType = url.searchParams.get("event_type");
+          const targetType = url.searchParams.get("target_type");
+          const targetId = url.searchParams.get("target_id");
+          const limitParam = url.searchParams.get("limit");
+          if (eventType) filters.event_type = eventType;
+          if (targetType) filters.target_type = targetType;
+          if (targetId) filters.target_id = targetId;
+          if (limitParam) filters.limit = parseInt(limitParam, 10);
+          const result = await listAuditEvents(filters, env);
+          if (!result.ok) {
+            return jsonResponse({ ok: false, error: result.error }, 500);
+          }
+          return jsonResponse({ ok: true, items: result.items, count: result.count });
+        } catch (err) {
+          logNV("❌ [GET /memory/audit] erro:", String(err));
+          return jsonResponse({ ok: false, error: String(err) }, 500);
+        }
+      }
+
+      // ============================================================
       // 🧠 GET /memory — Estado da memória persistida no KV
       // Painel: aba Memória. Contrato: mapMemoryResponse(raw).
       // ============================================================
@@ -6718,7 +6747,8 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • GET  /memory/learning  → PR5: Listar candidatos de aprendizado",
             "  • POST /memory/learning  → PR5: Registrar candidato de aprendizado",
             "  • POST /memory/learning/approve → PR5: Aprovar candidato (promoção para memória validada)",
-            "  • POST /memory/learning/reject  → PR5: Rejeitar candidato"
+            "  • POST /memory/learning/reject  → PR5: Rejeitar candidato",
+            "  • GET  /memory/audit → PR6: Listar eventos de auditoria da memória/aprendizado"
           ].join("\n"),
           { status: 200 }
         ));

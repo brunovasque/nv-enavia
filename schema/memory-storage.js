@@ -32,6 +32,12 @@ import {
   MEMORY_FLAGS,
 } from "./memory-schema.js";
 
+import {
+  emitAuditEvent,
+  AUDIT_EVENT_TYPES,
+  AUDIT_TARGET_TYPES,
+} from "./memory-audit-log.js";
+
 // ---------------------------------------------------------------------------
 // KV Key Helpers
 // ---------------------------------------------------------------------------
@@ -113,6 +119,17 @@ async function writeMemory(memoryObj, env) {
     await _writeIndex(index, env);
   }
 
+  // PR6 — Audit trail: memory created
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.MEMORY_CREATED,
+      target_type: AUDIT_TARGET_TYPES.MEMORY,
+      target_id:   memory_id,
+      source:      memoryObj.source || "system",
+      summary:     `Memória criada: ${memoryObj.title || memory_id} (type: ${memoryObj.memory_type})`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
+
   return { ok: true, memory_id, record: memoryObj };
 }
 
@@ -187,6 +204,18 @@ async function updateMemory(memory_id, patch, env) {
   }
 
   await env.ENAVIA_BRAIN.put(memoryKey(memory_id), JSON.stringify(updated));
+
+  // PR6 — Audit trail: memory updated
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.MEMORY_UPDATED,
+      target_type: AUDIT_TARGET_TYPES.MEMORY,
+      target_id:   memory_id,
+      source:      updated.source || "system",
+      summary:     `Memória atualizada: ${updated.title || memory_id}`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
+
   return { ok: true, memory_id, record: updated };
 }
 
@@ -336,6 +365,18 @@ async function invalidateMemory(memory_id, meta, env) {
   });
 
   await env.ENAVIA_BRAIN.put(memoryKey(memory_id), JSON.stringify(invalidated));
+
+  // PR6 — Audit trail: memory invalidated
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.MEMORY_INVALIDATED,
+      target_type: AUDIT_TARGET_TYPES.MEMORY,
+      target_id:   memory_id,
+      source:      (meta && meta.invalidated_by) || "system",
+      summary:     `Memória invalidada/expirada: ${existing.title || memory_id}`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
+
   return { ok: true, memory_id, record: invalidated };
 }
 
@@ -384,6 +425,18 @@ async function blockMemory(memory_id, meta, env) {
   });
 
   await env.ENAVIA_BRAIN.put(memoryKey(memory_id), JSON.stringify(blocked));
+
+  // PR6 — Audit trail: memory blocked
+  try {
+    await emitAuditEvent({
+      event_type:  AUDIT_EVENT_TYPES.MEMORY_BLOCKED,
+      target_type: AUDIT_TARGET_TYPES.MEMORY,
+      target_id:   memory_id,
+      source:      (meta && meta.blocked_by) || "system",
+      summary:     `Memória bloqueada: ${existing.title || memory_id}`,
+    }, env);
+  } catch (_e) { /* fire-and-forget */ }
+
   return { ok: true, memory_id, record: blocked };
 }
 
