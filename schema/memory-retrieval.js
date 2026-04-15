@@ -222,6 +222,68 @@ function _annotateMemory(mem, now) {
 }
 
 // ---------------------------------------------------------------------------
+// _detectExplicitConflicts(currentContextItems, historicalItems)
+//
+// Explicit, deterministic conflict detection.
+//
+// Rule: a historical memory EXPLICITLY CONFLICTS with current context when
+// it shares the same (entity_id + entity_type) as any current_context memory.
+//
+// Rationale: same entity_id + entity_type means both memories are about the
+// same real-world subject (same user, same project, same operation). When the
+// current context has information about that entity, the historical record about
+// the same entity is a conflict candidate — the current context wins (PR1 §3).
+//
+// Returns: array of { historical_idx, current_mem, conflict_key }
+//   - historical_idx:  index of the conflicting historical memory
+//   - current_mem:     the current_context memory that triggered the conflict
+//   - conflict_key:    string describing which fields matched
+// ---------------------------------------------------------------------------
+function _detectExplicitConflicts(currentContextItems, historicalItems) {
+  const conflicts = [];
+
+  // Build a quick lookup: (entity_id + entity_type) → current_context memory
+  // Entity "unknown" or missing entity_id means no conflict basis.
+  const currentByKey = new Map();
+  for (const curr of currentContextItems) {
+    const eid = typeof curr.entity_id === "string" && curr.entity_id.trim()
+      ? curr.entity_id.trim()
+      : null;
+    const etype = typeof curr.entity_type === "string" && curr.entity_type.trim()
+      ? curr.entity_type.trim()
+      : null;
+    if (!eid || !etype) continue; // need both fields to form a conflict key
+    const key = `${etype}::${eid}`;
+    if (!currentByKey.has(key)) {
+      currentByKey.set(key, curr);
+    }
+  }
+
+  if (currentByKey.size === 0) return conflicts;
+
+  for (let i = 0; i < historicalItems.length; i++) {
+    const hist = historicalItems[i];
+    const eid = typeof hist.entity_id === "string" && hist.entity_id.trim()
+      ? hist.entity_id.trim()
+      : null;
+    const etype = typeof hist.entity_type === "string" && hist.entity_type.trim()
+      ? hist.entity_type.trim()
+      : null;
+    if (!eid || !etype) continue;
+    const key = `${etype}::${eid}`;
+    if (currentByKey.has(key)) {
+      conflicts.push({
+        historical_idx: i,
+        current_mem:    currentByKey.get(key),
+        conflict_key:   key,
+      });
+    }
+  }
+
+  return conflicts;
+}
+
+// ---------------------------------------------------------------------------
 // _sortByRanking(items)
 //
 // Sorts annotated memory items by combined score descending.
@@ -259,10 +321,12 @@ function _sortByRanking(items) {
 //       manual_instructions: { items: [], count: number },
 //       validated_learning:  { items: [], count: number },
 //     },
-//     conflict_rules_applied: boolean,
-//     staleness_detected:     boolean,
-//     total_memories_read:    number,
-//     pipeline_version:       string,
+//     conflict_rules_applied:    boolean,
+//     explicit_conflicts_count:  number,  // count of entity-id-based explicit conflicts
+//     conflicts_detected:        boolean, // true if any explicit conflicts found
+//     staleness_detected:        boolean,
+//     total_memories_read:       number,
+//     pipeline_version:          string,
 //   }
 //   or { ok: false, error: string }
 // ---------------------------------------------------------------------------
@@ -316,13 +380,36 @@ async function buildRetrievalContext(context, env, options) {
     blocks[key] = _sortByRanking(blocks[key]);
   }
 
-  // Step 5: Apply conflict rules (PR1 §3 — Regra de Ouro)
-  // If historical memory conflicts with current context, mark as reference only.
-  // Conflict detection: if there is any current_context memory, all stale
-  // historical memories are automatically downgraded to reference-only.
+  // Step 5: Apply conflict rules — Explicit conflict detection (PR3 — Regra de Ouro)
+  // Structural signal: same (entity_type + entity_id) between current_context
+  // and historical_memory = explicit conflict. Current context wins.
+  // Matching memories are marked _pr3_explicit_conflict=true and downgraded to
+  // reference-only with an auditable conflict_key.
   const hasCurrentContext = blocks.current_context.length > 0;
   let conflictRulesApplied = false;
+  let explicitConflictsCount = 0;
 
+  if (hasCurrentContext) {
+    const explicitConflicts = _detectExplicitConflicts(
+      blocks.current_context,
+      blocks.historical_memory
+    );
+
+    for (const { historical_idx, conflict_key } of explicitConflicts) {
+      const mem = blocks.historical_memory[historical_idx];
+      blocks.historical_memory[historical_idx] = {
+        ...mem,
+        _pr3_is_reference:        true,
+        _pr3_explicit_conflict:   true,
+        _pr3_conflict_reason:     mem._pr3_conflict_reason || "entity_id_overlap",
+        _pr3_conflict_key:        conflict_key,
+      };
+      conflictRulesApplied = true;
+      explicitConflictsCount++;
+    }
+  }
+
+  // Step 6: Stale historical memory in presence of current context → reference only.
   if (hasCurrentContext) {
     for (let i = 0; i < blocks.historical_memory.length; i++) {
       const mem = blocks.historical_memory[i];
@@ -337,7 +424,7 @@ async function buildRetrievalContext(context, env, options) {
     }
   }
 
-  // Step 6: Low-confidence historical memory in presence of current context
+  // Step 7: Low-confidence historical memory in presence of current context
   // is always treated as reference (PR1 §2.1 / §4.3)
   if (hasCurrentContext) {
     for (let i = 0; i < blocks.historical_memory.length; i++) {
@@ -353,14 +440,14 @@ async function buildRetrievalContext(context, env, options) {
     }
   }
 
-  // Step 7: Cap items per block
+  // Step 8: Cap items per block
   for (const key of Object.keys(blocks)) {
     if (blocks[key].length > MAX_ITEMS_PER_BLOCK) {
       blocks[key] = blocks[key].slice(0, MAX_ITEMS_PER_BLOCK);
     }
   }
 
-  // Step 8: Compute stale/reference counts for historical block
+  // Step 9: Compute stale/reference counts for historical block
   const staleCount = blocks.historical_memory.filter((m) => m._pr3_stale).length;
   const referenceOnlyCount = blocks.historical_memory.filter((m) => m._pr3_is_reference).length;
   const stalenessDetected = staleCount > 0;
@@ -387,10 +474,12 @@ async function buildRetrievalContext(context, env, options) {
         count: blocks.validated_learning.length,
       },
     },
-    conflict_rules_applied: conflictRulesApplied,
-    staleness_detected:     stalenessDetected,
-    total_memories_read:    memories.length,
-    pipeline_version:       "PR3-v1",
+    conflict_rules_applied:   conflictRulesApplied,
+    explicit_conflicts_count: explicitConflictsCount,
+    conflicts_detected:       explicitConflictsCount > 0,
+    staleness_detected:       stalenessDetected,
+    total_memories_read:      memories.length,
+    pipeline_version:         "PR3-v1",
   };
 }
 
@@ -414,21 +503,26 @@ function buildRetrievalSummary(retrievalResult) {
 
   const _summarizeItems = (items, limit) =>
     (items || []).slice(0, limit).map((m) => ({
-      memory_id:     m.memory_id,
-      title:         m.title,
-      memory_type:   m.memory_type,
-      is_canonical:  m.is_canonical,
-      priority:      m.priority,
-      is_reference:  m._pr3_is_reference || false,
-      stale:         m._pr3_stale || false,
+      memory_id:       m.memory_id,
+      title:           m.title,
+      memory_type:     m.memory_type,
+      is_canonical:    m.is_canonical,
+      priority:        m.priority,
+      is_reference:    m._pr3_is_reference || false,
+      stale:           m._pr3_stale || false,
+      explicit_conflict:  m._pr3_explicit_conflict || false,
+      conflict_reason: m._pr3_conflict_reason || null,
+      conflict_key:    m._pr3_conflict_key || null,
     }));
 
   return {
     applied: true,
-    total_memories_read: retrievalResult.total_memories_read,
-    conflict_rules_applied: retrievalResult.conflict_rules_applied,
-    staleness_detected: retrievalResult.staleness_detected,
-    pipeline_version: retrievalResult.pipeline_version,
+    total_memories_read:     retrievalResult.total_memories_read,
+    conflict_rules_applied:  retrievalResult.conflict_rules_applied,
+    explicit_conflicts_count: retrievalResult.explicit_conflicts_count,
+    conflicts_detected:      retrievalResult.conflicts_detected,
+    staleness_detected:      retrievalResult.staleness_detected,
+    pipeline_version:        retrievalResult.pipeline_version,
     validated_learning: {
       count: b.validated_learning.count,
       items: _summarizeItems(b.validated_learning.items, 5),
@@ -466,4 +560,5 @@ export {
   _classifyMemory,
   _annotateMemory,
   _sortByRanking,
+  _detectExplicitConflicts,
 };

@@ -16,6 +16,7 @@
 //   Group 7: chat/runtime atual não quebrou (não-regressão)
 //   Group 8: ranking de relevância e recência
 //   Group 9: edge cases e error handling
+//   Group 10: conflito explícito por entity_id (contexto atual prevalece)
 // ============================================================================
 
 import {
@@ -30,6 +31,7 @@ import {
   _classifyMemory,
   _annotateMemory,
   _sortByRanking,
+  _detectExplicitConflicts,
 } from "../schema/memory-retrieval.js";
 
 import {
@@ -560,6 +562,142 @@ async function runTests() {
     ok(summary.current_context.count === 1, "summary current_context count");
     ok(summary.historical_memory.count === 1, "summary historical_memory count");
     ok(summary.pipeline_version === "PR3-v1", "summary pipeline_version");
+  }
+
+  // ========================================================================
+  // Group 10: Explicit conflict detection (entity_id overlap)
+  // ========================================================================
+  console.log("\nGroup 10: conflito explícito por entity_id — contexto atual prevalece");
+  {
+    // -----------------------------------------------------------------------
+    // 10a: _detectExplicitConflicts unit tests
+    // -----------------------------------------------------------------------
+    // No overlap: different entity_ids
+    const noConflict = _detectExplicitConflicts(
+      [{ entity_id: "user-1", entity_type: "user" }],
+      [{ entity_id: "user-2", entity_type: "user" }]
+    );
+    ok(noConflict.length === 0, "_detectExplicitConflicts: different entity_id → no conflict");
+
+    // Overlap on same entity_id + entity_type
+    const withConflict = _detectExplicitConflicts(
+      [{ entity_id: "proj-alpha", entity_type: "project" }],
+      [
+        { entity_id: "proj-alpha", entity_type: "project" },  // conflicts
+        { entity_id: "proj-beta",  entity_type: "project" },  // does not conflict
+      ]
+    );
+    ok(withConflict.length === 1, "_detectExplicitConflicts: same entity → 1 conflict");
+    ok(withConflict[0].historical_idx === 0, "conflicting historical_idx=0");
+    ok(withConflict[0].conflict_key === "project::proj-alpha", "conflict_key is entity_type::entity_id");
+
+    // No conflict if entity_type differs even with same entity_id
+    const typeMismatch = _detectExplicitConflicts(
+      [{ entity_id: "ent-1", entity_type: "user" }],
+      [{ entity_id: "ent-1", entity_type: "project" }]
+    );
+    ok(typeMismatch.length === 0, "different entity_type → no conflict (type must also match)");
+
+    // Missing entity_id → no conflict basis
+    const noEid = _detectExplicitConflicts(
+      [{ entity_id: "", entity_type: "user" }],
+      [{ entity_id: "user-1", entity_type: "user" }]
+    );
+    ok(noEid.length === 0, "empty entity_id in current_context → no conflict basis");
+
+    // Multiple current_context items each can create conflicts
+    const multi = _detectExplicitConflicts(
+      [
+        { entity_id: "proj-x", entity_type: "project" },
+        { entity_id: "user-y", entity_type: "user" },
+      ],
+      [
+        { entity_id: "proj-x", entity_type: "project" },  // conflicts with first current
+        { entity_id: "user-y", entity_type: "user" },      // conflicts with second current
+        { entity_id: "proj-z", entity_type: "project" },   // no conflict
+      ]
+    );
+    ok(multi.length === 2, "two entities in current_context → 2 explicit conflicts");
+
+    // -----------------------------------------------------------------------
+    // 10b: Integration test — buildRetrievalContext marks conflicting memories
+    // -----------------------------------------------------------------------
+    const env = makeKVMock();
+    const now = Date.now();
+    const recentDate = new Date(now - 500).toISOString();
+
+    // Current context memory about entity "proj-alpha"
+    await writeTestMemory({
+      memory_id:   "ctx-proj-alpha",
+      memory_type: MEMORY_TYPES.LIVE_CONTEXT,
+      entity_type: ENTITY_TYPES.PROJECT,
+      entity_id:   "proj-alpha",
+      title:       "Estado atual do projeto Alpha",
+      created_at:  recentDate,
+      updated_at:  recentDate,
+    }, env);
+
+    // Historical memory about the SAME entity "proj-alpha" → should conflict
+    await writeTestMemory({
+      memory_id:   "hist-proj-alpha",
+      memory_type: MEMORY_TYPES.PROJECT,
+      entity_type: ENTITY_TYPES.PROJECT,
+      entity_id:   "proj-alpha",
+      title:       "Registro histórico — projeto Alpha",
+      source:      "planner",
+      confidence:  MEMORY_CONFIDENCE.HIGH, // not low-confidence, not stale → pure entity conflict
+      created_at:  recentDate,
+      updated_at:  recentDate,
+    }, env);
+
+    // Historical memory about a DIFFERENT entity → should NOT conflict
+    await writeTestMemory({
+      memory_id:   "hist-proj-beta",
+      memory_type: MEMORY_TYPES.PROJECT,
+      entity_type: ENTITY_TYPES.PROJECT,
+      entity_id:   "proj-beta",
+      title:       "Registro histórico — projeto Beta",
+      source:      "planner",
+      confidence:  MEMORY_CONFIDENCE.HIGH,
+      created_at:  recentDate,
+      updated_at:  recentDate,
+    }, env);
+
+    const result = await buildRetrievalContext({}, env, { now });
+    ok(result.ok === true, "integration: retrieval ok=true");
+    ok(result.conflicts_detected === true, "conflicts_detected=true");
+    ok(result.explicit_conflicts_count === 1, "explicit_conflicts_count=1");
+    ok(result.conflict_rules_applied === true, "conflict_rules_applied=true");
+
+    // The conflicting historical memory is in historical_memory block
+    const histItems = result.blocks.historical_memory.items;
+    ok(histItems.length === 2, "both historical memories are in historical_memory block");
+
+    const alphaHist = histItems.find((m) => m.memory_id === "hist-proj-alpha");
+    ok(alphaHist !== undefined, "hist-proj-alpha is present");
+    ok(alphaHist._pr3_explicit_conflict === true, "hist-proj-alpha is marked explicit_conflict");
+    ok(alphaHist._pr3_is_reference === true, "hist-proj-alpha is downgraded to reference-only");
+    ok(alphaHist._pr3_conflict_reason === "entity_id_overlap", "conflict_reason=entity_id_overlap");
+    ok(alphaHist._pr3_conflict_key === "project::proj-alpha", "conflict_key matches entity");
+
+    const betaHist = histItems.find((m) => m.memory_id === "hist-proj-beta");
+    ok(betaHist !== undefined, "hist-proj-beta is present");
+    ok(!betaHist._pr3_explicit_conflict, "hist-proj-beta is NOT marked as conflict");
+    ok(!betaHist._pr3_is_reference, "hist-proj-beta is NOT reference-only");
+
+    // Current context is not affected by conflict rules
+    const ctxItems = result.blocks.current_context.items;
+    ok(ctxItems.length === 1, "current_context has 1 item");
+    ok(ctxItems[0].memory_id === "ctx-proj-alpha", "ctx-proj-alpha stays in current_context");
+
+    // Summary exposes new conflict fields
+    const summary = buildRetrievalSummary(result);
+    ok(summary.conflicts_detected === true, "summary.conflicts_detected=true");
+    ok(summary.explicit_conflicts_count === 1, "summary.explicit_conflicts_count=1");
+    const alphaSum = summary.historical_memory.items.find((m) => m.memory_id === "hist-proj-alpha");
+    ok(alphaSum?.explicit_conflict === true, "summary item shows explicit_conflict=true");
+    ok(alphaSum?.conflict_reason === "entity_id_overlap", "summary item shows conflict_reason");
+    ok(alphaSum?.conflict_key === "project::proj-alpha", "summary item shows conflict_key");
   }
 
   // ---- Summary ----
