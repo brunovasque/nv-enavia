@@ -354,8 +354,8 @@ async function runTests() {
   {
     const blocks = splitContractIntoBlocks(NO_HEADINGS_CONTRACT);
     const map = buildContractStructureMap(blocks, null);
-    assert(map.macro_objective !== null || map.macro_objective === null, "macro_objective handled safely");
-    assert(map.confidence.has_headings === false || map.confidence.has_headings === true, "has_headings is boolean");
+    assert(typeof map.macro_objective === "string" || map.macro_objective === null, "macro_objective is string or null");
+    assert(typeof map.confidence.has_headings === "boolean", "has_headings is boolean");
     assert(map.sections.length === blocks.length, "sections count matches");
   }
 

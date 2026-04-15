@@ -143,7 +143,8 @@ function extractHeading(lines) {
 function buildShortSummary(text, maxLen = 200) {
   if (!text || text.length < 40) return null;
   // Take first sentence or first maxLen chars
-  const sentences = text.split(/(?<=[.!?])\s+/);
+  // Use a compatible split (no lookbehind) — split on ". ", "! ", "? "
+  const sentences = text.split(/[.!?]\s+/);
   const first = sentences[0] || "";
   if (first.length > 10 && first.length <= maxLen) return first.trim();
   if (first.length > maxLen) return first.slice(0, maxLen).trim() + "…";
@@ -275,10 +276,14 @@ function buildContractStructureMap(blocks, metadata) {
 
   // Macro objective: try to find a "scope" or "object" block, or use first block
   const scopeBlock = blocks.find((b) => b.block_type === "scope");
-  const macroObjective = scopeBlock
-    ? (scopeBlock.summary || scopeBlock.heading || null)
-    : (metadata && metadata.goal) ? metadata.goal
-    : (blocks[0].summary || blocks[0].heading || null);
+  let macroObjective = null;
+  if (scopeBlock) {
+    macroObjective = scopeBlock.summary || scopeBlock.heading || null;
+  } else if (metadata && metadata.goal) {
+    macroObjective = metadata.goal;
+  } else {
+    macroObjective = blocks[0].summary || blocks[0].heading || null;
+  }
 
   // Sections overview
   const sections = blocks.map((b) => ({
