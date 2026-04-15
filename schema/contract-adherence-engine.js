@@ -89,6 +89,10 @@ const DEPLOY_PROMOTE_KEYWORDS = [
   "merge to main", "merge para main",
 ];
 
+// Heuristic thresholds
+const MAX_BLOCK_CONTENT_LENGTH = 800;
+const STRONG_OVERLAP_THRESHOLD = 2;
+
 // ---------------------------------------------------------------------------
 // _normalize(text) — lowercase + trim for matching
 // ---------------------------------------------------------------------------
@@ -138,7 +142,7 @@ function _scanBlocksForSignals(blocks, category, actionSummary) {
 
     // Block has signals in this category — check content overlap with action
     const blockText = _normalize(
-      (block.heading || "") + " " + (block.content || "").slice(0, 800)
+      (block.heading || "") + " " + (block.content || "").slice(0, MAX_BLOCK_CONTENT_LENGTH)
     );
     const actionWords = _extractKeywords(actionSummary);
     const blockWords = _extractKeywords(blockText);
@@ -146,7 +150,7 @@ function _scanBlocksForSignals(blocks, category, actionSummary) {
 
     for (const signal of block.signals[category]) {
       matched.push({
-        signal: typeof signal === "string" ? signal : String(signal),
+        signal: typeof signal === "string" ? signal : JSON.stringify(signal),
         block_id: block.block_id,
         heading: block.heading || null,
         block_type: block.block_type || null,
@@ -172,7 +176,7 @@ function _scanBlocksForContentMatch(blocks, actionSummary) {
   return blocks
     .map(block => {
       const blockText = _normalize(
-        (block.heading || "") + " " + (block.content || "").slice(0, 800)
+        (block.heading || "") + " " + (block.content || "").slice(0, MAX_BLOCK_CONTENT_LENGTH)
       );
       const blockWords = _extractKeywords(blockText);
       const overlap = actionWords.filter(w => blockWords.includes(w));
@@ -301,7 +305,7 @@ function evaluateContractAdherence({ scope, contractContext, candidateAction } =
   if (blockHardRules.length > 0) {
     // Evidence from real blocks — check each signal for action overlap
     for (const hit of blockHardRules) {
-      if (hit.overlap_count >= 2) {
+      if (hit.overlap_count >= STRONG_OVERLAP_THRESHOLD) {
         // Strong overlap — action conflicts with block's hard_rules
         violations.push({
           type: "hard_rule",
@@ -349,7 +353,7 @@ function evaluateContractAdherence({ scope, contractContext, candidateAction } =
       const intentWords = _extractKeywords(actionSummary);
       const overlap = ruleWords.filter(w => intentWords.includes(w));
 
-      if (overlap.length >= 2) {
+      if (overlap.length >= STRONG_OVERLAP_THRESHOLD) {
         violations.push({
           type: "hard_rule",
           description: `Action conflicts with hard rule (summary): "${rule}"`,
@@ -372,7 +376,7 @@ function evaluateContractAdherence({ scope, contractContext, candidateAction } =
 
   if (blockBlockingPoints.length > 0) {
     for (const hit of blockBlockingPoints) {
-      if (hit.overlap_count >= 2) {
+      if (hit.overlap_count >= STRONG_OVERLAP_THRESHOLD) {
         violations.push({
           type: "blocking_point",
           description: `Action conflicts with blocking point in block ${hit.block_id}: "${hit.signal}"`,
@@ -410,7 +414,7 @@ function evaluateContractAdherence({ scope, contractContext, candidateAction } =
       const intentWords = _extractKeywords(actionSummary);
       const overlap = bpWords.filter(w => intentWords.includes(w));
 
-      if (overlap.length >= 2) {
+      if (overlap.length >= STRONG_OVERLAP_THRESHOLD) {
         violations.push({
           type: "blocking_point",
           description: `Action conflicts with blocking point (summary): "${bp}"`,
