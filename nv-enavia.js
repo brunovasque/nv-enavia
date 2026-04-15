@@ -3364,6 +3364,42 @@ async function handleChatLLM(request, env) {
   const context = body.context && typeof body.context === "object" ? body.context : {};
 
   // -------------------------------------------------------------------------
+  // PR5 — Conversation History (Memory + Continuity)
+  //
+  // Accepts an optional conversation_history array from the panel.
+  // Each entry: { role: "user"|"assistant", content: string }
+  //
+  // Limits:
+  //   - Max 20 messages (10 most recent exchanges)
+  //   - Max 4000 characters total content (prevents context window overflow)
+  //   - Only "user" and "assistant" roles accepted (no "system" injection)
+  //   - Empty/invalid entries silently dropped
+  //
+  // The history is injected between the system prompt and the current user
+  // message, giving the LLM real conversational context without KV persistence.
+  // -------------------------------------------------------------------------
+  const _PR5_MAX_HISTORY_MSGS = 20;
+  const _PR5_MAX_HISTORY_CHARS = 4000;
+
+  let conversationHistory = [];
+  if (Array.isArray(body.conversation_history)) {
+    const validRoles = new Set(["user", "assistant"]);
+    let totalChars = 0;
+
+    // Take the most recent entries (tail of array), validate, and budget chars
+    const rawHistory = body.conversation_history.slice(-_PR5_MAX_HISTORY_MSGS);
+    for (const entry of rawHistory) {
+      if (!entry || typeof entry !== "object") continue;
+      const role = typeof entry.role === "string" ? entry.role.trim() : "";
+      const content = typeof entry.content === "string" ? entry.content.trim() : "";
+      if (!validRoles.has(role) || !content) continue;
+      if (totalChars + content.length > _PR5_MAX_HISTORY_CHARS) break;
+      totalChars += content.length;
+      conversationHistory.push({ role, content });
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // PR3 — Arbitration pre-check (deterministic, runs before LLM call)
   //
   // PM4 classifier (classifyRequest) is used as a deterministic gate on the
@@ -3429,8 +3465,12 @@ async function handleChatLLM(request, env) {
     // + awareness operacional real (PR4)
     const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness });
 
+    // --- PR5: Inject conversation history between system and current message ---
+    // This gives the LLM real context of the ongoing conversation.
+    // conversationHistory is pre-validated and budget-limited above.
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
+      ...conversationHistory,
       { role: "user", content: message },
     ];
 
@@ -3578,6 +3618,7 @@ async function handleChatLLM(request, env) {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: plannerUsed ? "LLM + PM4→PM9" : "LLM-only",
+        conversation_history_length: conversationHistory.length,
         arbitration: arbitrationDecision,
         operational_awareness: {
           browser_status:    operationalAwareness.browser.status,
@@ -3600,6 +3641,8 @@ async function handleChatLLM(request, env) {
         detail: String(err),
         telemetry: {
           duration_ms: Date.now() - startedAt,
+          // PR5: Include conversation history length even on LLM failure
+          conversation_history_length: conversationHistory.length,
           // Include PM4 pre-check result even on LLM failure — it's deterministic
           arbitration: pm4Arbitration ? {
             pm4_level: pm4Arbitration.level,
@@ -4283,6 +4326,7 @@ if (request.method === "GET") {
           message: "string (obrigatório) — texto do usuário",
           session_id: "string (opcional) — ID de sessão",
           context: "object (opcional) — contexto estrutural",
+          conversation_history: "array (opcional) — histórico recente [{role:'user'|'assistant', content:string}], max 20 msgs / 4000 chars",
         },
         response: {
           ok: "boolean",

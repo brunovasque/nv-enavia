@@ -237,7 +237,25 @@ export function buildChatSystemPrompt(opts = {}) {
     "O reply é sempre conversa humana. O planner trabalha silenciosamente por baixo.",
   );
 
-  // === 7. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
+  // === 7. PR5 — Continuidade de Conversa (memória de curto prazo) ===
+  sections.push(
+    "",
+    "CONTINUIDADE DE CONVERSA:",
+    "Quando houver mensagens anteriores na conversa (histórico injetado acima do último pedido),",
+    "USE esse contexto para:",
+    "• Continuar o raciocínio já iniciado sem recomeçar do zero.",
+    "• Reaproveitar informação já fornecida pelo operador — não repergunte o que já foi dito.",
+    "• Manter coerência com o que você já respondeu antes nesta sessão.",
+    "• Referenciar naturalmente o que já foi discutido quando relevante.",
+    "",
+    "LIMITES DA MEMÓRIA DE CONVERSA:",
+    "• Você só conhece o que está nesta conversa — não invente fatos de fora.",
+    "• Se o operador perguntar algo que não está no histórico nem no seu conhecimento, admita com honestidade.",
+    "• Nunca fabrique memória falsa. Se não sabe, diga que não sabe.",
+    "• O histórico visível é limitado às últimas mensagens — se algo não está aqui, pode ter sido antes do seu alcance.",
+  );
+
+  // === 8. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
   sections.push(
     "",
     "FORMATO DE RESPOSTA (técnico — não afeta como você fala):",
