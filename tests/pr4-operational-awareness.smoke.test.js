@@ -354,6 +354,51 @@ console.log("\n🧪 PR4 Operational Awareness — Group 7: HTTP /chat/run teleme
   ok(oa?.human_gate_active === true, "OA27: human_gate_active=true (supervised mode)");
 }
 
+// ── Group 8: Role guard — proibição de papel comercial ────────────────────
+console.log("\n🧪 PR4 Operational Awareness — Group 8: Role Guard (papel correto vs. papel proibido)\n");
+
+// OA28: buildChatSystemPrompt contains explicit PAPEL OPERACIONAL section
+{
+  const prompt = buildChatSystemPrompt({ ownerName: "Vasques" });
+  ok(prompt.includes("PAPEL OPERACIONAL"), "OA28: prompt contains PAPEL OPERACIONAL section");
+  ok(prompt.includes("ORQUESTRADOR COGNITIVO"), "OA28: prompt frames Enavia as cognitive orchestrator");
+}
+
+// OA29: prompt forbids commercial assistant role explicitly
+{
+  const prompt = buildChatSystemPrompt({ ownerName: "Vasques" });
+  ok(prompt.includes("PAPEL PROIBIDO"), "OA29: prompt contains explicit PAPEL PROIBIDO section");
+  ok(prompt.includes("Assistente comercial") || prompt.includes("assistente comercial"), "OA29: prompt forbids commercial assistant");
+  ok(prompt.includes("Atendente") || prompt.includes("atendente"), "OA29: prompt forbids attendant role");
+}
+
+// OA30: tone section has role guard bullet
+{
+  const prompt = buildChatSystemPrompt({ ownerName: "Vasques" });
+  ok(prompt.includes("Papel fixo"), "OA30: tone section includes 'Papel fixo' role guard");
+  ok(prompt.includes("nunca como assistente de vendas"), "OA30: tone guard forbids sales assistant framing");
+}
+
+// OA31: prompt contains examples for correct behavior per request type
+{
+  const prompt = buildChatSystemPrompt({ ownerName: "Vasques" });
+  ok(prompt.includes("EXEMPLOS DE RESPOSTA CORRETA"), "OA31: prompt contains correct behavior examples");
+  ok(prompt.includes("Cumprimento simples"), "OA31: examples cover casual greeting case");
+  ok(prompt.includes("Pedido de plano"), "OA31: examples cover plan request case");
+  ok(prompt.includes("Pergunta sobre capacidades"), "OA31: examples cover capabilities question case");
+  ok(prompt.includes("Pedido de execução"), "OA31: examples cover execution request case");
+}
+
+// OA32: role guard is present even without operational_awareness (always active)
+{
+  const prompt = buildChatSystemPrompt({ ownerName: "Vasques" });
+  ok(prompt.includes("PAPEL OPERACIONAL"), "OA32: role guard active without operational_awareness");
+  // And also present with it
+  const ctx = buildOperationalAwareness(ENV_NO_ARMS, {});
+  const promptWithAwareness = buildChatSystemPrompt({ ownerName: "Vasques", operational_awareness: ctx });
+  ok(promptWithAwareness.includes("PAPEL OPERACIONAL"), "OA32: role guard active with operational_awareness too");
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────
 console.log(`\n📊 PR4 Operational Awareness: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
