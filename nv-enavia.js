@@ -3278,7 +3278,7 @@ function _sanitizeChatReply(reply) {
 
   // Threshold: 3+ distinct mechanical terms = planner leak
   if (leakCount >= _PLANNER_LEAK_THRESHOLD) {
-    return "Entendido. Vou organizar isso internamente e te respondo em seguida.";
+    return "Entendido. Posso detalhar isso — o que você quer saber especificamente?";
   }
 
   return reply;
@@ -3303,7 +3303,7 @@ const _MANUAL_PLAN_THRESHOLD = 2;
 // Natural fallback reply when a manual plan leak is detected in the reply surface.
 // The plan structure lives in plannerSnapshot — the reply must stay conversational.
 const _MANUAL_PLAN_FALLBACK =
-  "Entendido. Estou organizando isso por dentro — o plano está estruturado internamente.";
+  "Entendido. Já organizei as etapas internamente — pode avançar ou me dizer se quer ajustar algo.";
 
 // Returns true if the reply looks like the LLM wrote a structured plan inline
 // (instead of a short natural conversational reply).
