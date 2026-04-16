@@ -127,6 +127,10 @@ const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs"; // kept for backward-compa
 const KV_SUFFIX_FLOG_ENTRY      = ":flog:";
 const MAX_FUNCTIONAL_LOGS_PER_CONTRACT = 50;
 
+// Terminal statuses for the Contract Executor state machine.
+// Contracts in any of these statuses are not considered active.
+const TERMINAL_STATUSES = ["completed", "cancelled", "failed"];
+
 // ---------------------------------------------------------------------------
 // Canonical global statuses for the Contract Executor state machine.
 //
@@ -3590,15 +3594,14 @@ async function handleGetContractSummary(env, contractId) {
 }
 
 // GET /contracts/active-surface — Return the surface of the most recent active contract
-const TERMINAL_STATUSES = ["completed", "cancelled", "failed"];
-
 async function handleGetActiveSurface(env) {
   // Read the contract index
   let index = [];
   try {
     const raw = await env.ENAVIA_BRAIN.get(KV_INDEX_KEY);
     if (raw) index = JSON.parse(raw);
-  } catch (_) {
+  } catch (err) {
+    console.error("[handleGetActiveSurface] Failed to read contract index:", err);
     index = [];
   }
 
