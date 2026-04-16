@@ -3589,6 +3589,49 @@ async function handleGetContractSummary(env, contractId) {
   };
 }
 
+// GET /contracts/active-surface — Return the surface of the most recent active contract
+const TERMINAL_STATUSES = ["completed", "cancelled", "failed"];
+
+async function handleGetActiveSurface(env) {
+  // Read the contract index
+  let index = [];
+  try {
+    const raw = await env.ENAVIA_BRAIN.get(KV_INDEX_KEY);
+    if (raw) index = JSON.parse(raw);
+  } catch (_) {
+    index = [];
+  }
+
+  if (!Array.isArray(index) || index.length === 0) {
+    return {
+      status: 404,
+      body: { ok: false, error: "NO_ACTIVE_CONTRACT", message: "No contracts found in index." },
+    };
+  }
+
+  // Iterate from most recent (last in array) to find first non-terminal contract
+  for (let i = index.length - 1; i >= 0; i--) {
+    const contractId = index[i];
+    const state = await readContractState(env, contractId);
+    if (!state) continue;
+    if (TERMINAL_STATUSES.includes(state.status_global)) continue;
+
+    const decomposition = await readContractDecomposition(env, contractId);
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        active_state: buildContractSummary(state, decomposition),
+      },
+    };
+  }
+
+  return {
+    status: 404,
+    body: { ok: false, error: "NO_ACTIVE_CONTRACT", message: "No active (non-terminal) contract found." },
+  };
+}
+
 // POST /contracts/execute — Execute current micro-PR in TEST
 async function handleExecuteContract(request, env) {
   let body;
@@ -5097,6 +5140,8 @@ export {
   resolvePlanRevision,
   // Summary
   buildContractSummary,
+  // PR1 — Active surface route
+  handleGetActiveSurface,
   // Route handlers
   handleCreateContract,
   handleGetContract,

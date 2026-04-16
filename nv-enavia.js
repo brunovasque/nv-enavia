@@ -2,6 +2,7 @@ import {
   handleCreateContract,
   handleGetContract,
   handleGetContractSummary,
+  handleGetActiveSurface,
   handleExecuteContract,
   handleCloseContractInTest,
   handleCancelContract,
@@ -6239,6 +6240,12 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // GET /contracts/active-surface → Surface do contrato ativo mais recente
+      if (method === "GET" && path === "/contracts/active-surface") {
+        const result = await handleGetActiveSurface(env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // POST /contracts/execute → Execute current micro-PR in TEST (C1)
       if (method === "POST" && path === "/contracts/execute") {
         const result = await handleExecuteContract(request, env);
@@ -6732,6 +6739,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /contracts/close-final → 🛡️ Fechamento final pesado do contrato inteiro (gate PR 3)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",
+            "  • GET  /contracts/active-surface → Surface do contrato ativo mais recente",
             "  • GET  /debug-brain    → Status interno do NV-FIRST",
             "  • GET  /engineer       → Testar rota do executor",
             "  • GET  /audit          → Schema/contrato da rota POST /audit",
