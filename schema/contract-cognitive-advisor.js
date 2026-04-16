@@ -514,7 +514,8 @@ function _assessConfidence({
 }) {
   const weakAction = _isWeakAction(candidateAction, actionSummary);
 
-  // Base score depends on starting evidence quality
+  // Base 0.35: lower than previous 0.5 so that empty/weak evidence
+  // starts below MEDIUM threshold (0.5), preventing false confidence.
   let score = 0.35;
 
   // ─── Boost: block evidence ─────────────────────────────────────────
