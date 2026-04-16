@@ -534,6 +534,115 @@ assert(typeof AMBIGUITY_LEVEL === "object" && AMBIGUITY_LEVEL.LOW === "low", "PR
 assert(typeof CONFIDENCE_THRESHOLDS === "object" && CONFIDENCE_THRESHOLDS.HIGH === 0.8, "PR5: CONFIDENCE_THRESHOLDS OK");
 
 // =========================================================================
+// TEST 19: gate ALLOW + requires_human_approval=true + cognição clara → NÃO vira EXECUTE_READY
+// =========================================================================
+console.log("\n--- Test 19: gate ALLOW + requires_human_approval=true → não EXECUTE_READY ---");
+{
+  const result = orchestrateContractAwareAction({
+    gateResult: mockGateAllow({ requires_human_approval: true }),
+    cognitiveResult: mockCognitiveClear(),
+    candidateAction,
+    scope: "default",
+  });
+  assert(result.final_decision !== FINAL_DECISION.EXECUTE_READY, "final_decision ≠ EXECUTE_READY");
+  assert(result.final_decision === FINAL_DECISION.HUMAN_CONFIRM, "final_decision = HUMAN_CONFIRM");
+  assert(result.requires_human_confirmation === true, "requires_human_confirmation = true");
+  assert(result.execution_mode !== EXECUTION_MODE.AUTO, "execution_mode ≠ AUTO");
+  assert(result.final_reason_code === "GATE_REQUIRES_HUMAN_APPROVAL", "final_reason_code = GATE_REQUIRES_HUMAN_APPROVAL");
+}
+
+// =========================================================================
+// TEST 20: gate ALLOW + requires_human_approval=true → execution_mode não é AUTO
+// =========================================================================
+console.log("\n--- Test 20: gate ALLOW + requires_human_approval=true → execution_mode seguro ---");
+{
+  const result = orchestrateContractAwareAction({
+    gateResult: mockGateAllow({ requires_human_approval: true }),
+    cognitiveResult: mockCognitiveClear({ confidence: 0.99, ambiguity_level: AMBIGUITY_LEVEL.LOW }),
+    candidateAction,
+    scope: "default",
+  });
+  assert(result.execution_mode !== EXECUTION_MODE.AUTO, "execution_mode ≠ AUTO even with high confidence");
+  assert(result.execution_mode === EXECUTION_MODE.SUPERVISED, "execution_mode = SUPERVISED");
+  assert(result.ok === true, "ok = true (not BLOCK/NO_CONTRACT)");
+}
+
+// =========================================================================
+// TEST 21: gate WARN + requires_human_approval=true + cognição clara → exige humano
+// =========================================================================
+console.log("\n--- Test 21: gate WARN + requires_human_approval=true + cognição clara → HUMAN_CONFIRM ---");
+{
+  const result = orchestrateContractAwareAction({
+    gateResult: mockGateWarn({ requires_human_approval: true }),
+    cognitiveResult: mockCognitiveClear(),
+    candidateAction,
+    scope: "default",
+  });
+  assert(result.final_decision === FINAL_DECISION.HUMAN_CONFIRM, "final_decision = HUMAN_CONFIRM");
+  assert(result.requires_human_confirmation === true, "requires_human_confirmation = true");
+  assert(result.final_reason_code === "GATE_REQUIRES_HUMAN_APPROVAL", "final_reason_code = GATE_REQUIRES_HUMAN_APPROVAL");
+  assert(result.execution_mode !== EXECUTION_MODE.AUTO, "execution_mode ≠ AUTO");
+}
+
+// =========================================================================
+// TEST 22: gate BLOCK continua soberano quando requires_human_approval=true
+// =========================================================================
+console.log("\n--- Test 22: gate BLOCK + requires_human_approval=true → BLOCK soberano ---");
+{
+  const result = orchestrateContractAwareAction({
+    gateResult: mockGateBlock({ requires_human_approval: true }),
+    cognitiveResult: mockCognitiveClear(),
+    candidateAction,
+    scope: "default",
+  });
+  assert(result.final_decision === FINAL_DECISION.BLOCK, "BLOCK ainda soberano");
+  assert(result.execution_mode === EXECUTION_MODE.BLOCKED, "execution_mode = BLOCKED");
+}
+
+// =========================================================================
+// TEST 23: fluxo EXECUTE_READY continua funcionando quando gate NÃO exige humano
+// =========================================================================
+console.log("\n--- Test 23: fluxo EXECUTE_READY válido sem requires_human_approval ---");
+{
+  const result = orchestrateContractAwareAction({
+    gateResult: mockGateAllow({ requires_human_approval: false }),
+    cognitiveResult: mockCognitiveClear(),
+    candidateAction,
+    scope: "default",
+  });
+  assert(result.final_decision === FINAL_DECISION.EXECUTE_READY, "final_decision = EXECUTE_READY (gate allows + no human approval required)");
+  assert(result.execution_mode === EXECUTION_MODE.AUTO, "execution_mode = AUTO");
+  assert(result.requires_human_confirmation === false, "requires_human_confirmation = false");
+}
+
+// =========================================================================
+// TEST 24: shape/notas/supporting_evidence sem regressão no novo caminho
+// =========================================================================
+console.log("\n--- Test 24: shape completo preservado no caminho requires_human_approval ---");
+{
+  const result = orchestrateContractAwareAction({
+    gateResult: mockGateAllow({ requires_human_approval: true }),
+    cognitiveResult: mockCognitiveClear(),
+    candidateAction,
+    scope: "default",
+  });
+  const requiredKeys = [
+    "ok", "final_decision", "final_reason_code", "final_reason_text",
+    "execution_mode", "requires_human_confirmation", "gate_decision",
+    "cognitive_confidence", "cognitive_ambiguity", "recommended_next_step",
+    "supporting_evidence", "notes",
+  ];
+  for (const key of requiredKeys) {
+    assert(key in result, `shape has '${key}'`);
+  }
+  const hasOrchNote = result.notes.some(n => n.includes("gate_requires_human_approval_sovereign"));
+  assert(hasOrchNote, "notes include rule_applied = gate_requires_human_approval_sovereign");
+  const gateEvidence = result.supporting_evidence.find(e => e.source === "gate_pr3");
+  assert(!!gateEvidence, "supporting_evidence has gate_pr3");
+  assert(gateEvidence.requires_human_approval === true, "gate evidence reflects requires_human_approval=true");
+}
+
+// =========================================================================
 // SUMMARY
 // =========================================================================
 console.log(`\n========================================`);

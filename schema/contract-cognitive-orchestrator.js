@@ -134,16 +134,17 @@ function _isCognitionLowConfidence(cognitiveResult) {
 //
 // Decision table — deterministic, auditable.
 //
-// Gate         | Cognition                      | Final Decision
-// -------------|--------------------------------|---------------------------
-// null/missing | *                              | NO_CONTRACT
-// NO_CONTRACT  | *                              | NO_CONTRACT
-// BLOCK        | *                              | BLOCK (always)
-// ALLOW        | low ambiguity + sufficient conf| EXECUTE_READY
-// ALLOW        | medium/high ambiguity          | HUMAN_CONFIRM
-// ALLOW        | low confidence (weak basis)    | INSUFFICIENT_BASIS
-// WARN         | low ambiguity + sufficient conf| CAUTION_READY
-// WARN         | ambiguous or low confidence    | HUMAN_CONFIRM
+// Gate                              | Cognition                      | Final Decision
+// ----------------------------------|--------------------------------|---------------------------
+// null/missing                      | *                              | NO_CONTRACT
+// NO_CONTRACT                       | *                              | NO_CONTRACT
+// BLOCK                             | *                              | BLOCK (sovereign)
+// requires_human_approval = true    | *                              | HUMAN_CONFIRM (sovereign)
+// ALLOW                             | low ambiguity + sufficient conf| EXECUTE_READY
+// ALLOW                             | medium/high ambiguity          | HUMAN_CONFIRM
+// ALLOW                             | low confidence (weak basis)    | INSUFFICIENT_BASIS
+// WARN                              | low ambiguity + sufficient conf| CAUTION_READY
+// WARN                              | ambiguous or low confidence    | HUMAN_CONFIRM
 // ---------------------------------------------------------------------------
 function _resolveDecision(gateResult, cognitiveResult) {
   // 1. No contract
@@ -170,7 +171,21 @@ function _resolveDecision(gateResult, cognitiveResult) {
     };
   }
 
-  // 3. Gate ALLOW
+  // 3. Gate requires human approval — sovereign even when decision is ALLOW/WARN
+  //    Prevents EXECUTE_READY from being returned when the gate itself demands
+  //    a human sign-off (e.g., deploy/promote actions per contract approval points).
+  if (gateResult.requires_human_approval === true) {
+    return {
+      final_decision: FINAL_DECISION.HUMAN_CONFIRM,
+      final_reason_code: "GATE_REQUIRES_HUMAN_APPROVAL",
+      final_reason_text: "Gate contratual exige aprovação humana — execução autônoma não permitida.",
+      execution_mode: EXECUTION_MODE.SUPERVISED,
+      requires_human_confirmation: true,
+      rule_applied: "gate_requires_human_approval_sovereign",
+    };
+  }
+
+  // 4. Gate ALLOW
   if (_isGateAllow(gateResult)) {
     // Low confidence / weak basis → INSUFFICIENT_BASIS
     if (_isCognitionLowConfidence(cognitiveResult)) {
@@ -207,7 +222,7 @@ function _resolveDecision(gateResult, cognitiveResult) {
     };
   }
 
-  // 4. Gate WARN
+  // 5. Gate WARN
   if (_isGateWarn(gateResult)) {
     // Low confidence → HUMAN_CONFIRM
     if (_isCognitionLowConfidence(cognitiveResult)) {
@@ -244,7 +259,7 @@ function _resolveDecision(gateResult, cognitiveResult) {
     };
   }
 
-  // 5. Fallback (unexpected gate state) — safe default
+  // 6. Fallback (unexpected gate state) — safe default
   return {
     final_decision: FINAL_DECISION.HUMAN_CONFIRM,
     final_reason_code: "UNKNOWN_GATE_STATE",
