@@ -2,8 +2,9 @@
 // 🧠 ENAVIA — Contract Cognitive Advisor (PR5)
 //
 // Camada cognitiva consultiva sobre contrato ativo.
-// Lê contrato ativo + blocos relevantes + contexto atual + resultado do gate,
-// interpreta ambiguidades e conflitos aparentes, e devolve saída estruturada
+// Lê contrato ativo + blocos relevantes + summary_canonic + resolution_ctx +
+// resultado do gate, interpreta ambiguidades e conflitos aparentes, expõe
+// leituras alternativas quando pertinente, e devolve saída estruturada
 // pronta para a PR6 consumir.
 //
 // REGRAS FUNDAMENTAIS:
@@ -14,12 +15,12 @@
 //   - Não pode decidir deploy/promote/ação crítica sozinha
 //   - Prepara saída canônica para PR6 orquestrar
 //
-// Usa:
-//   - getActiveContractContext (PR2) — contrato ativo + summary_canonic
-//   - resolveRelevantContractBlocks (PR2) — blocos relevantes
-//   - evaluateContractAdherence (PR3) — resultado do gate, quando disponível
-//   - resolution_ctx (PR2) — contexto de resolução
-//   - candidateAction — ação/intenção candidata
+// Fontes de evidência (todas utilizadas de verdade):
+//   - relevantBlocks (PR2)        — fonte primária de sinais estruturais
+//   - summary_canonic (PR2)       — suporte contextual e fallback honesto
+//   - resolution_ctx (PR2)        — qualidade/estratégia da resolução de blocos
+//   - adherenceResult / gate (PR3) — resultado do gate, quando disponível
+//   - candidateAction              — ação/intenção candidata
 //
 // NÃO faz:
 //   - LLM / embeddings / IA opaca
@@ -100,6 +101,184 @@ function _buildActionSummary(candidateAction) {
 }
 
 // ---------------------------------------------------------------------------
+// _isWeakAction(candidateAction, actionSummary)
+//
+// Determines if candidate action is absent, empty, or too weak to support
+// meaningful analysis.
+// ---------------------------------------------------------------------------
+function _isWeakAction(candidateAction, actionSummary) {
+  if (!candidateAction || typeof candidateAction !== "object") return true;
+  if (!actionSummary || actionSummary.trim().length === 0) return true;
+  const kw = _extractKeywords(actionSummary);
+  return kw.length === 0;
+}
+
+// ---------------------------------------------------------------------------
+// _assessSummaryEvidence(summary, actionSummary)
+//
+// Scans summary_canonic for evidence relevant to the candidate action.
+// Uses: macro_objective, hard_rules_top, approval_points_top,
+//       blocking_points_top, acceptance_criteria_top, deadlines_top,
+//       detected_phases.
+//
+// Returns structured summary-level evidence. Does NOT substitute block
+// evidence — provides contextual support and fallback.
+// ---------------------------------------------------------------------------
+function _assessSummaryEvidence(summary, actionSummary) {
+  const result = {
+    macro_objective_match: false,
+    macro_objective: null,
+    hard_rules_hits: [],
+    approval_points_hits: [],
+    blocking_points_hits: [],
+    acceptance_criteria_hits: [],
+    deadlines_hits: [],
+    detected_phases: null,
+    phase_match: false,
+    total_summary_signals: 0,
+    has_useful_summary: false,
+  };
+
+  if (!summary || typeof summary !== "object") return result;
+
+  // Expose detected phases even without action
+  if (Array.isArray(summary.detected_phases) && summary.detected_phases.length > 0) {
+    result.detected_phases = summary.detected_phases;
+  }
+  if (typeof summary.macro_objective === "string" && summary.macro_objective.trim()) {
+    result.macro_objective = summary.macro_objective;
+  }
+
+  // Check if summary has enough useful content
+  const hasSummaryContent = !!(
+    result.macro_objective ||
+    (summary.hard_rules_count && summary.hard_rules_count > 0) ||
+    (summary.approval_points_count && summary.approval_points_count > 0) ||
+    (summary.blocking_points_count && summary.blocking_points_count > 0) ||
+    result.detected_phases
+  );
+  result.has_useful_summary = hasSummaryContent;
+
+  if (!actionSummary) return result;
+  const actionWords = _extractKeywords(actionSummary);
+  if (actionWords.length === 0) return result;
+
+  // Check macro_objective overlap
+  if (result.macro_objective) {
+    const objWords = _extractKeywords(result.macro_objective);
+    const overlap = actionWords.filter(w => objWords.includes(w));
+    if (overlap.length > 0) {
+      result.macro_objective_match = true;
+      result.total_summary_signals++;
+    }
+  }
+
+  // Check top signals — each category
+  const categories = [
+    { key: "hard_rules_top",          target: "hard_rules_hits" },
+    { key: "approval_points_top",     target: "approval_points_hits" },
+    { key: "blocking_points_top",     target: "blocking_points_hits" },
+    { key: "acceptance_criteria_top", target: "acceptance_criteria_hits" },
+    { key: "deadlines_top",           target: "deadlines_hits" },
+  ];
+
+  for (const cat of categories) {
+    const items = summary[cat.key];
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      const text = typeof item === "string" ? item : String(item);
+      const signalWords = _extractKeywords(text);
+      const overlap = actionWords.filter(w => signalWords.includes(w));
+      if (overlap.length > 0) {
+        result[cat.target].push({
+          signal: text,
+          overlap_keywords: overlap,
+          overlap_count: overlap.length,
+          source: "summary",
+        });
+        result.total_summary_signals++;
+      }
+    }
+  }
+
+  // Check phase match
+  if (result.detected_phases) {
+    const phaseNorm = _normalize(actionSummary);
+    for (const phase of result.detected_phases) {
+      if (typeof phase === "string" && phaseNorm.includes(_normalize(phase))) {
+        result.phase_match = true;
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// _assessResolutionCtxQuality(resolutionCtx)
+//
+// Evaluates the resolution_ctx to understand how blocks were resolved.
+// Returns quality assessment that feeds into ambiguity/confidence.
+//
+// resolution_ctx shape (from PR2/PR3):
+//   strategy, fallback, matched_count, total_blocks,
+//   relevant_block_ids, current_phase_hint, last_task_id, resolved_at
+// ---------------------------------------------------------------------------
+function _assessResolutionCtxQuality(resolutionCtx) {
+  const result = {
+    has_resolution_ctx: false,
+    strategy: null,
+    is_fallback: false,
+    matched_ratio: 0,
+    matched_count: 0,
+    total_blocks: 0,
+    is_weak_resolution: false,
+    phase_hint: null,
+    quality_notes: [],
+  };
+
+  if (!resolutionCtx || typeof resolutionCtx !== "object") {
+    result.quality_notes.push("resolution_ctx ausente — seleção de blocos sem contexto de resolução.");
+    result.is_weak_resolution = true;
+    return result;
+  }
+
+  result.has_resolution_ctx = true;
+  result.strategy = resolutionCtx.strategy || null;
+  result.is_fallback = !!resolutionCtx.fallback;
+  result.matched_count = resolutionCtx.matched_count || 0;
+  result.total_blocks = resolutionCtx.total_blocks || 0;
+  result.phase_hint = resolutionCtx.current_phase_hint || null;
+
+  if (result.total_blocks > 0) {
+    result.matched_ratio = result.matched_count / result.total_blocks;
+  }
+
+  // Assess quality
+  if (result.is_fallback) {
+    result.quality_notes.push("Resolução usou fallback — blocos selecionados podem não ser os mais relevantes.");
+    result.is_weak_resolution = true;
+  }
+  if (result.strategy === "none" || !result.strategy) {
+    result.quality_notes.push("Estratégia de resolução indefinida — base de blocos pode ser imprecisa.");
+    result.is_weak_resolution = true;
+  }
+  if (result.matched_count === 0 && result.total_blocks > 0) {
+    result.quality_notes.push(`Nenhum bloco corresponde dentre ${result.total_blocks} — base contratual potencialmente inalcançável.`);
+    result.is_weak_resolution = true;
+  }
+  if (result.matched_ratio > 0 && result.matched_ratio < 0.1) {
+    result.quality_notes.push(`Apenas ${result.matched_count}/${result.total_blocks} blocos selecionados — cobertura muito parcial.`);
+  }
+  if (!result.is_fallback && result.strategy && result.matched_count > 0) {
+    result.quality_notes.push(`Resolução via estratégia "${result.strategy}" com ${result.matched_count}/${result.total_blocks} blocos.`);
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // _assessBlockEvidence(blocks, actionSummary)
 //
 // Scans blocks for signals relevant to the action and builds evidence map.
@@ -177,15 +356,15 @@ function _assessBlockEvidence(blocks, actionSummary) {
 }
 
 // ---------------------------------------------------------------------------
-// _detectConflicts(evidence, gateResult)
+// _detectConflicts(evidence, summaryEvidence, gateResult)
 //
-// Detects perceived conflicts from block evidence and gate result.
-// Returns array of conflict descriptions.
+// Detects perceived conflicts from block evidence, summary evidence,
+// and gate result. Returns array of conflict descriptions.
 // ---------------------------------------------------------------------------
-function _detectConflicts(evidence, gateResult) {
+function _detectConflicts(evidence, summaryEvidence, gateResult) {
   const conflicts = [];
 
-  // Conflict: hard rule signal overlaps with the candidate action
+  // Conflict: hard rule signal overlaps with the candidate action (from blocks)
   for (const hit of evidence.hard_rules) {
     if (hit.overlap_count >= 2) {
       conflicts.push({
@@ -194,11 +373,28 @@ function _detectConflicts(evidence, gateResult) {
         description: `Ação candidata tem sobreposição forte com regra dura do contrato no bloco ${hit.block_id}: "${hit.signal}"`,
         block_id: hit.block_id,
         evidence: hit.overlap_keywords,
+        source: "block",
       });
     }
   }
 
-  // Conflict: blocking point matches
+  // Conflict: hard rule from summary (fallback — only when blocks didn't catch it)
+  if (evidence.hard_rules.length === 0 && summaryEvidence.hard_rules_hits.length > 0) {
+    for (const hit of summaryEvidence.hard_rules_hits) {
+      if (hit.overlap_count >= 2) {
+        conflicts.push({
+          type: "hard_rule_conflict",
+          severity: "high",
+          description: `Ação candidata encosta em regra dura do summary_canonic: "${hit.signal}"`,
+          block_id: null,
+          evidence: hit.overlap_keywords,
+          source: "summary",
+        });
+      }
+    }
+  }
+
+  // Conflict: blocking point matches (from blocks)
   for (const hit of evidence.blocking_points) {
     if (hit.overlap_count >= 2) {
       conflicts.push({
@@ -207,7 +403,24 @@ function _detectConflicts(evidence, gateResult) {
         description: `Ponto de bloqueio contratual pode afetar ação no bloco ${hit.block_id}: "${hit.signal}"`,
         block_id: hit.block_id,
         evidence: hit.overlap_keywords,
+        source: "block",
       });
+    }
+  }
+
+  // Conflict: blocking point from summary (fallback)
+  if (evidence.blocking_points.length === 0 && summaryEvidence.blocking_points_hits.length > 0) {
+    for (const hit of summaryEvidence.blocking_points_hits) {
+      if (hit.overlap_count >= 2) {
+        conflicts.push({
+          type: "blocking_point_conflict",
+          severity: "high",
+          description: `Ponto de bloqueio detectado via summary_canonic: "${hit.signal}"`,
+          block_id: null,
+          evidence: hit.overlap_keywords,
+          source: "summary",
+        });
+      }
     }
   }
 
@@ -219,22 +432,28 @@ function _detectConflicts(evidence, gateResult) {
       description: `Gate de aderência (PR3) bloqueou esta ação: ${gateResult.reason_text || gateResult.reason_code || "motivo não especificado"}`,
       block_id: null,
       evidence: (gateResult.violations || []).map(v => v.description || String(v)),
+      source: "gate",
     });
   }
 
-  // Conflict: approval required — only flag as conflict when the candidate
-  // action is NOT already allowed by the gate and the overlap is strong.
-  // Weak overlap with approval points is noted but not a conflict.
-  for (const hit of evidence.approval_points) {
+  // Conflict: approval required — only flag when gate didn't already ALLOW
+  // and overlap is strong. Checks both blocks and summary.
+  const approvalHits = [
+    ...evidence.approval_points.map(h => ({ ...h, source: "block" })),
+    ...(evidence.approval_points.length === 0
+      ? summaryEvidence.approval_points_hits.map(h => ({ ...h, block_id: null, heading: null }))
+      : []),
+  ];
+  for (const hit of approvalHits) {
     if (hit.overlap_count >= 2) {
-      // Only treat as conflict if gate didn't already ALLOW
       if (!gateResult || gateResult.decision !== "ALLOW") {
         conflicts.push({
           type: "approval_required",
           severity: "medium",
-          description: `Ponto de aprovação contratual detectado no bloco ${hit.block_id}: "${hit.signal}" — pode exigir confirmação humana`,
-          block_id: hit.block_id,
+          description: `Ponto de aprovação contratual detectado${hit.block_id ? ` no bloco ${hit.block_id}` : " via summary_canonic"}: "${hit.signal}" — pode exigir confirmação humana`,
+          block_id: hit.block_id || null,
           evidence: hit.overlap_keywords,
+          source: hit.source || "block",
         });
       }
     }
@@ -244,67 +463,103 @@ function _detectConflicts(evidence, gateResult) {
 }
 
 // ---------------------------------------------------------------------------
-// _assessAmbiguity(evidence, conflicts, relevantBlocks, actionSummary, gateResult)
+// _assessAmbiguity(params)
 //
-// Determines ambiguity level based on evidence quality and conflicts.
-// Gate ALLOW with no conflicts = strong signal of low ambiguity.
+// Determines ambiguity level based on all evidence sources.
+// RULE: empty/weak evidence NEVER yields LOW. Vazio = incerteza, não clareza.
 // ---------------------------------------------------------------------------
-function _assessAmbiguity(evidence, conflicts, relevantBlocks, actionSummary, gateResult) {
+function _assessAmbiguity({
+  evidence, summaryEvidence, resolutionQuality, conflicts,
+  relevantBlocks, actionSummary, gateResult, candidateAction,
+}) {
   const hasBlocks = relevantBlocks && relevantBlocks.length > 0;
-  const hasStrongEvidence = evidence.total_signals_found >= 2;
+  const hasStrongBlockEvidence = evidence.total_signals_found >= 2;
+  const hasSummarySignals = summaryEvidence.total_summary_signals >= 1;
   const hasCriticalConflict = conflicts.some(c => c.severity === "critical");
   const hasHighConflict = conflicts.some(c => c.severity === "high");
-  const hasAction = actionSummary && actionSummary.trim().length > 0;
-  const hasMultipleReadings = conflicts.length > 0 && evidence.scope_matches.length > 0;
+  const weakAction = _isWeakAction(candidateAction, actionSummary);
+  const hasUsefulSummary = summaryEvidence.has_useful_summary;
+  const weakResolution = resolutionQuality.is_weak_resolution;
   const gateAllowed = gateResult && gateResult.decision === "ALLOW" && (!gateResult.violations || gateResult.violations.length === 0);
 
-  // Critical: gate already blocked + we have conflicting evidence
+  // ─── CRITICAL: gate blocked ────────────────────────────────────────
   if (hasCriticalConflict) return AMBIGUITY_LEVEL.CRITICAL;
 
-  // High: multiple conflicts or very little evidence with action present
-  if (hasHighConflict && !hasStrongEvidence) return AMBIGUITY_LEVEL.HIGH;
-  if (!hasBlocks && hasAction && !gateAllowed) return AMBIGUITY_LEVEL.HIGH;
-  if (hasMultipleReadings && hasHighConflict) return AMBIGUITY_LEVEL.HIGH;
+  // ─── HIGH: major gaps or conflicts ─────────────────────────────────
+  // Weak/absent action → NEVER low, always at least MEDIUM
+  if (weakAction && !gateAllowed) return AMBIGUITY_LEVEL.HIGH;
+  if (hasHighConflict && !hasStrongBlockEvidence) return AMBIGUITY_LEVEL.HIGH;
+  if (!hasBlocks && !hasUsefulSummary) return AMBIGUITY_LEVEL.HIGH;
+  if (!hasBlocks && !gateAllowed) return AMBIGUITY_LEVEL.HIGH;
 
-  // Medium: some conflicts or partial evidence
+  // ─── MEDIUM: partial evidence or weak signals ──────────────────────
   if (conflicts.length > 0) return AMBIGUITY_LEVEL.MEDIUM;
-  // When gate ALLOW + blocks present + no conflicts → low ambiguity even without strong signals
-  if (hasAction && !hasStrongEvidence && hasBlocks && !gateAllowed) return AMBIGUITY_LEVEL.MEDIUM;
+  if (weakResolution && !gateAllowed) return AMBIGUITY_LEVEL.MEDIUM;
+  if (!hasStrongBlockEvidence && !hasSummarySignals && !gateAllowed) return AMBIGUITY_LEVEL.MEDIUM;
+  if (weakAction && gateAllowed) return AMBIGUITY_LEVEL.MEDIUM;
 
-  // Low: clear evidence, no conflicts (or gate ALLOW)
+  // ─── LOW: clear combined evidence from blocks + summary ────────────
   return AMBIGUITY_LEVEL.LOW;
 }
 
 // ---------------------------------------------------------------------------
-// _assessConfidence(evidence, conflicts, relevantBlocks, ambiguityLevel)
+// _assessConfidence(params)
 //
 // Calculates a confidence score (0.0 - 1.0) for the interpretation.
+// Uses blocks, summary, resolution_ctx, and gate quality.
 // ---------------------------------------------------------------------------
-function _assessConfidence(evidence, conflicts, relevantBlocks, ambiguityLevel) {
-  let score = 0.5; // base
+function _assessConfidence({
+  evidence, summaryEvidence, resolutionQuality, conflicts,
+  relevantBlocks, ambiguityLevel, gateResult, candidateAction, actionSummary,
+}) {
+  const weakAction = _isWeakAction(candidateAction, actionSummary);
 
-  // Boost for evidence
+  // Base score depends on starting evidence quality
+  let score = 0.35;
+
+  // ─── Boost: block evidence ─────────────────────────────────────────
   if (relevantBlocks && relevantBlocks.length > 0) score += 0.1;
-  if (evidence.total_signals_found >= 2) score += 0.15;
-  if (evidence.scope_matches.length >= 2) score += 0.1;
+  if (evidence.total_signals_found >= 2) score += 0.12;
+  if (evidence.scope_matches.length >= 2) score += 0.08;
   if (evidence.blocks_with_evidence >= 2) score += 0.05;
 
-  // Penalty for conflicts and ambiguity
-  if (conflicts.length > 0) score -= 0.1 * Math.min(conflicts.length, 3);
-  if (ambiguityLevel === AMBIGUITY_LEVEL.CRITICAL) score -= 0.3;
-  else if (ambiguityLevel === AMBIGUITY_LEVEL.HIGH) score -= 0.2;
-  else if (ambiguityLevel === AMBIGUITY_LEVEL.MEDIUM) score -= 0.1;
+  // ─── Boost: summary evidence ───────────────────────────────────────
+  if (summaryEvidence.macro_objective_match) score += 0.08;
+  if (summaryEvidence.total_summary_signals >= 2) score += 0.07;
+  if (summaryEvidence.phase_match) score += 0.05;
+  if (summaryEvidence.has_useful_summary) score += 0.03;
+
+  // ─── Boost: resolution_ctx quality ─────────────────────────────────
+  if (resolutionQuality.has_resolution_ctx && !resolutionQuality.is_weak_resolution) score += 0.07;
+  if (resolutionQuality.is_fallback) score -= 0.05;
+  if (resolutionQuality.is_weak_resolution) score -= 0.05;
+
+  // ─── Boost: gate ───────────────────────────────────────────────────
+  if (gateResult && gateResult.decision === "ALLOW") score += 0.05;
+
+  // ─── Penalty: conflicts and ambiguity ──────────────────────────────
+  if (conflicts.length > 0) score -= 0.08 * Math.min(conflicts.length, 3);
+  if (ambiguityLevel === AMBIGUITY_LEVEL.CRITICAL) score -= 0.25;
+  else if (ambiguityLevel === AMBIGUITY_LEVEL.HIGH) score -= 0.15;
+  else if (ambiguityLevel === AMBIGUITY_LEVEL.MEDIUM) score -= 0.08;
+
+  // ─── Penalty: weak action ──────────────────────────────────────────
+  if (weakAction) score -= 0.15;
 
   // Clamp
   return Math.round(Math.max(0.0, Math.min(1.0, score)) * 100) / 100;
 }
 
 // ---------------------------------------------------------------------------
-// _buildInterpretation(evidence, conflicts, ambiguity, confidence, gateResult)
+// _buildInterpretation(params)
 //
 // Produces a human-readable interpretation summary.
+// Now includes summary_canonic and resolution_ctx insights.
 // ---------------------------------------------------------------------------
-function _buildInterpretation(evidence, conflicts, ambiguity, confidence, gateResult) {
+function _buildInterpretation({
+  evidence, summaryEvidence, resolutionQuality, conflicts,
+  ambiguity, confidence, gateResult,
+}) {
   const parts = [];
 
   // Gate context
@@ -318,7 +573,14 @@ function _buildInterpretation(evidence, conflicts, ambiguity, confidence, gateRe
     }
   }
 
-  // Evidence summary
+  // Macro objective context from summary
+  if (summaryEvidence.macro_objective_match) {
+    parts.push(`Ação candidata conversa com o objetivo macro do contrato: "${summaryEvidence.macro_objective}".`);
+  } else if (summaryEvidence.macro_objective) {
+    parts.push(`Objetivo macro do contrato: "${summaryEvidence.macro_objective}" — sem correspondência direta com a ação candidata.`);
+  }
+
+  // Block evidence summary
   if (evidence.hard_rules.length > 0) {
     parts.push(`${evidence.hard_rules.length} regra(s) dura(s) detectada(s) com sobreposição à ação candidata.`);
   }
@@ -327,6 +589,19 @@ function _buildInterpretation(evidence, conflicts, ambiguity, confidence, gateRe
   }
   if (evidence.blocking_points.length > 0) {
     parts.push(`${evidence.blocking_points.length} ponto(s) de bloqueio contratual relevante(s).`);
+  }
+
+  // Summary-level signals (when blocks are insufficient)
+  if (evidence.hard_rules.length === 0 && summaryEvidence.hard_rules_hits.length > 0) {
+    parts.push(`${summaryEvidence.hard_rules_hits.length} regra(s) dura(s) detectada(s) via summary_canonic (sem evidência em blocos).`);
+  }
+  if (evidence.approval_points.length === 0 && summaryEvidence.approval_points_hits.length > 0) {
+    parts.push(`${summaryEvidence.approval_points_hits.length} ponto(s) de aprovação detectado(s) via summary_canonic.`);
+  }
+
+  // Resolution context quality
+  if (resolutionQuality.is_fallback) {
+    parts.push("Resolução de blocos usou fallback — interpretação pode estar baseada em blocos menos relevantes.");
   }
 
   // Ambiguity assessment
@@ -357,7 +632,6 @@ function _buildInterpretation(evidence, conflicts, ambiguity, confidence, gateRe
 // NEVER overrides gate — only suggests.
 // ---------------------------------------------------------------------------
 function _suggestAction(ambiguity, conflicts, confidence, gateResult) {
-  // If gate blocked, cognitive layer respects it
   if (gateResult && gateResult.decision === "BLOCK") {
     return "Respeitar bloqueio do gate de aderência. Revisar ação candidata e resolver conflito contratual antes de prosseguir.";
   }
@@ -422,13 +696,14 @@ function _shouldRequireHumanConfirmation(ambiguity, conflicts, confidence, gateR
 }
 
 // ---------------------------------------------------------------------------
-// _extractContractEvidence(evidence, conflicts)
+// _extractContractEvidence(evidence, summaryEvidence, resolutionQuality)
 //
-// Builds auditable contract_evidence array.
+// Builds auditable contract_evidence array from blocks + summary + resolution.
 // ---------------------------------------------------------------------------
-function _extractContractEvidence(evidence, conflicts) {
+function _extractContractEvidence(evidence, summaryEvidence, resolutionQuality) {
   const items = [];
 
+  // Block-level evidence
   for (const hit of evidence.hard_rules) {
     items.push({
       type: "hard_rule",
@@ -436,9 +711,9 @@ function _extractContractEvidence(evidence, conflicts) {
       block_id: hit.block_id,
       heading: hit.heading,
       relevance: hit.overlap_count >= 2 ? "strong" : "weak",
+      source: "block",
     });
   }
-
   for (const hit of evidence.approval_points) {
     items.push({
       type: "approval_point",
@@ -446,9 +721,9 @@ function _extractContractEvidence(evidence, conflicts) {
       block_id: hit.block_id,
       heading: hit.heading,
       relevance: hit.overlap_count >= 2 ? "strong" : "weak",
+      source: "block",
     });
   }
-
   for (const hit of evidence.blocking_points) {
     items.push({
       type: "blocking_point",
@@ -456,9 +731,9 @@ function _extractContractEvidence(evidence, conflicts) {
       block_id: hit.block_id,
       heading: hit.heading,
       relevance: hit.overlap_count >= 2 ? "strong" : "weak",
+      source: "block",
     });
   }
-
   for (const match of evidence.scope_matches) {
     items.push({
       type: "scope_match",
@@ -466,6 +741,57 @@ function _extractContractEvidence(evidence, conflicts) {
       block_id: match.block_id,
       heading: match.heading,
       relevance: match.overlap_count >= 3 ? "strong" : "moderate",
+      source: "block",
+    });
+  }
+
+  // Summary-level evidence (when blocks don't cover)
+  for (const hit of summaryEvidence.hard_rules_hits) {
+    if (!evidence.hard_rules.some(b => b.signal === hit.signal)) {
+      items.push({
+        type: "hard_rule",
+        signal: hit.signal,
+        block_id: null,
+        heading: null,
+        relevance: hit.overlap_count >= 2 ? "strong" : "weak",
+        source: "summary",
+      });
+    }
+  }
+  for (const hit of summaryEvidence.approval_points_hits) {
+    if (!evidence.approval_points.some(b => b.signal === hit.signal)) {
+      items.push({
+        type: "approval_point",
+        signal: hit.signal,
+        block_id: null,
+        heading: null,
+        relevance: hit.overlap_count >= 2 ? "strong" : "weak",
+        source: "summary",
+      });
+    }
+  }
+  for (const hit of summaryEvidence.blocking_points_hits) {
+    if (!evidence.blocking_points.some(b => b.signal === hit.signal)) {
+      items.push({
+        type: "blocking_point",
+        signal: hit.signal,
+        block_id: null,
+        heading: null,
+        relevance: hit.overlap_count >= 2 ? "strong" : "weak",
+        source: "summary",
+      });
+    }
+  }
+
+  // Resolution context quality as evidence item (when relevant)
+  if (resolutionQuality.has_resolution_ctx) {
+    items.push({
+      type: "resolution_context",
+      signal: `strategy=${resolutionQuality.strategy || "unknown"}, fallback=${resolutionQuality.is_fallback}, matched=${resolutionQuality.matched_count}/${resolutionQuality.total_blocks}`,
+      block_id: null,
+      heading: null,
+      relevance: resolutionQuality.is_weak_resolution ? "weak" : "moderate",
+      source: "resolution_ctx",
     });
   }
 
@@ -473,11 +799,11 @@ function _extractContractEvidence(evidence, conflicts) {
 }
 
 // ---------------------------------------------------------------------------
-// _buildLikelyIntent(candidateAction, evidence, ambiguity)
+// _buildLikelyIntent(candidateAction, evidence, summaryEvidence, ambiguity)
 //
 // Infers the most likely intent from candidate action and evidence.
 // ---------------------------------------------------------------------------
-function _buildLikelyIntent(candidateAction, evidence, ambiguity) {
+function _buildLikelyIntent(candidateAction, evidence, summaryEvidence, ambiguity) {
   if (!candidateAction || typeof candidateAction !== "object") {
     return "Intenção não identificável — ação candidata ausente.";
   }
@@ -495,24 +821,50 @@ function _buildLikelyIntent(candidateAction, evidence, ambiguity) {
     return `Intenção "${intent}" — com correspondência em ${evidence.scope_matches.length} bloco(s) do contrato.`;
   }
 
+  if (summaryEvidence.macro_objective_match) {
+    return `Intenção "${intent}" — alinhada ao objetivo macro do contrato.`;
+  }
+
   return `Intenção declarada: "${intent}".`;
 }
 
 // ---------------------------------------------------------------------------
-// _buildNotes(evidence, conflicts, ambiguity, confidence, gateResult)
+// _buildNotes(params)
 //
-// Builds array of audit notes.
+// Builds array of audit notes from all evidence sources.
 // ---------------------------------------------------------------------------
-function _buildNotes(evidence, conflicts, ambiguity, confidence, gateResult) {
+function _buildNotes({
+  evidence, summaryEvidence, resolutionQuality, conflicts,
+  ambiguity, confidence, gateResult,
+}) {
   const notes = [];
 
+  // Block evidence notes
   notes.push(`Blocos relevantes analisados: ${evidence.blocks_with_evidence}.`);
-  notes.push(`Sinais contratuais encontrados: ${evidence.total_signals_found}.`);
+  notes.push(`Sinais contratuais encontrados (blocos): ${evidence.total_signals_found}.`);
 
+  // Summary evidence notes
+  notes.push(`Sinais contratuais encontrados (summary): ${summaryEvidence.total_summary_signals}.`);
+  if (summaryEvidence.macro_objective) {
+    notes.push(`Objetivo macro do contrato: "${summaryEvidence.macro_objective}".`);
+  }
+  if (summaryEvidence.detected_phases) {
+    notes.push(`Fases contratuais detectadas: ${summaryEvidence.detected_phases.join(", ")}.`);
+  }
+  if (summaryEvidence.macro_objective_match) {
+    notes.push("Ação candidata tem correspondência com o objetivo macro.");
+  }
+
+  // Resolution context notes
+  for (const note of resolutionQuality.quality_notes) {
+    notes.push(note);
+  }
+
+  // Gate notes
   if (gateResult) {
     notes.push(`Gate de aderência (PR3): decision=${gateResult.decision}, reason_code=${gateResult.reason_code || "N/A"}.`);
   } else {
-    notes.push("Gate de aderência (PR3) não fornecido — interpretação baseada apenas em blocos.");
+    notes.push("Gate de aderência (PR3) não fornecido — interpretação baseada apenas em blocos e summary.");
   }
 
   if (conflicts.length === 0) {
@@ -528,6 +880,112 @@ function _buildNotes(evidence, conflicts, ambiguity, confidence, gateResult) {
   }
 
   return notes;
+}
+
+// ---------------------------------------------------------------------------
+// _buildPossibleReadings(params)
+//
+// Builds possible_readings array: primary reading + alternatives when
+// there is partial evidence supporting more than one interpretation.
+//
+// Only exposes alternative readings when there is real contractual
+// basis — never invents interpretations without evidence.
+//
+// Each reading: { summary, basis, confidence_hint, source }
+// ---------------------------------------------------------------------------
+function _buildPossibleReadings({
+  evidence, summaryEvidence, resolutionQuality, conflicts,
+  ambiguity, confidence, gateResult, candidateAction, actionSummary,
+}) {
+  const readings = [];
+
+  // ─── Primary reading ────────────────────────────────────────────────
+  const primaryParts = [];
+  let primarySource = "block";
+  let primaryConfidence = confidence >= CONFIDENCE_THRESHOLDS.HIGH ? "alta"
+    : confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? "média"
+    : confidence >= CONFIDENCE_THRESHOLDS.LOW ? "baixa" : "muito_baixa";
+
+  if (gateResult && gateResult.decision === "BLOCK") {
+    primaryParts.push("Gate de aderência bloqueou a ação.");
+    primarySource = "gate";
+  } else if (gateResult && gateResult.decision === "ALLOW" && ambiguity === AMBIGUITY_LEVEL.LOW) {
+    primaryParts.push("Ação aderente ao contrato segundo o gate e evidência disponível.");
+  } else if (ambiguity === AMBIGUITY_LEVEL.HIGH || ambiguity === AMBIGUITY_LEVEL.CRITICAL) {
+    primaryParts.push("Evidência contratual insuficiente ou conflitante para interpretação segura.");
+  } else {
+    primaryParts.push("Ação parcialmente alinhada ao contrato com base na evidência disponível.");
+  }
+
+  if (summaryEvidence.macro_objective_match) {
+    primaryParts.push(`Conversa com objetivo macro: "${summaryEvidence.macro_objective}".`);
+  }
+
+  readings.push({
+    summary: primaryParts.join(" "),
+    basis: _describePrimaryBasis(evidence, summaryEvidence, gateResult),
+    confidence_hint: primaryConfidence,
+    source: primarySource,
+  });
+
+  // ─── Alternative readings (only when real evidence supports them) ──
+  // Alt 1: If hard rules from summary conflict but blocks don't show it
+  if (evidence.hard_rules.length === 0 && summaryEvidence.hard_rules_hits.length > 0) {
+    readings.push({
+      summary: `Leitura alternativa: summary_canonic indica regra(s) dura(s) que podem conflitar — "${summaryEvidence.hard_rules_hits[0].signal}".`,
+      basis: `Baseada em ${summaryEvidence.hard_rules_hits.length} sinal(is) de hard_rules no summary, sem evidência correspondente nos blocos selecionados.`,
+      confidence_hint: "baixa",
+      source: "summary",
+    });
+  }
+
+  // Alt 2: If approval points detected but gate allowed
+  if (gateResult && gateResult.decision === "ALLOW" &&
+      (evidence.approval_points.length > 0 || summaryEvidence.approval_points_hits.length > 0)) {
+    const approvalSignal = evidence.approval_points.length > 0
+      ? evidence.approval_points[0].signal
+      : summaryEvidence.approval_points_hits[0].signal;
+    readings.push({
+      summary: `Leitura alternativa: ponto de aprovação contratual detectado ("${approvalSignal}") — gate permitiu, mas aprovação formal pode ainda ser necessária.`,
+      basis: `Sinal de approval_point com sobreposição à ação, mesmo com gate ALLOW.`,
+      confidence_hint: "média",
+      source: evidence.approval_points.length > 0 ? "block" : "summary",
+    });
+  }
+
+  // Alt 3: If resolution used fallback
+  if (resolutionQuality.is_fallback && evidence.total_signals_found > 0) {
+    readings.push({
+      summary: "Leitura alternativa: blocos foram selecionados por fallback — sinais encontrados podem não ser os mais relevantes para esta ação.",
+      basis: `Resolução usou fallback. ${resolutionQuality.matched_count}/${resolutionQuality.total_blocks} blocos selecionados.`,
+      confidence_hint: "baixa",
+      source: "resolution_ctx",
+    });
+  }
+
+  // Alt 4: Conflicting signals between block evidence and gate
+  if (gateResult && gateResult.decision === "ALLOW" &&
+      conflicts.some(c => c.severity === "high" && c.source === "block")) {
+    readings.push({
+      summary: "Leitura alternativa: gate permitiu, mas evidência de blocos sugere possível conflito — pode haver desalinhamento entre gate e contrato detalhado.",
+      basis: `Conflito de severidade alta em blocos + gate ALLOW.`,
+      confidence_hint: "média",
+      source: "block",
+    });
+  }
+
+  return readings;
+}
+
+// ---------------------------------------------------------------------------
+// _describePrimaryBasis — summarizes what the primary reading is based on
+// ---------------------------------------------------------------------------
+function _describePrimaryBasis(evidence, summaryEvidence, gateResult) {
+  const sources = [];
+  if (evidence.total_signals_found > 0) sources.push(`${evidence.total_signals_found} sinal(is) de blocos`);
+  if (summaryEvidence.total_summary_signals > 0) sources.push(`${summaryEvidence.total_summary_signals} sinal(is) de summary`);
+  if (gateResult) sources.push(`gate: ${gateResult.decision}`);
+  return sources.length > 0 ? sources.join(", ") + "." : "Sem base contratual identificada.";
 }
 
 // ===========================================================================
@@ -550,15 +1008,8 @@ function _buildNotes(evidence, conflicts, ambiguity, confidence, gateResult) {
 //     .summary         {object}   — summary_canonic
 //     .resolution_ctx  {object}
 //     .ready_for_pr3   {boolean}
-//   candidateAction    {object}   — ação/intenção candidata:
-//     .intent          {string}   — intenção declarada
-//     .action_type     {string}   — tipo de ação (ex: "deploy", "implement")
-//     .target          {string}   — alvo da ação
-//     .summary         {string}   — resumo textual
-//     .phase           {string}   — fase contratual
-//     .task            {string}   — tarefa
-//     .task_id         {string}   — ID da tarefa
-//   relevantBlocks     {Array}    — blocos já resolvidos ou [] para resolver
+//   candidateAction    {object}   — ação/intenção candidata
+//   relevantBlocks     {Array}    — blocos já resolvidos ou []
 //   adherenceResult    {object?}  — resultado do gate PR3, se disponível
 //
 // Retorna (CognitiveAdvisoryResult):
@@ -573,6 +1024,7 @@ function _buildNotes(evidence, conflicts, ambiguity, confidence, gateResult) {
 //     suggested_next_step         {string}
 //     requires_human_confirmation {boolean}
 //     contract_evidence           {Array}
+//     possible_readings           {Array}
 //     notes                       {Array<string>}
 //   }
 // ---------------------------------------------------------------------------
@@ -586,10 +1038,11 @@ function analyzeContractContextCognitively(input) {
 
   // --- Guard: no contract context ---
   if (!contractContext || !contractContext.contract_id) {
+    const emptySummaryEv = _assessSummaryEvidence(null, "");
     return {
       ok: false,
       interpretation_summary: "Contrato ativo ausente — não é possível realizar interpretação cognitiva.",
-      likely_intent: _buildLikelyIntent(candidateAction, _assessBlockEvidence([], ""), AMBIGUITY_LEVEL.HIGH),
+      likely_intent: _buildLikelyIntent(candidateAction, _assessBlockEvidence([], ""), emptySummaryEv, AMBIGUITY_LEVEL.HIGH),
       ambiguity_level: AMBIGUITY_LEVEL.HIGH,
       confidence: 0.1,
       perceived_conflicts: [],
@@ -597,33 +1050,60 @@ function analyzeContractContextCognitively(input) {
       suggested_next_step: "Ingerir e ativar contrato via PR1/PR2 antes de prosseguir.",
       requires_human_confirmation: true,
       contract_evidence: [],
+      possible_readings: [],
       notes: ["Contrato ativo ausente.", `Scope: ${scope}.`],
     };
   }
 
+  // --- Extract data from contractContext ---
+  const summary = contractContext.summary || null;
+  const resolutionCtx = contractContext.resolution_ctx || null;
+
   // --- Build action summary for matching ---
   const actionSummary = _buildActionSummary(candidateAction);
 
-  // --- Assess block evidence ---
+  // --- Assess block evidence (primary source) ---
   const evidence = _assessBlockEvidence(relevantBlocks, actionSummary);
 
-  // --- Detect conflicts ---
-  const conflicts = _detectConflicts(evidence, gateResult);
+  // --- Assess summary evidence (contextual support + fallback) ---
+  const summaryEvidence = _assessSummaryEvidence(summary, actionSummary);
 
-  // --- Assess ambiguity ---
-  const ambiguity = _assessAmbiguity(evidence, conflicts, relevantBlocks, actionSummary, gateResult);
+  // --- Assess resolution context quality ---
+  const resolutionQuality = _assessResolutionCtxQuality(resolutionCtx);
 
-  // --- Assess confidence ---
-  const confidence = _assessConfidence(evidence, conflicts, relevantBlocks, ambiguity);
+  // --- Detect conflicts (blocks + summary + gate) ---
+  const conflicts = _detectConflicts(evidence, summaryEvidence, gateResult);
+
+  // --- Assess ambiguity (all sources) ---
+  const ambiguity = _assessAmbiguity({
+    evidence, summaryEvidence, resolutionQuality, conflicts,
+    relevantBlocks, actionSummary, gateResult, candidateAction,
+  });
+
+  // --- Assess confidence (all sources) ---
+  const confidence = _assessConfidence({
+    evidence, summaryEvidence, resolutionQuality, conflicts,
+    relevantBlocks, ambiguityLevel: ambiguity, gateResult, candidateAction, actionSummary,
+  });
 
   // --- Build outputs ---
-  const interpretation = _buildInterpretation(evidence, conflicts, ambiguity, confidence, gateResult);
-  const likelyIntent = _buildLikelyIntent(candidateAction, evidence, ambiguity);
+  const interpretation = _buildInterpretation({
+    evidence, summaryEvidence, resolutionQuality, conflicts,
+    ambiguity, confidence, gateResult,
+  });
+  const likelyIntent = _buildLikelyIntent(candidateAction, evidence, summaryEvidence, ambiguity);
   const suggestedAction = _suggestAction(ambiguity, conflicts, confidence, gateResult);
   const suggestedNextStep = _suggestNextStep(ambiguity, conflicts, evidence, gateResult);
   const requiresHumanConfirmation = _shouldRequireHumanConfirmation(ambiguity, conflicts, confidence, gateResult);
-  const contractEvidence = _extractContractEvidence(evidence, conflicts);
-  const notes = _buildNotes(evidence, conflicts, ambiguity, confidence, gateResult);
+  const contractEvidence = _extractContractEvidence(evidence, summaryEvidence, resolutionQuality);
+  const notes = _buildNotes({
+    evidence, summaryEvidence, resolutionQuality, conflicts,
+    ambiguity, confidence, gateResult,
+  });
+  const possibleReadings = _buildPossibleReadings({
+    evidence, summaryEvidence, resolutionQuality, conflicts,
+    ambiguity, confidence, gateResult, candidateAction, actionSummary,
+  });
 
   return {
     ok: true,
@@ -636,6 +1116,7 @@ function analyzeContractContextCognitively(input) {
     suggested_next_step: suggestedNextStep,
     requires_human_confirmation: requiresHumanConfirmation,
     contract_evidence: contractEvidence,
+    possible_readings: possibleReadings,
     notes,
   };
 }
