@@ -127,6 +127,10 @@ const KV_SUFFIX_FUNCTIONAL_LOGS = ":functional_logs"; // kept for backward-compa
 const KV_SUFFIX_FLOG_ENTRY      = ":flog:";
 const MAX_FUNCTIONAL_LOGS_PER_CONTRACT = 50;
 
+// Terminal statuses for the Contract Executor state machine.
+// Contracts in any of these statuses are not considered active.
+const TERMINAL_STATUSES = ["completed", "cancelled", "failed"];
+
 // ---------------------------------------------------------------------------
 // Canonical global statuses for the Contract Executor state machine.
 //
@@ -3589,6 +3593,51 @@ async function handleGetContractSummary(env, contractId) {
   };
 }
 
+// GET /contracts/active-surface — Return the surface of the most recent active contract
+async function handleGetActiveSurface(env) {
+  // Read the contract index
+  let index = [];
+  try {
+    const raw = await env.ENAVIA_BRAIN.get(KV_INDEX_KEY);
+    if (raw) index = JSON.parse(raw);
+  } catch (err) {
+    console.error("[handleGetActiveSurface] Failed to read contract index:", err);
+    index = [];
+  }
+
+  // No contracts in index — return stable empty surface
+  if (!Array.isArray(index) || index.length === 0) {
+    return {
+      status: 200,
+      body: { ok: true, active_state: null, adherence: null },
+    };
+  }
+
+  // Iterate from most recent (last in array) to find first non-terminal contract
+  for (let i = index.length - 1; i >= 0; i--) {
+    const contractId = index[i];
+    const state = await readContractState(env, contractId);
+    if (!state) continue;
+    if (TERMINAL_STATUSES.includes(state.status_global)) continue;
+
+    const decomposition = await readContractDecomposition(env, contractId);
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        active_state: buildContractSummary(state, decomposition),
+        adherence: null,
+      },
+    };
+  }
+
+  // All contracts are terminal — return stable empty surface
+  return {
+    status: 200,
+    body: { ok: true, active_state: null, adherence: null },
+  };
+}
+
 // POST /contracts/execute — Execute current micro-PR in TEST
 async function handleExecuteContract(request, env) {
   let body;
@@ -5097,6 +5146,8 @@ export {
   resolvePlanRevision,
   // Summary
   buildContractSummary,
+  // PR1 — Active surface route
+  handleGetActiveSurface,
   // Route handlers
   handleCreateContract,
   handleGetContract,
