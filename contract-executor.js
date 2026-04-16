@@ -3605,10 +3605,11 @@ async function handleGetActiveSurface(env) {
     index = [];
   }
 
+  // No contracts in index — return stable empty surface
   if (!Array.isArray(index) || index.length === 0) {
     return {
-      status: 404,
-      body: { ok: false, error: "NO_ACTIVE_CONTRACT", message: "No contracts found in index." },
+      status: 200,
+      body: { ok: true, active_state: null, adherence: null },
     };
   }
 
@@ -3625,13 +3626,15 @@ async function handleGetActiveSurface(env) {
       body: {
         ok: true,
         active_state: buildContractSummary(state, decomposition),
+        adherence: null,
       },
     };
   }
 
+  // All contracts are terminal — return stable empty surface
   return {
-    status: 404,
-    body: { ok: false, error: "NO_ACTIVE_CONTRACT", message: "No active (non-terminal) contract found." },
+    status: 200,
+    body: { ok: true, active_state: null, adherence: null },
   };
 }
 
