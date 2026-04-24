@@ -3631,6 +3631,15 @@ async function _dispatchFromChat(env, pendingPlan) {
   return { ok: executorOk, bridge_id: bridgeId, executor_ok: executorOk, executor_response: executorJson };
 }
 
+// Terms used to detect operational context from the incoming message.
+// Separate from _CHAT_BRIDGE_OPERATIONAL_TERMS (planner activation) —
+// this set is broader and focused on whether the message implies
+// system/worker/validation intent that warrants operational mode.
+const _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS = [
+  "validar", "sistema", "worker", "plano", "executor", "execução",
+  "auditoria", "deploy-worker", "healthcheck", "auditar",
+];
+
 // ============================================================================
 // 💬 CHAT LLM-FIRST — POST /chat/run
 //
@@ -3671,6 +3680,8 @@ async function handleChatLLM(request, env) {
 
   const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
   const context = body.context && typeof body.context === "object" ? body.context : {};
+  // debug=true: expose full prompt structure in telemetry for diagnostic purposes.
+  const debugMode = body.debug === true;
 
   // -------------------------------------------------------------------------
   // BLOCO B — Detecção determinística de aprovação e despacho ao executor
@@ -3871,6 +3882,22 @@ async function handleChatLLM(request, env) {
   const operationalOverride = hasOperationalIntent && !hasDangerousTermForOverride;
   const shouldActivatePlanner = pm4AllowsPlanner || operationalOverride;
 
+  // --- Operational Context Detection (target + mensagem) ---
+  // isOperationalContext: true quando context.target existe com campos relevantes OU
+  // quando a mensagem menciona termos operacionais/sistêmicos.
+  // Usado para: injetar target block no prompt, fortalecer instrução de memória e telemetria.
+  const _chatTarget = context.target && typeof context.target === "object" ? context.target : null;
+  const hasTarget = !!(_chatTarget && (_chatTarget.worker || _chatTarget.repo || _chatTarget.environment || _chatTarget.mode));
+  const isOperationalMessage = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
+  const isOperationalContext = hasTarget || isOperationalMessage;
+  const operationalDefaultsUsed = isOperationalContext
+    ? [
+        ...(_chatTarget?.mode === "read_only" ? ["read_only"] : []),
+        "health_first", "no_deploy", "no_write", "approval_required",
+      ]
+    : [];
+  const obviousQuestionsSuppressed = hasTarget;
+
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
     // Leitura de memória estruturada com separação explícita de blocos.
@@ -3895,7 +3922,7 @@ async function handleChatLLM(request, env) {
     // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4) ---
     // System prompt completo: base institucional + tom conversacional + contexto dinâmico
     // + awareness operacional real (PR4)
-    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness });
+    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness, is_operational_context: isOperationalContext });
 
     // --- PR5: Inject conversation history between system and current message ---
     // This gives the LLM real context of the ongoing conversation.
@@ -3959,17 +3986,85 @@ async function handleChatLLM(request, env) {
       }
 
       if (parts.length > 0) {
-        _pr3MemoryBlock.push({
-          role: "system",
-          content: `MEMÓRIA RECUPERADA (PR3):\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`,
-        });
+        const memBlockContent = isOperationalContext
+          ? [
+              "MEMÓRIA RECUPERADA (PR3) — MODO OPERACIONAL:",
+              "Estas memórias são regras operacionais ativas para esta resposta.",
+              "Instruções manuais e aprendizado validado têm peso de regra preferencial — aplique-as diretamente para influenciar sua resposta e decisão.",
+              "Nunca apenas liste ou explique as memórias: use-as para agir.",
+              "Só ignore uma memória se ela for claramente irrelevante para a intenção atual.",
+              "Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.",
+              ...parts,
+            ].join("\n")
+          : [
+              "MEMÓRIA RECUPERADA (PR3):",
+              "Regra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.",
+              ...parts,
+            ].join("\n");
+        _pr3MemoryBlock.push({ role: "system", content: memBlockContent });
       }
+    }
+
+    // --- Operational Context Override Block ---
+    // When target is present, inject a dedicated system message immediately
+    // before the user message. This high-recency instruction overrides the
+    // generic "short reply" rule (section 6 of chatSystemPrompt) for operational
+    // queries, anchoring the LLM to the real target and active memory rules.
+    //
+    // The PRIORIDADE DE DECISÃO section here is intentionally complementary to
+    // section 7b in buildChatSystemPrompt (enavia-cognitive-runtime.js): the base
+    // prompt establishes the general principle (always active), while this block
+    // is the high-recency last-instruction injected immediately before the user
+    // message and is only active when hasTarget=true. Both are needed: the base
+    // prompt sets behaviour for all contexts; this block is the authoritative anchor
+    // for the specific operational turn.
+    const _operationalContextBlock = [];
+    if (hasTarget) {
+      const _tgt = _chatTarget;
+      const targetDesc = [
+        _tgt.worker      ? `worker: ${_tgt.worker}`           : null,
+        _tgt.repo        ? `repo: ${_tgt.repo}`               : null,
+        _tgt.branch      ? `branch: ${_tgt.branch}`           : null,
+        _tgt.environment ? `environment: ${_tgt.environment}` : null,
+        _tgt.mode        ? `mode: ${_tgt.mode}`               : null,
+      ].filter(Boolean).join(" | ");
+
+      const memActive = chatRetrievalSummary.applied && chatRetrievalSummary.total_memories_read > 0;
+      const memNote = memActive
+        ? `\nMEMÓRIA ATIVA (${chatRetrievalSummary.total_memories_read} item(s)): instrução manual e aprendizado validado aplicam-se como regra operacional. Siga preferências de read_only, aprovação e segurança se presentes.`
+        : "";
+
+      const readOnlyNote = _tgt.mode === "read_only"
+        ? "\nMODO READ-ONLY: resposta NÃO pode sugerir deploy, patch, merge, push ou escrita de qualquer tipo."
+        : "";
+
+      _operationalContextBlock.push({
+        role: "system",
+        content: `INSTRUÇÃO OPERACIONAL PARA ESTA RESPOSTA:\n` +
+          `Alvo ativo confirmado: ${targetDesc}.\n` +
+          `O operador fez uma pergunta operacional. Você CONHECE o alvo acima — não pergunte qual sistema, worker ou ambiente.\n` +
+          `Responda diretamente usando o alvo. Pode e deve dar uma resposta completa e direta — a restrição de "reply curto" não se aplica a perguntas operacionais com alvo definido.\n` +
+          `Escreva de forma natural, sem markdown headers, sem "Fase 1/2/3" ou listas numeradas.\n` +
+          `\nRESOLUÇÃO DE AMBIGUIDADE — REGRA OBRIGATÓRIA:\n` +
+          `Quando o operador usar termos genéricos como "o sistema", "o worker", "o ambiente" ou "o projeto" e houver target ativo, resolva imediatamente para o target confirmado acima.\n` +
+          `NÃO pergunte "você quer dizer nv-enavia ou outro sistema?" — a resposta é sempre o target ativo.\n` +
+          `Se quiser confirmar, use: "Vou assumir o target atual (${_tgt.worker || _tgt.repo || "target ativo"}); me corrija se quiser outro alvo."\n` +
+          `\nPRIORIDADE DE DECISÃO — siga esta ordem antes de responder:\n` +
+          `1. Interprete a intenção do operador.\n` +
+          `2. Cruze com o contexto operacional (alvo acima).\n` +
+          `3. Cruze com as memórias recuperadas (se presentes): trate-as como instruções ou preferências ativas, não como informação descritiva.\n` +
+          `4. Só pergunte algo se faltar informação ESSENCIAL para executar a ação — nunca para entender o contexto (que já foi fornecido).\n` +
+          `Evite perguntas genéricas quando o contexto ou a memória já fornecem a base necessária.` +
+          readOnlyNote +
+          memNote,
+      });
     }
 
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
       ..._pr3MemoryBlock,
       ...conversationHistory,
+      ..._operationalContextBlock,
       { role: "user", content: message },
     ];
 
@@ -4208,6 +4303,13 @@ async function handleChatLLM(request, env) {
         ]
       : [];
 
+    // --- Diagnostic telemetry: target and memory observability ---
+    const _targetFieldsSeen = hasTarget
+      ? Object.entries(_chatTarget).filter(([, v]) => v != null && v !== "").map(([k]) => k)
+      : [];
+    const _memoryContentInjected = _pr3MemoryBlock.length > 0;
+    const _memoryHitsCount = _chatMemHits.length;
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
@@ -4216,6 +4318,7 @@ async function handleChatLLM(request, env) {
       planner_used: plannerUsed,
       memory_applied: _chatMemApplied,
       memory_hits: _chatMemHits,
+      operational_context_applied: isOperationalContext,
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
@@ -4224,6 +4327,12 @@ async function handleChatLLM(request, env) {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: plannerUsed ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
+        operational_defaults_used: operationalDefaultsUsed,
+        obvious_questions_suppressed: obviousQuestionsSuppressed,
+        target_seen: hasTarget,
+        target_fields_seen: _targetFieldsSeen,
+        memory_content_injected: _memoryContentInjected,
+        memory_hits_count: _memoryHitsCount,
         // PR3: retrieval context summary (separação de blocos explícita)
         retrieval: chatRetrievalSummary,
         // PR7: explicit continuity flag — true when conversation history was injected into LLM context
@@ -4254,6 +4363,48 @@ async function handleChatLLM(request, env) {
           approval_mode:     operationalAwareness.approval.mode,
           human_gate_active: operationalAwareness.approval.human_gate_active,
         },
+        // prompt_debug: only present when body.debug===true — exposes full LLM message structure
+        ...(debugMode ? {
+          prompt_debug: (() => {
+            const roles = llmMessages.map((m) => m.role);
+            const systemMsgs = llmMessages.filter((m) => m.role === "system");
+            const opBlockIndex = llmMessages.findIndex(
+              (m) => m.role === "system" && typeof m.content === "string" && m.content.includes("INSTRUÇÃO OPERACIONAL PARA ESTA RESPOSTA")
+            );
+            const memBlockIndex = llmMessages.findIndex(
+              (m) => m.role === "system" && typeof m.content === "string" && m.content.includes("MEMÓRIA RECUPERADA")
+            );
+            const userMsg = llmMessages.find((m) => m.role === "user");
+            const opBlock = opBlockIndex >= 0 ? llmMessages[opBlockIndex] : null;
+            const memBlock = memBlockIndex >= 0 ? llmMessages[memBlockIndex] : null;
+            const baseSystemMsg = llmMessages[0];
+            return {
+              llm_messages_count: llmMessages.length,
+              llm_messages_roles: roles,
+              context_target_received: hasTarget,
+              target_seen: hasTarget,
+              target_fields_seen: _targetFieldsSeen,
+              has_operational_context_block: opBlockIndex >= 0,
+              operational_block_index: opBlockIndex >= 0 ? opBlockIndex : null,
+              operational_block_preview: opBlock ? String(opBlock.content).slice(0, 600) : null,
+              has_resolution_ambiguity_block: opBlock
+                ? String(opBlock.content).includes("RESOLUÇÃO DE AMBIGUIDADE")
+                : false,
+              has_target_in_final_prompt: roles.some((r) => r === "system") &&
+                llmMessages.some((m) => typeof m.content === "string" && m.content.includes("ALVO OPERACIONAL ATIVO")),
+              has_memory_block: memBlockIndex >= 0,
+              memory_block_preview: memBlock ? String(memBlock.content).slice(0, 400) : null,
+              system_messages_preview: systemMsgs.map((m) => ({
+                index: llmMessages.indexOf(m),
+                preview: String(m.content).slice(0, 300),
+              })),
+              user_message_final: userMsg ? String(userMsg.content).slice(0, 300) : null,
+              base_system_has_section_5c: baseSystemMsg
+                ? String(baseSystemMsg.content).includes("ALVO OPERACIONAL ATIVO")
+                : false,
+            };
+          })(),
+        } : {}),
       },
     });
   } catch (err) {

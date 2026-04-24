@@ -84,9 +84,10 @@ export function buildCognitivePromptBlock(opts = {}) {
  *   - base cognitiva (identidade, capacidades, constituição)
  *   - diretriz de tom conversacional
  *   - contexto dinâmico da sessão (quando fornecido)
+ *   - bloco de alvo operacional ativo (quando context.target presente ou modo operacional ativo)
  *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
  *
- * @param {{ ownerName?: string, context?: object, operational_awareness?: object }} [opts]
+ * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean }} [opts]
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
@@ -96,6 +97,7 @@ export function buildChatSystemPrompt(opts = {}) {
   const operational_awareness = opts.operational_awareness && typeof opts.operational_awareness === "object"
     ? opts.operational_awareness
     : null;
+  const is_operational_context = opts.is_operational_context === true;
 
   const sections = [];
 
@@ -206,6 +208,57 @@ export function buildChatSystemPrompt(opts = {}) {
     }
   }
 
+  // === 5c. Alvo Operacional Ativo + Instruções Operacionais ===
+  // Injetado quando context.target existe com campos relevantes OU modo operacional ativo.
+  // Garante que o LLM trate o alvo como referência real, não pergunte dados já presentes
+  // no target e siga defaults seguros para validação.
+  const target = context.target && typeof context.target === "object" ? context.target : null;
+  const hasActiveTarget = !!(target && (target.worker || target.repo || target.environment || target.mode));
+
+  if (hasActiveTarget || is_operational_context) {
+    // Bloco de target em formato legível para o LLM
+    if (hasActiveTarget) {
+      const targetLines = ["[ALVO OPERACIONAL ATIVO]"];
+      if (target.worker)      targetLines.push(`worker: ${target.worker}`);
+      if (target.repo)        targetLines.push(`repo: ${target.repo}`);
+      if (target.branch)      targetLines.push(`branch: ${target.branch}`);
+      if (target.environment) targetLines.push(`environment: ${target.environment}`);
+      if (target.mode)        targetLines.push(`mode: ${target.mode}`);
+      if (target.target_type) targetLines.push(`tipo: ${target.target_type}`);
+      sections.push("", targetLines.join("\n"));
+    }
+
+    // Instruções operacionais fortes
+    sections.push(
+      "",
+      "MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:",
+    );
+    if (hasActiveTarget) {
+      sections.push("• O alvo operacional acima é real e está ativo. Use-o como referência nesta resposta — não pergunte dados que já estão no alvo.");
+    }
+    if (target?.mode === "read_only") {
+      sections.push("• MODO READ-ONLY CONFIRMADO: não sugira deploy, patch, merge, escrita ou qualquer operação de escrita. Foque exclusivamente em validação e leitura.");
+    }
+    sections.push(
+      "• NUNCA pergunte 'qual sistema?', 'qual worker?' ou 'qual ambiente?' se esses dados já existirem no alvo operacional.",
+      "• Quando o operador perguntar 'como validar o sistema?' e houver alvo ativo, responda diretamente com um plano usando o alvo — não pergunte qual sistema.",
+      "• Defaults seguros para validação de sistema/worker: health/status primeiro; leitura apenas; sem deploy; sem patch; sem escrita; pedir aprovação antes de qualquer execução.",
+      "• Quando houver dúvida não bloqueante, assuma o default seguro e informe qual default foi assumido.",
+      "• Pergunte apenas se faltar dado bloqueante real que impeça a ação.",
+      "",
+      "NÃO PERGUNTAR (quando já existem no alvo operacional):",
+      "• 'qual sistema?' — use o worker/repo do alvo",
+      "• 'qual worker?' — use o worker do alvo",
+      "• 'produção ou staging?' — use o environment do alvo",
+      "• 'read-only ou execução?' — use o mode do alvo",
+      "",
+      "PODE PERGUNTAR (apenas lacunas realmente bloqueantes):",
+      "• Endpoint específico, se não houver default seguro disponível.",
+      "• Critério de sucesso específico, se a ação for além de health/status.",
+      "• Autorização humana explícita, antes de qualquer execução.",
+    );
+  }
+
   // === 6. Política de arbitração de ferramentas internas (PR3) ===
   // Orienta o LLM sobre o papel do reply vs. planner interno — sem expor mecânica.
   sections.push(
@@ -237,6 +290,22 @@ export function buildChatSystemPrompt(opts = {}) {
     "",
     "Quando houver histórico desta conversa disponível, use-o com naturalidade — continue de onde paramos, aproveite o que já foi dito, não repita perguntas respondidas e mantenha coerência com suas respostas anteriores.",
     "Você só conhece o que está nesta conversa. Se não souber algo, admita com honestidade.",
+  );
+
+  // === 7b. Uso e criação de memória operacional ===
+  sections.push(
+    "",
+    "USO DE MEMÓRIA RECUPERADA:",
+    "• Memórias recuperadas são instruções ou preferências ativas — use-as para influenciar sua resposta e decisão.",
+    "• Nunca apenas liste ou explique memórias — use-as para agir.",
+    "• Só ignore uma memória se ela for claramente irrelevante para a intenção atual.",
+    "",
+    "CRIAÇÃO DE MEMÓRIA — só registre quando identificar:",
+    "• Regra operacional explícita do operador.",
+    "• Preferência persistente confirmada (não inferida de uma única mensagem).",
+    "• Padrão recorrente confirmado por múltiplas interações.",
+    "• Nunca salve memória baseada em uma única interação ambígua.",
+    "• A memória deve ser clara, reutilizável e aplicável em sessões futuras.",
   );
 
   // === 8. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
