@@ -144,10 +144,34 @@ export function mapPlannerSnapshot(raw) {
           status:      "pending",
           durationMs:  null,
           deps:        [],
+          action:      null,
+          input:       null,
+          expected:    null,
+          safe:        true,
         };
       }
-      // Already object (mock shape or enriched shape) — pass through.
-      return s;
+      // Executable step object — normalise to card shape.
+      // Build a human-readable label from action + target when label is absent.
+      const derivedLabel = typeof s.label === "string" && s.label.trim()
+        ? s.label
+        : (s.action ? `${s.action}${s.target ? ` ${s.target}` : ""}` : `Passo ${i + 1}`);
+
+      return {
+        id:          s.id          ?? `s${i + 1}`,
+        label:       derivedLabel,
+        description: s.description ?? null,
+        status:      s.status      ?? "pending",
+        durationMs:  s.durationMs  ?? null,
+        deps:        Array.isArray(s.deps) ? s.deps : [],
+        // Executable fields — forwarded for rendering; null when absent
+        action:      s.action      ?? null,
+        // `input` is the canonical field name in execution_spec; `target` is accepted
+        // as a backend alias (some LLM responses may use the spec's earlier `target` name).
+        input:       s.input       ?? s.target ?? null,
+        // `expected` is canonical; `expected_output` accepted as LLM alias.
+        expected:    s.expected    ?? s.expected_output ?? null,
+        safe:        typeof s.safe === "boolean" ? s.safe : true,
+      };
     });
     // Carry objective if present (used in PlanSteps header and Chat summary)
     canonicalPlan = {

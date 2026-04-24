@@ -59,9 +59,31 @@ function formatDuration(ms) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+// ── Action badge metadata ─────────────────────────────────────────────────────
+const ACTION_META = {
+  http_get:            { label: "GET",       color: "#3B82F6", bg: "rgba(59,130,246,0.1)",  border: "rgba(59,130,246,0.25)" },
+  http_post:           { label: "POST",      color: "#F59E0B", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.25)" },
+  discover_endpoints:  { label: "DISCOVER",  color: "#8B5CF6", bg: "rgba(139,92,246,0.1)",  border: "rgba(139,92,246,0.25)" },
+  validate_config:     { label: "VALIDATE",  color: "#10B981", bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.25)" },
+  read_logs:           { label: "LOGS",      color: "#6B7280", bg: "rgba(107,114,128,0.1)", border: "rgba(107,114,128,0.25)" },
+};
+
+function formatExpected(expected) {
+  if (!expected || typeof expected !== "object") return null;
+  const parts = [];
+  if (typeof expected.status === "number") parts.push(`HTTP ${expected.status}`);
+  if (Array.isArray(expected.contains) && expected.contains.length > 0) {
+    parts.push(`contains: ${expected.contains.join(", ")}`);
+  }
+  if (typeof expected.matches === "string") parts.push(`matches: ${expected.matches}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 function StepRow({ step, index, total }) {
   const meta = STEP_META[step.status] ?? STEP_META[STEP_STATUS.PENDING];
   const isLast = index === total - 1;
+  const actionMeta = step.action ? (ACTION_META[step.action] ?? null) : null;
+  const expectedSummary = formatExpected(step.expected);
 
   return (
     <div style={s.stepOuter}>
@@ -107,6 +129,25 @@ function StepRow({ step, index, total }) {
           </div>
           {step.description && (
             <p style={s.stepDesc}>{step.description}</p>
+          )}
+          {/* Executable step details */}
+          {(actionMeta || step.input || expectedSummary || step.safe === true) && (
+            <div style={s.execRow}>
+              {actionMeta && (
+                <span style={{ ...s.execBadge, color: actionMeta.color, background: actionMeta.bg, borderColor: actionMeta.border }}>
+                  {actionMeta.label}
+                </span>
+              )}
+              {step.input && (
+                <span style={s.execPath}>{step.input}</span>
+              )}
+              {expectedSummary && (
+                <span style={s.execExpected}>→ {expectedSummary}</span>
+              )}
+              {step.safe === true && (
+                <span style={s.safeChip}>safe</span>
+              )}
+            </div>
           )}
           {step.deps && step.deps.length > 0 && (
             <p style={s.stepDeps}>
@@ -378,5 +419,54 @@ const s = {
     border: "1px solid var(--border)",
     padding: "1px 5px",
     borderRadius: "3px",
+  },
+  // Executable step styles
+  execRow: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "5px",
+    marginTop: "5px",
+    marginBottom: "2px",
+  },
+  execBadge: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "0.5px",
+    padding: "1px 6px",
+    borderRadius: "3px",
+    border: "1px solid",
+    flexShrink: 0,
+  },
+  execPath: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "11px",
+    color: "var(--text-secondary)",
+    background: "var(--bg-base)",
+    border: "1px solid var(--border)",
+    padding: "1px 6px",
+    borderRadius: "3px",
+    maxWidth: "260px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  execExpected: {
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    fontFamily: "var(--font-mono)",
+    whiteSpace: "nowrap",
+  },
+  safeChip: {
+    fontSize: "10px",
+    fontWeight: 600,
+    color: "#10B981",
+    background: "rgba(16,185,129,0.08)",
+    border: "1px solid rgba(16,185,129,0.2)",
+    padding: "1px 5px",
+    borderRadius: "3px",
+    letterSpacing: "0.3px",
+    flexShrink: 0,
   },
 };
