@@ -3,6 +3,7 @@ import { useChatState } from "../chat/useChatState";
 import { useTargetState } from "../chat/useTargetState";
 import { useAttachments } from "../chat/useAttachments";
 import { usePlannerStore } from "../store/plannerStore";
+import { getApiConfig } from "../api";
 import MessageBubble from "../chat/MessageBubble";
 import ChatComposer from "../chat/ChatComposer";
 import TargetPanel from "../chat/TargetPanel";
@@ -177,6 +178,9 @@ export default function ChatPage() {
   const { plannerSnapshot } = usePlannerStore();
   const hasPendingPlan = !!plannerSnapshot;
 
+  // Memory is only available in real mode (endpoint /memory/manual requires backend)
+  const memoryAvailable = getApiConfig().mode === "real";
+
   // Ref for triggering file input from QuickActions
   const attachTriggerRef = useRef(null);
 
@@ -237,7 +241,7 @@ export default function ChatPage() {
         <QuickActions
           disabled={thinking}
           pendingPlan={hasPendingPlan}
-          memoryAvailable={true}
+          memoryAvailable={memoryAvailable}
           onValidate={() => validateSystem(buildContext())}
           onGeneratePlan={() => runPlannerAction(inputValue, buildContext())}
           onApprove={() => approveExecution(buildContext())}

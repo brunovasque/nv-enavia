@@ -1,5 +1,18 @@
 import { useState, useRef } from "react";
-import { useTargetState, DEFAULT_TARGET } from "./useTargetState";
+
+const DEFAULT_TARGET_REPO     = "brunovasque/nv-enavia";
+const DEFAULT_TARGET_WORKER   = "nv-enavia";
+const DEFAULT_TARGET_BRANCH   = "main";
+const DEFAULT_TARGET_ENV      = "prod";
+const DEFAULT_PLACEHOLDERS = {
+  target_id:   "nv-enavia-prod",
+  target_type: "cloudflare_worker",
+  repo:        DEFAULT_TARGET_REPO,
+  worker:      DEFAULT_TARGET_WORKER,
+  branch:      DEFAULT_TARGET_BRANCH,
+  environment: DEFAULT_TARGET_ENV,
+  mode:        "read_only",
+};
 
 const FIELD_LABELS = {
   target_id:   "Target ID",
@@ -20,10 +33,10 @@ export default function TargetPanel({ target, onUpdate, onReset }) {
   }
 
   const isDefault =
-    target.repo === DEFAULT_TARGET.repo &&
-    target.worker === DEFAULT_TARGET.worker &&
-    target.branch === DEFAULT_TARGET.branch &&
-    target.environment === DEFAULT_TARGET.environment;
+    target.repo === DEFAULT_TARGET_REPO &&
+    target.worker === DEFAULT_TARGET_WORKER &&
+    target.branch === DEFAULT_TARGET_BRANCH &&
+    target.environment === DEFAULT_TARGET_ENV;
 
   return (
     <div style={styles.wrap}>
@@ -59,7 +72,7 @@ export default function TargetPanel({ target, onUpdate, onReset }) {
                   style={styles.fieldInput}
                   value={target[field] ?? ""}
                   onChange={(e) => handleChange(field, e.target.value)}
-                  placeholder={DEFAULT_TARGET[field] ?? ""}
+                  placeholder={DEFAULT_PLACEHOLDERS[field] ?? ""}
                   aria-label={label}
                 />
               )}

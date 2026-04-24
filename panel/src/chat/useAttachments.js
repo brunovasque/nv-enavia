@@ -66,8 +66,11 @@ export function useAttachments() {
 
       let truncated = false;
       if (new Blob([text]).size > MAX_BYTES) {
-        // Truncate to MAX_BYTES chars (conservative: use char count as proxy)
-        text = text.slice(0, MAX_BYTES) + "\n[... arquivo truncado por tamanho]";
+        // Truncate accurately by byte length using TextEncoder
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(text);
+        const truncBytes = bytes.slice(0, MAX_BYTES);
+        text = new TextDecoder("utf-8", { fatal: false }).decode(truncBytes) + "\n[... arquivo truncado por tamanho]";
         truncated = true;
       }
 

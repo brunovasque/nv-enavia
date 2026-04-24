@@ -238,7 +238,9 @@ export function useChatState() {
       content:  content || "Confiabilidade sempre: priorizar segurança, staging e validação read-only antes de qualquer ação.",
       source:   "chat_quick_action",
       session_id: getSessionId(),
-      ...(context?.target ? { tags: [context.target.environment, context.target.worker] } : {}),
+      ...(context?.target ? {
+        tags: [context.target.environment, context.target.worker].filter((v) => typeof v === "string" && v.length > 0),
+      } : {}),
     };
 
     let result;
