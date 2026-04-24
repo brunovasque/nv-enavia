@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { chatSend, normalizeError, runPlanner, createManualMemory, getSessionId } from "../api";
 import { onChatSuccess } from "../store/plannerStore";
+import { targetFields } from "./useTargetState";
 
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
@@ -175,7 +176,7 @@ export function useChatState() {
     setThinking(true);
     setError(null);
 
-    const promptText = trimmed || "Gere um plano operacional com base no contexto atual.";
+    const promptText = trimmed || "Validar o target atual em modo read-only";
     const userMsg = makeMsg("user", `📋 Gerar plano: ${promptText}`);
     setMessages((prev) => [...prev, userMsg]);
 
@@ -211,6 +212,12 @@ export function useChatState() {
       || planner?.gate?.gate_status === "approval_required";
 
     let summaryLines = [];
+    // Target metadata — shown as separate line, never mixed with objective
+    const tFields = targetFields(context?.target);
+    if (tFields.length > 0) {
+      const parts = tFields.map((f) => f.value).join(" / ");
+      summaryLines.push(`**Target:** ${parts}`);
+    }
     if (objective) {
       summaryLines.push(`**Objetivo:** ${objective}`);
     }

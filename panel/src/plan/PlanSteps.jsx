@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { STEP_STATUS } from "./mockPlan";
+import { targetFields } from "../chat/useTargetState";
 
 const STEP_META = {
   [STEP_STATUS.DONE]: {
@@ -121,7 +122,24 @@ function StepRow({ step, index, total }) {
   );
 }
 
-export default function PlanSteps({ canonicalPlan }) {
+function TargetMetaRow({ target }) {
+  const parts = targetFields(target);
+
+  if (parts.length === 0) return null;
+
+  return (
+    <div style={s.targetMeta}>
+      {parts.map(({ label, value }) => (
+        <span key={label} style={s.targetChip}>
+          <span style={s.targetChipLabel}>{label}</span>
+          <span style={s.targetChipValue}>{value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export default function PlanSteps({ canonicalPlan, targetInfo }) {
   if (!canonicalPlan) return null;
   const { objective, steps } = canonicalPlan;
 
@@ -131,13 +149,14 @@ export default function PlanSteps({ canonicalPlan }) {
         <div style={s.cardHeader}>
           <p style={s.cardTitle}>Plano Canônico</p>
         </div>
+        {targetInfo && <TargetMetaRow target={targetInfo} />}
         {objective && <p style={s.objective}>{objective}</p>}
         <p style={s.empty}>Nenhum plano estruturado disponível.</p>
       </div>
     );
   }
 
-  const done = steps.filter((s) => s.status === STEP_STATUS.DONE).length;
+  const done = steps.filter((step) => step.status === STEP_STATUS.DONE).length;
   const total = steps.length;
 
   return (
@@ -149,6 +168,9 @@ export default function PlanSteps({ canonicalPlan }) {
           {done}/{total} concluídos
         </span>
       </div>
+
+      {/* Target metadata — separate from objective */}
+      {targetInfo && <TargetMetaRow target={targetInfo} />}
 
       {/* Objective — shown when present */}
       {objective && <p style={s.objective}>{objective}</p>}
@@ -182,6 +204,30 @@ const s = {
     display: "flex",
     flexDirection: "column",
     gap: "14px",
+  },
+  targetMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+  },
+  targetChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    background: "var(--bg-base)",
+    border: "1px solid var(--border)",
+    borderRadius: "4px",
+  },
+  targetChipLabel: {
+    color: "var(--text-muted)",
+    fontWeight: 600,
+    letterSpacing: "0.3px",
+  },
+  targetChipValue: {
+    color: "var(--text-secondary)",
+    fontFamily: "var(--font-mono)",
   },
   objective: {
     fontSize: "13px",

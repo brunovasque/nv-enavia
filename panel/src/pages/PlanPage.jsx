@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan, getSessionId } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
+import { TARGET_STORAGE_KEY, DEFAULT_TARGET } from "../chat/useTargetState";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
 import OutputModeCard from "../plan/OutputModeCard";
@@ -64,6 +65,19 @@ function BlockedBanner({ gate }) {
       </div>
     </div>
   );
+}
+
+// Read current operational target from sessionStorage (set by ChatPage)
+function readTargetFromStorage() {
+  try {
+    const raw = sessionStorage.getItem(TARGET_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_TARGET };
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return { ...DEFAULT_TARGET };
+    return parsed;
+  } catch {
+    return { ...DEFAULT_TARGET };
+  }
 }
 
 // ── PlanPage ───────────────────────────────────────────────────────────────
@@ -322,7 +336,7 @@ export default function PlanPage() {
         <div style={s.body}>
           {/* Main column */}
           <div style={s.main}>
-            <PlanSteps canonicalPlan={plan.canonicalPlan} />
+            <PlanSteps canonicalPlan={plan.canonicalPlan} targetInfo={readTargetFromStorage()} />
           </div>
 
           {/* Sidebar column */}

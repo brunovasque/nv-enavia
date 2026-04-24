@@ -17,6 +17,22 @@ import { useState, useCallback } from "react";
 
 export const TARGET_STORAGE_KEY = "enavia_operational_target";
 
+/**
+ * Returns an ordered array of { label, value } pairs for a target object.
+ * Used for both display (chip rendering) and summary formatting.
+ * Fields with no value are excluded.
+ */
+export function targetFields(target) {
+  if (!target || typeof target !== "object") return [];
+  return [
+    { label: "Worker", value: target.worker },
+    { label: "Repo",   value: target.repo },
+    { label: "Branch", value: target.branch },
+    { label: "Env",    value: target.environment },
+    { label: "Modo",   value: target.mode },
+  ].filter((f) => Boolean(f.value));
+}
+
 export const DEFAULT_TARGET = {
   target_id:   "nv-enavia-prod",
   target_type: "cloudflare_worker",
