@@ -3987,16 +3987,54 @@ async function handleChatLLM(request, env) {
         _pr3MemoryBlock.push({
           role: "system",
           content: isOperationalContext
-            ? `MEMÓRIA RECUPERADA (PR3) — MODO OPERACIONAL:\nEstas memórias devem influenciar a decisão operacional desta resposta. Instruções manuais e aprendizado validado têm peso de regra operacional preferencial — não apenas contexto auxiliar.\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`
+            ? `MEMÓRIA RECUPERADA (PR3) — MODO OPERACIONAL:\nEstas memórias são regras operacionais ativas para esta resposta. Instruções manuais e aprendizado validado têm peso de regra preferencial — aplique-as diretamente. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`
             : `MEMÓRIA RECUPERADA (PR3):\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`,
         });
       }
+    }
+
+    // --- Operational Context Override Block ---
+    // When target is present, inject a dedicated system message immediately
+    // before the user message. This high-recency instruction overrides the
+    // generic "short reply" rule (section 6 of chatSystemPrompt) for operational
+    // queries, anchoring the LLM to the real target and active memory rules.
+    const _operationalContextBlock = [];
+    if (hasTarget) {
+      const _tgt = _chatTarget;
+      const targetDesc = [
+        _tgt.worker      ? `worker: ${_tgt.worker}`           : null,
+        _tgt.repo        ? `repo: ${_tgt.repo}`               : null,
+        _tgt.branch      ? `branch: ${_tgt.branch}`           : null,
+        _tgt.environment ? `environment: ${_tgt.environment}` : null,
+        _tgt.mode        ? `mode: ${_tgt.mode}`               : null,
+      ].filter(Boolean).join(" | ");
+
+      const memActive = chatRetrievalSummary.applied === true && chatRetrievalSummary.total_memories_read > 0;
+      const memNote = memActive
+        ? `\nMEMÓRIA ATIVA (${chatRetrievalSummary.total_memories_read} item(s)): instrução manual e aprendizado validado aplicam-se como regra operacional. Siga preferências de read_only, aprovação e segurança se presentes.`
+        : "";
+
+      const readOnlyNote = _tgt.mode === "read_only"
+        ? "\nMODO READ-ONLY: resposta NÃO pode sugerir deploy, patch, merge, push ou escrita de qualquer tipo."
+        : "";
+
+      _operationalContextBlock.push({
+        role: "system",
+        content: `INSTRUÇÃO OPERACIONAL PARA ESTA RESPOSTA:\n` +
+          `Alvo ativo confirmado: ${targetDesc}.\n` +
+          `O operador fez uma pergunta operacional. Você CONHECE o alvo acima — não pergunte qual sistema, worker ou ambiente.\n` +
+          `Responda diretamente usando o alvo. Pode e deve dar uma resposta completa e direta — a restrição de "reply curto" não se aplica a perguntas operacionais com alvo definido.\n` +
+          `Escreva de forma natural, sem markdown headers, sem "Fase 1/2/3" ou listas numeradas.` +
+          readOnlyNote +
+          memNote,
+      });
     }
 
     const llmMessages = [
       { role: "system", content: chatSystemPrompt },
       ..._pr3MemoryBlock,
       ...conversationHistory,
+      ..._operationalContextBlock,
       { role: "user", content: message },
     ];
 
@@ -4235,6 +4273,13 @@ async function handleChatLLM(request, env) {
         ]
       : [];
 
+    // --- Diagnostic telemetry: target and memory observability ---
+    const _targetFieldsSeen = hasTarget
+      ? Object.entries(_chatTarget).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k]) => k)
+      : [];
+    const _memoryContentInjected = _pr3MemoryBlock.length > 0;
+    const _memoryHitsCount = _chatMemHits.length;
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
@@ -4254,6 +4299,10 @@ async function handleChatLLM(request, env) {
         pipeline: plannerUsed ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
         operational_defaults_used: operationalDefaultsUsed,
         obvious_questions_suppressed: obviousQuestionsSuppressed,
+        target_seen: hasTarget,
+        target_fields_seen: _targetFieldsSeen,
+        memory_content_injected: _memoryContentInjected,
+        memory_hits_count: _memoryHitsCount,
         // PR3: retrieval context summary (separação de blocos explícita)
         retrieval: chatRetrievalSummary,
         // PR7: explicit continuity flag — true when conversation history was injected into LLM context
