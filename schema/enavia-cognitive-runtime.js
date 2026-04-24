@@ -234,7 +234,7 @@ export function buildChatSystemPrompt(opts = {}) {
       "MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:",
     );
     if (hasActiveTarget) {
-      sections.push("• O alvo operacional acima é real e está ativo. Use-o como referência para todas as respostas desta conversa — não pergunte dados que já estão no alvo.");
+      sections.push("• O alvo operacional acima é real e está ativo. Use-o como referência nesta resposta — não pergunte dados que já estão no alvo.");
     }
     if (target?.mode === "read_only") {
       sections.push("• MODO READ-ONLY CONFIRMADO: não sugira deploy, patch, merge, escrita ou qualquer operação de escrita. Foque exclusivamente em validação e leitura.");

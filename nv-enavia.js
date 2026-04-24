@@ -3631,6 +3631,15 @@ async function _dispatchFromChat(env, pendingPlan) {
   return { ok: executorOk, bridge_id: bridgeId, executor_ok: executorOk, executor_response: executorJson };
 }
 
+// Terms used to detect operational context from the incoming message.
+// Separate from _CHAT_BRIDGE_OPERATIONAL_TERMS (planner activation) —
+// this set is broader and focused on whether the message implies
+// system/worker/validation intent that warrants operational mode.
+const _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS = [
+  "validar", "sistema", "worker", "plano", "executor", "execução",
+  "auditoria", "deploy-worker", "healthcheck", "auditar",
+];
+
 // ============================================================================
 // 💬 CHAT LLM-FIRST — POST /chat/run
 //
@@ -3875,13 +3884,9 @@ async function handleChatLLM(request, env) {
   // isOperationalContext: true quando context.target existe com campos relevantes OU
   // quando a mensagem menciona termos operacionais/sistêmicos.
   // Usado para: injetar target block no prompt, fortalecer instrução de memória e telemetria.
-  const _OPERATIONAL_CONTEXT_MSG_TERMS = [
-    "validar", "sistema", "worker", "plano", "executor", "execução",
-    "auditoria", "deploy-worker", "healthcheck", "auditar",
-  ];
   const _chatTarget = context.target && typeof context.target === "object" ? context.target : null;
   const hasTarget = !!(_chatTarget && (_chatTarget.worker || _chatTarget.repo || _chatTarget.environment || _chatTarget.mode));
-  const isOperationalMessage = _OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
+  const isOperationalMessage = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
   const isOperationalContext = hasTarget || isOperationalMessage;
   const operationalDefaultsUsed = isOperationalContext
     ? [
