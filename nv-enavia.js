@@ -3990,9 +3990,19 @@ async function handleChatLLM(request, env) {
 
         // ---------------------------------------------------------------
         // BLOCO A — Salvar pending_plan no KV quando gate exige aprovação
+        //           OU quando há intenção operacional/mecânica segura.
         //
-        // Condições: session_id existe + gate exige aprovação humana +
-        // plano não é formal_contract (Level C) + KV disponível.
+        // Condições:
+        //   - session_id existe
+        //   - gate exige aprovação humana  OR planner foi ativado por
+        //     intenção operacional/mecânica determinística (operationalOverride)
+        //   - outputMode não é formal_contract (Level C)
+        //   - KV disponível
+        //
+        // Razão do alargamento: mensagens Level B (tactical) têm
+        // needs_human_approval=false mesmo com intenção operacional explícita.
+        // O operationalOverride já garante: termos operacionais presentes
+        // E sem termos perigosos — é seguro salvar pending_plan.
         //
         // O executor_payload é construído diretamente do canonicalPlan
         // porque bridge.executor_payload é null quando gate bloqueia.
@@ -4000,7 +4010,8 @@ async function handleChatLLM(request, env) {
         // ---------------------------------------------------------------
         if (
           session_id &&
-          gate.needs_human_approval === true &&
+          !hasDangerousTermForOverride &&
+          (gate.needs_human_approval === true || !gate.can_proceed || operationalOverride) &&
           plannerSnapshot.outputMode !== "formal_contract" &&
           env.ENAVIA_BRAIN
         ) {
