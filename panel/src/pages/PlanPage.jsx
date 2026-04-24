@@ -82,6 +82,9 @@ function readTargetFromStorage() {
 }
 
 // ── PlanPage ───────────────────────────────────────────────────────────────
+// Intervalo de polling para sincronização com GET /planner/latest.
+const _PLAN_SYNC_INTERVAL_MS = 30_000;
+
 export default function PlanPage() {
   const { visibleState, demoOverride, lastChatText, plannerSnapshot } = usePlannerStore();
   const sessionId = useSessionId();
@@ -193,14 +196,16 @@ export default function PlanPage() {
 
   // Sincroniza no mount e sempre que plannerSnapshot do store muda.
   // Sem skip: backend é sempre consultado, mesmo quando o store já tem dados.
+  // plannerSnapshot é dep intencional como gatilho (não usado dentro do callback).
   useEffect(() => {
     _doSyncFromBackend();
-  }, [_doSyncFromBackend, plannerSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_doSyncFromBackend, plannerSnapshot]);
 
   // Polling de 30s: mantém a aba sincronizada enquanto aberta.
   useEffect(() => {
     if (!isRealMode) return;
-    const id = setInterval(_doSyncFromBackend, 30_000);
+    const id = setInterval(_doSyncFromBackend, _PLAN_SYNC_INTERVAL_MS);
     return () => clearInterval(id);
   }, [isRealMode, _doSyncFromBackend]);
 
