@@ -3308,21 +3308,40 @@ async function handlePlannerRun(request, env) {
       });
     }
 
+    const plannerPayload = {
+      memoryContext: memory_context,
+      retrievalContext: retrieval_context, // PR3 — separação explícita de blocos
+      classification,
+      canonicalPlan,
+      gate,
+      bridge,
+      memoryConsolidation,
+      outputMode: envelope.output_mode,
+    };
+
+    // Persistir snapshot para GET /planner/latest (fire-and-forget, não crítico)
+    if (session_id && env?.ENAVIA_BRAIN) {
+      try {
+        await env.ENAVIA_BRAIN.put(
+          `planner:latest:${session_id}`,
+          JSON.stringify(plannerPayload),
+          { expirationTtl: _PENDING_PLAN_TTL_SECONDS }
+        );
+        logNV("💾 [PLANNER/RUN] planner:latest salvo no KV", { session_id });
+      } catch (kvErr) {
+        logNV("⚠️ [PLANNER/RUN] Falha ao persistir planner:latest (não crítico)", {
+          session_id,
+          error: String(kvErr),
+        });
+      }
+    }
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
       timestamp: Date.now(),
       input: message,
-      planner: {
-        memoryContext: memory_context,
-        retrievalContext: retrieval_context, // PR3 — separação explícita de blocos
-        classification,
-        canonicalPlan,
-        gate,
-        bridge,
-        memoryConsolidation,
-        outputMode: envelope.output_mode,
-      },
+      planner: plannerPayload,
       telemetry: {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
@@ -3347,6 +3366,47 @@ async function handlePlannerRun(request, env) {
       500
     );
   }
+}
+
+// ============================================================================
+// 📋 GET /planner/latest — Retorna o último plano gerado para uma sessão
+//
+// Fonte: KV planner:latest:{session_id} (escrito por handlePlannerRun).
+// Retorna has_plan=false sem erro quando não há plano para a sessão.
+// session_id obrigatório — sem ele, retorna 400.
+// ============================================================================
+async function handlePlannerLatest(request, env) {
+  const url = new URL(request.url);
+  const session_id = (url.searchParams.get("session_id") || "").trim();
+
+  if (!session_id) {
+    return jsonResponse({ ok: false, error: "session_id é obrigatório." }, 400);
+  }
+
+  if (!env?.ENAVIA_BRAIN) {
+    logNV("⚠️ [PLANNER/LATEST] ENAVIA_BRAIN indisponível — retornando has_plan=false", { session_id });
+    return jsonResponse({ ok: true, session_id, has_plan: false, plan: null });
+  }
+
+  let plannerPayload = null;
+  try {
+    plannerPayload = await env.ENAVIA_BRAIN.get(`planner:latest:${session_id}`, "json");
+  } catch (kvErr) {
+    logNV("⚠️ [PLANNER/LATEST] Erro ao buscar planner:latest do KV", {
+      session_id,
+      error: String(kvErr),
+    });
+    return jsonResponse(
+      { ok: false, error: "Falha ao buscar plano.", detail: String(kvErr) },
+      500
+    );
+  }
+
+  if (!plannerPayload) {
+    return jsonResponse({ ok: true, session_id, has_plan: false, plan: null });
+  }
+
+  return jsonResponse({ ok: true, session_id, has_plan: true, plan: plannerPayload });
 }
 
 // ============================================================================
@@ -4985,6 +5045,15 @@ if (request.method === "GET") {
         },
       },
     }));
+  }
+}
+
+// GET /planner/latest?session_id=... — Retorna o último plano gerado para a sessão
+if (request.method === "GET") {
+  const url = new URL(request.url);
+  if (url.pathname === "/planner/latest") {
+    const response = await handlePlannerLatest(request, env);
+    return withCORS(response);
   }
 }
 

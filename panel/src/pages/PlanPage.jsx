@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan, getSessionId } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
@@ -73,6 +73,16 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
+  // Local snapshot from direct /planner/run or /planner/latest calls
+  const [localPlannerSnapshot, setLocalPlannerSnapshot] = useState(null);
+
+  // Instruction form state
+  const [planInstruction, setPlanInstruction] = useState("");
+  const [planGenerating, setPlanGenerating] = useState(false);
+  const [planGenError, setPlanGenError] = useState(null);
+  const [latestLoading, setLatestLoading] = useState(false);
+  const [latestError, setLatestError] = useState(null);
+
   // P11 — gate action: local override da decisão humana (sem bridge real)
   // null = nenhuma ação tomada; "approved" | "blocked" = ação do operador
   const [gateAction, setGateAction] = useState(null);
@@ -107,10 +117,12 @@ export default function PlanPage() {
   }, [visibleState, plannerSnapshot]);
 
   useEffect(() => {
-    // ── Real mode: plan comes from plannerSnapshot in store (raw → mapper) ──
+    // ── Real mode: plan comes from localPlannerSnapshot (direct call) or
+    //    plannerSnapshot in store (via chat). Local takes precedence.
     if (isRealMode) {
-      if (plannerSnapshot) {
-        const mapped = mapPlannerSnapshot(plannerSnapshot);
+      const snapshot = localPlannerSnapshot ?? plannerSnapshot;
+      if (snapshot) {
+        const mapped = mapPlannerSnapshot(snapshot);
         setPlan(mapped);
       } else {
         // No snapshot yet — show EmptyState. Never fall back to MOCK_PLANS.
@@ -138,7 +150,7 @@ export default function PlanPage() {
     });
 
     return () => { stale = true; };
-  }, [isRealMode, visibleState, plannerSnapshot]);
+  }, [isRealMode, visibleState, plannerSnapshot, localPlannerSnapshot]);
 
   // P11 → P12 — handlers de ação humana; gate approval triggers bridge send
   const handleBridgeSend = useCallback(async () => {
@@ -202,6 +214,41 @@ export default function PlanPage() {
     }
   }
 
+  // Gerar plano diretamente via POST /planner/run
+  const handleRunPlanner = useCallback(async () => {
+    if (!planInstruction.trim() || planGenerating) return;
+    setPlanGenerating(true);
+    setPlanGenError(null);
+    setLatestError(null);
+    const result = await runPlanner(planInstruction.trim());
+    setPlanGenerating(false);
+    if (result.ok && result.data?.planner) {
+      setLocalPlannerSnapshot(result.data.planner);
+    } else {
+      setPlanGenError(result.error?.message ?? "Falha ao gerar plano.");
+    }
+  }, [planInstruction, planGenerating]);
+
+  // Buscar último plano salvo via GET /planner/latest
+  const handleFetchLatest = useCallback(async () => {
+    if (latestLoading) return;
+    setLatestLoading(true);
+    setLatestError(null);
+    setPlanGenError(null);
+    const sid = getSessionId();
+    const result = await fetchLatestPlan(sid);
+    setLatestLoading(false);
+    if (result.ok) {
+      if (result.data.has_plan && result.data.plan) {
+        setLocalPlannerSnapshot(result.data.plan);
+      } else {
+        setLatestError("Nenhum plano encontrado para esta sessão.");
+      }
+    } else {
+      setLatestError(result.error?.message ?? "Falha ao buscar último plano.");
+    }
+  }, [latestLoading]);
+
   // P11 — gate efetivo: sobrepõe state do gate com decisão local do operador
   function getEffectiveGate(gate) {
     if (!gate || !gateAction) return gate;
@@ -229,6 +276,41 @@ export default function PlanPage() {
         onDemoOverride={setDemoOverride}
         onClearDemoOverride={clearDemoOverride}
       />
+
+      {/* Instruction form — only in real mode */}
+      {isRealMode && (
+        <div style={f.wrap}>
+          <div style={f.row}>
+            <input
+              style={f.input}
+              type="text"
+              placeholder="Instrução para gerar plano..."
+              value={planInstruction}
+              onChange={(e) => setPlanInstruction(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleRunPlanner(); } }}
+              disabled={planGenerating}
+              aria-label="Instrução para gerar plano"
+            />
+            <button
+              style={f.btn}
+              onClick={handleRunPlanner}
+              disabled={planGenerating || !planInstruction.trim()}
+            >
+              {planGenerating ? "Gerando..." : "Gerar plano"}
+            </button>
+            <button
+              style={f.btnSecondary}
+              onClick={handleFetchLatest}
+              disabled={latestLoading}
+            >
+              {latestLoading ? "Buscando..." : "Atualizar último plano"}
+            </button>
+          </div>
+          {(planGenError || latestError) && (
+            <p style={f.error}>⚠ {planGenError || latestError}</p>
+          )}
+        </div>
+      )}
 
       {/* Blocked banner — reage ao gate efetivo (inclui ação humana local) */}
       {plan && <BlockedBanner gate={effectiveGate} />}
@@ -458,5 +540,59 @@ const bb = {
     fontSize: "12px",
     color: "var(--text-muted)",
     lineHeight: 1.5,
+  },
+};
+
+// Instruction form styles
+const f = {
+  wrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    flexShrink: 0,
+  },
+  row: {
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
+  },
+  input: {
+    flex: 1,
+    padding: "8px 12px",
+    fontSize: "13px",
+    background: "var(--bg-surface)",
+    border: "1px solid var(--border-light)",
+    borderRadius: "var(--radius-md)",
+    color: "var(--text-primary)",
+    outline: "none",
+    minWidth: 0,
+  },
+  btn: {
+    padding: "8px 16px",
+    fontSize: "13px",
+    fontWeight: 600,
+    background: "var(--color-primary)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "var(--radius-md)",
+    cursor: "pointer",
+    flexShrink: 0,
+    opacity: 1,
+  },
+  btnSecondary: {
+    padding: "8px 14px",
+    fontSize: "13px",
+    fontWeight: 500,
+    background: "var(--bg-surface)",
+    color: "var(--text-secondary)",
+    border: "1px solid var(--border-light)",
+    borderRadius: "var(--radius-md)",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  error: {
+    fontSize: "12px",
+    color: "#EF4444",
+    margin: 0,
   },
 };
