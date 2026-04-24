@@ -4043,8 +4043,13 @@ async function handleChatLLM(request, env) {
         content: `INSTRUÇÃO OPERACIONAL PARA ESTA RESPOSTA:\n` +
           `Alvo ativo confirmado: ${targetDesc}.\n` +
           `O operador fez uma pergunta operacional. Você CONHECE o alvo acima — não pergunte qual sistema, worker ou ambiente.\n` +
-          `Responda diretamente usando o alvo. Pode e deve dar uma resposta completa e direta — a restrição de "reply curto" não se aplica a perguntas operacionais com alvo definido.\n` +
-          `Escreva de forma natural, sem markdown headers, sem "Fase 1/2/3" ou listas numeradas.\n` +
+          `\nFORMATO OBRIGATÓRIO PARA RESPOSTA OPERACIONAL:\n` +
+          `Resposta deve ser OBJETIVA, PRÁTICA e ACIONÁVEL — não um artigo ou explicação longa.\n` +
+          `• Comece diretamente com a ação recomendada — sem introdução longa.\n` +
+          `• Use até 7 passos numerados. Cada passo começa com verbo de ação (ex: "testar", "verificar", "conferir").\n` +
+          `• Finalize com uma próxima ação clara e objetiva (ex: "Próximo passo: posso montar os comandos para esse teste.").\n` +
+          `• Se precisar perguntar algo, pergunte no máximo 1 coisa bloqueante — nunca perguntas genéricas de contexto.\n` +
+          `• Sem markdown headers (##, ###). Sem "Fase 1/2/3". Sem categorias conceituais desnecessárias.\n` +
           `\nRESOLUÇÃO DE AMBIGUIDADE — REGRA OBRIGATÓRIA:\n` +
           `Quando o operador usar termos genéricos como "o sistema", "o worker", "o ambiente" ou "o projeto" e houver target ativo, resolva imediatamente para o target confirmado acima.\n` +
           `NÃO pergunte "você quer dizer nv-enavia ou outro sistema?" — a resposta é sempre o target ativo.\n` +
@@ -4333,6 +4338,7 @@ async function handleChatLLM(request, env) {
         target_fields_seen: _targetFieldsSeen,
         memory_content_injected: _memoryContentInjected,
         memory_hits_count: _memoryHitsCount,
+        ...(hasTarget ? { operational_output_mode: "actionable_compact" } : {}),
         // PR3: retrieval context summary (separação de blocos explícita)
         retrieval: chatRetrievalSummary,
         // PR7: explicit continuity flag — true when conversation history was injected into LLM context
