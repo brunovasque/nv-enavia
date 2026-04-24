@@ -3447,6 +3447,115 @@ function _isManualPlanReply(reply) {
 }
 
 // ============================================================================
+// Chat Bridge — constantes de aprovação e termos perigosos (Bloco B)
+//
+// Listas determinísticas usadas para detectar aprovação explícita e bloquear
+// mensagens com termos de risco sem depender do LLM.
+// ============================================================================
+const _CHAT_BRIDGE_APPROVAL_TERMS = [
+  "aprovado", "pode executar", "confirmo", "sim, execute", "execute agora", "go",
+];
+const _CHAT_BRIDGE_DANGEROUS_TERMS = [
+  "deploy", "delete", "rm ", "drop", "prod", "produção", "write", "patch", "post", "merge", "rollback",
+];
+// TTL for pending_plan stored in KV after planner generates a plan requiring approval.
+const _PENDING_PLAN_TTL_SECONDS = 600;
+
+// ============================================================================
+// _dispatchFromChat — helper interno: despacha executor a partir de pending_plan
+//
+// Recebe env e pendingPlan (já recuperado do KV).
+// Chama o executor via service binding, grava trilha de execução no KV com o
+// mesmo shape que handlePlannerBridge usa (para /execution enxergar o evento).
+// Retorna { ok, bridge_id, executor_ok, executor_response?, error?, detail? }
+// ============================================================================
+async function _dispatchFromChat(env, pendingPlan) {
+  const bridgeId = pendingPlan.bridge_id || safeId("bridge");
+  const sessionId = pendingPlan.session_id || null;
+  const ep = pendingPlan.bridge_executor_payload;
+
+  logNV("🚀 [CHAT/BRIDGE] Disparando executor a partir de aprovação no chat", {
+    bridgeId,
+    sessionId,
+    source: ep?.source,
+  });
+
+  let executorJson = null;
+  let executorStatus = null;
+  let executorOk = false;
+  let networkError = null;
+
+  try {
+    const executorPayload = {
+      action: "execute_plan",
+      source: "chat_bridge",
+      bridge_id: bridgeId,
+      session_id: sessionId,
+      executor_payload: ep,
+    };
+
+    const executorRes = await env.EXECUTOR.fetch("https://internal/engineer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(executorPayload),
+    });
+
+    executorStatus = executorRes.status;
+    executorOk = executorStatus >= 200 && executorStatus < 300;
+
+    try {
+      executorJson = await executorRes.json();
+    } catch {
+      executorJson = { ok: false, error: "EXECUTOR_INVALID_JSON" };
+    }
+
+    logNV("🚀 [CHAT/BRIDGE] Resposta do executor", {
+      bridgeId,
+      executor_ok: executorOk,
+      status: executorStatus,
+    });
+  } catch (netErr) {
+    networkError = String(netErr);
+    logNV("🔴 [CHAT/BRIDGE] Falha de rede ao chamar executor", {
+      bridgeId,
+      error: networkError,
+    });
+  }
+
+  // Persistir trilha de execução — mesmo shape que handlePlannerBridge usa
+  // para que GET /execution enxergue o evento gerado pelo chat bridge.
+  const trail = {
+    bridge_id: bridgeId,
+    dispatched_at: new Date().toISOString(),
+    session_id: sessionId,
+    source: ep?.source || "chat_bridge",
+    steps_count: Array.isArray(ep?.steps) ? ep.steps.length : 0,
+    executor_ok: executorOk,
+    executor_status: executorStatus,
+    executor_error: networkError
+      ? "NETWORK_ERROR"
+      : (executorOk ? null : (executorJson?.error ?? null)),
+  };
+
+  if (env.ENAVIA_BRAIN) {
+    try {
+      await env.ENAVIA_BRAIN.put("execution:trail:latest", JSON.stringify(trail));
+      await env.ENAVIA_BRAIN.put(`execution:trail:${bridgeId}`, JSON.stringify(trail));
+    } catch (kvErr) {
+      logNV("⚠️ [CHAT/BRIDGE] Falha ao persistir trilha no KV (não crítico)", {
+        bridgeId,
+        error: String(kvErr),
+      });
+    }
+  }
+
+  if (networkError) {
+    return { ok: false, bridge_id: bridgeId, executor_ok: false, error: "NETWORK_ERROR", detail: networkError };
+  }
+  return { ok: executorOk, bridge_id: bridgeId, executor_ok: executorOk, executor_response: executorJson };
+}
+
+// ============================================================================
 // 💬 CHAT LLM-FIRST — POST /chat/run
 //
 // Rota de conversa livre LLM-first para a aba Chat do painel.
@@ -3486,6 +3595,88 @@ async function handleChatLLM(request, env) {
 
   const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
   const context = body.context && typeof body.context === "object" ? body.context : {};
+
+  // -------------------------------------------------------------------------
+  // BLOCO B — Detecção determinística de aprovação e despacho ao executor
+  //
+  // Regras de segurança (sem LLM):
+  //   - Só age se session_id existir e ENAVIA_BRAIN estiver disponível
+  //   - Só age se mensagem contiver aprovação explícita (lista determinística)
+  //   - Bloqueia silenciosamente se mensagem contiver termos perigosos
+  //   - Só executa se houver pending_plan válido no KV para este session_id
+  //   - Apaga pending_plan antes de despachar (previne dupla execução)
+  //   - Retorna imediatamente — não passa pelo LLM
+  // -------------------------------------------------------------------------
+  if (session_id && env.ENAVIA_BRAIN) {
+    const normalizedMsg = message.toLowerCase();
+    const hasApproval = _CHAT_BRIDGE_APPROVAL_TERMS.some((t) => normalizedMsg.includes(t));
+    const hasDangerousTerm = _CHAT_BRIDGE_DANGEROUS_TERMS.some((t) => normalizedMsg.includes(t));
+
+    if (hasApproval && hasDangerousTerm) {
+      logNV("🛡️ [CHAT/BRIDGE] Aprovação bloqueada por termo perigoso", {
+        session_id,
+        message: message.slice(0, 80),
+      });
+      // Fall through to normal LLM conversation — do not execute
+    } else if (hasApproval) {
+      const pendingKey = `chat:pending_plan:${session_id}`;
+      let pendingPlan = null;
+      try {
+        pendingPlan = await env.ENAVIA_BRAIN.get(pendingKey, "json");
+      } catch (kvErr) {
+        logNV("⚠️ [CHAT/BRIDGE] Erro ao buscar pending_plan do KV", {
+          session_id,
+          error: String(kvErr),
+        });
+      }
+
+      if (pendingPlan) {
+        if (!env.EXECUTOR || typeof env.EXECUTOR.fetch !== "function") {
+          return jsonResponse({
+            ok: false,
+            system: "ENAVIA-NV-FIRST",
+            mode: "llm-first",
+            execution_dispatched: false,
+            error: "EXECUTOR binding não disponível para executar plano aprovado.",
+            timestamp: Date.now(),
+            telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_bridge_approval" },
+          }, 503);
+        }
+
+        // Apagar pending_plan antes de despachar (previne dupla execução)
+        try {
+          await env.ENAVIA_BRAIN.delete(pendingKey);
+        } catch { /* não crítico */ }
+
+        const dispatchResult = await _dispatchFromChat(env, pendingPlan);
+
+        return jsonResponse({
+          ok: dispatchResult.ok,
+          system: "ENAVIA-NV-FIRST",
+          mode: "llm-first",
+          execution_dispatched: true,
+          bridge_id: dispatchResult.bridge_id,
+          executor_ok: dispatchResult.executor_ok,
+          ...(dispatchResult.executor_response ? { executor_response: dispatchResult.executor_response } : {}),
+          ...(dispatchResult.error ? { executor_error: dispatchResult.error } : {}),
+          reply: dispatchResult.ok
+            ? "Plano aprovado. Execução foi despachada para o executor."
+            : `Aprovação recebida, mas houve falha ao chamar o executor: ${dispatchResult.error || "erro desconhecido"}.`,
+          plan_summary: pendingPlan.plan_summary || null,
+          timestamp: Date.now(),
+          telemetry: {
+            duration_ms: Date.now() - startedAt,
+            session_id,
+            pipeline: "chat_bridge_approval",
+          },
+        });
+      }
+
+      // Sem pending_plan válido — seguir fluxo normal de conversa sem executar
+      logNV("ℹ️ [CHAT/BRIDGE] Aprovação detectada mas sem pending_plan válido", { session_id });
+    }
+  }
+  // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
   // PR5 — Conversation History (Memory + Continuity)
@@ -3575,6 +3766,34 @@ async function handleChatLLM(request, env) {
   const operationalAwareness = buildOperationalAwareness(env, {
     browserArmState: getBrowserArmState(),
   });
+
+  // --- Chat Bridge: operational override + shouldActivatePlanner (pre-LLM) ---
+  //
+  // Computed here — before the try block — so the decision is available even when
+  // the LLM call fails, and so that the planner runs regardless of LLM outcome
+  // when the message carries clear operational intent.
+  //
+  // PM4 decides as base authority. The operational override adds a deterministic
+  // layer: if the message contains operational/mechanical intent terms AND no
+  // dangerous terms, planner is forced even if PM4 returned Level A.
+  // ---------------------------------------------------------------------------
+  const _CHAT_BRIDGE_OPERATIONAL_TERMS = [
+    "executar", "execução", "executor", "deploy-worker", "healthcheck",
+    "auditar", "validar", "plano operacional", "preparar execução",
+  ];
+  const msgLower = message.toLowerCase();
+  const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : false;
+  const hasOperationalIntent = _CHAT_BRIDGE_OPERATIONAL_TERMS.some((t) => msgLower.includes(t));
+  // Dangerous term check for override uses word-boundary matching so that
+  // compound service names like "deploy-worker" do not falsely match "deploy".
+  // A term is dangerous only when it appears as a standalone word/phrase,
+  // i.e. not immediately followed by a hyphen that would make it a compound name.
+  const hasDangerousTermForOverride = _CHAT_BRIDGE_DANGEROUS_TERMS.some((t) => {
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").trim();
+    return new RegExp(escaped + "(?![\\w-])", "i").test(msgLower);
+  });
+  const operationalOverride = hasOperationalIntent && !hasDangerousTermForOverride;
+  const shouldActivatePlanner = pm4AllowsPlanner || operationalOverride;
 
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
@@ -3706,8 +3925,7 @@ async function handleChatLLM(request, env) {
     // while generating a full structured plan in reply. PM4 as sole authority
     // closes this gap: if the message is B/C, planner always runs internally,
     // and the reply must remain conversational (enforced by _isManualPlanReply).
-    const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : false;
-    const shouldActivatePlanner = pm4AllowsPlanner;
+    // (shouldActivatePlanner, pm4AllowsPlanner, operationalOverride computed pre-LLM above)
 
     // Auditoria da decisão de arbitration — provável sem LLM real
     const arbitrationDecision = {
@@ -3716,12 +3934,16 @@ async function handleChatLLM(request, env) {
       pm4_signals:          pm4Arbitration?.signals      || [],
       pm4_allows_planner:   pm4AllowsPlanner,
       llm_requested_planner: wantsPlan,
-      // final_decision reflects PM4-only authority:
-      //   "planner_activated"      → LLM requested + PM4 level B/C (coherent)
-      //   "planner_forced_level_BC"→ PM4 level B/C but LLM didn't request it
-      //   "planner_blocked_level_A"→ PM4 level A (blocks even if LLM wanted it)
+      ...(operationalOverride ? { operational_override: true } : {}),
+      // final_decision reflects PM4-only authority (or operational override):
+      //   "planner_activated"              → LLM requested + PM4 level B/C (coherent)
+      //   "planner_forced_level_BC"        → PM4 level B/C but LLM didn't request it
+      //   "planner_forced_operational"     → PM4 level A overridden by operational term
+      //   "planner_blocked_level_A"        → PM4 level A (blocks even if LLM wanted it)
       final_decision: shouldActivatePlanner
-        ? (wantsPlan ? "planner_activated" : "planner_forced_level_BC")
+        ? (operationalOverride && !pm4AllowsPlanner
+            ? "planner_forced_operational"
+            : (wantsPlan ? "planner_activated" : "planner_forced_level_BC"))
         : "planner_blocked_level_A",
     };
 
@@ -3737,6 +3959,7 @@ async function handleChatLLM(request, env) {
     let plannerUsed = false;
     // PR7: Track planner failure when it was supposed to run (Level B/C forced)
     let plannerError = null;
+    let pendingPlanSaved = false;
 
     if (shouldActivatePlanner) {
       try {
@@ -3764,6 +3987,75 @@ async function handleChatLLM(request, env) {
           outputMode: envelope.output_mode,
         };
         plannerUsed = true;
+
+        // ---------------------------------------------------------------
+        // BLOCO A — Salvar pending_plan no KV quando gate exige aprovação
+        //           OU quando há intenção operacional/mecânica segura.
+        //
+        // Condições:
+        //   - session_id existe
+        //   - gate exige aprovação humana  OR planner foi ativado por
+        //     intenção operacional/mecânica determinística (operationalOverride)
+        //   - outputMode não é formal_contract (Level C)
+        //   - KV disponível
+        //
+        // Razão do alargamento: mensagens Level B (tactical) têm
+        // needs_human_approval=false mesmo com intenção operacional explícita.
+        // O operationalOverride já garante: termos operacionais presentes
+        // E sem termos perigosos — é seguro salvar pending_plan.
+        //
+        // O executor_payload é construído diretamente do canonicalPlan
+        // porque bridge.executor_payload é null quando gate bloqueia.
+        // TTL: 600 segundos.
+        // ---------------------------------------------------------------
+        if (
+          session_id &&
+          !hasDangerousTermForOverride &&
+          (gate.needs_human_approval === true || !gate.can_proceed || operationalOverride) &&
+          plannerSnapshot.outputMode !== "formal_contract" &&
+          env.ENAVIA_BRAIN
+        ) {
+          const pendingKey = `chat:pending_plan:${session_id}`;
+          const now = Date.now();
+          // Build executor_payload from canonicalPlan (same shape as _buildExecutorPayload in PM8)
+          const builtExecutorPayload = {
+            version: "1.0",
+            source: "planner_bridge",
+            plan_summary: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : "",
+            complexity_level: canonicalPlan.complexity_level,
+            plan_type: canonicalPlan.plan_type,
+            steps: Array.isArray(canonicalPlan.steps) ? canonicalPlan.steps : [],
+            risks: Array.isArray(canonicalPlan.risks) ? canonicalPlan.risks : [],
+            acceptance_criteria: Array.isArray(canonicalPlan.acceptance_criteria) ? canonicalPlan.acceptance_criteria : [],
+          };
+          const pendingBridgeId = safeId("bridge");
+          const pendingValue = {
+            session_id,
+            bridge_id: pendingBridgeId,
+            bridge_executor_payload: builtExecutorPayload,
+            plan_summary: builtExecutorPayload.plan_summary,
+            gate_status: gate.gate_status,
+            created_at: new Date(now).toISOString(),
+            expires_at: new Date(now + _PENDING_PLAN_TTL_SECONDS * 1000).toISOString(),
+            source: "chat_run",
+          };
+          try {
+            await env.ENAVIA_BRAIN.put(pendingKey, JSON.stringify(pendingValue), {
+              expirationTtl: _PENDING_PLAN_TTL_SECONDS,
+            });
+            pendingPlanSaved = true;
+            logNV("💾 [CHAT/LLM] pending_plan salvo no KV", {
+              session_id,
+              gate_status: gate.gate_status,
+              bridge_id: pendingBridgeId,
+            });
+          } catch (kvErr) {
+            logNV("⚠️ [CHAT/LLM] Falha ao salvar pending_plan (não crítico)", {
+              session_id,
+              error: String(kvErr),
+            });
+          }
+        }
 
         logNV("🔧 [CHAT/LLM] Planner acionado como ferramenta interna", {
           session_id,
@@ -3797,6 +4089,7 @@ async function handleChatLLM(request, env) {
       reply,
       planner_used: plannerUsed,
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
+      ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
       input: message,
       telemetry: {
@@ -3885,16 +4178,19 @@ async function handleChatLLM(request, env) {
           // PR7: continuity_active and pipeline are derivable before LLM call — include on failure
           continuity_active: conversationHistory.length > 0,
           conversation_history_length: conversationHistory.length,
-          pipeline: pm4Arbitration?.allows_planner ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
+          pipeline: shouldActivatePlanner ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
           // PR7: llm_parse_mode is unknown on failure (LLM never responded)
           llm_parse_mode: _LLM_PARSE_MODE.UNKNOWN,
           // Include PM4 pre-check result even on LLM failure — it's deterministic
           arbitration: pm4Arbitration ? {
             pm4_level: pm4Arbitration.level,
-            pm4_allows_planner: pm4Arbitration.allows_planner,
-            // Compute final_decision from PM4 alone (LLM decision unknown on failure)
-            final_decision: pm4Arbitration.allows_planner
-              ? "planner_forced_level_BC"
+            pm4_allows_planner: pm4AllowsPlanner,
+            ...(operationalOverride ? { operational_override: true } : {}),
+            // Compute final_decision from PM4 + operational override (LLM decision unknown on failure)
+            final_decision: shouldActivatePlanner
+              ? (operationalOverride && !pm4AllowsPlanner
+                  ? "planner_forced_operational"
+                  : "planner_forced_level_BC")
               : "planner_blocked_level_A",
           } : null,
           // Include operational awareness even on LLM failure — computed before try block
