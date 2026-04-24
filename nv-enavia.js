@@ -4009,7 +4009,7 @@ async function handleChatLLM(request, env) {
         _tgt.mode        ? `mode: ${_tgt.mode}`               : null,
       ].filter(Boolean).join(" | ");
 
-      const memActive = chatRetrievalSummary.applied === true && chatRetrievalSummary.total_memories_read > 0;
+      const memActive = chatRetrievalSummary.applied && chatRetrievalSummary.total_memories_read > 0;
       const memNote = memActive
         ? `\nMEMÓRIA ATIVA (${chatRetrievalSummary.total_memories_read} item(s)): instrução manual e aprendizado validado aplicam-se como regra operacional. Siga preferências de read_only, aprovação e segurança se presentes.`
         : "";
@@ -4275,7 +4275,7 @@ async function handleChatLLM(request, env) {
 
     // --- Diagnostic telemetry: target and memory observability ---
     const _targetFieldsSeen = hasTarget
-      ? Object.entries(_chatTarget).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k]) => k)
+      ? Object.entries(_chatTarget).filter(([, v]) => v != null && v !== "").map(([k]) => k)
       : [];
     const _memoryContentInjected = _pr3MemoryBlock.length > 0;
     const _memoryHitsCount = _chatMemHits.length;
