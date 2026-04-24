@@ -193,12 +193,39 @@ export function useChatState() {
     }
 
     const planner = result.data?.planner;
-    const summary = planner?.classification?.objective
-      || planner?.canonicalPlan?.summary
-      || planner?.canonicalPlan?.title
-      || JSON.stringify(planner ?? {}).slice(0, 300);
 
-    const replyContent = `📋 **Plano gerado**\n\n${summary}\n\n_Revise e clique "Aprovar execução" para prosseguir._`;
+    // Build a readable plan summary — never use JSON.stringify.
+    // canonicalPlan.objective is the primary source; fall back to listing steps.
+    const objective = planner?.canonicalPlan?.objective
+      || planner?.classification?.objective
+      || null;
+    const rawSteps = Array.isArray(planner?.canonicalPlan?.steps)
+      ? planner.canonicalPlan.steps
+      : [];
+    const needsApproval = planner?.gate?.needs_human_approval === true
+      || planner?.gate?.gate_status === "approval_required";
+
+    let summaryLines = [];
+    if (objective) {
+      summaryLines.push(`**Objetivo:** ${objective}`);
+    }
+    if (rawSteps.length > 0) {
+      const stepList = rawSteps
+        .slice(0, 8)
+        .map((s, i) => `${i + 1}. ${typeof s === "string" ? s : (s.label ?? s.description ?? s.action ?? "Passo sem nome")}`)
+        .join("\n");
+      summaryLines.push(`**Passos (${rawSteps.length}):**\n${stepList}`);
+      if (rawSteps.length > 8) summaryLines.push(`_... e mais ${rawSteps.length - 8} passo(s)_`);
+    }
+    if (summaryLines.length === 0) {
+      summaryLines.push("Plano estruturado gerado. Nenhum objetivo ou passo disponível.");
+    }
+    if (needsApproval) {
+      summaryLines.push("⏳ **Gate humano:** aprovação necessária antes de executar.");
+    }
+    summaryLines.push("_Abra a aba /plan para detalhes completos._");
+
+    const replyContent = `📋 **Plano gerado**\n\n${summaryLines.join("\n\n")}`;
     setMessages((prev) => [...prev, makeMsg("enavia", replyContent, new Date().toISOString())]);
     onChatSuccess(promptText, planner ?? null);
     setThinking(false);

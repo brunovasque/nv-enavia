@@ -66,12 +66,11 @@ const _MEMORY_PRIORITY_MAP = {
  *   - canonicalPlan        — non-null object
  *   - gate                 — non-null object
  *   - bridge               — non-null object
- *   - memoryConsolidation  — non-null object
+ *   - memoryConsolidation OR memoryContext — non-null object (backend alias)
  *   - outputMode           — non-empty string (backend emits it as a string)
  *
- * Rationale: in mode=real this snapshot is the ONLY authoritative data source.
- * A partial snapshot would silently hide missing pipeline stages. Rejecting it
- * forces the UI to show EmptyState rather than rendering incomplete cards.
+ * Note: the backend may return `memoryContext` instead of `memoryConsolidation`.
+ * Both are accepted here; the mapper normalises them under `memoryConsolidation`.
  *
  * @param {unknown} raw
  * @returns {boolean}
@@ -79,12 +78,15 @@ const _MEMORY_PRIORITY_MAP = {
 export function isValidPlannerSnapshot(raw) {
   if (typeof raw !== "object" || raw === null) return false;
   const r = /** @type {Record<string, unknown>} */ (raw);
+  const hasMemory =
+    (typeof r.memoryConsolidation === "object" && r.memoryConsolidation !== null) ||
+    (typeof r.memoryContext        === "object" && r.memoryContext        !== null);
   return (
     typeof r.classification === "object" && r.classification !== null &&
-    typeof r.canonicalPlan === "object" && r.canonicalPlan !== null &&
-    typeof r.gate === "object" && r.gate !== null &&
-    typeof r.bridge === "object" && r.bridge !== null &&
-    typeof r.memoryConsolidation === "object" && r.memoryConsolidation !== null &&
+    typeof r.canonicalPlan  === "object" && r.canonicalPlan  !== null &&
+    typeof r.gate           === "object" && r.gate           !== null &&
+    typeof r.bridge         === "object" && r.bridge         !== null &&
+    hasMemory &&
     typeof r.outputMode === "string" && r.outputMode.length > 0
   );
 }
@@ -114,7 +116,8 @@ export function mapPlannerSnapshot(raw) {
   const cp = raw.canonicalPlan;
   const g = raw.gate;
   const b = raw.bridge;
-  const mc = raw.memoryConsolidation;
+  // Accept memoryContext (backend alias) or memoryConsolidation
+  const mc = raw.memoryConsolidation ?? raw.memoryContext ?? null;
   const om = raw.outputMode;
 
   // ── Classification card shape ──────────────────────────────────────────
@@ -146,7 +149,13 @@ export function mapPlannerSnapshot(raw) {
       // Already object (mock shape or enriched shape) — pass through.
       return s;
     });
-    canonicalPlan = { steps };
+    // Carry objective if present (used in PlanSteps header and Chat summary)
+    canonicalPlan = {
+      objective: typeof cp.objective === "string" && cp.objective.length > 0
+        ? cp.objective
+        : null,
+      steps,
+    };
   }
 
   // ── Gate card shape ────────────────────────────────────────────────────
@@ -172,6 +181,7 @@ export function mapPlannerSnapshot(raw) {
   } : null;
 
   // ── Memory consolidation card shape ────────────────────────────────────
+  // Handles both memoryConsolidation and memoryContext (backend alias).
   let memoryConsolidation = null;
   if (mc) {
     const rawCandidates = Array.isArray(mc.memory_candidates)

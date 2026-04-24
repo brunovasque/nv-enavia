@@ -123,7 +123,19 @@ function StepRow({ step, index, total }) {
 
 export default function PlanSteps({ canonicalPlan }) {
   if (!canonicalPlan) return null;
-  const { steps } = canonicalPlan;
+  const { objective, steps } = canonicalPlan;
+
+  if (!steps || steps.length === 0) {
+    return (
+      <div style={s.card}>
+        <div style={s.cardHeader}>
+          <p style={s.cardTitle}>Plano Canônico</p>
+        </div>
+        {objective && <p style={s.objective}>{objective}</p>}
+        <p style={s.empty}>Nenhum plano estruturado disponível.</p>
+      </div>
+    );
+  }
 
   const done = steps.filter((s) => s.status === STEP_STATUS.DONE).length;
   const total = steps.length;
@@ -137,6 +149,9 @@ export default function PlanSteps({ canonicalPlan }) {
           {done}/{total} concluídos
         </span>
       </div>
+
+      {/* Objective — shown when present */}
+      {objective && <p style={s.objective}>{objective}</p>}
 
       {/* Progress bar */}
       <div style={s.progressTrack}>
@@ -167,6 +182,20 @@ const s = {
     display: "flex",
     flexDirection: "column",
     gap: "14px",
+  },
+  objective: {
+    fontSize: "13px",
+    color: "var(--text-primary)",
+    lineHeight: 1.6,
+    padding: "10px 12px",
+    background: "var(--bg-base)",
+    borderRadius: "var(--radius-sm)",
+    borderLeft: "3px solid var(--color-primary)",
+  },
+  empty: {
+    fontSize: "13px",
+    color: "var(--text-muted)",
+    fontStyle: "italic",
   },
   cardHeader: {
     display: "flex",
