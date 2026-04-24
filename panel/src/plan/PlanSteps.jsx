@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { STEP_STATUS } from "./mockPlan";
+import { targetFields } from "../chat/useTargetState";
 
 const STEP_META = {
   [STEP_STATUS.DONE]: {
@@ -58,9 +59,31 @@ function formatDuration(ms) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+// ── Action badge metadata ─────────────────────────────────────────────────────
+const ACTION_META = {
+  http_get:            { label: "GET",       color: "#3B82F6", bg: "rgba(59,130,246,0.1)",  border: "rgba(59,130,246,0.25)" },
+  http_post:           { label: "POST",      color: "#F59E0B", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.25)" },
+  discover_endpoints:  { label: "DISCOVER",  color: "#8B5CF6", bg: "rgba(139,92,246,0.1)",  border: "rgba(139,92,246,0.25)" },
+  validate_config:     { label: "VALIDATE",  color: "#10B981", bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.25)" },
+  read_logs:           { label: "LOGS",      color: "#6B7280", bg: "rgba(107,114,128,0.1)", border: "rgba(107,114,128,0.25)" },
+};
+
+function formatExpected(expected) {
+  if (!expected || typeof expected !== "object") return null;
+  const parts = [];
+  if (typeof expected.status === "number") parts.push(`HTTP ${expected.status}`);
+  if (Array.isArray(expected.contains) && expected.contains.length > 0) {
+    parts.push(`contains: ${expected.contains.join(", ")}`);
+  }
+  if (typeof expected.matches === "string") parts.push(`matches: ${expected.matches}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 function StepRow({ step, index, total }) {
   const meta = STEP_META[step.status] ?? STEP_META[STEP_STATUS.PENDING];
   const isLast = index === total - 1;
+  const actionMeta = step.action ? (ACTION_META[step.action] ?? null) : null;
+  const expectedSummary = formatExpected(step.expected);
 
   return (
     <div style={s.stepOuter}>
@@ -107,6 +130,25 @@ function StepRow({ step, index, total }) {
           {step.description && (
             <p style={s.stepDesc}>{step.description}</p>
           )}
+          {/* Executable step details */}
+          {(actionMeta || step.input || expectedSummary || step.safe === true) && (
+            <div style={s.execRow}>
+              {actionMeta && (
+                <span style={{ ...s.execBadge, color: actionMeta.color, background: actionMeta.bg, borderColor: actionMeta.border }}>
+                  {actionMeta.label}
+                </span>
+              )}
+              {step.input && (
+                <span style={s.execPath}>{step.input}</span>
+              )}
+              {expectedSummary && (
+                <span style={s.execExpected}>→ {expectedSummary}</span>
+              )}
+              {step.safe === true && (
+                <span style={s.safeChip}>safe</span>
+              )}
+            </div>
+          )}
           {step.deps && step.deps.length > 0 && (
             <p style={s.stepDeps}>
               Depende de:{" "}
@@ -121,11 +163,41 @@ function StepRow({ step, index, total }) {
   );
 }
 
-export default function PlanSteps({ canonicalPlan }) {
-  if (!canonicalPlan) return null;
-  const { steps } = canonicalPlan;
+function TargetMetaRow({ target }) {
+  const parts = targetFields(target);
 
-  const done = steps.filter((s) => s.status === STEP_STATUS.DONE).length;
+  if (parts.length === 0) return null;
+
+  return (
+    <div style={s.targetMeta}>
+      {parts.map(({ label, value }) => (
+        <span key={label} style={s.targetChip}>
+          <span style={s.targetChipLabel}>{label}</span>
+          <span style={s.targetChipValue}>{value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export default function PlanSteps({ canonicalPlan, targetInfo }) {
+  if (!canonicalPlan) return null;
+  const { objective, steps } = canonicalPlan;
+
+  if (!steps || steps.length === 0) {
+    return (
+      <div style={s.card}>
+        <div style={s.cardHeader}>
+          <p style={s.cardTitle}>Plano Canônico</p>
+        </div>
+        {targetInfo && <TargetMetaRow target={targetInfo} />}
+        {objective && <p style={s.objective}>{objective}</p>}
+        <p style={s.empty}>Nenhum plano estruturado disponível.</p>
+      </div>
+    );
+  }
+
+  const done = steps.filter((step) => step.status === STEP_STATUS.DONE).length;
   const total = steps.length;
 
   return (
@@ -137,6 +209,12 @@ export default function PlanSteps({ canonicalPlan }) {
           {done}/{total} concluídos
         </span>
       </div>
+
+      {/* Target metadata — separate from objective */}
+      {targetInfo && <TargetMetaRow target={targetInfo} />}
+
+      {/* Objective — shown when present */}
+      {objective && <p style={s.objective}>{objective}</p>}
 
       {/* Progress bar */}
       <div style={s.progressTrack}>
@@ -167,6 +245,44 @@ const s = {
     display: "flex",
     flexDirection: "column",
     gap: "14px",
+  },
+  targetMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+  },
+  targetChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    background: "var(--bg-base)",
+    border: "1px solid var(--border)",
+    borderRadius: "4px",
+  },
+  targetChipLabel: {
+    color: "var(--text-muted)",
+    fontWeight: 600,
+    letterSpacing: "0.3px",
+  },
+  targetChipValue: {
+    color: "var(--text-secondary)",
+    fontFamily: "var(--font-mono)",
+  },
+  objective: {
+    fontSize: "13px",
+    color: "var(--text-primary)",
+    lineHeight: 1.6,
+    padding: "10px 12px",
+    background: "var(--bg-base)",
+    borderRadius: "var(--radius-sm)",
+    borderLeft: "3px solid var(--color-primary)",
+  },
+  empty: {
+    fontSize: "13px",
+    color: "var(--text-muted)",
+    fontStyle: "italic",
   },
   cardHeader: {
     display: "flex",
@@ -303,5 +419,54 @@ const s = {
     border: "1px solid var(--border)",
     padding: "1px 5px",
     borderRadius: "3px",
+  },
+  // Executable step styles
+  execRow: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "5px",
+    marginTop: "5px",
+    marginBottom: "2px",
+  },
+  execBadge: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "0.5px",
+    padding: "1px 6px",
+    borderRadius: "3px",
+    border: "1px solid",
+    flexShrink: 0,
+  },
+  execPath: {
+    fontFamily: "var(--font-mono)",
+    fontSize: "11px",
+    color: "var(--text-secondary)",
+    background: "var(--bg-base)",
+    border: "1px solid var(--border)",
+    padding: "1px 6px",
+    borderRadius: "3px",
+    maxWidth: "260px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  execExpected: {
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    fontFamily: "var(--font-mono)",
+    whiteSpace: "nowrap",
+  },
+  safeChip: {
+    fontSize: "10px",
+    fontWeight: 600,
+    color: "#10B981",
+    background: "rgba(16,185,129,0.08)",
+    border: "1px solid rgba(16,185,129,0.2)",
+    padding: "1px 5px",
+    borderRadius: "3px",
+    letterSpacing: "0.3px",
+    flexShrink: 0,
   },
 };

@@ -1,7 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useChatState } from "../chat/useChatState";
+import { useTargetState } from "../chat/useTargetState";
+import { useAttachments } from "../chat/useAttachments";
+import { usePlannerStore } from "../store/plannerStore";
+import { getApiConfig } from "../api";
 import MessageBubble from "../chat/MessageBubble";
 import ChatComposer from "../chat/ChatComposer";
+import TargetPanel from "../chat/TargetPanel";
+import AttachmentBar from "../chat/AttachmentBar";
+import QuickActions from "../chat/QuickActions";
 
 // ── Empty State — cara forte de produto ────────────────────────────
 function EmptyState({ onSend, onInputChange, onSeed }) {
@@ -87,7 +94,7 @@ function ThinkingBubble() {
 }
 
 // ── Aux Panel (leve) ───────────────────────────────────────────────
-function AuxPanel({ messageCount, thinking }) {
+function AuxPanel({ messageCount, thinking, target, hasPendingPlan, attachCount }) {
   const status = thinking ? "Processando" : messageCount > 0 ? "Ativa" : "Aguardando";
   const statusColor = thinking
     ? "var(--color-primary)"
@@ -100,6 +107,27 @@ function AuxPanel({ messageCount, thinking }) {
       <p style={styles.auxSection}>Sessão</p>
       <AuxRow label="Status" value={status} valueColor={statusColor} />
       <AuxRow label="Mensagens" value={messageCount} />
+
+      <div style={styles.auxDivider} />
+      <p style={styles.auxSection}>Target</p>
+      <AuxRow label="Worker" value={target?.worker ?? "—"} />
+      <AuxRow label="Branch" value={target?.branch ?? "—"} />
+      <AuxRow label="Env" value={target?.environment ?? "—"} />
+      <AuxRow label="Modo" value={target?.mode ?? "—"} valueColor="#10B981" />
+
+      <div style={styles.auxDivider} />
+      <p style={styles.auxSection}>Operação</p>
+      <AuxRow
+        label="Plano"
+        value={hasPendingPlan ? "Pendente" : "Nenhum"}
+        valueColor={hasPendingPlan ? "var(--color-primary)" : "var(--text-muted)"}
+      />
+      <AuxRow
+        label="Anexos"
+        value={attachCount > 0 ? `${attachCount} arquivo(s)` : "Nenhum"}
+        valueColor={attachCount > 0 ? "var(--color-primary)" : "var(--text-muted)"}
+      />
+
       <div style={styles.auxDivider} />
       <p style={styles.auxSection}>Sistema</p>
       <AuxRow label="Módulo" value="Chat" />
@@ -131,7 +159,31 @@ export default function ChatPage() {
     retryMessage,
     seedMessages,
     dismissError,
+    injectInfoMessage,
+    runPlannerAction,
+    approveExecution,
+    validateSystem,
+    saveToMemory,
   } = useChatState();
+
+  const { target, updateTarget, resetTarget } = useTargetState();
+  const {
+    attachments,
+    attachError,
+    addFiles,
+    removeAttachment,
+    dismissAttachError,
+    buildAttachments,
+  } = useAttachments();
+
+  const { plannerSnapshot } = usePlannerStore();
+  const hasPendingPlan = !!plannerSnapshot;
+
+  // Memory is only available in real mode (endpoint /memory/manual requires backend)
+  const memoryAvailable = getApiConfig().mode === "real";
+
+  // Ref for triggering file input from QuickActions
+  const attachTriggerRef = useRef(null);
 
   const bottomRef = useRef(null);
 
@@ -139,9 +191,26 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
 
+  // Build operational context to forward to all API calls
+  function buildContext() {
+    const ctx = { target };
+    const attachs = buildAttachments();
+    if (attachs.length > 0) ctx.attachments = attachs;
+    return ctx;
+  }
+
+  // Handle file attachment: add files then show chat notification
+  async function handleAddFiles(fileList) {
+    const result = await addFiles(fileList);
+    if (result?.added?.length > 0) {
+      const names = result.added.map((a) => `\`${a.name}\``).join(", ");
+      injectInfoMessage(`📎 Contexto anexado: ${names}`);
+    }
+  }
+
   function handleSend(text) {
     setInputValue("");
-    sendMessage(text);
+    sendMessage(text, buildContext());
   }
 
   const isEmpty = messages.length === 0 && !thinking;
@@ -177,6 +246,41 @@ export default function ChatPage() {
             </span>
           </div>
         </div>
+
+        {/* Quick Actions toolbar */}
+        <QuickActions
+          disabled={thinking}
+          pendingPlan={hasPendingPlan}
+          memoryAvailable={memoryAvailable}
+          onValidate={() => validateSystem(buildContext())}
+          onGeneratePlan={() => {
+            // Fix 1: use the actual user instruction; clear the input after capturing it.
+            // runPlannerAction handles empty string with a safe fallback.
+            const msg = inputValue;
+            setInputValue("");
+            runPlannerAction(msg, buildContext());
+          }}
+          onApprove={() => approveExecution(buildContext())}
+          onSaveMemory={() => saveToMemory(null, buildContext())}
+          onTriggerAttach={() => attachTriggerRef.current?.click()}
+        />
+
+        {/* Target panel */}
+        <TargetPanel
+          target={target}
+          onUpdate={updateTarget}
+          onReset={resetTarget}
+        />
+
+        {/* Attachment bar */}
+        <AttachmentBar
+          ref={attachTriggerRef}
+          attachments={attachments}
+          onAdd={handleAddFiles}
+          onRemove={removeAttachment}
+          error={attachError}
+          onDismissError={dismissAttachError}
+        />
 
         {/* Messages / Empty */}
         <div style={styles.messagesArea}>
@@ -216,7 +320,13 @@ export default function ChatPage() {
       </div>
 
       {/* ── Aux panel (leve) ── */}
-      <AuxPanel messageCount={msgCount} thinking={thinking} />
+      <AuxPanel
+        messageCount={msgCount}
+        thinking={thinking}
+        target={target}
+        hasPendingPlan={hasPendingPlan}
+        attachCount={attachments.length}
+      />
     </div>
   );
 }

@@ -12,15 +12,64 @@ import { normalizeError, ERROR_CODES } from "../errors.js";
 import { getApiConfig }                from "../config.js";
 import { getSessionId }                from "../session.js";
 
+// ── Executable step spec ──────────────────────────────────────────────────────
+
+// Known safe read-only endpoints for each target_type.
+// Executor will probe these without side-effects.
+const _TARGET_TYPE_ENDPOINTS = {
+  cloudflare_worker: ["/health", "/metrics", "/status", "/config"],
+};
+
+/**
+ * Builds an `execution_spec` object injected into every `/planner/run` request.
+ * This signals to the LLM pipeline the desired step schema and safety constraints,
+ * so the planner emits executable steps rather than descriptive ones.
+ *
+ * @param {object|null} target — context.target from the caller
+ * @returns {object}
+ */
+function buildExecutionSpec(target) {
+  const mode = target?.mode ?? "read_only";
+  const targetType = target?.target_type ?? null;
+  const knownEndpoints = targetType ? (_TARGET_TYPE_ENDPOINTS[targetType] ?? []) : [];
+
+  return {
+    // Desired shape for every step object in canonicalPlan.steps.
+    // `input` is the canonical field name (matches mapper + mock data).
+    // `expected_output` is accepted as alias for `expected` (both handled by mapper).
+    step_schema: {
+      id:              "string — unique step identifier, e.g. step_1",
+      action:          "string — one of: http_get | http_post | discover_endpoints | validate_config | read_logs",
+      input:           "string — relative path or resource identifier, e.g. /health",
+      expected:        "object — { status?: number, contains?: string[], matches?: string }",
+      expected_output: "object — alias for expected; either field is accepted",
+      safe:            "boolean — true when action has no side-effects (required for read_only mode)",
+    },
+    constraints: {
+      mode,
+      safe_only:                    mode === "read_only",
+      destructive_actions_blocked:  mode === "read_only",
+      allowed_actions:              ["http_get", "discover_endpoints", "validate_config", "read_logs"],
+      blocked_actions:              ["http_post", "http_patch", "http_delete", "deploy", "write", "delete"],
+    },
+    // Provide known endpoints so the planner can skip discovery when possible
+    ...(knownEndpoints.length > 0 && {
+      known_endpoints:             knownEndpoints,
+      discover_first_if_unknown:   true,
+    }),
+  };
+}
+
 /**
  * Gera um plano real chamando POST /planner/run.
  * Apenas disponível em modo real.
  *
  * @param {string} message — instrução do usuário
+ * @param {object} [context] — contexto operacional { target, attachments_summary }
  * @returns {Promise<SuccessEnvelope|ErrorEnvelope>}
  *   SuccessEnvelope.data = { planner: object } (raw backend payload)
  */
-export async function runPlanner(message) {
+export async function runPlanner(message, context) {
   const t0 = Date.now();
   const { mode } = getApiConfig();
 
@@ -33,9 +82,17 @@ export async function runPlanner(message) {
 
   try {
     const session_id = getSessionId();
+    // Send the user instruction as-is; target travels in context.target (JSON).
+    // The LLM derives the plan objective from the instruction, not from the target.
+    // execution_spec guides the pipeline to produce executable steps.
+    const enrichedContext = {
+      ...(context && typeof context === "object" ? context : {}),
+      execution_spec: buildExecutionSpec(context?.target ?? null),
+    };
+    const body = { message, session_id, context: enrichedContext };
     const res = await apiClient.request("/planner/run", {
       method: "POST",
-      body: { message, session_id },
+      body,
     });
 
     if (!res.ok || !res.data?.ok) {

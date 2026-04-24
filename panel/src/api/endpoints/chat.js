@@ -79,15 +79,35 @@ export async function chatSend(text, opts = {}) {
 
   try {
     const reqBody = { message: text, session_id: getSessionId() };
-    // PR5: Forward conversation history when provided by caller
-    if (Array.isArray(opts.conversation_history) && opts.conversation_history.length > 0) {
-      reqBody.conversation_history = opts.conversation_history;
+
+    // Build conversation history (target injected as system context when present)
+    let convHistory = Array.isArray(opts.conversation_history) ? [...opts.conversation_history] : [];
+    if (opts.context?.target && typeof opts.context.target === "object") {
+      const t = opts.context.target;
+      const targetLines = [
+        "[Contexto operacional ativo]",
+        t.worker      ? `worker: ${t.worker}`           : null,
+        t.repo        ? `repo: ${t.repo}`               : null,
+        t.branch      ? `branch: ${t.branch}`           : null,
+        t.environment ? `environment: ${t.environment}` : null,
+        t.mode        ? `mode: ${t.mode}`               : null,
+      ].filter(Boolean).join("\n");
+      convHistory = [{ role: "system", content: targetLines }, ...convHistory];
+    }
+    if (convHistory.length > 0) {
+      reqBody.conversation_history = convHistory;
     }
 
+    // Operational context: target + attachments (sent as JSON for backend tooling)
+    if (opts.context && typeof opts.context === "object") {
+      reqBody.context = opts.context;
+    }
+
+    const { conversation_history: _ch, context: _ctx, ...restOpts } = opts;
     const res = await apiClient.request("/chat/run", {
       method: "POST",
       body: reqBody,
-      ...opts,
+      ...restOpts,
     });
 
     if (!res.ok || !res.data?.ok) {

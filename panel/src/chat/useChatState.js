@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
-import { chatSend, normalizeError } from "../api";
+import { chatSend, normalizeError, runPlanner, createManualMemory, getSessionId } from "../api";
 import { onChatSuccess } from "../store/plannerStore";
+import { targetFields } from "./useTargetState";
 
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
@@ -62,6 +63,8 @@ export function useChatState() {
   const sendingRef = useRef(false);
   // Tracks the last trimmed text successfully dispatched — used by retryMessage.
   const lastSentRef = useRef(null);
+  // Tracks the last context dispatched — used by retryMessage.
+  const lastContextRef = useRef(null);
   // PR5: Stores conversation history snapshot for the current send cycle.
   // Updated in sendMessage before adding the new user message.
   // Persists across send→retry so retryMessage uses the same history.
@@ -70,11 +73,15 @@ export function useChatState() {
   // HTTP-only layer: calls chatSend(), handles response, updates state.
   // Does NOT add a user message bubble — that is the caller's responsibility.
   // Called by sendMessage (after adding the bubble) and by retryMessage (no new bubble).
-  const _doHttpSend = useCallback(async (trimmed) => {
+  // context: optional { target, attachments_summary } forwarded to /chat/run.
+  const _doHttpSend = useCallback(async (trimmed, context) => {
     // PR5: Forward conversation history for LLM context continuity
     const chatOpts = {};
     if (historyRef.current.length > 0) {
       chatOpts.conversation_history = historyRef.current;
+    }
+    if (context && typeof context === "object") {
+      chatOpts.context = context;
     }
 
     let result;
@@ -103,12 +110,13 @@ export function useChatState() {
   }, []);
 
   const sendMessage = useCallback(
-    async (text) => {
+    async (text, context) => {
       const trimmed = text.trim();
       if (!trimmed || sendingRef.current) return;
 
       sendingRef.current = true;
       lastSentRef.current = trimmed;
+      lastContextRef.current = context ?? null;
       setError(null);
 
       // PR5: Snapshot conversation history BEFORE adding the new user message.
@@ -120,7 +128,7 @@ export function useChatState() {
       setMessages((prev) => [...prev, userMsg]);
       setThinking(true);
 
-      await _doHttpSend(trimmed);
+      await _doHttpSend(trimmed, context);
     },
     [_doHttpSend, messages],
   );
@@ -132,10 +140,15 @@ export function useChatState() {
     sendingRef.current = true;
     setError(null);
     setThinking(true);
-    await _doHttpSend(lastSentRef.current);
+    await _doHttpSend(lastSentRef.current, lastContextRef.current);
   }, [_doHttpSend]);
 
   const dismissError = useCallback(() => setError(null), []);
+
+  // Inject an info message from outside (e.g. attachment notification)
+  const injectInfoMessage = useCallback((content) => {
+    setMessages((prev) => [...prev, makeMsg("enavia", content, new Date().toISOString())]);
+  }, []);
 
   // Loads a static conversation seed to validate the "conversation" state without typing.
   const seedMessages = useCallback(() => {
@@ -153,6 +166,141 @@ export function useChatState() {
     setError(null);
   }, []);
 
+  // ── Quick Action: Gerar plano via /planner/run ──────────────────────────────
+  // Pega message atual + context (target + attachments) → POST /planner/run.
+  // Exibe resumo do plano no chat. NÃO executa nada.
+  const runPlannerAction = useCallback(async (message, context) => {
+    const trimmed = (message || "").trim();
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    setThinking(true);
+    setError(null);
+
+    const promptText = trimmed || "Validar o target atual em modo read-only";
+    const userMsg = makeMsg("user", `📋 Gerar plano: ${promptText}`);
+    setMessages((prev) => [...prev, userMsg]);
+
+    let result;
+    try {
+      result = await runPlanner(promptText, context);
+    } catch (err) {
+      const envelope = normalizeError(err, "planner");
+      setError(envelope.error.message);
+      setThinking(false);
+      sendingRef.current = false;
+      return;
+    }
+
+    if (!result.ok) {
+      setError(result.error.message);
+      setThinking(false);
+      sendingRef.current = false;
+      return;
+    }
+
+    const planner = result.data?.planner;
+
+    // Build a readable plan summary — never use JSON.stringify.
+    // canonicalPlan.objective is the primary source; fall back to listing steps.
+    const objective = planner?.canonicalPlan?.objective
+      || planner?.classification?.objective
+      || null;
+    const rawSteps = Array.isArray(planner?.canonicalPlan?.steps)
+      ? planner.canonicalPlan.steps
+      : [];
+    const needsApproval = planner?.gate?.needs_human_approval === true
+      || planner?.gate?.gate_status === "approval_required";
+
+    let summaryLines = [];
+    // Target metadata — shown as separate line, never mixed with objective
+    const tFields = targetFields(context?.target);
+    if (tFields.length > 0) {
+      const parts = tFields.map((f) => f.value).join(" / ");
+      summaryLines.push(`**Target:** ${parts}`);
+    }
+    if (objective) {
+      summaryLines.push(`**Objetivo:** ${objective}`);
+    }
+    if (rawSteps.length > 0) {
+      const stepList = rawSteps
+        .slice(0, 8)
+        .map((s, i) => `${i + 1}. ${typeof s === "string" ? s : (s.label ?? s.description ?? s.action ?? "Passo sem nome")}`)
+        .join("\n");
+      summaryLines.push(`**Passos (${rawSteps.length}):**\n${stepList}`);
+      if (rawSteps.length > 8) summaryLines.push(`_... e mais ${rawSteps.length - 8} passo(s)_`);
+    }
+    if (summaryLines.length === 0) {
+      summaryLines.push("Plano estruturado gerado. Nenhum objetivo ou passo disponível.");
+    }
+    if (needsApproval) {
+      summaryLines.push("⏳ **Gate humano:** aprovação necessária antes de executar.");
+    }
+    summaryLines.push("_Abra a aba /plan para detalhes completos._");
+
+    const replyContent = `📋 **Plano gerado**\n\n${summaryLines.join("\n\n")}`;
+    setMessages((prev) => [...prev, makeMsg("enavia", replyContent, new Date().toISOString())]);
+    onChatSuccess(promptText, planner ?? null);
+    setThinking(false);
+    sendingRef.current = false;
+  }, []);
+
+  // ── Quick Action: Aprovar execução → /chat/run com message="aprovado" ────────
+  const approveExecution = useCallback(async (context) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    lastSentRef.current = "aprovado";
+    lastContextRef.current = context ?? null;
+    historyRef.current = _buildConversationHistory(messages);
+
+    const userMsg = makeMsg("user", "✅ Aprovado — prosseguir com execução.");
+    setMessages((prev) => [...prev, userMsg]);
+    setThinking(true);
+    setError(null);
+
+    await _doHttpSend("aprovado", context);
+  }, [_doHttpSend, messages]);
+
+  // ── Quick Action: Validar sistema ─────────────────────────────────────────────
+  // Monta prompt seguro read-only e chama /planner/run.
+  const validateSystem = useCallback(async (context) => {
+    const prompt =
+      "Crie um plano e prepare execução via executor para validar o worker alvo em modo somente leitura. " +
+      "Não execute nada. Apenas prepare o plano de validação.";
+    await runPlannerAction(prompt, context);
+  }, [runPlannerAction]);
+
+  // ── Quick Action: Salvar na memória → /memory/manual ─────────────────────────
+  // Salva preferência operacional informada. Retorna se sucesso ou falha.
+  const saveToMemory = useCallback(async (content, context) => {
+    setError(null);
+    const payload = {
+      content:  content || "Confiabilidade sempre: priorizar segurança, staging e validação read-only antes de qualquer ação.",
+      source:   "chat_quick_action",
+      session_id: getSessionId(),
+      ...(context?.target ? {
+        tags: [context.target.environment, context.target.worker].filter((v) => typeof v === "string" && v.length > 0),
+      } : {}),
+    };
+
+    let result;
+    try {
+      result = await createManualMemory(payload);
+    } catch (err) {
+      const envelope = normalizeError(err, "memory");
+      setError(envelope.error.message);
+      return { ok: false };
+    }
+
+    if (!result.ok) {
+      setError(result.error?.message ?? "Falha ao salvar na memória.");
+      return { ok: false };
+    }
+
+    const confirmMsg = makeMsg("enavia", "🧠 Preferência operacional salva na memória com sucesso.", new Date().toISOString());
+    setMessages((prev) => [...prev, confirmMsg]);
+    return { ok: true };
+  }, []);
+
   return {
     messages,
     thinking,
@@ -164,5 +312,11 @@ export function useChatState() {
     seedMessages,
     dismissError,
     clearMessages,
+    injectInfoMessage,
+    // Quick actions
+    runPlannerAction,
+    approveExecution,
+    validateSystem,
+    saveToMemory,
   };
 }
