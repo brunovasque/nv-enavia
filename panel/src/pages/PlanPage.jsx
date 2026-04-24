@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, fetchLatestPlan } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import { useSessionId } from "../chat/useSessionState";
 import { TARGET_STORAGE_KEY, DEFAULT_TARGET } from "../chat/useTargetState";
@@ -95,10 +95,6 @@ export default function PlanPage() {
   // Local snapshot from direct /planner/run or /planner/latest calls
   const [localPlannerSnapshot, setLocalPlannerSnapshot] = useState(null);
 
-  // Instruction form state
-  const [planInstruction, setPlanInstruction] = useState("");
-  const [planGenerating, setPlanGenerating] = useState(false);
-  const [planGenError, setPlanGenError] = useState(null);
   const [latestLoading, setLatestLoading] = useState(false);
   const [latestError, setLatestError] = useState(null);
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
@@ -271,28 +267,11 @@ export default function PlanPage() {
     }
   }
 
-  // Gerar plano diretamente via POST /planner/run
-  const handleRunPlanner = useCallback(async () => {
-    if (!planInstruction.trim() || planGenerating) return;
-    setPlanGenerating(true);
-    setPlanGenError(null);
-    setLatestError(null);
-    const result = await runPlanner(planInstruction.trim());
-    setPlanGenerating(false);
-    if (result.ok && result.data?.planner) {
-      setLocalPlannerSnapshot(result.data.planner);
-      setLastSyncedAt(new Date());
-    } else {
-      setPlanGenError(result.error?.message ?? "Falha ao gerar plano.");
-    }
-  }, [planInstruction, planGenerating]);
-
   // Buscar último plano salvo via GET /planner/latest (manual)
   const handleFetchLatest = useCallback(async () => {
     if (latestLoading) return;
     setLatestLoading(true);
     setLatestError(null);
-    setPlanGenError(null);
     const result = await fetchLatestPlan(sessionId);
     setLatestLoading(false);
     if (result.ok) {
@@ -335,42 +314,25 @@ export default function PlanPage() {
         onClearDemoOverride={clearDemoOverride}
       />
 
-      {/* Instruction form — only in real mode */}
+      {/* Sync status bar — real mode only */}
       {isRealMode && (
         <div style={f.wrap}>
           <div style={f.row}>
-            <input
-              style={f.input}
-              type="text"
-              placeholder="Instrução para gerar plano..."
-              value={planInstruction}
-              onChange={(e) => setPlanInstruction(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleRunPlanner(); } }}
-              disabled={planGenerating}
-              aria-label="Instrução para gerar plano"
-            />
-            <button
-              style={f.btn}
-              onClick={handleRunPlanner}
-              disabled={planGenerating || !planInstruction.trim()}
-            >
-              {planGenerating ? "Gerando..." : "Gerar plano"}
-            </button>
             <button
               style={f.btnSecondary}
               onClick={handleFetchLatest}
               disabled={latestLoading}
             >
-              {latestLoading ? "Buscando..." : "Atualizar último plano"}
+              {latestLoading ? "Buscando..." : "↻ Sincronizar"}
             </button>
+            {lastSyncedAt && (
+              <span style={f.syncInline}>
+                Sincronizado às {lastSyncedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
           </div>
-          {(planGenError || latestError) && (
-            <p style={f.error}>⚠ {planGenError || latestError}</p>
-          )}
-          {lastSyncedAt && (
-            <p style={f.sync}>
-              ↻ Sincronizado às {lastSyncedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </p>
+          {latestError && (
+            <p style={f.error}>⚠ {latestError}</p>
           )}
         </div>
       )}
@@ -619,29 +581,6 @@ const f = {
     gap: "8px",
     alignItems: "center",
   },
-  input: {
-    flex: 1,
-    padding: "8px 12px",
-    fontSize: "13px",
-    background: "var(--bg-surface)",
-    border: "1px solid var(--border-light)",
-    borderRadius: "var(--radius-md)",
-    color: "var(--text-primary)",
-    outline: "none",
-    minWidth: 0,
-  },
-  btn: {
-    padding: "8px 16px",
-    fontSize: "13px",
-    fontWeight: 600,
-    background: "var(--color-primary)",
-    color: "#fff",
-    border: "none",
-    borderRadius: "var(--radius-md)",
-    cursor: "pointer",
-    flexShrink: 0,
-    opacity: 1,
-  },
   btnSecondary: {
     padding: "8px 14px",
     fontSize: "13px",
@@ -658,10 +597,9 @@ const f = {
     color: "#EF4444",
     margin: 0,
   },
-  sync: {
+  syncInline: {
     fontSize: "11px",
     color: "var(--text-muted)",
-    margin: 0,
     opacity: 0.7,
   },
 };

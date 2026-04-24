@@ -212,16 +212,56 @@ export function useChatState() {
 
   // ── Quick Action: Gerar plano via /planner/run ──────────────────────────────
   // Pega message atual + context (target + attachments) → POST /planner/run.
+  // Quando não há mensagem explícita, deriva intenção do histórico da conversa.
   // Exibe resumo do plano no chat. NÃO executa nada.
   const runPlannerAction = useCallback(async (message, context) => {
     const trimmed = (message || "").trim();
     if (sendingRef.current) return;
+
+    // ── Derivar intenção da conversa quando não há texto explícito ──────────
+    let promptText;
+    if (trimmed) {
+      promptText = trimmed;
+    } else {
+      // Filtra mensagens reais (exclui meta-mensagens de plano e sistema)
+      const conversationMsgs = messages.filter(
+        (m) => (m.role === "user" || m.role === "enavia") &&
+               typeof m.content === "string" &&
+               m.content.trim().length > 0 &&
+               !m.content.startsWith("📋") &&
+               !m.content.startsWith("✅") &&
+               m.role !== "system",
+      );
+
+      if (conversationMsgs.length === 0) {
+        // Sem contexto de conversa — orientar o operador a alinhar no Chat primeiro.
+        setMessages((prev) => [
+          ...prev,
+          makeMsg(
+            "enavia",
+            "Para gerar um plano, primeiro alinhe a intenção aqui no Chat. " +
+            "Descreva o objetivo, o target e o escopo da operação. " +
+            "Quando estiver pronto, clique em **Gerar plano** novamente.",
+            new Date().toISOString(),
+          ),
+        ]);
+        return;
+      }
+
+      // Usa as últimas mensagens como contexto consolidado para o planner.
+      const contextLines = conversationMsgs
+        .slice(-4)
+        .map((m) => `${m.role === "user" ? "Operador" : "Enavia"}: ${m.content.trim()}`)
+        .join("\n");
+      promptText = `Gerar plano com base no alinhamento da conversa:\n${contextLines}`;
+    }
+
     sendingRef.current = true;
     setThinking(true);
     setError(null);
 
-    const promptText = trimmed || "Validar o target atual em modo read-only";
-    const userMsg = makeMsg("user", `📋 Gerar plano: ${promptText}`);
+    const userMsg = makeMsg("user", `📋 Gerar plano: ${trimmed || "(contexto da conversa)"}`);
+    setMessages((prev) => [...prev, userMsg]);
     setMessages((prev) => [...prev, userMsg]);
 
     let result;
@@ -286,7 +326,7 @@ export function useChatState() {
     onChatSuccess(promptText, planner ?? null);
     setThinking(false);
     sendingRef.current = false;
-  }, []);
+  }, [messages]);
 
   // ── Quick Action: Aprovar execução → /chat/run com message="aprovado" ────────
   const approveExecution = useCallback(async (context) => {
