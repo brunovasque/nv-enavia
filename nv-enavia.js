@@ -3458,6 +3458,8 @@ const _CHAT_BRIDGE_APPROVAL_TERMS = [
 const _CHAT_BRIDGE_DANGEROUS_TERMS = [
   "deploy", "delete", "rm ", "drop", "prod", "produção", "write", "patch", "post", "merge", "rollback",
 ];
+// TTL for pending_plan stored in KV after planner generates a plan requiring approval.
+const _PENDING_PLAN_TTL_SECONDS = 600;
 
 // ============================================================================
 // _dispatchFromChat — helper interno: despacha executor a partir de pending_plan
@@ -3606,11 +3608,11 @@ async function handleChatLLM(request, env) {
   //   - Retorna imediatamente — não passa pelo LLM
   // -------------------------------------------------------------------------
   if (session_id && env.ENAVIA_BRAIN) {
-    const msgNorm = message.toLowerCase();
-    const hasApproval = _CHAT_BRIDGE_APPROVAL_TERMS.some((t) => msgNorm.includes(t));
-    const hasDanger   = _CHAT_BRIDGE_DANGEROUS_TERMS.some((t) => msgNorm.includes(t));
+    const normalizedMsg = message.toLowerCase();
+    const hasApproval = _CHAT_BRIDGE_APPROVAL_TERMS.some((t) => normalizedMsg.includes(t));
+    const hasDangerousTerm = _CHAT_BRIDGE_DANGEROUS_TERMS.some((t) => normalizedMsg.includes(t));
 
-    if (hasApproval && hasDanger) {
+    if (hasApproval && hasDangerousTerm) {
       logNV("🛡️ [CHAT/BRIDGE] Aprovação bloqueada por termo perigoso", {
         session_id,
         message: message.slice(0, 80),
@@ -3965,7 +3967,6 @@ async function handleChatLLM(request, env) {
         // porque bridge.executor_payload é null quando gate bloqueia.
         // TTL: 600 segundos.
         // ---------------------------------------------------------------
-        const _PENDING_PLAN_TTL = 600;
         if (
           session_id &&
           gate.needs_human_approval === true &&
@@ -3993,12 +3994,12 @@ async function handleChatLLM(request, env) {
             plan_summary: builtExecutorPayload.plan_summary,
             gate_status: gate.gate_status,
             created_at: new Date(now).toISOString(),
-            expires_at: new Date(now + _PENDING_PLAN_TTL * 1000).toISOString(),
+            expires_at: new Date(now + _PENDING_PLAN_TTL_SECONDS * 1000).toISOString(),
             source: "chat_run",
           };
           try {
             await env.ENAVIA_BRAIN.put(pendingKey, JSON.stringify(pendingValue), {
-              expirationTtl: _PENDING_PLAN_TTL,
+              expirationTtl: _PENDING_PLAN_TTL_SECONDS,
             });
             pendingPlanSaved = true;
             logNV("💾 [CHAT/LLM] pending_plan salvo no KV", {
@@ -4046,7 +4047,7 @@ async function handleChatLLM(request, env) {
       reply,
       planner_used: plannerUsed,
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
-      ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: 600 } : {}),
+      ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
       input: message,
       telemetry: {
