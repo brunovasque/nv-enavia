@@ -3767,6 +3767,34 @@ async function handleChatLLM(request, env) {
     browserArmState: getBrowserArmState(),
   });
 
+  // --- Chat Bridge: operational override + shouldActivatePlanner (pre-LLM) ---
+  //
+  // Computed here — before the try block — so the decision is available even when
+  // the LLM call fails, and so that the planner runs regardless of LLM outcome
+  // when the message carries clear operational intent.
+  //
+  // PM4 decides as base authority. The operational override adds a deterministic
+  // layer: if the message contains operational/mechanical intent terms AND no
+  // dangerous terms, planner is forced even if PM4 returned Level A.
+  // ---------------------------------------------------------------------------
+  const _CHAT_BRIDGE_OPERATIONAL_TERMS = [
+    "executar", "execução", "executor", "deploy-worker", "healthcheck",
+    "auditar", "validar", "plano operacional", "preparar execução",
+  ];
+  const msgLower = message.toLowerCase();
+  const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : false;
+  const hasOperationalIntent = _CHAT_BRIDGE_OPERATIONAL_TERMS.some((t) => msgLower.includes(t));
+  // Dangerous term check for override uses word-boundary matching so that
+  // compound service names like "deploy-worker" do not falsely match "deploy".
+  // A term is dangerous only when it appears as a standalone word/phrase,
+  // i.e. not immediately followed by a hyphen that would make it a compound name.
+  const hasDangerousTermForOverride = _CHAT_BRIDGE_DANGEROUS_TERMS.some((t) => {
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").trim();
+    return new RegExp(escaped + "(?![\\w-])", "i").test(msgLower);
+  });
+  const operationalOverride = hasOperationalIntent && !hasDangerousTermForOverride;
+  const shouldActivatePlanner = pm4AllowsPlanner || operationalOverride;
+
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
     // Leitura de memória estruturada com separação explícita de blocos.
@@ -3897,8 +3925,7 @@ async function handleChatLLM(request, env) {
     // while generating a full structured plan in reply. PM4 as sole authority
     // closes this gap: if the message is B/C, planner always runs internally,
     // and the reply must remain conversational (enforced by _isManualPlanReply).
-    const pm4AllowsPlanner = pm4Arbitration ? pm4Arbitration.allows_planner : false;
-    const shouldActivatePlanner = pm4AllowsPlanner;
+    // (shouldActivatePlanner, pm4AllowsPlanner, operationalOverride computed pre-LLM above)
 
     // Auditoria da decisão de arbitration — provável sem LLM real
     const arbitrationDecision = {
@@ -3907,12 +3934,16 @@ async function handleChatLLM(request, env) {
       pm4_signals:          pm4Arbitration?.signals      || [],
       pm4_allows_planner:   pm4AllowsPlanner,
       llm_requested_planner: wantsPlan,
-      // final_decision reflects PM4-only authority:
-      //   "planner_activated"      → LLM requested + PM4 level B/C (coherent)
-      //   "planner_forced_level_BC"→ PM4 level B/C but LLM didn't request it
-      //   "planner_blocked_level_A"→ PM4 level A (blocks even if LLM wanted it)
+      ...(operationalOverride ? { operational_override: true } : {}),
+      // final_decision reflects PM4-only authority (or operational override):
+      //   "planner_activated"              → LLM requested + PM4 level B/C (coherent)
+      //   "planner_forced_level_BC"        → PM4 level B/C but LLM didn't request it
+      //   "planner_forced_operational"     → PM4 level A overridden by operational term
+      //   "planner_blocked_level_A"        → PM4 level A (blocks even if LLM wanted it)
       final_decision: shouldActivatePlanner
-        ? (wantsPlan ? "planner_activated" : "planner_forced_level_BC")
+        ? (operationalOverride && !pm4AllowsPlanner
+            ? "planner_forced_operational"
+            : (wantsPlan ? "planner_activated" : "planner_forced_level_BC"))
         : "planner_blocked_level_A",
     };
 
@@ -4136,16 +4167,19 @@ async function handleChatLLM(request, env) {
           // PR7: continuity_active and pipeline are derivable before LLM call — include on failure
           continuity_active: conversationHistory.length > 0,
           conversation_history_length: conversationHistory.length,
-          pipeline: pm4Arbitration?.allows_planner ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
+          pipeline: shouldActivatePlanner ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
           // PR7: llm_parse_mode is unknown on failure (LLM never responded)
           llm_parse_mode: _LLM_PARSE_MODE.UNKNOWN,
           // Include PM4 pre-check result even on LLM failure — it's deterministic
           arbitration: pm4Arbitration ? {
             pm4_level: pm4Arbitration.level,
-            pm4_allows_planner: pm4Arbitration.allows_planner,
-            // Compute final_decision from PM4 alone (LLM decision unknown on failure)
-            final_decision: pm4Arbitration.allows_planner
-              ? "planner_forced_level_BC"
+            pm4_allows_planner: pm4AllowsPlanner,
+            ...(operationalOverride ? { operational_override: true } : {}),
+            // Compute final_decision from PM4 + operational override (LLM decision unknown on failure)
+            final_decision: shouldActivatePlanner
+              ? (operationalOverride && !pm4AllowsPlanner
+                  ? "planner_forced_operational"
+                  : "planner_forced_level_BC")
               : "planner_blocked_level_A",
           } : null,
           // Include operational awareness even on LLM failure — computed before try block
