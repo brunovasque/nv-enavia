@@ -80,25 +80,18 @@ export async function chatSend(text, opts = {}) {
   try {
     const reqBody = { message: text, session_id: getSessionId() };
 
-    // Build conversation history (target injected as system context when present)
-    let convHistory = Array.isArray(opts.conversation_history) ? [...opts.conversation_history] : [];
-    if (opts.context?.target && typeof opts.context.target === "object") {
-      const t = opts.context.target;
-      const targetLines = [
-        "[Contexto operacional ativo]",
-        t.worker      ? `worker: ${t.worker}`           : null,
-        t.repo        ? `repo: ${t.repo}`               : null,
-        t.branch      ? `branch: ${t.branch}`           : null,
-        t.environment ? `environment: ${t.environment}` : null,
-        t.mode        ? `mode: ${t.mode}`               : null,
-      ].filter(Boolean).join("\n");
-      convHistory = [{ role: "system", content: targetLines }, ...convHistory];
-    }
+    // Build conversation history: only user/assistant roles (backend silently
+    // drops system-role entries so we never inject target as a system message here).
+    const convHistory = Array.isArray(opts.conversation_history) ? [...opts.conversation_history] : [];
     if (convHistory.length > 0) {
       reqBody.conversation_history = convHistory;
     }
 
-    // Operational context: target + attachments (sent as JSON for backend tooling)
+    // Operational context: target + attachments.
+    // This is the authoritative path for context.target — the backend reads
+    // body.context.target to populate target_seen / _operationalContextBlock.
+    // Every normal send from ChatPage passes buildContext() which always
+    // includes the current target (default: nv-enavia/prod/read_only).
     if (opts.context && typeof opts.context === "object") {
       reqBody.context = opts.context;
     }
@@ -124,6 +117,12 @@ export async function chatSend(text, opts = {}) {
     const planner = res.data.planner || null;
     const memoryApplied = res.data.memory_applied === true;
     const memoryHits = Array.isArray(res.data.memory_hits) ? res.data.memory_hits : [];
+    const operationalContextApplied = res.data.operational_context_applied === true;
+    const telemetry = res.data.telemetry && typeof res.data.telemetry === "object" ? res.data.telemetry : {};
+    const targetSeen = telemetry.target_seen === true;
+    const targetFieldsSeen = Array.isArray(telemetry.target_fields_seen) ? telemetry.target_fields_seen : [];
+    const memoryContentInjected = telemetry.memory_content_injected === true;
+    const memoryHitsCount = typeof telemetry.memory_hits_count === "number" ? telemetry.memory_hits_count : 0;
     const sessionId = getSessionId();
 
     const data = mapChatResponse(
@@ -144,6 +143,11 @@ export async function chatSend(text, opts = {}) {
       plannerSnapshot: planner,
       memoryApplied,
       memoryHits,
+      operationalContextApplied,
+      targetSeen,
+      targetFieldsSeen,
+      memoryContentInjected,
+      memoryHitsCount,
       meta: { durationMs: Date.now() - t0 },
     };
   } catch (err) {

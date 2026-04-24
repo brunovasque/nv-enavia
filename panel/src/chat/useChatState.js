@@ -119,6 +119,14 @@ export function useChatState() {
       enaMsg.memoryApplied = true;
       enaMsg.memoryHits = Array.isArray(result.memoryHits) ? result.memoryHits : [];
     }
+    // Attach operational context telemetry so MessageBubble can show the target badge.
+    if (result.operationalContextApplied === true) {
+      enaMsg.operationalContextApplied = true;
+      enaMsg.targetSeen = result.targetSeen === true;
+      enaMsg.targetFieldsSeen = Array.isArray(result.targetFieldsSeen) ? result.targetFieldsSeen : [];
+      enaMsg.memoryContentInjected = result.memoryContentInjected === true;
+      enaMsg.memoryHitsCount = typeof result.memoryHitsCount === "number" ? result.memoryHitsCount : 0;
+    }
     setMessages((prev) => [...prev, enaMsg]);
     onChatSuccess(trimmed, result.plannerSnapshot ?? null);
     setThinking(false);

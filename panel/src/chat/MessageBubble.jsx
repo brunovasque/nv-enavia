@@ -30,6 +30,8 @@ export default function MessageBubble({ message }) {
   }
 
   const hits = Array.isArray(message.memoryHits) ? message.memoryHits : [];
+  const targetFields = Array.isArray(message.targetFieldsSeen) ? message.targetFieldsSeen : [];
+  const hasBadges = message.targetSeen === true || message.memoryApplied === true;
 
   return (
     <div style={styles.enaWrap}>
@@ -38,14 +40,28 @@ export default function MessageBubble({ message }) {
       </div>
       <div style={styles.enaBubble}>
         <p style={styles.bubbleText}>{content}</p>
-        {message.memoryApplied === true && (
-          <span
-            style={styles.memoryBadge}
-            title={hits.length > 0 ? hits.map((h) => h.title).join(", ") : "Memória aplicada"}
-            aria-label={`Memória aplicada${hits.length > 0 ? `: ${hits.map((h) => h.title).join(", ")}` : ""}`}
-          >
-            🧠 memória aplicada{hits.length > 0 ? ` (${hits.length})` : ""}
-          </span>
+        {hasBadges && (
+          <div style={styles.badgesWrap}>
+            {message.targetSeen === true && (
+              <span
+                role="status"
+                style={styles.targetBadge}
+                title={targetFields.length > 0 ? `campos: ${targetFields.join(", ")}` : "Alvo operacional ativo"}
+                aria-label={`Alvo operacional ativo${targetFields.length > 0 ? `, campos: ${targetFields.join(", ")}` : ""}`}
+              >
+                🎯 alvo ativo{targetFields.length > 0 ? ` (${targetFields.length} campos)` : ""}
+              </span>
+            )}
+            {message.memoryApplied === true && (
+              <span
+                style={styles.memoryBadge}
+                title={hits.length > 0 ? hits.map((h) => h.title).join(", ") : "Memória aplicada"}
+                aria-label={`Memória aplicada${hits.length > 0 ? `: ${hits.map((h) => h.title).join(", ")}` : ""}`}
+              >
+                🧠 memória aplicada{hits.length > 0 ? ` (${hits.length})` : ""}
+              </span>
+            )}
+          </div>
         )}
         <span style={styles.timestamp}>{formatTime(timestamp)}</span>
       </div>
@@ -127,8 +143,23 @@ const styles = {
     border: "1px solid var(--color-primary-border)",
     borderRadius: "10px",
     padding: "1px 8px",
-    marginTop: "6px",
     cursor: "default",
+  },
+  targetBadge: {
+    display: "inline-block",
+    fontSize: "10px",
+    color: "#10B981",
+    background: "rgba(16,185,129,0.08)",
+    border: "1px solid rgba(16,185,129,0.25)",
+    borderRadius: "10px",
+    padding: "1px 8px",
+    cursor: "default",
+  },
+  badgesWrap: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "6px",
   },
   timestamp: {
     display: "block",
