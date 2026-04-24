@@ -292,6 +292,22 @@ export function buildChatSystemPrompt(opts = {}) {
     "Você só conhece o que está nesta conversa. Se não souber algo, admita com honestidade.",
   );
 
+  // === 7b. Uso e criação de memória operacional ===
+  sections.push(
+    "",
+    "USO DE MEMÓRIA RECUPERADA:",
+    "• Memórias recuperadas são instruções ou preferências ativas — use-as para influenciar sua resposta e decisão.",
+    "• Nunca apenas liste ou explique memórias — use-as para agir.",
+    "• Só ignore uma memória se ela for claramente irrelevante para a intenção atual.",
+    "",
+    "CRIAÇÃO DE MEMÓRIA — só registre quando identificar:",
+    "• Regra operacional explícita do operador.",
+    "• Preferência persistente confirmada (não inferida de uma única mensagem).",
+    "• Padrão recorrente confirmado por múltiplas interações.",
+    "• Nunca salve memória baseada em uma única interação ambígua.",
+    "• A memória deve ser clara, reutilizável e aplicável em sessões futuras.",
+  );
+
   // === 8. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
   sections.push(
     "",

@@ -3984,12 +3984,22 @@ async function handleChatLLM(request, env) {
       }
 
       if (parts.length > 0) {
-        _pr3MemoryBlock.push({
-          role: "system",
-          content: isOperationalContext
-            ? `MEMÓRIA RECUPERADA (PR3) — MODO OPERACIONAL:\nEstas memórias são regras operacionais ativas para esta resposta. Instruções manuais e aprendizado validado têm peso de regra preferencial — aplique-as diretamente. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`
-            : `MEMÓRIA RECUPERADA (PR3):\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`,
-        });
+        const memBlockContent = isOperationalContext
+          ? [
+              "MEMÓRIA RECUPERADA (PR3) — MODO OPERACIONAL:",
+              "Estas memórias são regras operacionais ativas para esta resposta.",
+              "Instruções manuais e aprendizado validado têm peso de regra preferencial — aplique-as diretamente para influenciar sua resposta e decisão.",
+              "Nunca apenas liste ou explique as memórias: use-as para agir.",
+              "Só ignore uma memória se ela for claramente irrelevante para a intenção atual.",
+              "Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.",
+              ...parts,
+            ].join("\n")
+          : [
+              "MEMÓRIA RECUPERADA (PR3):",
+              "Regra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.",
+              ...parts,
+            ].join("\n");
+        _pr3MemoryBlock.push({ role: "system", content: memBlockContent });
       }
     }
 
@@ -3998,6 +4008,14 @@ async function handleChatLLM(request, env) {
     // before the user message. This high-recency instruction overrides the
     // generic "short reply" rule (section 6 of chatSystemPrompt) for operational
     // queries, anchoring the LLM to the real target and active memory rules.
+    //
+    // The PRIORIDADE DE DECISÃO section here is intentionally complementary to
+    // section 7b in buildChatSystemPrompt (enavia-cognitive-runtime.js): the base
+    // prompt establishes the general principle (always active), while this block
+    // is the high-recency last-instruction injected immediately before the user
+    // message and is only active when hasTarget=true. Both are needed: the base
+    // prompt sets behaviour for all contexts; this block is the authoritative anchor
+    // for the specific operational turn.
     const _operationalContextBlock = [];
     if (hasTarget) {
       const _tgt = _chatTarget;
@@ -4024,7 +4042,13 @@ async function handleChatLLM(request, env) {
           `Alvo ativo confirmado: ${targetDesc}.\n` +
           `O operador fez uma pergunta operacional. Você CONHECE o alvo acima — não pergunte qual sistema, worker ou ambiente.\n` +
           `Responda diretamente usando o alvo. Pode e deve dar uma resposta completa e direta — a restrição de "reply curto" não se aplica a perguntas operacionais com alvo definido.\n` +
-          `Escreva de forma natural, sem markdown headers, sem "Fase 1/2/3" ou listas numeradas.` +
+          `Escreva de forma natural, sem markdown headers, sem "Fase 1/2/3" ou listas numeradas.\n` +
+          `\nPRIORIDADE DE DECISÃO — siga esta ordem antes de responder:\n` +
+          `1. Interprete a intenção do operador.\n` +
+          `2. Cruze com o contexto operacional (alvo acima).\n` +
+          `3. Cruze com as memórias recuperadas (se presentes): trate-as como instruções ou preferências ativas, não como informação descritiva.\n` +
+          `4. Só pergunte algo se faltar informação ESSENCIAL para executar a ação — nunca para entender o contexto (que já foi fornecido).\n` +
+          `Evite perguntas genéricas quando o contexto ou a memória já fornecem a base necessária.` +
           readOnlyNote +
           memNote,
       });
