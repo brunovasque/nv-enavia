@@ -3913,6 +3913,13 @@ async function handleChatLLM(request, env) {
         ? chatRetrievalResult.blocks
         : null;
 
+      // Helper: bullet line for one memory item.
+      // suffix appended to the title line; contentField read from content_structured.
+      const _memLine = (item, contentField, suffix = "") => {
+        const txt = item.content_structured?.[contentField];
+        return `  • ${item.title} (${item.memory_type})${suffix}${txt ? `\n    → ${txt}` : ""}`;
+      };
+
       const parts = [];
 
       // Validated learning: include full content text
@@ -3921,10 +3928,7 @@ async function handleChatLLM(request, env) {
         : chatRetrievalSummary.validated_learning.items;
       if (_vlItems.length > 0) {
         parts.push(`[APRENDIZADO VALIDADO — ${_vlItems.length} item(s)]`);
-        for (const item of _vlItems) {
-          const contentText = item.content_structured?.text;
-          parts.push(`  • ${item.title} (${item.memory_type})${contentText ? `\n    → ${contentText}` : ""}`);
-        }
+        for (const item of _vlItems) parts.push(_memLine(item, "text"));
       }
 
       // Manual instructions: include full content text
@@ -3933,10 +3937,7 @@ async function handleChatLLM(request, env) {
         : chatRetrievalSummary.manual_instructions.items;
       if (_miItems.length > 0) {
         parts.push(`[INSTRUÇÕES MANUAIS — ${_miItems.length} item(s)]`);
-        for (const item of _miItems) {
-          const contentText = item.content_structured?.text;
-          parts.push(`  • ${item.title} (${item.memory_type})${contentText ? `\n    → ${contentText}` : ""}`);
-        }
+        for (const item of _miItems) parts.push(_memLine(item, "text"));
       }
 
       // Historical memory: reference-only → title + summary; non-reference → title + content text
@@ -3950,14 +3951,10 @@ async function handleChatLLM(request, env) {
         parts.push(`[MEMÓRIA HISTÓRICA — ${_hmItems.length} item(s), ${_hmRefCount} referência apenas]`);
         for (const item of _hmItems) {
           const isRef = item._pr3_is_reference ?? item.is_reference ?? false;
-          if (isRef) {
-            const summaryText = item.content_structured?.summary;
-            const label = " (REFERÊNCIA HISTÓRICA — não usar como verdade)";
-            parts.push(`  • ${item.title} (${item.memory_type})${label}${summaryText ? `\n    → ${summaryText}` : ""}`);
-          } else {
-            const contentText = item.content_structured?.text;
-            parts.push(`  • ${item.title} (${item.memory_type})${contentText ? `\n    → ${contentText}` : ""}`);
-          }
+          parts.push(isRef
+            ? _memLine(item, "summary", " (REFERÊNCIA HISTÓRICA — não usar como verdade)")
+            : _memLine(item, "text"),
+          );
         }
       }
 

@@ -39,7 +39,11 @@ export default function MessageBubble({ message }) {
       <div style={styles.enaBubble}>
         <p style={styles.bubbleText}>{content}</p>
         {message.memoryApplied === true && (
-          <span style={styles.memoryBadge} title={hits.length > 0 ? hits.map((h) => h.title).join(", ") : "Memória aplicada"}>
+          <span
+            style={styles.memoryBadge}
+            title={hits.length > 0 ? hits.map((h) => h.title).join(", ") : "Memória aplicada"}
+            aria-label={`Memória aplicada${hits.length > 0 ? `: ${hits.map((h) => h.title).join(", ")}` : ""}`}
+          >
             🧠 memória aplicada{hits.length > 0 ? ` (${hits.length})` : ""}
           </span>
         )}
