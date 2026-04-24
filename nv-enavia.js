@@ -3871,6 +3871,26 @@ async function handleChatLLM(request, env) {
   const operationalOverride = hasOperationalIntent && !hasDangerousTermForOverride;
   const shouldActivatePlanner = pm4AllowsPlanner || operationalOverride;
 
+  // --- Operational Context Detection (target + mensagem) ---
+  // isOperationalContext: true quando context.target existe com campos relevantes OU
+  // quando a mensagem menciona termos operacionais/sistêmicos.
+  // Usado para: injetar target block no prompt, fortalecer instrução de memória e telemetria.
+  const _OPERATIONAL_CONTEXT_MSG_TERMS = [
+    "validar", "sistema", "worker", "plano", "executor", "execução",
+    "auditoria", "deploy-worker", "healthcheck", "auditar",
+  ];
+  const _chatTarget = context.target && typeof context.target === "object" ? context.target : null;
+  const hasTarget = !!(_chatTarget && (_chatTarget.worker || _chatTarget.repo || _chatTarget.environment || _chatTarget.mode));
+  const isOperationalMessage = _OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
+  const isOperationalContext = hasTarget || isOperationalMessage;
+  const operationalDefaultsUsed = isOperationalContext
+    ? [
+        ...(_chatTarget?.mode === "read_only" ? ["read_only"] : []),
+        "health_first", "no_deploy", "no_write", "approval_required",
+      ]
+    : [];
+  const obviousQuestionsSuppressed = hasTarget;
+
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
     // Leitura de memória estruturada com separação explícita de blocos.
@@ -3895,7 +3915,7 @@ async function handleChatLLM(request, env) {
     // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4) ---
     // System prompt completo: base institucional + tom conversacional + contexto dinâmico
     // + awareness operacional real (PR4)
-    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness });
+    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness, is_operational_context: isOperationalContext });
 
     // --- PR5: Inject conversation history between system and current message ---
     // This gives the LLM real context of the ongoing conversation.
@@ -3961,7 +3981,9 @@ async function handleChatLLM(request, env) {
       if (parts.length > 0) {
         _pr3MemoryBlock.push({
           role: "system",
-          content: `MEMÓRIA RECUPERADA (PR3):\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`,
+          content: isOperationalContext
+            ? `MEMÓRIA RECUPERADA (PR3) — MODO OPERACIONAL:\nEstas memórias devem influenciar a decisão operacional desta resposta. Instruções manuais e aprendizado validado têm peso de regra operacional preferencial — não apenas contexto auxiliar.\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`
+            : `MEMÓRIA RECUPERADA (PR3):\nRegra: contexto atual prevalece sobre memória antiga. Itens marcados como REFERÊNCIA HISTÓRICA são apenas auxiliares.\n${parts.join("\n")}`,
         });
       }
     }
@@ -4216,6 +4238,7 @@ async function handleChatLLM(request, env) {
       planner_used: plannerUsed,
       memory_applied: _chatMemApplied,
       memory_hits: _chatMemHits,
+      operational_context_applied: isOperationalContext,
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
@@ -4224,6 +4247,8 @@ async function handleChatLLM(request, env) {
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: plannerUsed ? "PR3 + LLM + PM4→PM9" : "PR3 + LLM-only",
+        operational_defaults_used: operationalDefaultsUsed,
+        obvious_questions_suppressed: obviousQuestionsSuppressed,
         // PR3: retrieval context summary (separação de blocos explícita)
         retrieval: chatRetrievalSummary,
         // PR7: explicit continuity flag — true when conversation history was injected into LLM context
