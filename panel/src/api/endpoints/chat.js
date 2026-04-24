@@ -122,6 +122,8 @@ export async function chatSend(text, opts = {}) {
     // LLM-first: reply comes directly from response.reply
     const content = res.data.reply || "Instrução recebida. Processando.";
     const planner = res.data.planner || null;
+    const memoryApplied = res.data.memory_applied === true;
+    const memoryHits = Array.isArray(res.data.memory_hits) ? res.data.memory_hits : [];
     const sessionId = getSessionId();
 
     const data = mapChatResponse(
@@ -140,6 +142,8 @@ export async function chatSend(text, opts = {}) {
       ok: true,
       data,
       plannerSnapshot: planner,
+      memoryApplied,
+      memoryHits,
       meta: { durationMs: Date.now() - t0 },
     };
   } catch (err) {

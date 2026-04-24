@@ -29,6 +29,8 @@ export default function MessageBubble({ message }) {
     );
   }
 
+  const hits = Array.isArray(message.memoryHits) ? message.memoryHits : [];
+
   return (
     <div style={styles.enaWrap}>
       <div style={styles.enaAvatar} aria-hidden="true">
@@ -36,6 +38,15 @@ export default function MessageBubble({ message }) {
       </div>
       <div style={styles.enaBubble}>
         <p style={styles.bubbleText}>{content}</p>
+        {message.memoryApplied === true && (
+          <span
+            style={styles.memoryBadge}
+            title={hits.length > 0 ? hits.map((h) => h.title).join(", ") : "Memória aplicada"}
+            aria-label={`Memória aplicada${hits.length > 0 ? `: ${hits.map((h) => h.title).join(", ")}` : ""}`}
+          >
+            🧠 memória aplicada{hits.length > 0 ? ` (${hits.length})` : ""}
+          </span>
+        )}
         <span style={styles.timestamp}>{formatTime(timestamp)}</span>
       </div>
     </div>
@@ -107,6 +118,17 @@ const styles = {
     color: "var(--text-primary)",
     lineHeight: 1.6,
     whiteSpace: "pre-wrap",
+  },
+  memoryBadge: {
+    display: "inline-block",
+    fontSize: "10px",
+    color: "var(--color-primary)",
+    background: "var(--color-primary-glow)",
+    border: "1px solid var(--color-primary-border)",
+    borderRadius: "10px",
+    padding: "1px 8px",
+    marginTop: "6px",
+    cursor: "default",
   },
   timestamp: {
     display: "block",

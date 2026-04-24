@@ -3210,6 +3210,7 @@ async function handlePlannerRun(request, env) {
             memory_type:  m.memory_type,
             is_canonical: m.is_canonical,
             priority:     m.priority,
+            content_text: m.content_structured?.text || null, // conteúdo real para o pipeline PM4+
           }))
         : [],
     };
@@ -3336,11 +3337,26 @@ async function handlePlannerRun(request, env) {
       }
     }
 
+    // Derive top-level memory telemetry from memory_context (P16/P17).
+    // memory_applied: true when relevant memories were read and injected.
+    // memory_hits: compact list of the items that were available to the pipeline.
+    const _plannerMemApplied = memory_context.applied === true && memory_context.count > 0;
+    const _plannerMemHits = _plannerMemApplied
+      ? memory_context.items.map((m) => ({
+          id:    m.memory_id,
+          title: m.title,
+          type:  m.memory_type,
+          block: m.is_canonical ? "canonical" : m.memory_type,
+        }))
+      : [];
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
       timestamp: Date.now(),
       input: message,
+      memory_applied: _plannerMemApplied,
+      memory_hits: _plannerMemHits,
       planner: plannerPayload,
       telemetry: {
         duration_ms: Date.now() - startedAt,
@@ -3887,30 +3903,61 @@ async function handleChatLLM(request, env) {
 
     // --- PR3: Build memory context block for LLM (if retrieval produced results) ---
     // Injected as a system message between system prompt and conversation history.
-    // Validated learning and manual instructions get priority.
-    // Historical memory marked as reference-only is explicitly labeled.
+    // Validated learning and manual instructions: title + full content text injected.
+    // Historical memory reference-only: title + short summary (if present).
+    // Historical memory non-reference: title + content text.
     const _pr3MemoryBlock = [];
     if (chatRetrievalSummary.applied && chatRetrievalSummary.total_memories_read > 0) {
+      // Use full objects from chatRetrievalResult.blocks so content_structured is available.
+      const _blocks = chatRetrievalResult.ok && chatRetrievalResult.blocks
+        ? chatRetrievalResult.blocks
+        : null;
+
+      // Helper: bullet line for one memory item.
+      // suffix appended to the title line; contentField read from content_structured.
+      const _memLine = (item, contentField, suffix = "") => {
+        const txt = item.content_structured?.[contentField];
+        return `  • ${item.title} (${item.memory_type})${suffix}${txt ? `\n    → ${txt}` : ""}`;
+      };
+
       const parts = [];
-      if (chatRetrievalSummary.validated_learning.count > 0) {
-        parts.push(`[APRENDIZADO VALIDADO — ${chatRetrievalSummary.validated_learning.count} item(s)]`);
-        for (const item of chatRetrievalSummary.validated_learning.items) {
-          parts.push(`  • ${item.title} (${item.memory_type})`);
+
+      // Validated learning: include full content text
+      const _vlItems = _blocks
+        ? _blocks.validated_learning.items
+        : chatRetrievalSummary.validated_learning.items;
+      if (_vlItems.length > 0) {
+        parts.push(`[APRENDIZADO VALIDADO — ${_vlItems.length} item(s)]`);
+        for (const item of _vlItems) parts.push(_memLine(item, "text"));
+      }
+
+      // Manual instructions: include full content text
+      const _miItems = _blocks
+        ? _blocks.manual_instructions.items
+        : chatRetrievalSummary.manual_instructions.items;
+      if (_miItems.length > 0) {
+        parts.push(`[INSTRUÇÕES MANUAIS — ${_miItems.length} item(s)]`);
+        for (const item of _miItems) parts.push(_memLine(item, "text"));
+      }
+
+      // Historical memory: reference-only → title + summary; non-reference → title + content text
+      const _hmItems = _blocks
+        ? _blocks.historical_memory.items
+        : chatRetrievalSummary.historical_memory.items;
+      const _hmRefCount = _blocks
+        ? _blocks.historical_memory.reference_only_count
+        : chatRetrievalSummary.historical_memory.reference_only_count;
+      if (_hmItems.length > 0) {
+        parts.push(`[MEMÓRIA HISTÓRICA — ${_hmItems.length} item(s), ${_hmRefCount} referência apenas]`);
+        for (const item of _hmItems) {
+          const isRef = item._pr3_is_reference ?? item.is_reference ?? false;
+          parts.push(isRef
+            ? _memLine(item, "summary", " (REFERÊNCIA HISTÓRICA — não usar como verdade)")
+            : _memLine(item, "text"),
+          );
         }
       }
-      if (chatRetrievalSummary.manual_instructions.count > 0) {
-        parts.push(`[INSTRUÇÕES MANUAIS — ${chatRetrievalSummary.manual_instructions.count} item(s)]`);
-        for (const item of chatRetrievalSummary.manual_instructions.items) {
-          parts.push(`  • ${item.title} (${item.memory_type})`);
-        }
-      }
-      if (chatRetrievalSummary.historical_memory.count > 0) {
-        parts.push(`[MEMÓRIA HISTÓRICA — ${chatRetrievalSummary.historical_memory.count} item(s), ${chatRetrievalSummary.historical_memory.reference_only_count} referência apenas]`);
-        for (const item of chatRetrievalSummary.historical_memory.items) {
-          const label = item.is_reference ? " (REFERÊNCIA HISTÓRICA — não usar como verdade)" : "";
-          parts.push(`  • ${item.title} (${item.memory_type})${label}`);
-        }
-      }
+
       if (parts.length > 0) {
         _pr3MemoryBlock.push({
           role: "system",
@@ -4142,12 +4189,33 @@ async function handleChatLLM(request, env) {
       logNV("🛡️ [CHAT/LLM] Manual plan leak detectado no reply — sanitizado", { session_id });
     }
 
+    // Derive top-level memory telemetry from retrieval summary.
+    // memory_applied: true when retrieval ran and found ≥1 active memory.
+    // memory_hits: flat list of all memories that entered the LLM context block,
+    //   including their block classification and reference status.
+    const _chatMemApplied = chatRetrievalSummary.applied === true && chatRetrievalSummary.total_memories_read > 0;
+    const _chatMemHits = _chatMemApplied
+      ? [
+          ...chatRetrievalSummary.validated_learning.items.map((m) => ({
+            id: m.memory_id, title: m.title, type: m.memory_type, block: "validated_learning", is_reference: false,
+          })),
+          ...chatRetrievalSummary.manual_instructions.items.map((m) => ({
+            id: m.memory_id, title: m.title, type: m.memory_type, block: "manual_instructions", is_reference: false,
+          })),
+          ...chatRetrievalSummary.historical_memory.items.map((m) => ({
+            id: m.memory_id, title: m.title, type: m.memory_type, block: "historical_memory", is_reference: m.is_reference || false,
+          })),
+        ]
+      : [];
+
     return jsonResponse({
       ok: true,
       system: "ENAVIA-NV-FIRST",
       mode: "llm-first",
       reply,
       planner_used: plannerUsed,
+      memory_applied: _chatMemApplied,
+      memory_hits: _chatMemHits,
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
