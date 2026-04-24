@@ -4043,6 +4043,10 @@ async function handleChatLLM(request, env) {
           `O operador fez uma pergunta operacional. Você CONHECE o alvo acima — não pergunte qual sistema, worker ou ambiente.\n` +
           `Responda diretamente usando o alvo. Pode e deve dar uma resposta completa e direta — a restrição de "reply curto" não se aplica a perguntas operacionais com alvo definido.\n` +
           `Escreva de forma natural, sem markdown headers, sem "Fase 1/2/3" ou listas numeradas.\n` +
+          `\nRESOLUÇÃO DE AMBIGUIDADE — REGRA OBRIGATÓRIA:\n` +
+          `Quando o operador usar termos genéricos como "o sistema", "o worker", "o ambiente" ou "o projeto" e houver target ativo, resolva imediatamente para o target confirmado acima.\n` +
+          `NÃO pergunte "você quer dizer nv-enavia ou outro sistema?" — a resposta é sempre o target ativo.\n` +
+          `Se quiser confirmar, use: "Vou assumir o target atual (${_tgt.worker || _tgt.repo || "target ativo"}); me corrija se quiser outro alvo."\n` +
           `\nPRIORIDADE DE DECISÃO — siga esta ordem antes de responder:\n` +
           `1. Interprete a intenção do operador.\n` +
           `2. Cruze com o contexto operacional (alvo acima).\n` +
