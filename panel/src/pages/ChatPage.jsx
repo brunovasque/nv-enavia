@@ -159,6 +159,7 @@ export default function ChatPage() {
     retryMessage,
     seedMessages,
     dismissError,
+    injectInfoMessage,
     runPlannerAction,
     approveExecution,
     validateSystem,
@@ -172,7 +173,7 @@ export default function ChatPage() {
     addFiles,
     removeAttachment,
     dismissAttachError,
-    buildAttachmentsSummary,
+    buildAttachments,
   } = useAttachments();
 
   const { plannerSnapshot } = usePlannerStore();
@@ -193,9 +194,18 @@ export default function ChatPage() {
   // Build operational context to forward to all API calls
   function buildContext() {
     const ctx = { target };
-    const summaries = buildAttachmentsSummary();
-    if (summaries.length > 0) ctx.attachments_summary = summaries;
+    const attachs = buildAttachments();
+    if (attachs.length > 0) ctx.attachments = attachs;
     return ctx;
+  }
+
+  // Handle file attachment: add files then show chat notification
+  async function handleAddFiles(fileList) {
+    const result = await addFiles(fileList);
+    if (result?.added?.length > 0) {
+      const names = result.added.map((a) => `\`${a.name}\``).join(", ");
+      injectInfoMessage(`📎 Contexto anexado: ${names}`);
+    }
   }
 
   function handleSend(text) {
@@ -243,7 +253,13 @@ export default function ChatPage() {
           pendingPlan={hasPendingPlan}
           memoryAvailable={memoryAvailable}
           onValidate={() => validateSystem(buildContext())}
-          onGeneratePlan={() => runPlannerAction(inputValue, buildContext())}
+          onGeneratePlan={() => {
+            // Fix 1: use the actual user instruction; clear the input after capturing it.
+            // runPlannerAction handles empty string with a safe fallback.
+            const msg = inputValue;
+            setInputValue("");
+            runPlannerAction(msg, buildContext());
+          }}
           onApprove={() => approveExecution(buildContext())}
           onSaveMemory={() => saveToMemory(null, buildContext())}
           onTriggerAttach={() => attachTriggerRef.current?.click()}
@@ -260,7 +276,7 @@ export default function ChatPage() {
         <AttachmentBar
           ref={attachTriggerRef}
           attachments={attachments}
-          onAdd={addFiles}
+          onAdd={handleAddFiles}
           onRemove={removeAttachment}
           error={attachError}
           onDismissError={dismissAttachError}

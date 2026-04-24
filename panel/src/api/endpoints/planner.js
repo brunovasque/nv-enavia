@@ -34,7 +34,23 @@ export async function runPlanner(message, context) {
 
   try {
     const session_id = getSessionId();
-    const body = { message, session_id };
+
+    // Include target as human-readable preamble so the LLM can use it
+    let effectiveMessage = message;
+    if (context?.target && typeof context.target === "object") {
+      const t = context.target;
+      const targetBlock = [
+        "[Target operacional]",
+        t.worker      ? `worker: ${t.worker}`           : null,
+        t.repo        ? `repo: ${t.repo}`               : null,
+        t.branch      ? `branch: ${t.branch}`           : null,
+        t.environment ? `environment: ${t.environment}` : null,
+        t.mode        ? `mode: ${t.mode}`               : null,
+      ].filter(Boolean).join("\n");
+      effectiveMessage = `${targetBlock}\n\n${message}`;
+    }
+
+    const body = { message: effectiveMessage, session_id };
     if (context && typeof context === "object") {
       body.context = context;
     }

@@ -97,6 +97,12 @@ export function useAttachments() {
     if (results.length > 0) {
       setAttachments((prev) => [...prev, ...results]);
     }
+
+    // Return added/blocked so callers can react (e.g. show chat notification)
+    return {
+      added:   results.map((r) => ({ name: r.name })),
+      blocked,
+    };
   }, []);
 
   const removeAttachment = useCallback((id) => {
@@ -110,13 +116,14 @@ export function useAttachments() {
 
   const dismissAttachError = useCallback(() => setAttachError(null), []);
 
-  // Build the summary sent to API — content + metadata, no execution risk
-  const buildAttachmentsSummary = useCallback(() => {
+  // Build the context.attachments payload — filename/type/content_text/content_summary/truncated
+  const buildAttachments = useCallback(() => {
     return attachments.map((a) => ({
-      name:      a.name,
-      ext:       a.ext,
-      truncated: a.truncated,
-      content:   a.content,
+      filename:        a.name,
+      type:            a.ext,
+      content_text:    a.content,
+      content_summary: a.content.slice(0, 300).trimEnd() + (a.content.length > 300 ? "…" : ""),
+      truncated:       a.truncated,
     }));
   }, [attachments]);
 
@@ -127,6 +134,6 @@ export function useAttachments() {
     removeAttachment,
     clearAttachments,
     dismissAttachError,
-    buildAttachmentsSummary,
+    buildAttachments,
   };
 }

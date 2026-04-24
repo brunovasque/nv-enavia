@@ -144,6 +144,11 @@ export function useChatState() {
 
   const dismissError = useCallback(() => setError(null), []);
 
+  // Inject an info message from outside (e.g. attachment notification)
+  const injectInfoMessage = useCallback((content) => {
+    setMessages((prev) => [...prev, makeMsg("enavia", content, new Date().toISOString())]);
+  }, []);
+
   // Loads a static conversation seed to validate the "conversation" state without typing.
   const seedMessages = useCallback(() => {
     const seeded = SEED_MESSAGES.map((m, i) =>
@@ -300,6 +305,7 @@ export function useChatState() {
     seedMessages,
     dismissError,
     clearMessages,
+    injectInfoMessage,
     // Quick actions
     runPlannerAction,
     approveExecution,
