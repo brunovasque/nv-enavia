@@ -113,7 +113,13 @@ export function useChatState() {
     }
 
     const { role, content, timestamp } = result.data;
-    setMessages((prev) => [...prev, makeMsg(role, content, timestamp)]);
+    const enaMsg = makeMsg(role, content, timestamp);
+    // Attach memory telemetry to the message so MessageBubble can render the badge.
+    if (result.memoryApplied === true) {
+      enaMsg.memoryApplied = true;
+      enaMsg.memoryHits = Array.isArray(result.memoryHits) ? result.memoryHits : [];
+    }
+    setMessages((prev) => [...prev, enaMsg]);
     onChatSuccess(trimmed, result.plannerSnapshot ?? null);
     setThinking(false);
     sendingRef.current = false;
