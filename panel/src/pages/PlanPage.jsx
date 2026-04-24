@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import { useSessionId } from "../chat/useSessionState";
@@ -98,6 +98,10 @@ export default function PlanPage() {
   const [planGenError, setPlanGenError] = useState(null);
   const [latestLoading, setLatestLoading] = useState(false);
   const [latestError, setLatestError] = useState(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+
+  // Ref: prevents concurrent background syncs from overlapping
+  const syncingRef = useRef(false);
 
   // P11 — gate action: local override da decisão humana (sem bridge real)
   // null = nenhuma ação tomada; "approved" | "blocked" = ação do operador
@@ -168,25 +172,37 @@ export default function PlanPage() {
     return () => { stale = true; };
   }, [isRealMode, visibleState, plannerSnapshot, localPlannerSnapshot]);
 
-  // Auto-fetch latest plan from backend on mount (real mode only).
-  // Runs when plannerSnapshot is null (no plan from the current chat session)
-  // so the plan generated in the Chat tab is immediately visible here — even
-  // after a reload — as long as the session_id in localStorage matches the KV
-  // key used by the backend (planner:latest:{session_id}).
-  useEffect(() => {
-    if (!isRealMode) return;
-    // Skip if the store already has a snapshot from this session (chat round-trip).
-    if (plannerSnapshot) return;
-
-    let stale = false;
-    fetchLatestPlan(sessionId).then((result) => {
-      if (stale) return;
+  // ── Backend sync — fonte primária de verdade para o plano ────────────────
+  // Sempre consulta GET /planner/latest no backend (real mode apenas).
+  // Chamado no mount, após mudança de plannerSnapshot no store, e periodicamente.
+  const _doSyncFromBackend = useCallback(async () => {
+    if (!isRealMode || syncingRef.current) return;
+    syncingRef.current = true;
+    try {
+      const result = await fetchLatestPlan(sessionId);
       if (result.ok && result.data.has_plan && result.data.plan) {
         setLocalPlannerSnapshot(result.data.plan);
+        setLastSyncedAt(new Date());
       }
-    }).catch(() => { /* silent — background fetch, non-blocking */ });
-    return () => { stale = true; };
-  }, [isRealMode, sessionId, plannerSnapshot]);
+    } catch {
+      // silent — background fetch, non-blocking
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [isRealMode, sessionId]);
+
+  // Sincroniza no mount e sempre que plannerSnapshot do store muda.
+  // Sem skip: backend é sempre consultado, mesmo quando o store já tem dados.
+  useEffect(() => {
+    _doSyncFromBackend();
+  }, [_doSyncFromBackend, plannerSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling de 30s: mantém a aba sincronizada enquanto aberta.
+  useEffect(() => {
+    if (!isRealMode) return;
+    const id = setInterval(_doSyncFromBackend, 30_000);
+    return () => clearInterval(id);
+  }, [isRealMode, _doSyncFromBackend]);
 
   // P11 → P12 — handlers de ação humana; gate approval triggers bridge send
   const handleBridgeSend = useCallback(async () => {
@@ -260,12 +276,13 @@ export default function PlanPage() {
     setPlanGenerating(false);
     if (result.ok && result.data?.planner) {
       setLocalPlannerSnapshot(result.data.planner);
+      setLastSyncedAt(new Date());
     } else {
       setPlanGenError(result.error?.message ?? "Falha ao gerar plano.");
     }
   }, [planInstruction, planGenerating]);
 
-  // Buscar último plano salvo via GET /planner/latest
+  // Buscar último plano salvo via GET /planner/latest (manual)
   const handleFetchLatest = useCallback(async () => {
     if (latestLoading) return;
     setLatestLoading(true);
@@ -276,6 +293,7 @@ export default function PlanPage() {
     if (result.ok) {
       if (result.data.has_plan && result.data.plan) {
         setLocalPlannerSnapshot(result.data.plan);
+        setLastSyncedAt(new Date());
       } else {
         setLatestError("Nenhum plano encontrado para esta sessão.");
       }
@@ -343,6 +361,11 @@ export default function PlanPage() {
           </div>
           {(planGenError || latestError) && (
             <p style={f.error}>⚠ {planGenError || latestError}</p>
+          )}
+          {lastSyncedAt && (
+            <p style={f.sync}>
+              ↻ Sincronizado às {lastSyncedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </p>
           )}
         </div>
       )}
@@ -629,5 +652,11 @@ const f = {
     fontSize: "12px",
     color: "#EF4444",
     margin: 0,
+  },
+  sync: {
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    margin: 0,
+    opacity: 0.7,
   },
 };
