@@ -83,11 +83,16 @@ export async function chatSend(text, opts = {}) {
     if (Array.isArray(opts.conversation_history) && opts.conversation_history.length > 0) {
       reqBody.conversation_history = opts.conversation_history;
     }
+    // Operational context: target + attachments_summary
+    if (opts.context && typeof opts.context === "object") {
+      reqBody.context = opts.context;
+    }
 
+    const { conversation_history: _ch, context: _ctx, ...restOpts } = opts;
     const res = await apiClient.request("/chat/run", {
       method: "POST",
       body: reqBody,
-      ...opts,
+      ...restOpts,
     });
 
     if (!res.ok || !res.data?.ok) {

@@ -17,10 +17,11 @@ import { getSessionId }                from "../session.js";
  * Apenas disponível em modo real.
  *
  * @param {string} message — instrução do usuário
+ * @param {object} [context] — contexto operacional { target, attachments_summary }
  * @returns {Promise<SuccessEnvelope|ErrorEnvelope>}
  *   SuccessEnvelope.data = { planner: object } (raw backend payload)
  */
-export async function runPlanner(message) {
+export async function runPlanner(message, context) {
   const t0 = Date.now();
   const { mode } = getApiConfig();
 
@@ -33,9 +34,13 @@ export async function runPlanner(message) {
 
   try {
     const session_id = getSessionId();
+    const body = { message, session_id };
+    if (context && typeof context === "object") {
+      body.context = context;
+    }
     const res = await apiClient.request("/planner/run", {
       method: "POST",
-      body: { message, session_id },
+      body,
     });
 
     if (!res.ok || !res.data?.ok) {
