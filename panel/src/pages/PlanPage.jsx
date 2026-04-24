@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan, getSessionId } from "../api";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
+import { useSessionId } from "../chat/useSessionState";
 import { TARGET_STORAGE_KEY, DEFAULT_TARGET } from "../chat/useTargetState";
 import PlanHeader from "../plan/PlanHeader";
 import ClassificationCard from "../plan/ClassificationCard";
@@ -83,6 +84,7 @@ function readTargetFromStorage() {
 // ── PlanPage ───────────────────────────────────────────────────────────────
 export default function PlanPage() {
   const { visibleState, demoOverride, lastChatText, plannerSnapshot } = usePlannerStore();
+  const sessionId = useSessionId();
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -165,6 +167,26 @@ export default function PlanPage() {
 
     return () => { stale = true; };
   }, [isRealMode, visibleState, plannerSnapshot, localPlannerSnapshot]);
+
+  // Auto-fetch latest plan from backend on mount (real mode only).
+  // Runs when plannerSnapshot is null (no plan from the current chat session)
+  // so the plan generated in the Chat tab is immediately visible here — even
+  // after a reload — as long as the session_id in localStorage matches the KV
+  // key used by the backend (planner:latest:{session_id}).
+  useEffect(() => {
+    if (!isRealMode) return;
+    // Skip if the store already has a snapshot from this session (chat round-trip).
+    if (plannerSnapshot) return;
+
+    let stale = false;
+    fetchLatestPlan(sessionId).then((result) => {
+      if (stale) return;
+      if (result.ok && result.data.has_plan && result.data.plan) {
+        setLocalPlannerSnapshot(result.data.plan);
+      }
+    }).catch(() => { /* silent — background fetch, non-blocking */ });
+    return () => { stale = true; };
+  }, [isRealMode, sessionId, plannerSnapshot]);
 
   // P11 → P12 — handlers de ação humana; gate approval triggers bridge send
   const handleBridgeSend = useCallback(async () => {
@@ -249,8 +271,7 @@ export default function PlanPage() {
     setLatestLoading(true);
     setLatestError(null);
     setPlanGenError(null);
-    const sid = getSessionId();
-    const result = await fetchLatestPlan(sid);
+    const result = await fetchLatestPlan(sessionId);
     setLatestLoading(false);
     if (result.ok) {
       if (result.data.has_plan && result.data.plan) {
@@ -261,7 +282,7 @@ export default function PlanPage() {
     } else {
       setLatestError(result.error?.message ?? "Falha ao buscar último plano.");
     }
-  }, [latestLoading]);
+  }, [latestLoading, sessionId]);
 
   // P11 — gate efetivo: sobrepõe state do gate com decisão local do operador
   function getEffectiveGate(gate) {
