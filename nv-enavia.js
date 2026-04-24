@@ -3320,7 +3320,7 @@ async function handlePlannerRun(request, env) {
     };
 
     // Persistir snapshot para GET /planner/latest (fire-and-forget, não crítico)
-    if (session_id && env && env.ENAVIA_BRAIN) {
+    if (session_id && env?.ENAVIA_BRAIN) {
       try {
         await env.ENAVIA_BRAIN.put(
           `planner:latest:${session_id}`,
@@ -3383,7 +3383,8 @@ async function handlePlannerLatest(request, env) {
     return jsonResponse({ ok: false, error: "session_id é obrigatório." }, 400);
   }
 
-  if (!env || !env.ENAVIA_BRAIN) {
+  if (!env?.ENAVIA_BRAIN) {
+    logNV("⚠️ [PLANNER/LATEST] ENAVIA_BRAIN indisponível — retornando has_plan=false", { session_id });
     return jsonResponse({ ok: true, session_id, has_plan: false, plan: null });
   }
 

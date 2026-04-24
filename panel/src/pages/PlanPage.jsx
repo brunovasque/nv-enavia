@@ -287,7 +287,7 @@ export default function PlanPage() {
               placeholder="Instrução para gerar plano..."
               value={planInstruction}
               onChange={(e) => setPlanInstruction(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleRunPlanner(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleRunPlanner(); } }}
               disabled={planGenerating}
               aria-label="Instrução para gerar plano"
             />
