@@ -160,6 +160,7 @@ export default function ChatPage() {
     seedMessages,
     dismissError,
     injectInfoMessage,
+    resetChat,
     runPlannerAction,
     approveExecution,
     validateSystem,
@@ -232,6 +233,18 @@ export default function ChatPage() {
             </div>
           </div>
           <div style={styles.headerRight}>
+            <button
+              style={{
+                ...styles.resetBtn,
+                ...(thinking ? styles.resetBtnDisabled : {}),
+              }}
+              onClick={thinking ? undefined : resetChat}
+              disabled={thinking}
+              title="Limpa o histórico visual do chat. Memórias, planos e execuções são preservados."
+              aria-label="Reset chat"
+            >
+              ↺ Reset chat
+            </button>
             <span
               style={{
                 ...styles.statusDot,
@@ -386,7 +399,23 @@ const styles = {
   headerRight: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    gap: "10px",
+  },
+  resetBtn: {
+    background: "transparent",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-md)",
+    color: "var(--text-muted)",
+    fontSize: "11px",
+    cursor: "pointer",
+    padding: "3px 9px",
+    fontFamily: "var(--font-body)",
+    lineHeight: 1.4,
+    transition: "border-color 0.15s, color 0.15s",
+  },
+  resetBtnDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
   },
   statusDot: {
     width: "7px",

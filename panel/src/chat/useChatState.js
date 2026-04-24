@@ -1,7 +1,11 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { chatSend, normalizeError, runPlanner, createManualMemory, getSessionId } from "../api";
 import { onChatSuccess } from "../store/plannerStore";
+import { loadChatHistory, saveChatHistory, clearChatHistory } from "./useChatPersistence";
 import { targetFields } from "./useTargetState";
+
+// Reset command patterns (case-insensitive, trimmed).
+const RESET_PATTERNS = ["reset chat", "limpar chat", "zerar conversa"];
 
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
@@ -54,7 +58,8 @@ function makeMsg(role, content, timestampOrOffsetMs = 0) {
 }
 
 export function useChatState() {
-  const [messages, setMessages] = useState([]);
+  const sessionId = getSessionId();
+  const [messages, setMessages] = useState(() => loadChatHistory(sessionId));
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState(null);
   const [inputValue, setInputValue] = useState("");
@@ -69,6 +74,11 @@ export function useChatState() {
   // Updated in sendMessage before adding the new user message.
   // Persists across send→retry so retryMessage uses the same history.
   const historyRef = useRef([]);
+
+  // Persist messages to localStorage whenever they change.
+  useEffect(() => {
+    saveChatHistory(sessionId, messages);
+  }, [sessionId, messages]);
 
   // HTTP-only layer: calls chatSend(), handles response, updates state.
   // Does NOT add a user message bubble — that is the caller's responsibility.
@@ -109,10 +119,36 @@ export function useChatState() {
     sendingRef.current = false;
   }, []);
 
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    setThinking(false);
+    setError(null);
+  }, []);
+
+  // Clears the chat history (visual + localStorage) for the current session.
+  // Does NOT touch memory, planner, execution, or session_id.
+  const resetChat = useCallback(() => {
+    clearChatHistory(sessionId);
+    const resetMsg = makeMsg(
+      "system",
+      "Chat resetado. Memórias, planos e execuções não foram apagados.",
+      new Date().toISOString(),
+    );
+    setMessages([resetMsg]);
+    setThinking(false);
+    setError(null);
+  }, [sessionId]);
+
   const sendMessage = useCallback(
     async (text, context) => {
       const trimmed = text.trim();
       if (!trimmed || sendingRef.current) return;
+
+      // Detect textual reset commands — execute locally without calling LLM.
+      if (RESET_PATTERNS.includes(trimmed.toLowerCase())) {
+        resetChat();
+        return;
+      }
 
       sendingRef.current = true;
       lastSentRef.current = trimmed;
@@ -130,7 +166,7 @@ export function useChatState() {
 
       await _doHttpSend(trimmed, context);
     },
-    [_doHttpSend, messages],
+    [_doHttpSend, messages, resetChat],
   );
 
   // Retries the last failed send.
@@ -156,12 +192,6 @@ export function useChatState() {
       makeMsg(m.role, m.content, (SEED_MESSAGES.length - i) * SEED_INTERVAL_MS),
     );
     setMessages(seeded);
-    setThinking(false);
-    setError(null);
-  }, []);
-
-  const clearMessages = useCallback(() => {
-    setMessages([]);
     setThinking(false);
     setError(null);
   }, []);
@@ -312,6 +342,7 @@ export function useChatState() {
     seedMessages,
     dismissError,
     clearMessages,
+    resetChat,
     injectInfoMessage,
     // Quick actions
     runPlannerAction,
