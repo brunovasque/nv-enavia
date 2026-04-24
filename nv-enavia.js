@@ -3680,6 +3680,8 @@ async function handleChatLLM(request, env) {
 
   const session_id = typeof body.session_id === "string" ? body.session_id.trim() : "";
   const context = body.context && typeof body.context === "object" ? body.context : {};
+  // debug=true: expose full prompt structure in telemetry for diagnostic purposes.
+  const debugMode = body.debug === true;
 
   // -------------------------------------------------------------------------
   // BLOCO B — Detecção determinística de aprovação e despacho ao executor
@@ -4361,6 +4363,48 @@ async function handleChatLLM(request, env) {
           approval_mode:     operationalAwareness.approval.mode,
           human_gate_active: operationalAwareness.approval.human_gate_active,
         },
+        // prompt_debug: only present when body.debug===true — exposes full LLM message structure
+        ...(debugMode ? {
+          prompt_debug: (() => {
+            const roles = llmMessages.map((m) => m.role);
+            const systemMsgs = llmMessages.filter((m) => m.role === "system");
+            const opBlockIndex = llmMessages.findIndex(
+              (m) => m.role === "system" && typeof m.content === "string" && m.content.includes("INSTRUÇÃO OPERACIONAL PARA ESTA RESPOSTA")
+            );
+            const memBlockIndex = llmMessages.findIndex(
+              (m) => m.role === "system" && typeof m.content === "string" && m.content.includes("MEMÓRIA RECUPERADA")
+            );
+            const userMsg = llmMessages.find((m) => m.role === "user");
+            const opBlock = opBlockIndex >= 0 ? llmMessages[opBlockIndex] : null;
+            const memBlock = memBlockIndex >= 0 ? llmMessages[memBlockIndex] : null;
+            const baseSystemMsg = llmMessages[0];
+            return {
+              llm_messages_count: llmMessages.length,
+              llm_messages_roles: roles,
+              context_target_received: hasTarget,
+              target_seen: hasTarget,
+              target_fields_seen: _targetFieldsSeen,
+              has_operational_context_block: opBlockIndex >= 0,
+              operational_block_index: opBlockIndex >= 0 ? opBlockIndex : null,
+              operational_block_preview: opBlock ? String(opBlock.content).slice(0, 600) : null,
+              has_resolution_ambiguity_block: opBlock
+                ? String(opBlock.content).includes("RESOLUÇÃO DE AMBIGUIDADE")
+                : false,
+              has_target_in_final_prompt: roles.some((r) => r === "system") &&
+                llmMessages.some((m) => typeof m.content === "string" && m.content.includes("ALVO OPERACIONAL ATIVO")),
+              has_memory_block: memBlockIndex >= 0,
+              memory_block_preview: memBlock ? String(memBlock.content).slice(0, 400) : null,
+              system_messages_preview: systemMsgs.map((m) => ({
+                index: llmMessages.indexOf(m),
+                preview: String(m.content).slice(0, 300),
+              })),
+              user_message_final: userMsg ? String(userMsg.content).slice(0, 300) : null,
+              base_system_has_section_5c: baseSystemMsg
+                ? String(baseSystemMsg.content).includes("ALVO OPERACIONAL ATIVO")
+                : false,
+            };
+          })(),
+        } : {}),
       },
     });
   } catch (err) {
