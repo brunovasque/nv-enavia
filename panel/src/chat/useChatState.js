@@ -223,18 +223,22 @@ export function useChatState() {
     if (trimmed) {
       promptText = trimmed;
     } else {
-      // Filtra mensagens reais (exclui meta-mensagens de plano e sistema)
-      const conversationMsgs = messages.filter(
-        (m) => (m.role === "user" || m.role === "enavia") &&
+      // Bloqueio: prefixo injetado pela própria Enavia quando não há contexto.
+      // Essas mensagens NÃO devem ser usadas como base de intenção.
+      const NUDGE_PREFIX = "Para gerar um plano, primeiro alinhe";
+
+      // Usa apenas mensagens do operador (user) como fonte de intenção.
+      // Exclui meta-mensagens de plano/aprovação e a mensagem de nudge acima.
+      const userIntentMsgs = messages.filter(
+        (m) => m.role === "user" &&
                typeof m.content === "string" &&
                m.content.trim().length > 0 &&
                !m.content.startsWith("📋") &&
-               !m.content.startsWith("✅") &&
-               m.role !== "system",
+               !m.content.startsWith("✅"),
       );
 
-      if (conversationMsgs.length === 0) {
-        // Sem contexto de conversa — orientar o operador a alinhar no Chat primeiro.
+      if (userIntentMsgs.length === 0) {
+        // Sem mensagens do operador — orientar a alinhar antes de gerar.
         setMessages((prev) => [
           ...prev,
           makeMsg(
@@ -248,12 +252,26 @@ export function useChatState() {
         return;
       }
 
-      // Usa as últimas mensagens como contexto consolidado para o planner.
-      const contextLines = conversationMsgs
-        .slice(-4)
-        .map((m) => `${m.role === "user" ? "Operador" : "Enavia"}: ${m.content.trim()}`)
+      // Usa as últimas mensagens do operador como contexto de intenção.
+      // A mensagem mais recente do usuário é o núcleo do objetivo.
+      const recentUserMsgs = userIntentMsgs.slice(-4);
+      const lastUserMsg = recentUserMsgs[recentUserMsgs.length - 1].content.trim();
+
+      // Inclui mensagens anteriores como contexto adicional, se houver.
+      const priorLines = recentUserMsgs
+        .slice(0, -1)
+        .map((m) => `- ${m.content.trim()}`)
         .join("\n");
-      promptText = `Gerar plano com base no alinhamento da conversa:\n${contextLines}`;
+
+      promptText = priorLines.length > 0
+        ? `${lastUserMsg}\n\nContexto adicional da conversa:\n${priorLines}`
+        : lastUserMsg;
+
+      // Garantia extra: se o promptText ainda contiver a mensagem de nudge
+      // (ex.: usuário copiou o texto da Enavia), substitui por um fallback seguro.
+      if (promptText.startsWith(NUDGE_PREFIX)) {
+        promptText = "Gerar plano operacional com base no target atual.";
+      }
     }
 
     sendingRef.current = true;
@@ -261,7 +279,6 @@ export function useChatState() {
     setError(null);
 
     const userMsg = makeMsg("user", `📋 Gerar plano: ${trimmed || "(contexto da conversa)"}`);
-    setMessages((prev) => [...prev, userMsg]);
     setMessages((prev) => [...prev, userMsg]);
 
     let result;
