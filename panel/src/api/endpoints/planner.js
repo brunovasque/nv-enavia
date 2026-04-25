@@ -82,8 +82,10 @@ export async function runPlanner(message, context) {
 
   try {
     const session_id = getSessionId();
-    // Send the user instruction as-is; target travels in context.target (JSON).
-    // The LLM derives the plan objective from the instruction, not from the target.
+    // `message` carries the short trigger/command only.
+    // The full operational brief (operator_intent, current_state, conversation_summary,
+    // memory_summary, attachments, constraints, scope, acceptance_criteria) travels in
+    // context.planner_brief as a structured object built by runPlannerAction.
     // execution_spec guides the pipeline to produce executable steps.
     const enrichedContext = {
       ...(context && typeof context === "object" ? context : {}),
