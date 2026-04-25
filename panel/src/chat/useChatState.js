@@ -280,14 +280,78 @@ export function useChatState() {
     // context.planner_brief. O backend LLM usa os campos nomeados para
     // derivar objetivo, passos e restrições — não interpreta texto livre.
 
+    // ── Classificar mensagens do usuário por função ────────────────────────
+    // Cada mensagem recebe um papel: 'objective', 'context', ou 'neutral'.
+    //
+    // objective: define o objetivo/intenção real do plano.
+    //   Indicadores: "objetivo:", "quero", "preciso", "meu objetivo",
+    //   "validar", "mapear", "corrigir", "auditar", "implementar", "criar",
+    //   "resolver", "diagnóstico", "analisar", "revisar".
+    //
+    // context: adiciona URL, arquivo, ambiente, restrição ou detalhe
+    //   complementar — NUNCA deve substituir objective.
+    //   Indicadores: "use como url", "use este arquivo", "use essa url",
+    //   "com esse contexto", "pode consolidar", "considere",
+    //   "url pública", "adiciona", "complemento", "também considere",
+    //   "use o arquivo", "usando", "com a url".
+    //
+    // neutral: outros comentários/pergutnas sem papel definido.
+
+    const OBJECTIVE_PATTERNS = [
+      /\bobjetivo\s*:/i,
+      /\bquero\s+(montar|criar|validar|mapear|corrigir|auditar|implementar|gerar|verificar|checar|revisar|analisar|diagnosticar)\b/i,
+      /\bpreciso\s+(validar|mapear|corrigir|auditar|implementar|criar|verificar|checar|revisar|analisar|diagnosticar|de um plano)\b/i,
+      /\bmeu objetivo\b/i,
+      /\bo objetivo é\b/i,
+      /\bplano\s+(para|de|operacional)\b/i,
+    ];
+
+    const CONTEXT_PATTERNS = [
+      /\buse\s+(como\s+url|este\s+arquivo|essa\s+url|o\s+arquivo|a\s+url)\b/i,
+      /\bcom\s+(esse|este|esse\s+novo|este\s+novo)\s+contexto\b/i,
+      /\bpode\s+consolidar\b/i,
+      /\bconsidere\b/i,
+      /\burl\s+p[úu]blica\b/i,
+      /\btamb[ée]m\s+considere\b/i,
+      /\badiciona\b/i,
+      /\bcomplemento\b/i,
+      /\busing\b.*\burl\b/i,
+      /\bcom\s+a\s+url\b/i,
+      /\bcom\s+o\s+target\b/i,
+      /\buse\s+o\s+seguinte\b/i,
+    ];
+
+    const classifyUserMsg = (content) => {
+      const c = content.trim();
+      if (OBJECTIVE_PATTERNS.some((rx) => rx.test(c))) return "objective";
+      if (CONTEXT_PATTERNS.some((rx) => rx.test(c))) return "context";
+      return "neutral";
+    };
+
+    // Classify all relevant user messages.
+    const classifiedUserMsgs = userMsgs.map((m) => ({
+      ...m,
+      _role: classifyUserMsg(m.content),
+    }));
+
     // trigger_message: só o comando imediato que disparou o botão.
     // userMsgs is guaranteed non-empty (checked above for ≥2, or trimmed was set)
     const triggerMessage = trimmed || userMsgs[userMsgs.length - 1].content.trim();
 
-    // operator_intent: síntese das últimas PLANNER_INTENT_WINDOW mensagens do operador.
-    // Todas as mensagens (não só a última) contribuem para a intenção real.
-    const intentLines = userMsgs.slice(-PLANNER_INTENT_WINDOW).map((m) => m.content.trim());
-    const operatorIntent = intentLines.join(" | ");
+    // operator_intent: prioriza mensagens classificadas como 'objective'.
+    // Se não houver nenhuma, usa mensagens 'neutral' da janela recente.
+    // Mensagens 'context' nunca entram no operator_intent.
+    const objectiveMsgs = classifiedUserMsgs.filter((m) => m._role === "objective");
+    const neutralMsgs   = classifiedUserMsgs.filter((m) => m._role === "neutral");
+    const intentSource  = objectiveMsgs.length > 0 ? objectiveMsgs : neutralMsgs;
+    // Cap to PLANNER_INTENT_WINDOW; prefer earlier objective messages over latest complement.
+    const intentLines   = intentSource.slice(-PLANNER_INTENT_WINDOW).map((m) => m.content.trim());
+    // Append context messages as additional detail, not as objective.
+    const contextMsgs   = classifiedUserMsgs.filter((m) => m._role === "context");
+    const contextDetail = contextMsgs.length > 0
+      ? ` [contexto adicional: ${contextMsgs.map((m) => m.content.trim()).join(" | ")}]`
+      : "";
+    const operatorIntent = intentLines.join(" | ") + contextDetail;
 
     // current_state: última resposta substantiva da Enavia (o que foi reconhecido).
     const lastEnaviaMsg = enaviaMsgs[enaviaMsgs.length - 1]?.content.trim() ?? null;
