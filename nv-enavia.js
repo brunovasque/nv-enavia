@@ -4196,6 +4196,31 @@ async function handleChatLLM(request, env) {
         plannerUsed = true;
 
         // ---------------------------------------------------------------
+        // BLOCO A.0 — Espelhar plannerSnapshot em planner:latest:{session_id}
+        //
+        // Objetivo: tornar a aba Plan backend-driven. Sem esta escrita, planos
+        // gerados via /chat/run não aparecem em GET /planner/latest e a aba
+        // Plan mostra "Nenhum plano ativo" após reload ou em outra aba.
+        //
+        // Espelha o padrão já utilizado por /planner/run (sem TTL).
+        // Fire-and-forget, não crítico — não bloqueia resposta ao usuário.
+        // ---------------------------------------------------------------
+        if (session_id && env?.ENAVIA_BRAIN) {
+          try {
+            await env.ENAVIA_BRAIN.put(
+              `planner:latest:${session_id}`,
+              JSON.stringify(plannerSnapshot),
+            );
+            logNV("💾 [CHAT/LLM] planner:latest atualizado no KV", { session_id });
+          } catch (kvErr) {
+            logNV("⚠️ [CHAT/LLM] Falha ao persistir planner:latest (não crítico)", {
+              session_id,
+              error: String(kvErr),
+            });
+          }
+        }
+
+        // ---------------------------------------------------------------
         // BLOCO A — Salvar pending_plan no KV quando gate exige aprovação
         //           OU quando há intenção operacional/mecânica segura.
         //

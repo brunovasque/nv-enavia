@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, runPlanner, fetchLatestPlan } from "../api";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { fetchPlan, PLAN_STATUS, getApiConfig, mapPlannerSnapshot, sendBridge, fetchBridgeStatus, postDecision, fetchLatestPlan } from "../api";
 import { usePlannerStore, setDemoOverride, clearDemoOverride } from "../store/plannerStore";
 import { useSessionId } from "../chat/useSessionState";
 import { TARGET_STORAGE_KEY, DEFAULT_TARGET } from "../chat/useTargetState";
@@ -82,6 +82,9 @@ function readTargetFromStorage() {
 }
 
 // ── PlanPage ───────────────────────────────────────────────────────────────
+// Intervalo de polling para sincronização com GET /planner/latest.
+const _PLAN_SYNC_INTERVAL_MS = 30_000;
+
 export default function PlanPage() {
   const { visibleState, demoOverride, lastChatText, plannerSnapshot } = usePlannerStore();
   const sessionId = useSessionId();
@@ -92,12 +95,12 @@ export default function PlanPage() {
   // Local snapshot from direct /planner/run or /planner/latest calls
   const [localPlannerSnapshot, setLocalPlannerSnapshot] = useState(null);
 
-  // Instruction form state
-  const [planInstruction, setPlanInstruction] = useState("");
-  const [planGenerating, setPlanGenerating] = useState(false);
-  const [planGenError, setPlanGenError] = useState(null);
   const [latestLoading, setLatestLoading] = useState(false);
   const [latestError, setLatestError] = useState(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+
+  // Ref: prevents concurrent background syncs from overlapping
+  const syncingRef = useRef(false);
 
   // P11 — gate action: local override da decisão humana (sem bridge real)
   // null = nenhuma ação tomada; "approved" | "blocked" = ação do operador
@@ -168,25 +171,39 @@ export default function PlanPage() {
     return () => { stale = true; };
   }, [isRealMode, visibleState, plannerSnapshot, localPlannerSnapshot]);
 
-  // Auto-fetch latest plan from backend on mount (real mode only).
-  // Runs when plannerSnapshot is null (no plan from the current chat session)
-  // so the plan generated in the Chat tab is immediately visible here — even
-  // after a reload — as long as the session_id in localStorage matches the KV
-  // key used by the backend (planner:latest:{session_id}).
-  useEffect(() => {
-    if (!isRealMode) return;
-    // Skip if the store already has a snapshot from this session (chat round-trip).
-    if (plannerSnapshot) return;
-
-    let stale = false;
-    fetchLatestPlan(sessionId).then((result) => {
-      if (stale) return;
+  // ── Backend sync — fonte primária de verdade para o plano ────────────────
+  // Sempre consulta GET /planner/latest no backend (real mode apenas).
+  // Chamado no mount, após mudança de plannerSnapshot no store, e periodicamente.
+  const _doSyncFromBackend = useCallback(async () => {
+    if (!isRealMode || syncingRef.current) return;
+    syncingRef.current = true;
+    try {
+      const result = await fetchLatestPlan(sessionId);
       if (result.ok && result.data.has_plan && result.data.plan) {
         setLocalPlannerSnapshot(result.data.plan);
+        setLastSyncedAt(new Date());
       }
-    }).catch(() => { /* silent — background fetch, non-blocking */ });
-    return () => { stale = true; };
-  }, [isRealMode, sessionId, plannerSnapshot]);
+    } catch {
+      // silent — background fetch, non-blocking
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [isRealMode, sessionId]);
+
+  // Sincroniza no mount e sempre que plannerSnapshot do store muda.
+  // Sem skip: backend é sempre consultado, mesmo quando o store já tem dados.
+  // plannerSnapshot é dep intencional como gatilho (não usado dentro do callback).
+  useEffect(() => {
+    _doSyncFromBackend();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_doSyncFromBackend, plannerSnapshot]);
+
+  // Polling de 30s: mantém a aba sincronizada enquanto aberta.
+  useEffect(() => {
+    if (!isRealMode) return;
+    const id = setInterval(_doSyncFromBackend, _PLAN_SYNC_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isRealMode, _doSyncFromBackend]);
 
   // P11 → P12 — handlers de ação humana; gate approval triggers bridge send
   const handleBridgeSend = useCallback(async () => {
@@ -250,32 +267,17 @@ export default function PlanPage() {
     }
   }
 
-  // Gerar plano diretamente via POST /planner/run
-  const handleRunPlanner = useCallback(async () => {
-    if (!planInstruction.trim() || planGenerating) return;
-    setPlanGenerating(true);
-    setPlanGenError(null);
-    setLatestError(null);
-    const result = await runPlanner(planInstruction.trim());
-    setPlanGenerating(false);
-    if (result.ok && result.data?.planner) {
-      setLocalPlannerSnapshot(result.data.planner);
-    } else {
-      setPlanGenError(result.error?.message ?? "Falha ao gerar plano.");
-    }
-  }, [planInstruction, planGenerating]);
-
-  // Buscar último plano salvo via GET /planner/latest
+  // Buscar último plano salvo via GET /planner/latest (manual)
   const handleFetchLatest = useCallback(async () => {
     if (latestLoading) return;
     setLatestLoading(true);
     setLatestError(null);
-    setPlanGenError(null);
     const result = await fetchLatestPlan(sessionId);
     setLatestLoading(false);
     if (result.ok) {
       if (result.data.has_plan && result.data.plan) {
         setLocalPlannerSnapshot(result.data.plan);
+        setLastSyncedAt(new Date());
       } else {
         setLatestError("Nenhum plano encontrado para esta sessão.");
       }
@@ -312,37 +314,25 @@ export default function PlanPage() {
         onClearDemoOverride={clearDemoOverride}
       />
 
-      {/* Instruction form — only in real mode */}
+      {/* Sync status bar — real mode only */}
       {isRealMode && (
         <div style={f.wrap}>
           <div style={f.row}>
-            <input
-              style={f.input}
-              type="text"
-              placeholder="Instrução para gerar plano..."
-              value={planInstruction}
-              onChange={(e) => setPlanInstruction(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleRunPlanner(); } }}
-              disabled={planGenerating}
-              aria-label="Instrução para gerar plano"
-            />
-            <button
-              style={f.btn}
-              onClick={handleRunPlanner}
-              disabled={planGenerating || !planInstruction.trim()}
-            >
-              {planGenerating ? "Gerando..." : "Gerar plano"}
-            </button>
             <button
               style={f.btnSecondary}
               onClick={handleFetchLatest}
               disabled={latestLoading}
             >
-              {latestLoading ? "Buscando..." : "Atualizar último plano"}
+              {latestLoading ? "Buscando..." : "↻ Sincronizar"}
             </button>
+            {lastSyncedAt && (
+              <span style={f.syncInline}>
+                Sincronizado às {lastSyncedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
           </div>
-          {(planGenError || latestError) && (
-            <p style={f.error}>⚠ {planGenError || latestError}</p>
+          {latestError && (
+            <p style={f.error}>⚠ {latestError}</p>
           )}
         </div>
       )}
@@ -591,29 +581,6 @@ const f = {
     gap: "8px",
     alignItems: "center",
   },
-  input: {
-    flex: 1,
-    padding: "8px 12px",
-    fontSize: "13px",
-    background: "var(--bg-surface)",
-    border: "1px solid var(--border-light)",
-    borderRadius: "var(--radius-md)",
-    color: "var(--text-primary)",
-    outline: "none",
-    minWidth: 0,
-  },
-  btn: {
-    padding: "8px 16px",
-    fontSize: "13px",
-    fontWeight: 600,
-    background: "var(--color-primary)",
-    color: "#fff",
-    border: "none",
-    borderRadius: "var(--radius-md)",
-    cursor: "pointer",
-    flexShrink: 0,
-    opacity: 1,
-  },
   btnSecondary: {
     padding: "8px 14px",
     fontSize: "13px",
@@ -629,5 +596,10 @@ const f = {
     fontSize: "12px",
     color: "#EF4444",
     margin: 0,
+  },
+  syncInline: {
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    opacity: 0.7,
   },
 };

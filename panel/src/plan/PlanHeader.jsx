@@ -97,8 +97,8 @@ export default function PlanHeader({ plan, currentState, lastChatText, hasDemoOv
       {plan ? (
         <div style={s.requestBlock}>
           <p style={s.requestLabel}>Pedido</p>
-          <p style={s.requestText}>{plan.request.text}</p>
-          <p style={s.requestTs}>{formatTs(plan.request.timestamp)}</p>
+          <p style={s.requestText}>{plan.request?.text ?? lastChatText ?? "—"}</p>
+          <p style={s.requestTs}>{formatTs(plan.request?.timestamp)}</p>
         </div>
       ) : lastChatText ? (
         <div style={s.requestBlock}>

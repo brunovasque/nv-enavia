@@ -390,15 +390,21 @@ describe("P14 PROVA 13 — Distinção P13 (imediato) vs P14 (acompanhamento)", 
 });
 
 // =============================================================================
-// PROVA 14 — Escopo fechado: sem auto-refresh, sem setInterval, sem P15+
+// PROVA 14 — Escopo fechado: sem auto-refresh no BridgeCard/bridge.js
+// Nota: PlanPage PODE conter setInterval para polling de planner:latest
+// (adicionado no PR "aba Plano consistente/backend-driven").
+// O guard original era escopo P14 (BridgeCard e bridge.js). Mantido.
 // =============================================================================
 describe("P14 PROVA 14 — Escopo fechado: sem auto-refresh ou P15+", () => {
   it("BridgeCard NÃO contém setInterval", () => {
     expect(BRIDGE_CARD_SRC).not.toContain("setInterval");
   });
 
-  it("PlanPage NÃO contém setInterval", () => {
-    expect(PLAN_PAGE_SRC).not.toContain("setInterval");
+  it("PlanPage contém setInterval para polling de planner:latest (backend-driven)", () => {
+    // O polling de 30s para GET /planner/latest é intencional e requerido
+    // pelo PR "aba Plano consistente / backend-driven".
+    expect(PLAN_PAGE_SRC).toContain("setInterval");
+    expect(PLAN_PAGE_SRC).toContain("_doSyncFromBackend");
   });
 
   it("bridge.js endpoint NÃO contém setInterval", () => {

@@ -211,22 +211,231 @@ export function useChatState() {
   }, []);
 
   // ── Quick Action: Gerar plano via /planner/run ──────────────────────────────
-  // Pega message atual + context (target + attachments) → POST /planner/run.
+  // Constrói um plannerBrief estruturado (handoff operacional) a partir do
+  // histórico da conversa + contexto e envia ao backend via context.planner_brief.
+  // O campo `message` recebe apenas o gatilho/trigger, não o plano completo.
   // Exibe resumo do plano no chat. NÃO executa nada.
+
+  // Quantas mensagens do operador formam a síntese de intenção (operator_intent).
+  const PLANNER_INTENT_WINDOW = 4;
+  // Tamanho máximo da janela de diálogo interleaved para conversation_summary.
+  const PLANNER_CONVERSATION_WINDOW = 8;
+  // Máximo de hits de memória incluídos no memory_summary para evitar payload excessivo.
+  const PLANNER_MAX_MEMORY_HITS = 4;
+  // Máximo de caracteres do content_summary de cada anexo incluídos no brief.
+  const PLANNER_ATTACH_SUMMARY_LEN = 80;
+
   const runPlannerAction = useCallback(async (message, context) => {
     const trimmed = (message || "").trim();
     if (sendingRef.current) return;
+
+    // ── Filtros de mensagens para extração de contexto ─────────────────────
+
+    // Padrões de mensagens da Enavia que representam bloqueio/fallback —
+    // NÃO devem ser incluídos como contexto operacional do planner.
+    const ENAVIA_FALLBACK_PATTERNS = [
+      "Para gerar um plano, primeiro alinhe",
+      "📋 **Plano gerado**",
+    ];
+    const isEnaviaFallback = (content) =>
+      ENAVIA_FALLBACK_PATTERNS.some((p) => content.trim().startsWith(p));
+
+    // Mensagens do operador relevantes: excluem meta-ações (📋/✅) e texto vazio.
+    const userMsgs = messages.filter(
+      (m) => m.role === "user" &&
+             typeof m.content === "string" &&
+             m.content.trim().length > 0 &&
+             !m.content.startsWith("📋") &&
+             !m.content.startsWith("✅"),
+    );
+
+    // Mensagens da Enavia relevantes: apenas respostas substantivas (excluem fallback).
+    const enaviaMsgs = messages.filter(
+      (m) => m.role === "enavia" &&
+             typeof m.content === "string" &&
+             m.content.trim().length > 0 &&
+             !isEnaviaFallback(m.content),
+    );
+
+    // ── Verificar suficiência de contexto ──────────────────────────────────
+    // Exige ao menos 2 mensagens do operador para derivar intenção real.
+    // Uma única mensagem não é suficiente para distinguir intenção de gatilho.
+    if (userMsgs.length < 2 && !trimmed) {
+      setMessages((prev) => [
+        ...prev,
+        makeMsg(
+          "enavia",
+          "Para gerar um plano estruturado, primeiro alinhe a intenção aqui no Chat. " +
+          "Descreva o **objetivo**, o **target** e o **escopo** da operação " +
+          "(2 ou mais mensagens de alinhamento). " +
+          "Quando estiver pronto, clique em **Gerar plano** novamente.",
+          new Date().toISOString(),
+        ),
+      ]);
+      return;
+    }
+
+    // ── Construir plannerBrief estruturado ─────────────────────────────────
+    // Este objeto é o handoff operacional enviado ao backend como
+    // context.planner_brief. O backend LLM usa os campos nomeados para
+    // derivar objetivo, passos e restrições — não interpreta texto livre.
+
+    // ── Classificar mensagens do usuário por função ────────────────────────
+    // Cada mensagem recebe um papel: 'objective', 'context', ou 'neutral'.
+    //
+    // objective: define o objetivo/intenção real do plano.
+    //   Indicadores: "objetivo:", "quero", "preciso", "meu objetivo",
+    //   "validar", "mapear", "corrigir", "auditar", "implementar", "criar",
+    //   "resolver", "diagnóstico", "analisar", "revisar".
+    //
+    // context: adiciona URL, arquivo, ambiente, restrição ou detalhe
+    //   complementar — NUNCA deve substituir objective.
+    //   Indicadores: "use como url", "use este arquivo", "use essa url",
+    //   "com esse contexto", "pode consolidar", "considere",
+    //   "url pública", "adiciona", "complemento", "também considere",
+    //   "use o arquivo", "usando", "com a url".
+    //
+    // neutral: outros comentários/pergutnas sem papel definido.
+
+    const OBJECTIVE_PATTERNS = [
+      /\bobjetivo\s*:/i,
+      /\bquero\s+(montar|criar|validar|mapear|corrigir|auditar|implementar|gerar|verificar|checar|revisar|analisar|diagnosticar)\b/i,
+      /\bpreciso\s+(validar|mapear|corrigir|auditar|implementar|criar|verificar|checar|revisar|analisar|diagnosticar|de um plano)\b/i,
+      /\bmeu objetivo\b/i,
+      /\bo objetivo é\b/i,
+      /\bplano\s+(para|de|operacional)\b/i,
+    ];
+
+    const CONTEXT_PATTERNS = [
+      /\buse\s+(como\s+url|este\s+arquivo|essa\s+url|o\s+arquivo|a\s+url)\b/i,
+      /\bcom\s+(esse|este|esse\s+novo|este\s+novo)\s+contexto\b/i,
+      /\bpode\s+consolidar\b/i,
+      /\bconsidere\b/i,
+      /\burl\s+p[úu]blica\b/i,
+      /\btamb[ée]m\s+considere\b/i,
+      /\badiciona\b/i,
+      /\bcomplemento\b/i,
+      /\busing\b.*\burl\b/i,
+      /\bcom\s+a\s+url\b/i,
+      /\bcom\s+o\s+target\b/i,
+      /\buse\s+o\s+seguinte\b/i,
+    ];
+
+    const classifyUserMsg = (content) => {
+      const c = content.trim();
+      if (OBJECTIVE_PATTERNS.some((rx) => rx.test(c))) return "objective";
+      if (CONTEXT_PATTERNS.some((rx) => rx.test(c))) return "context";
+      return "neutral";
+    };
+
+    // Classify all relevant user messages.
+    const classifiedUserMsgs = userMsgs.map((m) => ({
+      ...m,
+      _role: classifyUserMsg(m.content),
+    }));
+
+    // trigger_message: o comando curto que disparou o botão.
+    // Quando o campo de input está vazio, usa um comando canônico em vez da
+    // última mensagem do usuário (que pode ser um complemento de contexto como
+    // "Use como URL pública..."). A intenção real viaja em plannerBrief.operator_intent.
+    const triggerMessage = trimmed.length > 0 ? trimmed : "Gerar plano";
+
+    // operator_intent: prioriza mensagens classificadas como 'objective'.
+    // Se não houver nenhuma, usa mensagens 'neutral' da janela recente.
+    // Mensagens 'context' nunca entram no operator_intent.
+    const objectiveMsgs = classifiedUserMsgs.filter((m) => m._role === "objective");
+    const neutralMsgs   = classifiedUserMsgs.filter((m) => m._role === "neutral");
+    const intentSource  = objectiveMsgs.length > 0 ? objectiveMsgs : neutralMsgs;
+    // Cap to PLANNER_INTENT_WINDOW; prefer earlier objective messages over latest complement.
+    const intentLines   = intentSource.slice(-PLANNER_INTENT_WINDOW).map((m) => m.content.trim());
+    // Append context messages as additional detail, not as objective.
+    const contextMsgs   = classifiedUserMsgs.filter((m) => m._role === "context");
+    const contextDetail = contextMsgs.length > 0
+      ? ` [contexto adicional: ${contextMsgs.map((m) => m.content.trim()).join(" | ")}]`
+      : "";
+    const operatorIntent = intentLines.join(" | ") + contextDetail;
+
+    // current_state: última resposta substantiva da Enavia (o que foi reconhecido).
+    const lastEnaviaMsg = enaviaMsgs[enaviaMsgs.length - 1]?.content.trim() ?? null;
+
+    // relevant_conversation_summary: diálogo interleaved das últimas 8 msgs relevantes.
+    const allRelevant = messages.filter((m) => {
+      if (typeof m.content !== "string" || m.content.trim().length === 0) return false;
+      if (m.role === "user")   return !m.content.startsWith("📋") && !m.content.startsWith("✅");
+      if (m.role === "enavia") return !isEnaviaFallback(m.content);
+      return false;
+    });
+    const conversationWindow = allRelevant.slice(-PLANNER_CONVERSATION_WINDOW);
+    const conversationSummary = conversationWindow
+      .map((m) => `${m.role === "user" ? "Operador" : "Enavia"}: ${m.content.trim()}`)
+      .join("\n");
+
+    // memory_summary: hits de memória coletados de mensagens com memoryApplied=true.
+    const memoryHitsAll = messages.flatMap(
+      (m) => (m.memoryApplied === true && Array.isArray(m.memoryHits) ? m.memoryHits : []),
+    );
+    const memorySummary = memoryHitsAll.length > 0
+      ? `${memoryHitsAll.length} entrada(s) aplicada(s): ${memoryHitsAll.slice(0, PLANNER_MAX_MEMORY_HITS).join("; ")}`
+      : null;
+
+    // attachments_summary: nomes + summaries de arquivos anexados.
+    const attachList = Array.isArray(context?.attachments) ? context.attachments : [];
+    const attachmentsSummary = attachList.length > 0
+      ? attachList.map((a) => `${a.filename}${a.content_summary ? ` (${a.content_summary.slice(0, PLANNER_ATTACH_SUMMARY_LEN)})` : ""}`).join("; ")
+      : null;
+
+    // target: objeto estruturado do contexto operacional.
+    const targetObj = context?.target ?? null;
+
+    // constraints: derivadas do modo do target — sempre read_only nesta fase.
+    const constraints = {
+      mode:                       targetObj?.mode ?? "read_only",
+      requires_human_approval:    true,
+      auto_execution_blocked:     true,
+      destructive_actions_blocked: true,
+    };
+
+    // scope/out_of_scope/acceptance_criteria: defaults operacionais seguros.
+    const scope = "Leitura e validação do target operacional; diagnóstico sem side-effects.";
+    const outOfScope = ["deploy", "escrita", "patch", "deleção", "execução automática sem aprovação"];
+    const acceptanceCriteria = [
+      "Nenhuma ação destrutiva ou de escrita executada",
+      "Aprovação humana obrigatória antes de qualquer execução",
+      "Plano derivado do alinhamento real da conversa, não de suposições",
+    ];
+
+    const plannerBrief = {
+      trigger_message:               triggerMessage,
+      operator_intent:               operatorIntent,
+      current_state:                 lastEnaviaMsg,
+      target:                        targetObj,
+      relevant_conversation_summary: conversationSummary || null,
+      memory_summary:                memorySummary,
+      attachments_summary:           attachmentsSummary,
+      constraints,
+      scope,
+      out_of_scope:                  outOfScope,
+      acceptance_criteria:           acceptanceCriteria,
+    };
+
+    // Injeta plannerBrief no contexto enriquecido para o backend.
+    // O campo `message` recebe apenas o gatilho curto (trigger_message).
+    const enrichedContext = {
+      ...(context && typeof context === "object" ? context : {}),
+      planner_brief: plannerBrief,
+    };
+    const triggerText = triggerMessage;
+
     sendingRef.current = true;
     setThinking(true);
     setError(null);
 
-    const promptText = trimmed || "Validar o target atual em modo read-only";
-    const userMsg = makeMsg("user", `📋 Gerar plano: ${promptText}`);
+    const userMsg = makeMsg("user", `📋 Gerar plano: ${trimmed || "(contexto da conversa)"}`);
     setMessages((prev) => [...prev, userMsg]);
 
     let result;
     try {
-      result = await runPlanner(promptText, context);
+      result = await runPlanner(triggerText, enrichedContext);
     } catch (err) {
       const envelope = normalizeError(err, "planner");
       setError(envelope.error.message);
@@ -283,10 +492,12 @@ export function useChatState() {
 
     const replyContent = `📋 **Plano gerado**\n\n${summaryLines.join("\n\n")}`;
     setMessages((prev) => [...prev, makeMsg("enavia", replyContent, new Date().toISOString())]);
-    onChatSuccess(promptText, planner ?? null);
+    // Pass operatorIntent as lastChatText so PlanHeader shows the real plan goal,
+    // not the short trigger command. Falls back to triggerText only if intent is empty.
+    onChatSuccess(operatorIntent || triggerText, planner ?? null);
     setThinking(false);
     sendingRef.current = false;
-  }, []);
+  }, [messages]);
 
   // ── Quick Action: Aprovar execução → /chat/run com message="aprovado" ────────
   const approveExecution = useCallback(async (context) => {
