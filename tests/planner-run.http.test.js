@@ -88,7 +88,7 @@ async function runTests() {
 
   // telemetry fields
   assert(typeof body1.telemetry.duration_ms === "number", "telemetry.duration_ms é number");
-  assert(body1.telemetry.pipeline === "PM4→PM5→PM6→PM7→PM8→PM9", "telemetry.pipeline correto");
+  assert(body1.telemetry.pipeline === "PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15", "telemetry.pipeline correto");
 
   // classification correctness
   assert(body1.planner.classification.complexity_level === "A", "classificação nível A para input simples");
