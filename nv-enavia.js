@@ -3233,17 +3233,33 @@ async function handlePlannerRun(request, env) {
     // PM4 recebe este contexto; sinais de memória estão estruturalmente presentes.
     const plannerContext = { ...context, memory_context, retrieval_context };
 
+    // P-BRIEF — Resolução do objetivo operacional.
+    //
+    // Ordem de prioridade (decrescente):
+    //   1. context.planner_brief.operator_intent — intenção real alinhada no Chat
+    //   2. body.message — fallback seguro (mantido apenas como trigger bruto)
+    //
+    // "Gerar plano" é um trigger/comando, NUNCA deve virar objetivo do plano.
+    // O campo correto sempre viaja em context.planner_brief.operator_intent.
+    const _briefIntent = typeof context?.planner_brief?.operator_intent === "string"
+      ? context.planner_brief.operator_intent.trim()
+      : "";
+    const resolvedText = _briefIntent.length > 0 ? _briefIntent : message;
+    const objectiveSource = _briefIntent.length > 0
+      ? "planner_brief.operator_intent"
+      : "body.message";
+
     // PM4 — Classificação (recebe plannerContext enriquecido)
-    const classification = classifyRequest({ text: message, context: plannerContext });
+    const classification = classifyRequest({ text: resolvedText, context: plannerContext });
 
     // PM5 — Output Envelope
-    const envelope = buildOutputEnvelope(classification, { text: message });
+    const envelope = buildOutputEnvelope(classification, { text: resolvedText });
 
     // PM6 — Plano Canônico
     const canonicalPlan = buildCanonicalPlan({
       classification,
       envelope,
-      input: { text: message },
+      input: { text: resolvedText },
     });
 
     // PM7 — Gate de Aprovação
@@ -3365,6 +3381,11 @@ async function handlePlannerRun(request, env) {
         memory_read: memoryReadAudit,
         retrieval: retrieval_context, // PR3 — auditoria de retrieval
         consolidation_persisted,
+        // P-BRIEF — objetivo auditável
+        has_planner_brief: _briefIntent.length > 0,
+        objective_source: objectiveSource,
+        raw_message: message,
+        resolved_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
       },
     });
   } catch (err) {
@@ -4170,12 +4191,18 @@ async function handleChatLLM(request, env) {
 
     if (shouldActivatePlanner) {
       try {
-        const classification = classifyRequest({ text: message, context });
-        const envelope = buildOutputEnvelope(classification, { text: message });
+        // P-BRIEF — Resolução do objetivo no chat planner (mesma lógica de /planner/run).
+        // operator_intent vence sobre body.message para PM4/PM5/PM6.
+        const _chatBriefIntent = typeof context?.planner_brief?.operator_intent === "string"
+          ? context.planner_brief.operator_intent.trim()
+          : "";
+        const chatResolvedText = _chatBriefIntent.length > 0 ? _chatBriefIntent : message;
+        const classification = classifyRequest({ text: chatResolvedText, context });
+        const envelope = buildOutputEnvelope(classification, { text: chatResolvedText });
         const canonicalPlan = buildCanonicalPlan({
           classification,
           envelope,
-          input: { text: message },
+          input: { text: chatResolvedText },
         });
         const gate = evaluateApprovalGate(canonicalPlan);
         const bridge = buildExecutorBridgePayload({ plan: canonicalPlan, gate });
