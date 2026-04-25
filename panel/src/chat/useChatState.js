@@ -218,27 +218,39 @@ export function useChatState() {
     const trimmed = (message || "").trim();
     if (sendingRef.current) return;
 
-    // ── Derivar intenção da conversa quando não há texto explícito ──────────
+    // ── Construir contexto consolidado para o planner ──────────────────────
+    // Quando há texto explícito no input, ele é usado como gatilho direto.
+    // Quando não há, deriva intenção do histórico da conversa com contexto estruturado.
     let promptText;
     if (trimmed) {
       promptText = trimmed;
     } else {
-      // Bloqueio: prefixo injetado pela própria Enavia quando não há contexto.
-      // Essas mensagens NÃO devem ser usadas como base de intenção.
-      const NUDGE_PREFIX = "Para gerar um plano, primeiro alinhe";
+      // Padrões de mensagens da Enavia que representam bloqueio/fallback —
+      // NÃO devem ser incluídos como contexto operacional do planner.
+      const ENAVIA_FALLBACK_PATTERNS = [
+        "Para gerar um plano, primeiro alinhe",
+      ];
+      const isEnaviaFallback = (content) =>
+        ENAVIA_FALLBACK_PATTERNS.some((p) => content.trim().startsWith(p));
 
-      // Usa apenas mensagens do operador (user) como fonte de intenção.
-      // Exclui meta-mensagens de plano/aprovação e a mensagem de nudge acima.
-      const userIntentMsgs = messages.filter(
-        (m) => m.role === "user" &&
-               typeof m.content === "string" &&
-               m.content.trim().length > 0 &&
-               !m.content.startsWith("📋") &&
-               !m.content.startsWith("✅"),
-      );
+      // Mensagens relevantes para o planner:
+      //   - user: todas exceto meta-mensagens de plano/aprovação (📋/✅)
+      //   - enavia: apenas respostas substantivas (exclui fallback/nudge)
+      //   - system: sempre excluído
+      const relevantMsgs = messages.filter((m) => {
+        if (typeof m.content !== "string" || m.content.trim().length === 0) return false;
+        if (m.role === "user") {
+          return !m.content.startsWith("📋") && !m.content.startsWith("✅");
+        }
+        if (m.role === "enavia") {
+          return !isEnaviaFallback(m.content);
+        }
+        return false; // role=system excluído
+      });
 
-      if (userIntentMsgs.length === 0) {
-        // Sem mensagens do operador — orientar a alinhar antes de gerar.
+      // Exige ao menos uma mensagem do operador para gerar plano.
+      const hasUserMsg = relevantMsgs.some((m) => m.role === "user");
+      if (!hasUserMsg) {
         setMessages((prev) => [
           ...prev,
           makeMsg(
@@ -252,26 +264,52 @@ export function useChatState() {
         return;
       }
 
-      // Usa as últimas mensagens do operador como contexto de intenção.
-      // A mensagem mais recente do usuário é o núcleo do objetivo.
-      const recentUserMsgs = userIntentMsgs.slice(-4);
-      const lastUserMsg = recentUserMsgs[recentUserMsgs.length - 1].content.trim();
+      // Janela de contexto: últimas 6 mensagens relevantes (user + enavia substantivas).
+      const recentMsgs = relevantMsgs.slice(-6);
 
-      // Inclui mensagens anteriores como contexto adicional, se houver.
-      const priorLines = recentUserMsgs
-        .slice(0, -1)
-        .map((m) => `- ${m.content.trim()}`)
+      // Gatilho: última mensagem do operador na janela de contexto.
+      const triggerMsg = [...recentMsgs].reverse().find((m) => m.role === "user");
+      const triggerText = triggerMsg?.content.trim() ?? "(contexto da conversa)";
+
+      // Resumo do alinhamento — diálogo interleaved operator/enavia.
+      const conversationLines = recentMsgs
+        .map((m) => `${m.role === "user" ? "Operador" : "Enavia"}: ${m.content.trim()}`)
         .join("\n");
 
-      promptText = priorLines.length > 0
-        ? `${lastUserMsg}\n\nContexto adicional da conversa:\n${priorLines}`
-        : lastUserMsg;
+      // Target operacional — extraído do contexto passado pelo caller.
+      const tFields = targetFields(context?.target);
+      const targetLine = tFields.length > 0
+        ? tFields.map((f) => `${f.label}=${f.value}`).join(", ")
+        : null;
 
-      // Garantia extra: se o promptText ainda contiver a mensagem de nudge
-      // (ex.: usuário copiou o texto da Enavia), substitui por um fallback seguro.
-      if (promptText.startsWith(NUDGE_PREFIX)) {
-        promptText = "Gerar plano operacional com base no target atual.";
+      // Resumo de anexos — nomes de arquivos, se disponíveis.
+      const attachList = Array.isArray(context?.attachments) ? context.attachments : [];
+      const attachSummary = attachList.length > 0
+        ? `${attachList.length} arquivo(s): ${attachList.map((a) => a.filename).join(", ")}`
+        : null;
+
+      // Monta prompt estruturado para o planner.
+      // O LLM deve usar este contexto completo para derivar o objetivo do plano —
+      // nunca usar apenas uma frase solta como objetivo.
+      const parts = [
+        "Gerar plano operacional com base no contexto consolidado abaixo.",
+        "",
+        `Gatilho: ${triggerText}`,
+      ];
+      if (conversationLines.length > 0) {
+        parts.push("", "Alinhamento da conversa:", conversationLines);
       }
+      if (targetLine) {
+        parts.push("", `Target: ${targetLine}`);
+      }
+      if (attachSummary) {
+        parts.push(`Contexto adicional: ${attachSummary}`);
+      }
+      parts.push(
+        "",
+        "Restrições: somente leitura, aprovação humana obrigatória, sem execução automática.",
+      );
+      promptText = parts.join("\n");
     }
 
     sendingRef.current = true;
