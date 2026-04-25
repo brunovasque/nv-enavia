@@ -3111,6 +3111,31 @@ async function loadDirectorBrain(env) {
 // Este endpoint destrava P7/P8 ao fornecer retorno real e auditável
 // que o painel pode consumir sem mock.
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// _resolveOperatorIntent(context, rawMessage)
+//
+// P-BRIEF — Resolução canônica do texto operacional para PM4/PM5/PM6.
+//
+// Ordem de prioridade (decrescente):
+//   1. context.planner_brief.operator_intent — intenção real alinhada no Chat
+//   2. rawMessage — fallback seguro (trigger bruto, ex: "Gerar plano")
+//
+// "Gerar plano" é um trigger/comando e NUNCA deve virar objetivo do plano.
+//
+// Retorna { resolvedText, objectiveSource, hasPlannerBrief }
+// ---------------------------------------------------------------------------
+function _resolveOperatorIntent(context, rawMessage) {
+  const intent = typeof context?.planner_brief?.operator_intent === "string"
+    ? context.planner_brief.operator_intent.trim()
+    : "";
+  return {
+    resolvedText:     intent.length > 0 ? intent : rawMessage,
+    objectiveSource:  intent.length > 0 ? "planner_brief.operator_intent" : "body.message",
+    hasPlannerBrief:  intent.length > 0,
+  };
+}
+
 async function handlePlannerRun(request, env) {
   const startedAt = Date.now();
 
@@ -3233,21 +3258,10 @@ async function handlePlannerRun(request, env) {
     // PM4 recebe este contexto; sinais de memória estão estruturalmente presentes.
     const plannerContext = { ...context, memory_context, retrieval_context };
 
-    // P-BRIEF — Resolução do objetivo operacional.
-    //
-    // Ordem de prioridade (decrescente):
-    //   1. context.planner_brief.operator_intent — intenção real alinhada no Chat
-    //   2. body.message — fallback seguro (mantido apenas como trigger bruto)
-    //
-    // "Gerar plano" é um trigger/comando, NUNCA deve virar objetivo do plano.
-    // O campo correto sempre viaja em context.planner_brief.operator_intent.
-    const _briefIntent = typeof context?.planner_brief?.operator_intent === "string"
-      ? context.planner_brief.operator_intent.trim()
-      : "";
-    const resolvedText = _briefIntent.length > 0 ? _briefIntent : message;
-    const objectiveSource = _briefIntent.length > 0
-      ? "planner_brief.operator_intent"
-      : "body.message";
+    // P-BRIEF — Resolução do objetivo operacional via helper canônico.
+    // operator_intent vence sobre body.message para PM4/PM5/PM6.
+    const { resolvedText, objectiveSource, hasPlannerBrief } =
+      _resolveOperatorIntent(context, message);
 
     // PM4 — Classificação (recebe plannerContext enriquecido)
     const classification = classifyRequest({ text: resolvedText, context: plannerContext });
@@ -3382,7 +3396,7 @@ async function handlePlannerRun(request, env) {
         retrieval: retrieval_context, // PR3 — auditoria de retrieval
         consolidation_persisted,
         // P-BRIEF — objetivo auditável
-        has_planner_brief: _briefIntent.length > 0,
+        has_planner_brief: hasPlannerBrief,
         objective_source: objectiveSource,
         raw_message: message,
         resolved_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
@@ -4191,12 +4205,9 @@ async function handleChatLLM(request, env) {
 
     if (shouldActivatePlanner) {
       try {
-        // P-BRIEF — Resolução do objetivo no chat planner (mesma lógica de /planner/run).
+        // P-BRIEF — Resolução do objetivo no chat planner via helper canônico.
         // operator_intent vence sobre body.message para PM4/PM5/PM6.
-        const _chatBriefIntent = typeof context?.planner_brief?.operator_intent === "string"
-          ? context.planner_brief.operator_intent.trim()
-          : "";
-        const chatResolvedText = _chatBriefIntent.length > 0 ? _chatBriefIntent : message;
+        const { resolvedText: chatResolvedText } = _resolveOperatorIntent(context, message);
         const classification = classifyRequest({ text: chatResolvedText, context });
         const envelope = buildOutputEnvelope(classification, { text: chatResolvedText });
         const canonicalPlan = buildCanonicalPlan({
