@@ -7,6 +7,14 @@ import { targetFields } from "./useTargetState";
 // Reset command patterns (case-insensitive, trimmed).
 const RESET_PATTERNS = ["reset chat", "limpar chat", "zerar conversa"];
 
+// P-BRIEF: minimum character length for a user message to be considered substantive
+// (i.e., likely to contain an intent, not just a short command or acknowledgment).
+const _CHAT_BRIEF_MIN_CONTENT_LEN = 20;
+
+// P-BRIEF: content prefixes that identify metadata chat bubbles (planner/approval triggers)
+// rather than user intent messages — excluded from operator_intent derivation.
+const _CHAT_BRIEF_METADATA_PREFIXES = ["📋", "✅"];
+
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
   { role: "enavia", content: "Sessão iniciada. Módulos de planejamento e memória em standby. Como posso ajudar?" },
@@ -174,11 +182,38 @@ export function useChatState() {
       // message (which is sent separately as the primary `message` field).
       historyRef.current = _buildConversationHistory(messages);
 
+      // P-BRIEF: build minimal planner_brief for /chat/run so that if the LLM
+      // activates the planner internally, _resolveOperatorIntent has a real
+      // operator_intent instead of falling back to the trigger message.
+      // Uses recent substantive user messages (>_CHAT_BRIEF_MIN_CONTENT_LEN chars,
+      // no metadata prefixes) to derive the operator's real intent.
+      const _chatIntentMsgs = messages
+        .filter(
+          (m) =>
+            m.role === "user" &&
+            typeof m.content === "string" &&
+            m.content.trim().length > _CHAT_BRIEF_MIN_CONTENT_LEN &&
+            !_CHAT_BRIEF_METADATA_PREFIXES.some((p) => m.content.startsWith(p)),
+        )
+        .slice(-4)
+        .map((m) => m.content.trim());
+      const _chatOperatorIntent = _chatIntentMsgs.join(" | ");
+      const chatContext =
+        context && typeof context === "object"
+          ? {
+              ...context,
+              planner_brief: {
+                trigger_message: trimmed,
+                operator_intent: _chatOperatorIntent.length > 0 ? _chatOperatorIntent : trimmed,
+              },
+            }
+          : context;
+
       const userMsg = makeMsg("user", trimmed);
       setMessages((prev) => [...prev, userMsg]);
       setThinking(true);
 
-      await _doHttpSend(trimmed, context);
+      await _doHttpSend(trimmed, chatContext);
     },
     [_doHttpSend, messages, resetChat],
   );
@@ -430,6 +465,17 @@ export function useChatState() {
     setThinking(true);
     setError(null);
 
+    // P-BRIEF: pre-flight diagnostic log — confirms what the frontend is sending
+    console.log("[ENAVIA_DEBUG] runPlannerAction → outgoing", {
+      planner_button_clicked: true,
+      outgoing_message: triggerText,
+      has_planner_brief: true,
+      planner_brief_operator_intent_preview: String(operatorIntent || "").slice(0, 120),
+      planner_brief_keys: Object.keys(plannerBrief),
+      target_present: !!targetObj,
+      session_id: getSessionId(),
+    });
+
     const userMsg = makeMsg("user", `📋 Gerar plano: ${trimmed || "(contexto da conversa)"}`);
     setMessages((prev) => [...prev, userMsg]);
 
@@ -443,6 +489,19 @@ export function useChatState() {
       sendingRef.current = false;
       return;
     }
+
+    // P-BRIEF: post-response diagnostic log — confirms what the backend returned
+    console.log("[ENAVIA_DEBUG] runPlannerAction ← response", {
+      ok: result.ok,
+      fix_active: result.data?.telemetry?.fix_active ?? "(old worker — P-BRIEF fix not deployed)",
+      canonical_plan_objective: result.data?.planner?.canonicalPlan?.objective ?? null,
+      objective_source: result.data?.telemetry?.objective_source ?? "(telemetry.objective_source missing)",
+      has_planner_brief: result.data?.telemetry?.has_planner_brief ?? null,
+      raw_message: result.data?.telemetry?.raw_message ?? null,
+      resolved_objective: result.data?.telemetry?.resolved_objective ?? null,
+      // always the raw value received by backend; null = field absent (deploy diagnostic)
+      planner_brief_operator_intent_preview: result.data?.telemetry?.planner_brief_operator_intent_preview ?? null,
+    });
 
     if (!result.ok) {
       setError(result.error.message);
@@ -458,6 +517,17 @@ export function useChatState() {
     const objective = planner?.canonicalPlan?.objective
       || planner?.classification?.objective
       || null;
+
+    // P-BRIEF: card display diagnostic log — confirms which field feeds the chat card
+    console.log("[ENAVIA_DEBUG] chat card objective", {
+      display_objective: objective,
+      display_objective_source: planner?.canonicalPlan?.objective
+        ? "canonicalPlan.objective"
+        : (planner?.classification?.objective ? "classification.objective" : "null"),
+      request_text: result.data?.telemetry?.raw_message ?? null,
+      canonical_objective: planner?.canonicalPlan?.objective ?? null,
+      fallback_used: !planner?.canonicalPlan?.objective,
+    });
     const rawSteps = Array.isArray(planner?.canonicalPlan?.steps)
       ? planner.canonicalPlan.steps
       : [];

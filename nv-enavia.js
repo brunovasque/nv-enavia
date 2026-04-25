@@ -3111,6 +3111,31 @@ async function loadDirectorBrain(env) {
 // Este endpoint destrava P7/P8 ao fornecer retorno real e auditável
 // que o painel pode consumir sem mock.
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// _resolveOperatorIntent(context, rawMessage)
+//
+// P-BRIEF — Resolução canônica do texto operacional para PM4/PM5/PM6.
+//
+// Ordem de prioridade (decrescente):
+//   1. context.planner_brief.operator_intent — intenção real alinhada no Chat
+//   2. rawMessage — fallback seguro (trigger bruto, ex: "Gerar plano")
+//
+// "Gerar plano" é um trigger/comando e NUNCA deve virar objetivo do plano.
+//
+// Retorna { resolvedText, objectiveSource, hasPlannerBrief }
+// ---------------------------------------------------------------------------
+function _resolveOperatorIntent(context, rawMessage) {
+  const intent = typeof context?.planner_brief?.operator_intent === "string"
+    ? context.planner_brief.operator_intent.trim()
+    : "";
+  return {
+    resolvedText:     intent.length > 0 ? intent : rawMessage,
+    objectiveSource:  intent.length > 0 ? "planner_brief.operator_intent" : "body.message",
+    hasPlannerBrief:  intent.length > 0,
+  };
+}
+
 async function handlePlannerRun(request, env) {
   const startedAt = Date.now();
 
@@ -3233,17 +3258,22 @@ async function handlePlannerRun(request, env) {
     // PM4 recebe este contexto; sinais de memória estão estruturalmente presentes.
     const plannerContext = { ...context, memory_context, retrieval_context };
 
+    // P-BRIEF — Resolução do objetivo operacional via helper canônico.
+    // operator_intent vence sobre body.message para PM4/PM5/PM6.
+    const { resolvedText, objectiveSource, hasPlannerBrief } =
+      _resolveOperatorIntent(context, message);
+
     // PM4 — Classificação (recebe plannerContext enriquecido)
-    const classification = classifyRequest({ text: message, context: plannerContext });
+    const classification = classifyRequest({ text: resolvedText, context: plannerContext });
 
     // PM5 — Output Envelope
-    const envelope = buildOutputEnvelope(classification, { text: message });
+    const envelope = buildOutputEnvelope(classification, { text: resolvedText });
 
     // PM6 — Plano Canônico
     const canonicalPlan = buildCanonicalPlan({
       classification,
       envelope,
-      input: { text: message },
+      input: { text: resolvedText },
     });
 
     // PM7 — Gate de Aprovação
@@ -3359,12 +3389,24 @@ async function handlePlannerRun(request, env) {
       memory_hits: _plannerMemHits,
       planner: plannerPayload,
       telemetry: {
+        fix_active: "P-BRIEF-v2", // sentinel: confirms this worker has the P-BRIEF fix deployed
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: "PR3→PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15",
         memory_read: memoryReadAudit,
         retrieval: retrieval_context, // PR3 — auditoria de retrieval
         consolidation_persisted,
+        // P-BRIEF — objetivo auditável (telemetria de diagnóstico)
+        has_planner_brief: hasPlannerBrief,
+        objective_source: objectiveSource,
+        raw_message: message,
+        resolved_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
+        canonical_plan_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
+        // always shows what context.planner_brief.operator_intent actually contained when received;
+        // null means the field was absent — use alongside objective_source to diagnose fallbacks
+        planner_brief_operator_intent_preview: context?.planner_brief?.operator_intent != null
+          ? String(context.planner_brief.operator_intent).slice(0, 120)
+          : null,
       },
     });
   } catch (err) {
@@ -4167,15 +4209,24 @@ async function handleChatLLM(request, env) {
     // PR7: Track planner failure when it was supposed to run (Level B/C forced)
     let plannerError = null;
     let pendingPlanSaved = false;
+    // P-BRIEF: debug trace — objective resolution for /chat/run path
+    let _chatPlannerDebug = null;
 
     if (shouldActivatePlanner) {
       try {
-        const classification = classifyRequest({ text: message, context });
-        const envelope = buildOutputEnvelope(classification, { text: message });
+        // P-BRIEF — Resolução do objetivo no chat planner via helper canônico.
+        // operator_intent vence sobre body.message para PM4/PM5/PM6.
+        const {
+          resolvedText: chatResolvedText,
+          objectiveSource: chatObjectiveSource,
+          hasPlannerBrief: chatHasPlannerBrief,
+        } = _resolveOperatorIntent(context, message);
+        const classification = classifyRequest({ text: chatResolvedText, context });
+        const envelope = buildOutputEnvelope(classification, { text: chatResolvedText });
         const canonicalPlan = buildCanonicalPlan({
           classification,
           envelope,
-          input: { text: message },
+          input: { text: chatResolvedText },
         });
         const gate = evaluateApprovalGate(canonicalPlan);
         const bridge = buildExecutorBridgePayload({ plan: canonicalPlan, gate });
@@ -4194,6 +4245,21 @@ async function handleChatLLM(request, env) {
           outputMode: envelope.output_mode,
         };
         plannerUsed = true;
+
+        // P-BRIEF: populate debug trace after canonicalPlan is available
+        _chatPlannerDebug = {
+          fix_active: "P-BRIEF-v2", // sentinel: confirms this /chat/run handler has the P-BRIEF fix
+          received_message: message,
+          has_planner_brief: chatHasPlannerBrief,
+          // always shows raw value received; null means absent; use with objective_source to diagnose fallbacks
+          planner_brief_operator_intent: context?.planner_brief?.operator_intent != null
+            ? String(context.planner_brief.operator_intent).slice(0, 120)
+            : null,
+          resolved_text_used_for_pm: chatResolvedText.slice(0, 120),
+          objective_source: chatObjectiveSource,
+          canonical_plan_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
+          pending_plan_saved: false, // updated below if plan is saved
+        };
 
         // ---------------------------------------------------------------
         // BLOCO A.0 — Espelhar plannerSnapshot em planner:latest:{session_id}
@@ -4276,6 +4342,7 @@ async function handleChatLLM(request, env) {
               expirationTtl: _PENDING_PLAN_TTL_SECONDS,
             });
             pendingPlanSaved = true;
+            if (_chatPlannerDebug) _chatPlannerDebug.pending_plan_saved = true;
             logNV("💾 [CHAT/LLM] pending_plan salvo no KV", {
               session_id,
               gate_status: gate.gate_status,
@@ -4387,6 +4454,8 @@ async function handleChatLLM(request, env) {
         } : {}),
         // PR7: planner error when planner was forced (Level B/C) but failed internally
         ...(plannerError ? { planner_error: plannerError } : {}),
+        // P-BRIEF: planner debug — objective resolution trace for this /chat/run request
+        ...(plannerUsed && _chatPlannerDebug ? { planner_debug: _chatPlannerDebug } : {}),
         operational_awareness: {
           browser_status:    operationalAwareness.browser.status,
           browser_can_act:   operationalAwareness.browser.can_act,
