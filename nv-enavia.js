@@ -3389,6 +3389,7 @@ async function handlePlannerRun(request, env) {
       memory_hits: _plannerMemHits,
       planner: plannerPayload,
       telemetry: {
+        fix_active: "P-BRIEF-v2", // sentinel: confirms this worker has the P-BRIEF fix deployed
         duration_ms: Date.now() - startedAt,
         session_id: session_id || null,
         pipeline: "PR3→PM3→PM4→PM5→PM6→PM7→PM8→PM9→P15",
@@ -3401,7 +3402,9 @@ async function handlePlannerRun(request, env) {
         raw_message: message,
         resolved_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
         canonical_plan_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
-        planner_brief_operator_intent_preview: hasPlannerBrief
+        // always shows what context.planner_brief.operator_intent actually contained when received;
+        // null means the field was absent — use alongside objective_source to diagnose fallbacks
+        planner_brief_operator_intent_preview: context?.planner_brief?.operator_intent != null
           ? String(context.planner_brief.operator_intent).slice(0, 120)
           : null,
       },
@@ -4245,9 +4248,11 @@ async function handleChatLLM(request, env) {
 
         // P-BRIEF: populate debug trace after canonicalPlan is available
         _chatPlannerDebug = {
+          fix_active: "P-BRIEF-v2", // sentinel: confirms this /chat/run handler has the P-BRIEF fix
           received_message: message,
           has_planner_brief: chatHasPlannerBrief,
-          planner_brief_operator_intent: chatHasPlannerBrief
+          // always shows raw value received; null means absent; use with objective_source to diagnose fallbacks
+          planner_brief_operator_intent: context?.planner_brief?.operator_intent != null
             ? String(context.planner_brief.operator_intent).slice(0, 120)
             : null,
           resolved_text_used_for_pm: chatResolvedText.slice(0, 120),
