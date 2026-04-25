@@ -430,6 +430,17 @@ export function useChatState() {
     setThinking(true);
     setError(null);
 
+    // P-BRIEF: pre-flight diagnostic log — confirms what the frontend is sending
+    console.log("[ENAVIA_DEBUG] runPlannerAction → outgoing", {
+      planner_button_clicked: true,
+      outgoing_message: triggerText,
+      has_planner_brief: true,
+      planner_brief_operator_intent_preview: operatorIntent.slice(0, 120),
+      planner_brief_keys: Object.keys(plannerBrief),
+      target_present: !!targetObj,
+      session_id: getSessionId(),
+    });
+
     const userMsg = makeMsg("user", `📋 Gerar plano: ${trimmed || "(contexto da conversa)"}`);
     setMessages((prev) => [...prev, userMsg]);
 
@@ -443,6 +454,17 @@ export function useChatState() {
       sendingRef.current = false;
       return;
     }
+
+    // P-BRIEF: post-response diagnostic log — confirms what the backend returned
+    console.log("[ENAVIA_DEBUG] runPlannerAction ← response", {
+      ok: result.ok,
+      canonical_plan_objective: result.data?.planner?.canonicalPlan?.objective ?? null,
+      objective_source: result.data?.telemetry?.objective_source ?? "(telemetry not forwarded)",
+      has_planner_brief: result.data?.telemetry?.has_planner_brief ?? null,
+      raw_message: result.data?.telemetry?.raw_message ?? null,
+      resolved_objective: result.data?.telemetry?.resolved_objective ?? null,
+      planner_brief_operator_intent_preview: result.data?.telemetry?.planner_brief_operator_intent_preview ?? null,
+    });
 
     if (!result.ok) {
       setError(result.error.message);
@@ -458,6 +480,17 @@ export function useChatState() {
     const objective = planner?.canonicalPlan?.objective
       || planner?.classification?.objective
       || null;
+
+    // P-BRIEF: card display diagnostic log — confirms which field feeds the chat card
+    console.log("[ENAVIA_DEBUG] chat card objective", {
+      display_objective: objective,
+      display_objective_source: planner?.canonicalPlan?.objective
+        ? "canonicalPlan.objective"
+        : (planner?.classification?.objective ? "classification.objective" : "null"),
+      request_text: result.data?.telemetry?.raw_message ?? null,
+      canonical_objective: planner?.canonicalPlan?.objective ?? null,
+      fallback_used: !planner?.canonicalPlan?.objective,
+    });
     const rawSteps = Array.isArray(planner?.canonicalPlan?.steps)
       ? planner.canonicalPlan.steps
       : [];

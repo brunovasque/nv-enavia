@@ -108,7 +108,12 @@ export async function runPlanner(message, context) {
 
     return {
       ok: true,
-      data: { planner: res.data.planner },
+      data: {
+        planner: res.data.planner,
+        // P-BRIEF: expose backend telemetry so the frontend can log objective_source,
+        // has_planner_brief, resolved_objective, and other diagnostic fields.
+        telemetry: res.data.telemetry ?? null,
+      },
       meta: { durationMs: Date.now() - t0 },
     };
   } catch (err) {
