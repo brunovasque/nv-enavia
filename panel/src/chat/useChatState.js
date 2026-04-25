@@ -334,9 +334,11 @@ export function useChatState() {
       _role: classifyUserMsg(m.content),
     }));
 
-    // trigger_message: só o comando imediato que disparou o botão.
-    // userMsgs is guaranteed non-empty (checked above for ≥2, or trimmed was set)
-    const triggerMessage = trimmed || userMsgs[userMsgs.length - 1].content.trim();
+    // trigger_message: o comando curto que disparou o botão.
+    // Quando o campo de input está vazio, usa um comando canônico em vez da
+    // última mensagem do usuário (que pode ser um complemento de contexto como
+    // "Use como URL pública..."). A intenção real viaja em plannerBrief.operator_intent.
+    const triggerMessage = trimmed.length > 0 ? trimmed : "Gerar plano";
 
     // operator_intent: prioriza mensagens classificadas como 'objective'.
     // Se não houver nenhuma, usa mensagens 'neutral' da janela recente.
@@ -490,7 +492,9 @@ export function useChatState() {
 
     const replyContent = `📋 **Plano gerado**\n\n${summaryLines.join("\n\n")}`;
     setMessages((prev) => [...prev, makeMsg("enavia", replyContent, new Date().toISOString())]);
-    onChatSuccess(triggerText, planner ?? null);
+    // Pass operatorIntent as lastChatText so PlanHeader shows the real plan goal,
+    // not the short trigger command. Falls back to triggerText only if intent is empty.
+    onChatSuccess(operatorIntent || triggerText, planner ?? null);
     setThinking(false);
     sendingRef.current = false;
   }, [messages]);
