@@ -3402,7 +3402,7 @@ async function handlePlannerRun(request, env) {
         resolved_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
         canonical_plan_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
         planner_brief_operator_intent_preview: hasPlannerBrief
-          ? String(context.planner_brief.operator_intent).slice(0, 200)
+          ? String(context.planner_brief.operator_intent).slice(0, 120)
           : null,
       },
     });
@@ -4248,9 +4248,9 @@ async function handleChatLLM(request, env) {
           received_message: message,
           has_planner_brief: chatHasPlannerBrief,
           planner_brief_operator_intent: chatHasPlannerBrief
-            ? String(context.planner_brief.operator_intent).slice(0, 200)
+            ? String(context.planner_brief.operator_intent).slice(0, 120)
             : null,
-          resolved_text_used_for_pm: chatResolvedText.slice(0, 200),
+          resolved_text_used_for_pm: chatResolvedText.slice(0, 120),
           objective_source: chatObjectiveSource,
           canonical_plan_objective: typeof canonicalPlan.objective === "string" ? canonicalPlan.objective : null,
           pending_plan_saved: false, // updated below if plan is saved

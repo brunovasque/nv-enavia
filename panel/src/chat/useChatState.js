@@ -435,7 +435,7 @@ export function useChatState() {
       planner_button_clicked: true,
       outgoing_message: triggerText,
       has_planner_brief: true,
-      planner_brief_operator_intent_preview: operatorIntent.slice(0, 120),
+      planner_brief_operator_intent_preview: String(operatorIntent || "").slice(0, 120),
       planner_brief_keys: Object.keys(plannerBrief),
       target_present: !!targetObj,
       session_id: getSessionId(),
