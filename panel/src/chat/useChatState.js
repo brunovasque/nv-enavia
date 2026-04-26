@@ -350,7 +350,7 @@ export function useChatState() {
       hasStructuredBrief         ||
       (hasObjective && hasTarget && hasScopeOrConstraints);
 
-    let plannerContextReason;
+    let plannerContextReason = "insufficient_context";
     let gateBlockedReason = null;
     if (plannerContextSufficient) {
       if (alignmentMessageCount >= 2)  plannerContextReason = "multiple_alignment_messages";
