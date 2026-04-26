@@ -293,16 +293,86 @@ export function useChatState() {
     );
 
     // ── Verificar suficiência de contexto ──────────────────────────────────
-    // Exige ao menos 2 mensagens do operador para derivar intenção real.
-    // Uma única mensagem não é suficiente para distinguir intenção de gatilho.
-    if (userMsgs.length < 2 && !trimmed) {
+    // Aceita: (a) 2+ mensagens de alinhamento; (b) brief estruturado único com
+    // objetivo + target/contexto + escopo/restrições/critério; (c) input não vazio.
+    //
+    // Padrões para detectar cada elemento do brief nas mensagens do operador.
+    const BRIEF_OBJ_RX = [
+      /\bobjetivo\s*:/i,
+      /\bquero\s+(montar|criar|validar|mapear|corrigir|auditar|implementar|gerar|verificar|checar|revisar|analisar|diagnosticar)\b/i,
+      /\bpreciso\s+(validar|mapear|corrigir|auditar|implementar|criar|verificar|checar|revisar|analisar|diagnosticar|de um plano)\b/i,
+      /\bplano\s+(operacional|para|de)\b/i,
+      /\bconfirmar\s+se\b/i,
+    ];
+    const BRIEF_TARGET_RX = [
+      /\btarget\b/i,
+      /\bcontexto\s*:/i,
+      /\balvo\b/i,
+      /nv-enavia/i,
+      /\bprod\b|\bstaging\b|\bread_only\b/i,
+    ];
+    const BRIEF_SCOPE_RX = [
+      /\brestri[çc][oõ]es?\s*:/i,
+      /\bcrit[eé]rio\b/i,
+      /\bescopo\b/i,
+      /\bn[aã]o\s+(executar|fazer|alterar|chamar|deploy)\b/i,
+    ];
+    // hasStructuredBrief: ao menos uma mensagem contém todos os cabeçalhos explícitos.
+    const BRIEF_HEADERS_RX = [
+      /\bobjetivo\s*:/i,
+      /\bcontexto\s*:/i,
+      /\brestri[çc][oõ]es?\s*:/i,
+      /\bcrit[eé]rio\b/i,
+    ];
+
+    const allUserTexts = [
+      ...userMsgs.map((m) => m.content),
+      ...(trimmed ? [trimmed] : []),
+    ];
+    const combinedText = allUserTexts.join("\n");
+    const hasActiveTarget = !!(
+      context?.target?.url  ||
+      context?.target?.name ||
+      context?.target?.repo ||
+      context?.target?.id
+    );
+
+    const hasObjective          = BRIEF_OBJ_RX.some((rx) => rx.test(combinedText));
+    const hasTarget             = hasActiveTarget || BRIEF_TARGET_RX.some((rx) => rx.test(combinedText));
+    const hasScopeOrConstraints = BRIEF_SCOPE_RX.some((rx) => rx.test(combinedText));
+    // Brief estruturado: uma única mensagem com todos os cabeçalhos explícitos.
+    const hasStructuredBrief    = allUserTexts.some((txt) => BRIEF_HEADERS_RX.every((rx) => rx.test(txt)));
+
+    const alignmentMessageCount = userMsgs.length;
+    const plannerContextSufficient =
+      alignmentMessageCount >= 2 ||
+      trimmed.length > 0         ||
+      hasStructuredBrief         ||
+      (hasObjective && hasTarget && hasScopeOrConstraints);
+
+    let plannerContextReason;
+    let gateBlockedReason = null;
+    if (plannerContextSufficient) {
+      if (alignmentMessageCount >= 2)  plannerContextReason = "multiple_alignment_messages";
+      else if (trimmed.length > 0)     plannerContextReason = "user_input_provided";
+      else if (hasStructuredBrief)     plannerContextReason = "single_structured_brief";
+      else                             plannerContextReason = "objective_target_scope_detected";
+    } else {
+      plannerContextReason = "insufficient_context";
+      gateBlockedReason = !hasObjective
+        ? "missing_objective"
+        : !hasTarget
+        ? "missing_target"
+        : "missing_scope_or_constraints";
+    }
+
+    if (!plannerContextSufficient) {
       setMessages((prev) => [
         ...prev,
         makeMsg(
           "enavia",
           "Para gerar um plano estruturado, primeiro alinhe a intenção aqui no Chat. " +
-          "Descreva o **objetivo**, o **target** e o **escopo** da operação " +
-          "(2 ou mais mensagens de alinhamento). " +
+          "Descreva o **objetivo**, o **target** e o **escopo** da operação. " +
           "Quando estiver pronto, clique em **Gerar plano** novamente.",
           new Date().toISOString(),
         ),
@@ -474,6 +544,15 @@ export function useChatState() {
       planner_brief_keys: Object.keys(plannerBrief),
       target_present: !!targetObj,
       session_id: getSessionId(),
+      // P-GATE: planner context sufficiency telemetry
+      planner_context_sufficient: plannerContextSufficient,
+      planner_context_reason:     plannerContextReason,
+      alignment_message_count:    alignmentMessageCount,
+      has_structured_brief:       hasStructuredBrief,
+      has_objective:              hasObjective,
+      has_target:                 hasTarget,
+      has_scope_or_constraints:   hasScopeOrConstraints,
+      gate_blocked_reason:        gateBlockedReason,
     });
 
     const userMsg = makeMsg("user", `📋 Gerar plano: ${trimmed || "(contexto da conversa)"}`);
