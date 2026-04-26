@@ -309,6 +309,8 @@ async function runTests() {
     "next_action",
     "chat_reply",
     "reason",
+    "steps_source",
+    "planner_brief_used_for_steps",
   ];
 
   for (const field of REQUIRED_FIELDS) {
@@ -372,6 +374,85 @@ async function runTests() {
   assert(parsed.plan_type            === planC.plan_type,            "T13: plano C é serializável (plan_type)");
   assert(parsed.needs_human_approval === planC.needs_human_approval, "T13: plano C é serializável (needs_human_approval)");
   assert(parsed.steps.length         === planC.steps.length,         "T13: plano C é serializável (steps)");
+
+  // -------------------------------------------------------------------------
+  // Group 15: T14 — steps derivados do planner_brief quando brief útil
+  // -------------------------------------------------------------------------
+  console.log("\nGroup 15: T14 — steps derivados do planner_brief");
+
+  const briefA = {
+    operator_intent: "Quero validar a aba Plano da Enavia em prod/read_only",
+    target: { name: "nv-enavia", env: "prod", mode: "read_only" },
+    constraints: { mode: "read_only", safe_only: true },
+    acceptance_criteria: ["Plano aparece corretamente na aba /plan", "Persistência confirmada após reload"],
+    out_of_scope: ["deploy", "execução automática"],
+  };
+
+  const briefB = {
+    operator_intent: "Mapear todos os endpoints do worker e registrar status",
+    target: { name: "enavia-worker", env: "staging" },
+    constraints: { mode: "read_only" },
+    acceptance_criteria: ["Endpoints listados", "Status HTTP verificado para cada um"],
+  };
+
+  const briefC = {
+    operator_intent: "Redesenhar a arquitetura do pipeline de memória com migração em fases",
+    target: { name: "nv-enavia", env: "prod" },
+    constraints: { mode: "supervised" },
+    acceptance_criteria: ["Plano revisado por humano", "Todas as frentes mapeadas"],
+  };
+
+  // Plano A com brief — steps derivados do contexto
+  const planABrief = buildCanonicalPlan({ classification: classA, envelope: envA, input: inputA, planner_brief: briefA });
+  assert(planABrief.steps_source === "planner_brief",              "T14: A com brief — steps_source === 'planner_brief'");
+  assert(planABrief.planner_brief_used_for_steps === true,         "T14: A com brief — planner_brief_used_for_steps === true");
+  assert(Array.isArray(planABrief.steps) && planABrief.steps.length >= 1, "T14: A com brief — steps é array não-vazio");
+  assert(planABrief.steps.length <= 3,                             "T14: A com brief — steps mantém <= 3 (nível A)");
+  // Steps devem referenciar dados reais do brief
+  const planABriefStr = planABrief.steps.join(" ");
+  assert(planABriefStr.toLowerCase().includes("nv-enavia") || planABriefStr.toLowerCase().includes("prod"),
+    "T14: A com brief — steps referenciam alvo real (target)");
+  // Sem "Frente N:" genéricas
+  assert(!planABriefStr.match(/Frente\s+\d+:/i), "T14: A com brief — sem 'Frente N:' genérico");
+
+  // Plano B com brief
+  const planBBrief = buildCanonicalPlan({ classification: classB, envelope: envB, input: inputB, planner_brief: briefB });
+  assert(planBBrief.steps_source === "planner_brief",              "T14: B com brief — steps_source === 'planner_brief'");
+  assert(planBBrief.planner_brief_used_for_steps === true,         "T14: B com brief — planner_brief_used_for_steps === true");
+  assert(planBBrief.steps.length >= 3 && planBBrief.steps.length <= 5, "T14: B com brief — steps 3–5");
+  const planBBriefStr = planBBrief.steps.join(" ");
+  assert(!planBBriefStr.match(/Frente\s+\d+:/i), "T14: B com brief — sem 'Frente N:' genérico");
+  // Brief de briefB menciona target enavia-worker
+  assert(planBBriefStr.toLowerCase().includes("enavia-worker") || planBBriefStr.toLowerCase().includes("staging"),
+    "T14: B com brief — steps referenciam alvo real (target)");
+
+  // Plano C com brief — gate e needs_human_approval intactos
+  const planCBrief = buildCanonicalPlan({ classification: classC, envelope: envC, input: inputC, planner_brief: briefC });
+  assert(planCBrief.steps_source === "planner_brief",              "T14: C com brief — steps_source === 'planner_brief'");
+  assert(planCBrief.planner_brief_used_for_steps === true,         "T14: C com brief — planner_brief_used_for_steps === true");
+  assert(planCBrief.needs_human_approval === true,                 "T14: C com brief — needs_human_approval intacto");
+  assert(planCBrief.steps.length >= 3,                             "T14: C com brief — steps >= 3");
+  const planCBriefStr = planCBrief.steps.join(" ");
+  assert(!planCBriefStr.match(/Frente\s+\d+:/i), "T14: C com brief — sem 'Frente N:' genérico");
+
+  // Fallback — sem brief (ou brief inválido) → generic_fallback
+  const planANobrief = buildCanonicalPlan({ classification: classA, envelope: envA, input: inputA });
+  assert(planANobrief.steps_source === "generic_fallback",         "T14: sem brief — steps_source === 'generic_fallback'");
+  assert(planANobrief.planner_brief_used_for_steps === false,      "T14: sem brief — planner_brief_used_for_steps === false");
+
+  const planAEmptyBrief = buildCanonicalPlan({ classification: classA, envelope: envA, input: inputA, planner_brief: {} });
+  assert(planAEmptyBrief.steps_source === "generic_fallback",      "T14: brief vazio — generic_fallback");
+
+  const planAShortIntent = buildCanonicalPlan({
+    classification: classA, envelope: envA, input: inputA,
+    planner_brief: { operator_intent: "Teste" },  // < 20 chars → não útil
+  });
+  assert(planAShortIntent.steps_source === "generic_fallback",     "T14: intent curto → generic_fallback");
+
+  // Determinismo — mesma entrada, mesmo output
+  const briefBrief1 = buildCanonicalPlan({ classification: classA, envelope: envA, input: inputA, planner_brief: briefA });
+  const briefBrief2 = buildCanonicalPlan({ classification: classA, envelope: envA, input: inputA, planner_brief: briefA });
+  assert(JSON.stringify(briefBrief1) === JSON.stringify(briefBrief2), "T14: brief-driven é determinístico");
 
   // ---- Summary ----
   console.log(`\n${"=".repeat(60)}`);
