@@ -320,6 +320,14 @@ function _describeTarget(target) {
 //
 // Não contém if/else específico para rotas ou objetivos concretos.
 // ---------------------------------------------------------------------------
+
+// Tamanho máximo para a versão curta do intent nos steps (com "..." se truncado).
+const _BRIEF_INTENT_MAX_LEN = 100;
+// Tamanho máximo do anchor usado em S1 quando não há target disponível.
+const _BRIEF_ANCHOR_MAX_LEN = 70;
+// Máximo de critérios de aceite incluídos no passo de validação.
+const _BRIEF_MAX_AC_IN_STEP = 2;
+
 function _buildStepsFromBrief(planner_brief, level) {
   const intent      = typeof planner_brief.operator_intent === "string"
     ? planner_brief.operator_intent.trim() : "";
@@ -332,7 +340,9 @@ function _buildStepsFromBrief(planner_brief, level) {
     ? planner_brief.acceptance_criteria.filter((s) => typeof s === "string" && s.trim().length > 0)
     : [];
 
-  const intentShort = intent.length <= 100 ? intent : intent.slice(0, 97) + "...";
+  const intentShort = intent.length <= _BRIEF_INTENT_MAX_LEN
+    ? intent
+    : intent.slice(0, _BRIEF_INTENT_MAX_LEN - 3) + "...";
   const targetDesc  = _describeTarget(target);
 
   const steps = [];
@@ -341,7 +351,7 @@ function _buildStepsFromBrief(planner_brief, level) {
   if (targetDesc) {
     steps.push(`Confirmar alvo ${targetDesc} antes de iniciar a operação`);
   } else {
-    const anchor = intent.slice(0, 70);
+    const anchor = intent.slice(0, _BRIEF_ANCHOR_MAX_LEN);
     steps.push(`Confirmar escopo da operação: ${anchor}`);
   }
 
@@ -354,7 +364,7 @@ function _buildStepsFromBrief(planner_brief, level) {
 
   // S3 — Validar resultado / critérios de aceite
   if (ac.length > 0) {
-    const acText = ac.slice(0, 2).join("; ");
+    const acText = ac.slice(0, _BRIEF_MAX_AC_IN_STEP).join("; ");
     steps.push(`Validar critérios de aceite: ${acText}`);
   } else if (isReadOnly) {
     steps.push("Validar resultado sem executar ações destrutivas ou de escrita");
