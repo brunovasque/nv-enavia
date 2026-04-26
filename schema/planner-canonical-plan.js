@@ -57,7 +57,7 @@ const LEVEL_TO_PLAN_TYPE = {
 };
 
 // ---------------------------------------------------------------------------
-// buildCanonicalPlan({ classification, envelope, input })
+// buildCanonicalPlan({ classification, envelope, input, planner_brief })
 //
 // Builder público e determinístico do plano canônico.
 //
@@ -72,6 +72,19 @@ const LEVEL_TO_PLAN_TYPE = {
 //     objective   {string}  — objetivo extraído do pedido
 //   input {object} — pedido original (opcional):
 //     text {string}
+//   planner_brief {object} — handoff operacional estruturado (opcional):
+//     operator_intent    {string}  — intenção real alinhada no Chat
+//     current_state      {string}  — último reconhecimento da Enavia
+//     target             {object}  — alvo operacional { name, env, mode, ... }
+//     constraints        {object}  — restrições { mode, safe_only, ... }
+//     scope              {string}  — escopo definido pelo operador
+//     out_of_scope       {string[]} — o que está fora do escopo
+//     acceptance_criteria {string[]} — critérios de aceite
+//     relevant_conversation_summary {string}
+//
+//   Quando planner_brief contiver operator_intent útil (> 20 chars), os steps
+//   são derivados do contexto real (steps_source = "planner_brief").
+//   Caso contrário, aplica-se o fallback genérico por nível (steps_source = "generic_fallback").
 //
 // Retorna:
 //   {
@@ -87,13 +100,15 @@ const LEVEL_TO_PLAN_TYPE = {
 //     needs_human_approval,
 //     next_action,
 //     reason,
+//     steps_source,              — "planner_brief" | "generic_fallback"
+//     planner_brief_used_for_steps,  — boolean
 //   }
 //
 // Lança:
 //   Error — se classification ou complexity_level ausente/inválido
 //   Error — se envelope ausente ou sem output_mode
 // ---------------------------------------------------------------------------
-function buildCanonicalPlan({ classification, envelope, input } = {}) {
+function buildCanonicalPlan({ classification, envelope, input, planner_brief } = {}) {
   // --- Validação de entrada ---
   if (!classification || typeof classification.complexity_level !== "string") {
     throw new Error(
@@ -128,13 +143,19 @@ function buildCanonicalPlan({ classification, envelope, input } = {}) {
   // output_mode espelha plan_type — mantidos alinhados para evitar drift
   const output_mode = plan_type;
 
+  // P-BRIEF — quando planner_brief tiver intent útil, gera steps contextuais.
+  // Caso contrário mantém o fallback genérico por nível.
+  const briefUseful = _isBriefUseful(planner_brief);
+  const briefSteps  = briefUseful ? _buildStepsFromBrief(planner_brief, level) : null;
+  const steps_source = briefUseful ? "planner_brief" : "generic_fallback";
+
   switch (level) {
     case "A":
-      return _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason });
+      return _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason, briefSteps, steps_source });
     case "B":
-      return _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason });
+      return _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason, briefSteps, steps_source });
     case "C":
-      return _buildPlanC({ plan_type, output_mode, objective, risk_level, reason });
+      return _buildPlanC({ plan_type, output_mode, objective, risk_level, reason, briefSteps, steps_source });
     default:
       // Nunca deve chegar aqui — validado acima
       throw new Error(`buildCanonicalPlan: nível inesperado '${level}'`);
@@ -145,8 +166,9 @@ function buildCanonicalPlan({ classification, envelope, input } = {}) {
 // _buildPlanA — Nível A (simple / quick_reply)
 //
 // Plano curto: 1–3 steps, aceite simples, next_action direto.
+// Quando briefSteps disponível, substitui os steps genéricos.
 // ---------------------------------------------------------------------------
-function _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason }) {
+function _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason, briefSteps, steps_source }) {
   return {
     plan_version:        PLAN_VERSION,
     plan_type,
@@ -154,7 +176,7 @@ function _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_huma
     output_mode,
     objective,
     scope_summary:       "Escopo simples e direto — ação pontual sem etapas complexas.",
-    steps: [
+    steps: briefSteps ?? [
       "Avaliar o pedido e identificar a ação necessária",
       "Executar a ação diretamente",
       "Confirmar conclusão com o solicitante",
@@ -170,6 +192,8 @@ function _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_huma
     next_action: "Executar a ação identificada diretamente e confirmar conclusão.",
     chat_reply: "Recebido. Processando sua solicitação.",
     reason,
+    steps_source:               steps_source ?? "generic_fallback",
+    planner_brief_used_for_steps: steps_source === "planner_brief",
   };
 }
 
@@ -177,8 +201,9 @@ function _buildPlanA({ plan_type, output_mode, objective, risk_level, needs_huma
 // _buildPlanB — Nível B (tactical / tactical_plan)
 //
 // Plano tático: 3–5 steps definidos, dependências, aceite intermediário.
+// Quando briefSteps disponível, substitui os steps genéricos.
 // ---------------------------------------------------------------------------
-function _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason }) {
+function _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_human_approval, reason, briefSteps, steps_source }) {
   return {
     plan_version:        PLAN_VERSION,
     plan_type,
@@ -186,7 +211,7 @@ function _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_huma
     output_mode,
     objective,
     scope_summary:       "Escopo tático com etapas definidas — requer validação de dependências antes de iniciar.",
-    steps: [
+    steps: briefSteps ?? [
       "Decompor o pedido em etapas executáveis e ordenadas",
       "Validar dependências e recursos necessários para cada etapa",
       "Executar cada etapa com monitoramento de resultado",
@@ -205,6 +230,8 @@ function _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_huma
     next_action: "Revisar as etapas planejadas, validar dependências e aguardar confirmação para iniciar.",
     chat_reply: "Entendido. Estruturando as etapas táticas para sua solicitação.",
     reason,
+    steps_source:               steps_source ?? "generic_fallback",
+    planner_brief_used_for_steps: steps_source === "planner_brief",
   };
 }
 
@@ -213,8 +240,10 @@ function _buildPlanB({ plan_type, output_mode, objective, risk_level, needs_huma
 //
 // Plano formal: macro-etapas/frentes visíveis, needs_human_approval=true,
 // next_action aponta para aprovação/revisão humana formal.
+// Quando briefSteps disponível, steps derivados do contexto real substituem
+// as frentes genéricas — needs_human_approval e gate permanecem inalterados.
 // ---------------------------------------------------------------------------
-function _buildPlanC({ plan_type, output_mode, objective, risk_level, reason }) {
+function _buildPlanC({ plan_type, output_mode, objective, risk_level, reason, briefSteps, steps_source }) {
   return {
     plan_version:        PLAN_VERSION,
     plan_type,
@@ -222,7 +251,7 @@ function _buildPlanC({ plan_type, output_mode, objective, risk_level, reason }) 
     output_mode,
     objective,
     scope_summary:       "Escopo macro e complexo — requer frentes bem definidas, revisão formal e aprovação humana antes de qualquer execução.",
-    steps: [
+    steps: briefSteps ?? [
       "Frente 1: diagnóstico completo e levantamento de requisitos",
       "Frente 2: decomposição tática por módulos e dependências",
       "Frente 3: planejamento de execução supervisionada com critérios claros",
@@ -242,7 +271,122 @@ function _buildPlanC({ plan_type, output_mode, objective, risk_level, reason }) 
     next_action: "Submeter este plano para revisão e aprovação humana formal antes de qualquer execução.",
     chat_reply: "Recebido. Esta demanda requer planejamento formal — preparando plano para revisão e aprovação.",
     reason,
+    steps_source:               steps_source ?? "generic_fallback",
+    planner_brief_used_for_steps: steps_source === "planner_brief",
   };
+}
+
+// ---------------------------------------------------------------------------
+// _isBriefUseful(planner_brief)
+//
+// Retorna true quando planner_brief contiver operator_intent suficiente
+// para derivar steps práticos (string com mais de 20 caracteres).
+// ---------------------------------------------------------------------------
+function _isBriefUseful(planner_brief) {
+  if (!planner_brief || typeof planner_brief !== "object") return false;
+  const intent = planner_brief.operator_intent;
+  return typeof intent === "string" && intent.trim().length > 20;
+}
+
+// ---------------------------------------------------------------------------
+// _describeTarget(target)
+//
+// Constrói uma descrição curta legível do alvo operacional para uso nos steps.
+// Retorna null quando target ausente ou sem campos relevantes.
+// ---------------------------------------------------------------------------
+function _describeTarget(target) {
+  if (!target || typeof target !== "object") return null;
+  const parts = [];
+  if (typeof target.name === "string"   && target.name.trim().length > 0)  parts.push(target.name.trim());
+  if (typeof target.env === "string"    && target.env.trim().length > 0)   parts.push(target.env.trim());
+  if (typeof target.mode === "string"   && target.mode.trim().length > 0)  parts.push(`(${target.mode.trim()})`);
+  if (typeof target.repo === "string"   && target.repo.trim().length > 0)  parts.push(target.repo.trim());
+  if (typeof target.branch === "string" && target.branch.trim().length > 0) parts.push(target.branch.trim());
+  return parts.length > 0 ? parts.join(" / ") : null;
+}
+
+// ---------------------------------------------------------------------------
+// _buildStepsFromBrief(planner_brief, level)
+//
+// Gera steps práticos derivados do planner_brief — específicos ao contexto,
+// iniciando com verbo de ação, respeitando restrições e objetivo real.
+//
+// Regras de qualidade (não script fechado):
+//   - steps começam com verbo de ação;
+//   - citam elementos reais quando disponíveis (target, intent, critérios);
+//   - respeitam constraints (read_only → sem steps de escrita/deploy);
+//   - fallback genérico dentro de cada passo quando o campo estiver ausente;
+//   - quantidade proporcional ao nível (A: 3, B: 4, C: 5).
+//
+// Não contém if/else específico para rotas ou objetivos concretos.
+// ---------------------------------------------------------------------------
+
+// Tamanho máximo para a versão curta do intent nos steps (com "..." se truncado).
+const _BRIEF_INTENT_MAX_LEN = 100;
+// Tamanho máximo do anchor usado em S1 quando não há target disponível.
+const _BRIEF_ANCHOR_MAX_LEN = 70;
+// Máximo de critérios de aceite incluídos no passo de validação.
+const _BRIEF_MAX_AC_IN_STEP = 2;
+
+function _buildStepsFromBrief(planner_brief, level) {
+  const intent      = typeof planner_brief.operator_intent === "string"
+    ? planner_brief.operator_intent.trim() : "";
+  const target      = planner_brief.target && typeof planner_brief.target === "object"
+    ? planner_brief.target : null;
+  const constraints = planner_brief.constraints && typeof planner_brief.constraints === "object"
+    ? planner_brief.constraints : null;
+  const isReadOnly  = constraints?.mode === "read_only" || constraints?.safe_only === true;
+  const ac          = Array.isArray(planner_brief.acceptance_criteria)
+    ? planner_brief.acceptance_criteria.filter((s) => typeof s === "string" && s.trim().length > 0)
+    : [];
+
+  const intentShort = intent.length <= _BRIEF_INTENT_MAX_LEN
+    ? intent
+    : intent.slice(0, _BRIEF_INTENT_MAX_LEN - 3) + "...";
+  const targetDesc  = _describeTarget(target);
+
+  const steps = [];
+
+  // S1 — Confirmar alvo ou escopo antes de iniciar
+  if (targetDesc) {
+    steps.push(`Confirmar alvo ${targetDesc} antes de iniciar a operação`);
+  } else {
+    const anchor = intent.slice(0, _BRIEF_ANCHOR_MAX_LEN);
+    steps.push(`Confirmar escopo da operação: ${anchor}`);
+  }
+
+  // S2 — Ação principal derivada do operator_intent
+  if (isReadOnly) {
+    steps.push(`Executar diagnóstico sem escrita: ${intentShort}`);
+  } else {
+    steps.push(`Executar operação: ${intentShort}`);
+  }
+
+  // S3 — Validar resultado / critérios de aceite
+  if (ac.length > 0) {
+    const acText = ac.slice(0, _BRIEF_MAX_AC_IN_STEP).join("; ");
+    steps.push(`Validar critérios de aceite: ${acText}`);
+  } else if (isReadOnly) {
+    steps.push("Validar resultado sem executar ações destrutivas ou de escrita");
+  } else {
+    steps.push("Validar que o objetivo foi atingido conforme combinado");
+  }
+
+  // S4 — Evidência (nível B e C)
+  if (level === "B" || level === "C") {
+    if (isReadOnly) {
+      steps.push("Registrar evidências da validação sem acionar executor");
+    } else {
+      steps.push("Consolidar evidências e registrar resultado da operação");
+    }
+  }
+
+  // S5 — Gate de aprovação (nível C)
+  if (level === "C") {
+    steps.push("Submeter plano para aprovação humana formal antes de prosseguir");
+  }
+
+  return steps;
 }
 
 // ---------------------------------------------------------------------------

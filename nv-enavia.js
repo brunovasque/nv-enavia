@@ -3270,10 +3270,12 @@ async function handlePlannerRun(request, env) {
     const envelope = buildOutputEnvelope(classification, { text: resolvedText });
 
     // PM6 — Plano Canônico
+    // P-BRIEF: planner_brief encaminhado para PM6 quando disponível — steps derivados do contexto real.
     const canonicalPlan = buildCanonicalPlan({
       classification,
       envelope,
       input: { text: resolvedText },
+      planner_brief: context?.planner_brief ?? null,
     });
 
     // PM7 — Gate de Aprovação
@@ -3406,6 +3408,12 @@ async function handlePlannerRun(request, env) {
         // null means the field was absent — use alongside objective_source to diagnose fallbacks
         planner_brief_operator_intent_preview: context?.planner_brief?.operator_intent != null
           ? String(context.planner_brief.operator_intent).slice(0, 120)
+          : null,
+        // P-BRIEF steps telemetry — auditável: origem dos steps e preview do primeiro
+        steps_source:                 canonicalPlan.steps_source ?? "generic_fallback",
+        planner_brief_used_for_steps: canonicalPlan.planner_brief_used_for_steps ?? false,
+        steps_preview:                Array.isArray(canonicalPlan.steps) && canonicalPlan.steps.length > 0
+          ? canonicalPlan.steps[0]
           : null,
       },
     });
@@ -4227,6 +4235,7 @@ async function handleChatLLM(request, env) {
           classification,
           envelope,
           input: { text: chatResolvedText },
+          planner_brief: context?.planner_brief ?? null,
         });
         const gate = evaluateApprovalGate(canonicalPlan);
         const bridge = buildExecutorBridgePayload({ plan: canonicalPlan, gate });
