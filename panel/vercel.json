@@ -6,6 +6,7 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "env": {
-    "VITE_API_MODE": "mock"
+    "VITE_NV_ENAVIA_URL": "https://nv-enavia.brunovasque.workers.dev",
+    "VITE_API_MODE": "real"
   }
 }

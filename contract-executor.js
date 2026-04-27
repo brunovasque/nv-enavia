@@ -3605,12 +3605,19 @@ async function handleGetActiveSurface(env) {
     index = [];
   }
 
-  // No contracts in index — return stable empty surface
+  // PR1 — stable empty surface (no contracts or all terminal)
+  const emptySurface = {
+    ok: true,
+    source: "active-contract",
+    contract: null,
+    surface: { available: false, next_action: null, blocked: false, block_reason: null },
+    // backward-compat: Panel reads active_state + adherence
+    active_state: null,
+    adherence: null,
+  };
+
   if (!Array.isArray(index) || index.length === 0) {
-    return {
-      status: 200,
-      body: { ok: true, active_state: null, adherence: null },
-    };
+    return { status: 200, body: emptySurface };
   }
 
   // Iterate from most recent (last in array) to find first non-terminal contract
@@ -3621,21 +3628,42 @@ async function handleGetActiveSurface(env) {
     if (TERMINAL_STATUSES.includes(state.status_global)) continue;
 
     const decomposition = await readContractDecomposition(env, contractId);
+    const summary = buildContractSummary(state, decomposition);
+
+    const blockers = Array.isArray(state.blockers) ? state.blockers : [];
+    const isBlocked = blockers.length > 0;
+    const blockReason = isBlocked ? (blockers[0].reason || blockers[0] || null) : null;
+    // current_pr: use current_task as explicit fallback — no dedicated field exists yet (PR4 will refine)
+    const currentPr = state.current_task || null;
+
     return {
       status: 200,
       body: {
         ok: true,
-        active_state: buildContractSummary(state, decomposition),
+        source: "active-contract",
+        contract: {
+          id: state.contract_id || null,
+          title: state.contract_name || null,
+          status: state.status_global || null,
+          current_phase: state.current_phase || null,
+          current_pr: currentPr,
+          updated_at: state.updated_at || null,
+        },
+        surface: {
+          available: true,
+          next_action: state.next_action || null,
+          blocked: isBlocked,
+          block_reason: blockReason,
+        },
+        // backward-compat: Panel reads active_state + adherence
+        active_state: summary,
         adherence: null,
       },
     };
   }
 
-  // All contracts are terminal — return stable empty surface
-  return {
-    status: 200,
-    body: { ok: true, active_state: null, adherence: null },
-  };
+  // All contracts are terminal
+  return { status: 200, body: emptySurface };
 }
 
 // POST /contracts/execute — Execute current micro-PR in TEST
