@@ -7,9 +7,9 @@
 ## Estado geral
 - Contrato ativo: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅
 - Estrutura de governança mínima: ✅
-- PR1 — active surface: **concluída** ✅
-- PR2 — executor governado: **concluída** ✅
-- PR3 — panel backend real: **concluída** ✅
+- PR1 — active surface: **concluída** ✅ (merged)
+- PR2 — executor governado: **concluída** ✅ (merged)
+- PR3 — panel backend real: **concluída** ✅ (merged)
 - PR4 — worker confiabilidade: **concluída** ✅ (branch: `claude/pr4-worker-confiabilidade`)
 
 ## PRs do contrato
@@ -22,6 +22,7 @@
 - PR7 — schemas orquestração: pendente
 
 ## Decisões formalizadas em PR4
+- `executor.invalid` — corrigido para `https://enavia-executor.internal/audit`.
 - `consolidateAfterSave()` — dead code (definida mas nunca chamada). Integração fora do escopo de PR4; deixada para PR6 (loop supervisionado) se for necessária.
 - `ENAVIA_BUILD.deployed_at` — sem automação possível via CF Workers runtime. Atualização manual por deploy; CI/CD injection é o caminho correto no futuro.
 
