@@ -43,6 +43,7 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
   - Estrutura de resposta verificada contra shape do contrato.
 - **Alterações em código de produção:** `contract-executor.js` — 1 função, additive only.
 - **Bloqueios:** nenhum.
+- **Status:** mergeada na main.
 - **Próxima etapa segura:** PR2 — Executor-only.
 
 ---
