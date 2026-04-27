@@ -8,6 +8,9 @@ Se não conseguir acessar ou ler este arquivo, pare e avise.
 
 Responda sempre em português.
 
+PRÉ-REQUISITO OBRIGATÓRIO ANTES DO PATCH:
+Atualize a branch com `origin/main` antes de qualquer edição. Se houver conflito, resolva primeiro. A tarefa só pode continuar depois que a branch estiver sem conflito contra `main`.
+
 ---
 
 ## 2. Estrutura de governança obrigatória

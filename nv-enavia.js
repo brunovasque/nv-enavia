@@ -54,9 +54,11 @@ import { listAuditEvents } from "./schema/memory-audit-log.js";
 // ============================================================
 // 🔖 ENAVIA BUILD MARKER — TELEMETRIA DE DEPLOY
 // ============================================================
+// PR4: deployed_at is manually updated at each deploy — no runtime CF API available for this.
+// To automate: inject DEPLOYED_AT via wrangler.toml [vars] or CI/CD env at build time.
 const ENAVIA_BUILD = {
-  id: "ENAVIA_TEST_PATCH_2025-01",
-  deployed_at: "2025-01-21T00:00:00Z",
+  id: "ENAVIA_PR4_2026-04",
+  deployed_at: "2026-04-26T00:00:00Z",
   source: "deploy-worker",
 };
 
@@ -4884,6 +4886,7 @@ async function handleGetHealth(env) {
         blockedExecutions: [],
         recentCompleted:   [],
         latestDecision:    null,
+        _limitations:      { blockedExecutions: "derived_from_latest_decision_only" },
         _source:           "no_kv",
       },
     });
@@ -4927,6 +4930,7 @@ async function handleGetHealth(env) {
           blockedExecutions,
           recentCompleted:   [],
           latestDecision,
+          _limitations:      { blockedExecutions: "derived_from_latest_decision_only" },
           _source:           "exec_event_absent",
         },
       });
@@ -4992,6 +4996,7 @@ async function handleGetHealth(env) {
         blockedExecutions,
         recentCompleted,
         latestDecision,
+        _limitations:      { blockedExecutions: "derived_from_latest_decision_only" },
         _source:           "exec_event",
       },
     });
@@ -5751,7 +5756,7 @@ if (method === "POST" && path === "/enavia/observe") {
   
     let execRes, execStatus, execText, execJson;
     try {
-      execRes = await env.EXECUTOR.fetch("https://executor.invalid/audit", {
+      execRes = await env.EXECUTOR.fetch("https://enavia-executor.internal/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(execPayload),
