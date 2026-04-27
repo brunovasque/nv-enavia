@@ -1,39 +1,48 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-26
-**De:** PR1 — Worker-only — `GET /contracts/active-surface`
-**Para:** PR2 — Executor-only — trazer `enavia-executor` para dentro do repo
+**De:** PR2 — Executor-only — espelho governado do `enavia-executor`
+**Para:** PR3 — Panel-only — ligar painel no backend real
 
 ## O que foi feito nesta sessão
-- Diagnóstico completo do Worker (`nv-enavia.js`) antes de qualquer alteração.
-- Confirmado que a rota `GET /contracts/active-surface` já existia (linha 6937 de `nv-enavia.js`).
-- Identificado que o handler `handleGetActiveSurface` em `contract-executor.js` (linha 3597) retornava shape `{ ok, active_state, adherence }` — diferente do shape exigido pelo contrato PR1.
-- Patch cirúrgico em `contract-executor.js`: adicionados campos `source`, `contract`, `surface` à resposta **sem remover** `active_state` e `adherence` (backward-compat com Panel).
-- CORS confirmado como aplicado via `jsonResponse → withCORS`.
-- Arquivos de governança atualizados.
+- Diagnóstico READ-ONLY confirmou: `enavia-executor` é um Cloudflare Worker separado em repo privado `brunovasque/enavia-executor`.
+- Nenhum código de executor existia no repo `nv-enavia` antes desta PR.
+- Código-fonte obtido via GitHub API (`gh api repos/brunovasque/enavia-executor/contents/src/index.js`).
+- Criada pasta `executor/` com:
+  - `executor/src/index.js` — cópia fiel (245.762 chars, copiado em 2026-04-26)
+  - `executor/wrangler.toml` — referência sanitizada (sem IDs/secrets reais)
+  - `executor/README.md` — explica espelho governado, Service Binding, deploy externo
+  - `executor/CONTRACT.md` — contrato canônico de entrada/saída, rotas, compatibilidade com `env.EXECUTOR.fetch(...)`
+  - `executor/tests/executor.contract.test.js` — smoke test 23/23 passou
+- Smoke test executado: 23 passed, 0 failed.
+- `nv-enavia.js`, `contract-executor.js`, `panel/` — nenhuma alteração.
+- Deploy do executor externo: não alterado.
+- Service Binding no `wrangler.toml` do nv-enavia: não alterado.
 
-## Patch realizado
-- Arquivo: `contract-executor.js`
-- Função: `handleGetActiveSurface`
-- Tipo: additive (novos campos adicionados; nenhum campo removido)
-- Estratégia: `current_pr` usa `state.current_task` como fallback explícito documentado (campo dedicado não existe ainda — PR4 poderá refinar).
+## Relação com a PR1 já mergeada
+- PR1 — `GET /contracts/active-surface` já foi concluída e mergeada.
+- Esta PR2 preserva a sequência do contrato e avança somente o escopo Executor-only.
+- Nenhum conteúdo da PR1 deve ser removido do histórico de governança.
 
-## O que NÃO foi alterado (por escopo)
-- `nv-enavia.js` — sem alteração (rota já existia corretamente)
-- Panel (`panel/`) — sem alteração (PR3)
-- Executor (`contract-executor.js`) — apenas `handleGetActiveSurface`, sem alterar outros handlers
-- Lógica de execução, planner, memória, health
+## Bug documentado (para PR4)
+A URL `https://executor.invalid/audit` na linha 5722 de `nv-enavia.js` é inválida.
+Via Service Binding o roteamento ainda funciona pelo pathname `/audit`, mas o host é tecnicamente incorreto.
+Documentado em `executor/CONTRACT.md`. Corrigir em PR4.
 
 ## Estado do repo
-- Branch: `claude/pr1-active-surface`
-- Arquivo alterado: `contract-executor.js` (função `handleGetActiveSurface` apenas)
+- Branch: `claude/pr2-executor-governado`
+- Arquivos criados: 5 arquivos em `executor/`
+- Arquivos alterados: 3 arquivos de governança (`schema/`)
+- Worker, Panel, bindings, deploy: sem alteração
 
-## Próxima ação segura (PR2)
-1. Após merge da PR1, criar branch `claude/pr2-executor-governado`.
+## Próxima ação segura (PR3)
+1. Após merge da PR2, criar branch `claude/pr3-panel-backend-real`.
 2. Ler todos os arquivos de governança na ordem obrigatória.
-3. Executar PR2 — Executor-only — trazer `enavia-executor` para dentro do repo.
-4. Escopo: criar pasta `executor/`, CONTRACT.md, README.md, health mínimo, compatibilidade com `env.EXECUTOR.fetch(...)`.
-5. Não alterar Panel, não alterar Worker além do mínimo de documentação.
+3. PR3 é Panel-only:
+   - Ajustar `VITE_NV_ENAVIA_URL` ou equivalente.
+   - Ativar modo real onde hoje houver mock.
+   - Validar ContractPage, HealthPage, ExecutionPage contra backend real.
+4. Não alterar Worker nem Executor nesta PR.
 
 ## Bloqueios
 - nenhum
