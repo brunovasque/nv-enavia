@@ -4842,7 +4842,13 @@ async function handleGetExecution(env) {
       }
     }
 
-    return jsonResponse({ ok: true, execution });
+    // PR5 — decision:latest como campo aditivo para observabilidade completa
+    let latestDecision = null;
+    try {
+      latestDecision = await env.ENAVIA_BRAIN.get("decision:latest", "json");
+    } catch (_) { /* non-critical */ }
+
+    return jsonResponse({ ok: true, execution, latestDecision });
   } catch (err) {
     logNV("🔴 [GET /execution] Falha ao ler trilha do KV", { error: String(err) });
     return jsonResponse({ ok: false, execution: null, error: "Falha ao ler trilha de execução." }, 500);
@@ -4850,21 +4856,22 @@ async function handleGetExecution(env) {
 }
 
 // ============================================================================
-// PR3 — GET /health (handler canônico)
+// PR3/PR5 — GET /health (handler canônico)
 //
 // Retorna dados reais mínimos de saúde do sistema Enavia.
-// Fonte: exec_event mais recente (PR1) via readExecEvent +
-//        ponteiro execution:exec_event:latest_contract_id.
+// Fontes:
+//   - exec_event mais recente (PR1) via readExecEvent
+//   - decision:latest (P14) — execuções rejeitadas pelo gate humano
 //
 // Grupos entregues:
-//   - contadores: real mínimo (1 evento — status do último exec_event)
+//   - contadores: real mínimo (1 exec_event + decisões P14)
 //   - erros recentes: real mínimo (exec_event com status de erro)
-//   - bloqueadas: fallback honesto [] (não disponível na fonte PR1)
+//   - bloqueadas: real mínimo (PR5 — decisões P14 com decision=rejected)
 //   - concluídas: real mínimo (exec_event com status success)
+//   - latestDecision: última decisão P14 registrada (PR5)
 //
 // Honestidade:
 //   - Apenas o ÚLTIMO exec_event está disponível (sem histórico acumulado).
-//   - blocked=0 sempre: a fonte PR1 não registra execuções bloqueadas.
 //   - durationMs=null: a fonte PR1 não registra duração da execução.
 // ============================================================================
 async function handleGetHealth(env) {
@@ -4878,6 +4885,8 @@ async function handleGetHealth(env) {
         recentErrors:      [],
         blockedExecutions: [],
         recentCompleted:   [],
+        latestDecision:    null,
+        _limitations:      { blockedExecutions: "derived_from_latest_decision_only" },
         _source:           "no_kv",
       },
     });
@@ -4890,16 +4899,38 @@ async function handleGetHealth(env) {
       execEvent = await readExecEvent(env, latestContractId);
     }
 
+    // PR5 — decision:latest para surfacar execuções bloqueadas pelo gate humano
+    let latestDecision = null;
+    try {
+      latestDecision = await env.ENAVIA_BRAIN.get("decision:latest", "json");
+    } catch (_) { /* non-critical */ }
+
+    // PR5 — helper para derivar blockedExecutions de decisão P14 rejeitada
+    function buildBlockedFromDecision(dec) {
+      if (!dec || dec.decision !== "rejected" || !dec.bridge_id) return [];
+      return [{
+        id:         `decision-${dec.decision_id}`,
+        bridge_id:  dec.bridge_id,
+        blockedAt:  dec.decided_at,
+        reason:     dec.context ?? "Rejeitada pelo gate humano.",
+        decided_by: dec.decided_by,
+      }];
+    }
+
     if (!execEvent) {
+      // PR5 — mesmo sem exec_event, surfacar dados reais de decisões P14
+      const blockedExecutions = buildBlockedFromDecision(latestDecision);
       return jsonResponse({
         ok: true,
         health: {
           generatedAt:       new Date().toISOString(),
-          status:            "idle",
-          summary:           { total: 0, completed: 0, failed: 0, blocked: 0, running: 0 },
+          status:            blockedExecutions.length > 0 ? "degraded" : "idle",
+          summary:           { total: blockedExecutions.length, completed: 0, failed: 0, blocked: blockedExecutions.length, running: 0 },
           recentErrors:      [],
-          blockedExecutions: [],
+          blockedExecutions,
           recentCompleted:   [],
+          latestDecision,
+          _limitations:      { blockedExecutions: "derived_from_latest_decision_only" },
           _source:           "exec_event_absent",
         },
       });
@@ -4916,18 +4947,6 @@ async function handleGetHealth(env) {
     const isSuccess = statusAtual === "success";
     const isError   = !isRunning && !isSuccess && statusAtual !== null;
 
-    // Contadores reais mínimos (1 evento — não histórico acumulado)
-    const summary = {
-      total:     1,
-      completed: isSuccess ? 1 : 0,
-      failed:    isError   ? 1 : 0,
-      blocked:   0,         // não disponível na fonte PR1 — honesto
-      running:   isRunning ? 1 : 0,
-    };
-
-    // Status do sistema
-    const status = (isRunning || isSuccess) ? "healthy" : "degraded";
-
     // Erros recentes reais mínimos
     const recentErrors = isError ? [
       {
@@ -4939,8 +4958,8 @@ async function handleGetHealth(env) {
       },
     ] : [];
 
-    // Bloqueadas — não disponível na fonte PR1
-    const blockedExecutions = [];
+    // PR5 — Bloqueadas reais: execuções rejeitadas pelo gate humano (P14)
+    const blockedExecutions = buildBlockedFromDecision(latestDecision);
 
     // Concluídas reais mínimas
     const recentCompleted = isSuccess ? [
@@ -4953,6 +4972,20 @@ async function handleGetHealth(env) {
       },
     ] : [];
 
+    // Contadores reais mínimos (1 exec_event + decisões P14)
+    const summary = {
+      total:     1 + blockedExecutions.length,
+      completed: isSuccess ? 1 : 0,
+      failed:    isError   ? 1 : 0,
+      blocked:   blockedExecutions.length,
+      running:   isRunning ? 1 : 0,
+    };
+
+    // Status do sistema
+    const status = blockedExecutions.length > 0
+      ? "degraded"
+      : (isRunning || isSuccess) ? "healthy" : "degraded";
+
     return jsonResponse({
       ok: true,
       health: {
@@ -4962,6 +4995,8 @@ async function handleGetHealth(env) {
         recentErrors,
         blockedExecutions,
         recentCompleted,
+        latestDecision,
+        _limitations:      { blockedExecutions: "derived_from_latest_decision_only" },
         _source:           "exec_event",
       },
     });

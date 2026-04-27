@@ -117,3 +117,27 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Alterações em Panel/Executor:** nenhuma.
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** PR5 — Worker-only — observabilidade real mínima (`/health` e `/execution`).
+
+---
+
+## 2026-04-26 — PR5 — Worker-only — observabilidade real mínima consolidada
+
+- **Branch:** `claude/pr5-observabilidade-real`
+- **Escopo:** Worker-only. Sem alterar Panel, Executor, `contract-executor.js`, `executor/` ou `wrangler.toml`.
+- **Diagnóstico:**
+  - `handleGetHealth` já lia `exec_event` real, mas `blockedExecutions` era sempre `[]` e `summary.blocked` sempre `0`.
+  - `handleGetExecution` já lia trail + exec_event + functional logs. Faltava `decision:latest`.
+  - Fonte real disponível para "bloqueadas": `decision:latest` (P14) — decisões `rejected` pelo gate humano.
+- **Patches em `nv-enavia.js` (commit d2db458):**
+  1. **`handleGetHealth`:** leitura de `decision:latest` (não-crítica). `blockedExecutions` agora reflete decisões P14 rejeitadas. `summary.blocked` = `blockedExecutions.length`. Campo `latestDecision` adicionado. Status `"degraded"` se há bloqueios.
+  2. **`handleGetExecution`:** leitura de `decision:latest` (não-crítica). Campo `latestDecision` adicionado como top-level aditivo (backward-compat).
+- **Ajuste complementar (PR #153):** adicionado `_limitations: { blockedExecutions: "derived_from_latest_decision_only" }` ao health response — deixa explícito que `blockedExecutions` é derivado apenas da última decisão P14, não é lista histórica completa.
+- **Smoke tests:**
+  - `git diff --name-only origin/main...HEAD` → somente `nv-enavia.js` + arquivos de governança ✅
+  - `grep -c "decision:latest" nv-enavia.js` → 7 ✅
+  - `grep -n "latestDecision" nv-enavia.js` → 7 ocorrências nos dois handlers ✅
+  - `grep -n "_limitations" nv-enavia.js` → presente em todos os paths de `handleGetHealth` ✅
+  - `summary.total >= blocked` em ambos os paths: `total = blockedExecutions.length` (sem exec_event) e `total = 1 + blockedExecutions.length` (com exec_event) ✅
+- **Alterações em Panel/Executor:** nenhuma.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR6 — Worker-only — loop contratual supervisionado.
