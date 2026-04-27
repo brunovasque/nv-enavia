@@ -1,48 +1,52 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-26
-**De:** PR2 — Executor-only — espelho governado do `enavia-executor`
-**Para:** PR3 — Panel-only — ligar painel no backend real
+**De:** PR3 — Panel-only — painel ligado no backend real
+**Para:** PR4 — Worker-only — fixes cirúrgicos de confiabilidade
 
 ## O que foi feito nesta sessão
-- Diagnóstico READ-ONLY confirmou: `enavia-executor` é um Cloudflare Worker separado em repo privado `brunovasque/enavia-executor`.
-- Nenhum código de executor existia no repo `nv-enavia` antes desta PR.
-- Código-fonte obtido via GitHub API (`gh api repos/brunovasque/enavia-executor/contents/src/index.js`).
-- Criada pasta `executor/` com:
-  - `executor/src/index.js` — cópia fiel (245.762 chars, copiado em 2026-04-26)
-  - `executor/wrangler.toml` — referência sanitizada (sem IDs/secrets reais)
-  - `executor/README.md` — explica espelho governado, Service Binding, deploy externo
-  - `executor/CONTRACT.md` — contrato canônico de entrada/saída, rotas, compatibilidade com `env.EXECUTOR.fetch(...)`
-  - `executor/tests/executor.contract.test.js` — smoke test 23/23 passou
-- Smoke test executado: 23 passed, 0 failed.
-- `nv-enavia.js`, `contract-executor.js`, `panel/` — nenhuma alteração.
-- Deploy do executor externo: não alterado.
-- Service Binding no `wrangler.toml` do nv-enavia: não alterado.
 
-## Relação com a PR1 já mergeada
+### Diagnóstico
 - PR1 — `GET /contracts/active-surface` já foi concluída e mergeada.
-- Esta PR2 preserva a sequência do contrato e avança somente o escopo Executor-only.
-- Nenhum conteúdo da PR1 deve ser removido do histórico de governança.
+- PR2 — espelho governado do `enavia-executor` já foi concluída e mergeada.
+- PR3 confirmou que `panel/vercel.json` tinha `VITE_API_MODE: mock` hardcoded, forçando mock mode em produção.
+- `panel/src/api/config.js`: se `VITE_NV_ENAVIA_URL` não estiver vazio e `VITE_API_MODE` estiver definido, usa `VITE_API_MODE`; por isso o mock explícito no `vercel.json` sobrescrevia o default `real`.
+- ContractPage, HealthPage e ExecutionPage já tinham a lógica real implementada corretamente — apenas o modo estava errado.
+- Endpoints reais validados antes do commit.
 
-## Bug documentado (para PR4)
-A URL `https://executor.invalid/audit` na linha 5722 de `nv-enavia.js` é inválida.
-Via Service Binding o roteamento ainda funciona pelo pathname `/audit`, mas o host é tecnicamente incorreto.
-Documentado em `executor/CONTRACT.md`. Corrigir em PR4.
+### Patch
+- **Arquivo:** `panel/vercel.json` — único arquivo funcional alterado.
+- **Mudança:** adicionado `VITE_NV_ENAVIA_URL` apontando para o Worker real e alterado `VITE_API_MODE` de `mock` para `real`.
+- **Tipo:** patch pontual — sem refatoração de componentes.
+
+### Validações no backend real
+- `GET /contracts/active-surface` → 200 ✅
+- `GET /health` → 200 ✅
+- `GET /execution` → 200 ✅
+
+## Relação com PRs anteriores
+- A sequência de governança preserva setup → PR1 → PR2 → PR3.
+- Nenhum conteúdo útil da PR1 ou da PR2 deve ser removido do histórico de governança.
+- Esta PR3 altera apenas o painel via configuração de deploy.
+
+## O que NÃO foi alterado por escopo
+- `nv-enavia.js` — sem alteração
+- `contract-executor.js` — sem alteração
+- `wrangler.toml` — sem alteração
+- `executor/` — sem alteração
+- Componentes React — sem alteração
+- Deploy externo — sem alteração
 
 ## Estado do repo
-- Branch: `claude/pr2-executor-governado`
-- Arquivos criados: 5 arquivos em `executor/`
-- Arquivos alterados: 3 arquivos de governança (`schema/`)
-- Worker, Panel, bindings, deploy: sem alteração
+- Branch: `claude/pr3-panel-backend-real`
+- Arquivo funcional alterado: `panel/vercel.json`
+- Arquivos de governança atualizados: `schema/execution/ENAVIA_EXECUTION_LOG.md`, `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`, `schema/status/ENAVIA_STATUS_ATUAL.md`
 
-## Próxima ação segura (PR3)
-1. Após merge da PR2, criar branch `claude/pr3-panel-backend-real`.
+## Próxima ação segura PR4
+1. Após merge da PR3, criar branch `claude/pr4-worker-confiabilidade`.
 2. Ler todos os arquivos de governança na ordem obrigatória.
-3. PR3 é Panel-only:
-   - Ajustar `VITE_NV_ENAVIA_URL` ou equivalente.
-   - Ativar modo real onde hoje houver mock.
-   - Validar ContractPage, HealthPage, ExecutionPage contra backend real.
-4. Não alterar Worker nem Executor nesta PR.
+3. PR4 é Worker-only — correções cirúrgicas de confiabilidade já documentadas no contrato.
+4. Sem refatoração ampla. Sem alteração de Panel.
 
 ## Bloqueios
 - nenhum

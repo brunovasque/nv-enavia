@@ -70,4 +70,30 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
   - `git status` → apenas `executor/` como novo, sem alterações em Worker/Panel
 - **Alterações em código de produção:** nenhuma (apenas arquivos novos em `executor/`)
 - **Bloqueios:** nenhum.
+- **Status:** mergeada na main.
 - **Próxima etapa segura:** PR3 — Panel-only — ligar painel no backend real.
+
+---
+
+## 2026-04-26 — PR3 — Panel-only — ligar painel no backend real
+
+- **Branch:** `claude/pr3-panel-backend-real`
+- **Escopo:** Panel-only. Sem alterar Worker, Executor, deploy externo, Service Binding ou componentes React.
+- **Diagnóstico:**
+  - `panel/vercel.json` tinha `VITE_API_MODE: "mock"` hardcoded — forçava mock em produção.
+  - `panel/src/api/config.js` já tinha lógica correta: se `VITE_NV_ENAVIA_URL` estiver definido, o default é `real`.
+  - O `VITE_API_MODE: "mock"` explícito sobrescrevia esse default.
+  - ContractPage, HealthPage e ExecutionPage já estavam preparados para modo real — faltava apenas a configuração de deploy.
+- **Ações:**
+  - Patch cirúrgico em `panel/vercel.json`:
+    - Adicionado `VITE_NV_ENAVIA_URL: "https://nv-enavia.brunovasque.workers.dev"`.
+    - Alterado `VITE_API_MODE: "mock"` para `VITE_API_MODE: "real"`.
+- **Smoke tests:**
+  - Simulação de `config.js` com novos valores → `baseUrl: https://nv-enavia.brunovasque.workers.dev`, `mode: real`.
+  - `curl GET /contracts/active-surface` → 200, `{ ok: true, source: "active-contract" }`.
+  - `curl GET /health` → 200, `{ ok: true, health: {...} }`.
+  - `curl GET /execution` → 200, `{ ok: true, execution: {...} }`.
+- **Alterações em código de produção:** `panel/vercel.json` — 1 linha adicionada, 1 linha alterada.
+- **Worker/Executor:** nenhuma alteração.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR4 — Worker-only — fixes cirúrgicos de confiabilidade.

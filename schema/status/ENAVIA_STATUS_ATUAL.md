@@ -1,19 +1,20 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-26
-**Branch ativa:** claude/pr2-executor-governado
-**Última tarefa:** PR2 — Executor-only — espelho governado do `enavia-executor` criado em `executor/`.
+**Branch ativa:** claude/pr3-panel-backend-real
+**Última tarefa:** PR3 — Panel-only — painel ligado no backend real via `panel/vercel.json`.
 
 ## Estado geral
 - Contrato ativo: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅
 - Estrutura de governança mínima: ✅
 - PR1 — active surface: **concluída** ✅ (branch: `claude/pr1-active-surface`, merged)
-- PR2 — executor governado: **concluída** ✅ (branch: `claude/pr2-executor-governado`)
+- PR2 — executor governado: **concluída** ✅ (branch: `claude/pr2-executor-governado`, merged)
+- PR3 — panel backend real: **concluída** ✅ (branch: `claude/pr3-panel-backend-real`)
 
 ## PRs do contrato
 - PR1 — active surface: **concluída** ✅
 - PR2 — executor governado: **concluída** ✅
-- PR3 — panel backend real: pendente
+- PR3 — panel backend real: **concluída** ✅
 - PR4 — worker confiabilidade: pendente
 - PR5 — observabilidade real: pendente
 - PR6 — loop supervisionado: pendente
@@ -23,5 +24,5 @@
 - nenhum
 
 ## Próxima etapa segura
-- Aguardar merge da PR2 e autorização para iniciar PR3 (panel backend real) em branch `claude/pr3-panel-backend-real`.
-- PR3 é Panel-only: ligar painel no backend real, sem alterar Worker ou Executor.
+- Aguardar merge da PR3 e autorização para iniciar PR4 (worker confiabilidade) em branch `claude/pr4-worker-confiabilidade`.
+- PR4 é Worker-only: correções cirúrgicas, incluindo a URL `executor.invalid` na linha 5722 de `nv-enavia.js`.
