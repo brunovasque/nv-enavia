@@ -20,3 +20,27 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Alterações em código de produção:** nenhuma.
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** PR1 — active surface em branch separada.
+
+---
+
+## 2026-04-26 — PR1 — Worker-only — `GET /contracts/active-surface`
+
+- **Branch:** `claude/pr1-active-surface`
+- **Escopo:** Worker-only. Sem tocar Panel, sem tocar lógica de execução.
+- **Diagnóstico:**
+  - Rota `GET /contracts/active-surface` já existia em `nv-enavia.js` linha 6937.
+  - Handler: `handleGetActiveSurface` em `contract-executor.js` linha 3597.
+  - CORS: aplicado via `jsonResponse → withCORS` (ok).
+  - Shape anterior: `{ ok, active_state, adherence }` — Panel lê `active_state` e `adherence`.
+  - Shape exigido por PR1: adicionar `source`, `contract`, `surface`.
+- **Ações:**
+  - Patch cirúrgico em `contract-executor.js` função `handleGetActiveSurface`:
+    - Adicionados: `source: "active-contract"`, `contract: { id, title, status, current_phase, current_pr, updated_at }`, `surface: { available, next_action, blocked, block_reason }`.
+    - Mantidos: `active_state` e `adherence` (backward-compat com Panel).
+    - `current_pr` usa `state.current_task` como fallback explícito (campo dedicado inexistente — documentado).
+- **Smoke tests:**
+  - `git diff contract-executor.js` — revisado manualmente, apenas `handleGetActiveSurface` alterada.
+  - Estrutura de resposta verificada contra shape do contrato.
+- **Alterações em código de produção:** `contract-executor.js` — 1 função, additive only.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR2 — Executor-only — trazer `enavia-executor` para dentro do repo.
