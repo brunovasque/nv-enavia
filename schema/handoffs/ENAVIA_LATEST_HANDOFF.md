@@ -19,6 +19,11 @@
 - Deploy do executor externo: não alterado.
 - Service Binding no `wrangler.toml` do nv-enavia: não alterado.
 
+## Relação com a PR1 já mergeada
+- PR1 — `GET /contracts/active-surface` já foi concluída e mergeada.
+- Esta PR2 preserva a sequência do contrato e avança somente o escopo Executor-only.
+- Nenhum conteúdo da PR1 deve ser removido do histórico de governança.
+
 ## Bug documentado (para PR4)
 A URL `https://executor.invalid/audit` na linha 5722 de `nv-enavia.js` é inválida.
 Via Service Binding o roteamento ainda funciona pelo pathname `/audit`, mas o host é tecnicamente incorreto.
