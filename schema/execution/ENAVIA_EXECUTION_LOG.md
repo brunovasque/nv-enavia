@@ -96,4 +96,24 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Alterações em código de produção:** `panel/vercel.json` — 1 linha adicionada, 1 linha alterada.
 - **Worker/Executor:** nenhuma alteração.
 - **Bloqueios:** nenhum.
+- **Status:** mergeada na main.
 - **Próxima etapa segura:** PR4 — Worker-only — fixes cirúrgicos de confiabilidade.
+
+---
+
+## 2026-04-26 — PR4 — Worker-only — fixes cirúrgicos de confiabilidade
+
+- **Branch:** `claude/pr4-worker-confiabilidade`
+- **Escopo:** Worker-only. Sem alterar Panel, Executor, `contract-executor.js`, `executor/` ou `wrangler.toml`.
+- **Diagnóstico e decisões:**
+  1. **URL `executor.invalid` (linha 5722):** corrigida para `https://enavia-executor.internal/audit`. Verificado: 0 ocorrências restantes.
+  2. **`ENAVIA_BUILD.deployed_at`:** data stale atualizada para 2026-04-26. Limitação documentada — sem API runtime disponível; automação futura requer CI/CD injection.
+  3. **`consolidateAfterSave()`:** dead code confirmado (definida mas nunca chamada). Marcada formalmente fora do escopo de PR4; candidata para PR6.
+- **Patch:** `nv-enavia.js` — 2 patches pontuais, total de 4 linhas alteradas.
+- **Smoke tests:**
+  - `git diff --name-only` → somente `nv-enavia.js` ✅
+  - `grep -c "executor.invalid" nv-enavia.js` → 0 ✅
+  - `grep -n "consolidateAfterSave" nv-enavia.js` → apenas definição, 0 chamadas ✅
+- **Alterações em Panel/Executor:** nenhuma.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR5 — Worker-only — observabilidade real mínima (`/health` e `/execution`).
