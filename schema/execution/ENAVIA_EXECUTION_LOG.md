@@ -137,6 +137,7 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
   - `grep -c "decision:latest" nv-enavia.js` → 7 ✅
   - `grep -n "latestDecision" nv-enavia.js` → 7 ocorrências nos dois handlers ✅
   - `grep -n "_limitations" nv-enavia.js` → presente em todos os paths de `handleGetHealth` ✅
+  - `summary.total >= blocked` em ambos os paths: `total = blockedExecutions.length` (sem exec_event) e `total = 1 + blockedExecutions.length` (com exec_event) ✅
 - **Alterações em Panel/Executor:** nenhuma.
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** PR6 — Worker-only — loop contratual supervisionado.

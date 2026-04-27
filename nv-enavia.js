@@ -4925,7 +4925,7 @@ async function handleGetHealth(env) {
         health: {
           generatedAt:       new Date().toISOString(),
           status:            blockedExecutions.length > 0 ? "degraded" : "idle",
-          summary:           { total: 0, completed: 0, failed: 0, blocked: blockedExecutions.length, running: 0 },
+          summary:           { total: blockedExecutions.length, completed: 0, failed: 0, blocked: blockedExecutions.length, running: 0 },
           recentErrors:      [],
           blockedExecutions,
           recentCompleted:   [],
@@ -4974,7 +4974,7 @@ async function handleGetHealth(env) {
 
     // Contadores reais mínimos (1 exec_event + decisões P14)
     const summary = {
-      total:     1,
+      total:     1 + blockedExecutions.length,
       completed: isSuccess ? 1 : 0,
       failed:    isError   ? 1 : 0,
       blocked:   blockedExecutions.length,
