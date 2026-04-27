@@ -7,8 +7,8 @@
 ## Estado geral
 - Contrato ativo: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅
 - Estrutura de governança mínima: ✅
-- PR1 — active surface: **concluída** ✅ (branch: `claude/pr1-active-surface`)
-- PR2 — executor governado: **concluída** ✅ (branch: `claude/pr2-executor-governado`)
+- PR1 — active surface: **concluída** ✅ (branch: `claude/pr1-active-surface`, merged)
+- PR2 — executor governado: **concluída** ✅ (branch: `claude/pr2-executor-governado`, merged)
 - PR3 — panel backend real: **concluída** ✅ (branch: `claude/pr3-panel-backend-real`)
 
 ## PRs do contrato
