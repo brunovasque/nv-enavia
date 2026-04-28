@@ -4,6 +4,30 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR11 — Worker-only — integração segura com executor
+
+- **Branch:** `claude/pr11-integracao-segura-executor`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Diagnóstico do caminho executor + timeout + auditoria. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Diagnóstico realizado:**
+  - `env.EXECUTOR.fetch` é usado APENAS em `handleEngineerRequest` (rota `/engineer`, proxy direto). NÃO é usado no fluxo de contratos.
+  - Caminho `handleExecuteNext → handleExecuteContract → executeCurrentMicroPr` é integralmente KV puro. Sem Service Binding.
+  - `executeCurrentMicroPr` tem supervisor gate, task status check, TEST-only guard e active micro-PR check — gates suficientes.
+- **Alterações em `nv-enavia.js`:**
+  1. Constante `EXECUTE_NEXT_INTERNAL_TIMEOUT_MS = 15_000` adicionada.
+  2. Helper puro `buildExecutorPathInfo(env, opType)` — retorna `{ type, handler, uses_service_binding, service_binding_available, note }`.
+  3. `handleExecuteContract` chamado via `Promise.race` com timeout de 15s (step 6).
+  4. `handleCloseFinalContract` chamado via `Promise.race` com timeout de 15s (step 7).
+  5. Timeout distingue-se de outras falhas com prefixo `EXECUTE_NEXT_TIMEOUT:` → mensagem específica.
+  6. Campo `executor_path` adicionado a todos os paths de resposta (aditivo backward-compat). Paths antes do step 4: `null`. Paths após: `executorPathInfo`.
+- **Campos novos no response (backward-compat):**
+  - `executor_path: { type, handler, uses_service_binding, service_binding_available, note }`
+- **Smoke tests:** validação visual do código — estrutura idêntica às PRs anteriores; helpers puros sem side effects.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR12 — Panel-only — botões operacionais no painel.
+
+---
+
 ## 2026-04-28 — PR10 Ajuste — honestidade de validação em `execute-next`
 
 - **Branch:** `claude/pr10-gates-evidencias-rollback`
