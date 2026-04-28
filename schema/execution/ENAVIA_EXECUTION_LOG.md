@@ -4,6 +4,56 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR10 Ajuste — honestidade de validação em `execute-next`
+
+- **Branch:** `claude/pr10-gates-evidencias-rollback`
+- **PR:** #158
+- **Escopo:** Worker-only. Ajuste cirúrgico em `nv-enavia.js` apenas. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Problema tratado:** o gate de `evidence` já aceitava `evidence: []`, o que é correto como ACK operacional mínimo, mas o response ainda não deixava explícito que PR10 faz somente validação de presença, não validação semântica profunda.
+- **Patch aplicado:**
+  1. `buildEvidenceReport(...)` agora retorna também `validation_level: "presence_only"` e `semantic_validation: false`.
+  2. O bloqueio por ausência de `evidence` agora explica: campo obrigatório mesmo vazio para ACK operacional mínimo; validação atual é apenas de presença.
+  3. Mantido comportamento atual: sem campo `evidence` → bloqueado; com `evidence: []` → prossegue.
+- **Smoke tests:**
+  - `node --input-type=module <<'EOF' ... worker.fetch('/contracts/execute-next') ... EOF` → sem `evidence` retorna bloqueio com mensagem explícita + `validation_level`; com `evidence: []` mantém `missing: []` ✅
+  - `node tests/pr8-hardening-producao.smoke.test.js` → 41 passed, 0 failed ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR11 — integração segura com executor.
+
+---
+
+## 2026-04-28 — PR10 — Worker-only — gates, evidências e rollback
+
+- **Branch:** `claude/pr10-gates-evidencias-rollback`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Adição de helpers puros + enriquecimento de `handleExecuteNext`. Sem persistência nova. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Helpers criados (puros, `nv-enavia.js:4991–5059`):**
+  - `buildEvidenceReport(opType, contractId, body)` → `{ required, provided, missing }`.
+  - `buildRollbackRecommendation(opType, contractId, executed)` → `{ available, type, recommendation, command }`.
+- **Gates adicionados a `handleExecuteNext`:**
+  1. Contrato ausente / KV indisponível → `status: "blocked"`, `evidence: null, rollback: null`.
+  2. Estado terminal → `status: "blocked"`, `evidence: null, rollback: null`.
+  3. `can_execute !== true` → bloqueado com `evidence` + `rollback`.
+  4. `evidenceReport.missing.length > 0` → bloqueado com `evidence` + `rollback`.
+  5. `approve` sem `confirm === true` → `status: "awaiting_approval"`.
+  6. `approve` sem `approved_by` → 400.
+  7. Resultado ambíguo (status 200 sem `ok` explícito) → bloqueado + log de aviso.
+  8. Tipo sem caminho seguro → `status: "blocked"`.
+- **Campos adicionados ao response (backward-compat):**
+  - `evidence: { required, provided, missing }` — auditabilidade de evidências.
+  - `rollback: { available, type, recommendation, command }` — orientação de rollback sem execução.
+- **Smoke tests:**
+  - `execute_next` sem `evidence` no body → `missing: ["evidence[]"]` → bloqueado ✅.
+  - `execute_next` com `evidence: []` no body → `missing: []` → prossegue ✅.
+  - `approve` sem `confirm` → `awaiting_approval` com `evidence` + `rollback` ✅.
+  - Execução sucedida → `rollback: { available: true, type: "manual_review" }` ✅.
+  - Bloqueio → `rollback: { available: false, type: "no_state_change" }` ✅.
+  - Panel/Executor/`contract-executor.js` intocados ✅.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR11 — integração segura com executor.
+
+---
+
 ## 2026-04-28 — PR9 Ajuste — Gate booleano estrito em `handleExecuteNext`
 
 - **Branch:** `claude/pr9-execute-next-supervisionado`

@@ -4989,6 +4989,83 @@ async function handleGetLoopStatus(env) {
 }
 
 // ============================================================================
+// PR10 — buildEvidenceReport / buildRollbackRecommendation (Worker-only, pure)
+//
+// Helpers de auditabilidade para execute-next supervisionado.
+// Nenhum deles persiste estado ou executa ação.
+//
+// buildEvidenceReport: compara o que o contrato exige vs o que o chamador
+//   forneceu, retornando um relatório explícito de validação mínima por
+//   presença de campo (sem validação semântica profunda nesta PR10).
+//
+// buildRollbackRecommendation: retorna orientação de rollback sem executar.
+//   type: "no_state_change" | "manual_review"
+// ============================================================================
+function buildEvidenceReport(opType, contractId, body) {
+  const EVIDENCE_REQUIRED = {
+    execute_next: ["contract_id", "evidence[]"],
+    approve:      ["contract_id"],
+    close_final:  ["contract_id"],
+    reject:       ["contract_id"],
+    block:        [],
+  };
+
+  const required = EVIDENCE_REQUIRED[opType] ?? [];
+
+  const provided = [];
+  if (contractId) provided.push("contract_id");
+  if (body && "evidence" in body) provided.push("evidence[]");
+  if (body?.confirm === true) provided.push("confirm");
+  if (body?.approved_by) provided.push("approved_by");
+
+  const missing = required.filter(f => !provided.includes(f));
+
+  return {
+    required,
+    provided,
+    missing,
+    validation_level: "presence_only",
+    semantic_validation: false,
+  };
+}
+
+function buildRollbackRecommendation(opType, contractId, executed) {
+  if (!executed) {
+    return {
+      available: false,
+      type: "no_state_change",
+      recommendation: "Nenhuma mudança de estado ocorreu. Nenhuma ação de rollback necessária.",
+      command: null,
+    };
+  }
+
+  if (opType === "execute_next") {
+    return {
+      available: true,
+      type: "manual_review",
+      recommendation: `Verificar estado da task no contrato ${contractId} e reverter manualmente se necessário.`,
+      command: `POST /contracts/cancel { "contract_id": "${contractId}" }`,
+    };
+  }
+
+  if (opType === "approve") {
+    return {
+      available: true,
+      type: "manual_review",
+      recommendation: `Contrato ${contractId} processado para fechamento. Reabrir requer novo contrato ou revisão manual.`,
+      command: null,
+    };
+  }
+
+  return {
+    available: false,
+    type: "no_state_change",
+    recommendation: "Nenhuma mudança de estado. Nenhuma ação necessária.",
+    command: null,
+  };
+}
+
+// ============================================================================
 // PR9 — POST /contracts/execute-next (handler canônico, Worker-only)
 //
 // Loop operacional supervisionado: lê contrato ativo, resolve próxima ação,
@@ -5004,11 +5081,13 @@ async function handleGetLoopStatus(env) {
 // Body esperado:
 //   { confirm?: true, approved_by?: string, evidence?: any[] }
 //
-// Resposta:
-//   { ok, executed, status, reason, nextAction, operationalAction, audit_id }
+// Resposta (PR10 — enriquecida):
+//   { ok, executed, status, reason, nextAction, operationalAction,
+//     evidence: { required, provided, missing }, rollback: { available, type,
+//     recommendation, command }, execution_result?, audit_id }
 // ============================================================================
 async function handleExecuteNext(request, env) {
-  const auditId     = `exec-next:${Date.now()}`;
+  const auditId = `exec-next:${Date.now()}`;
 
   // 1. Parse body — falha segura
   let body = {};
@@ -5018,7 +5097,8 @@ async function handleExecuteNext(request, env) {
     return jsonResponse({
       ok: false, executed: false, status: "blocked",
       reason: "Body JSON inválido.",
-      nextAction: null, operationalAction: null, audit_id: auditId,
+      nextAction: null, operationalAction: null,
+      evidence: null, rollback: null, audit_id: auditId,
     }, 400);
   }
 
@@ -5027,7 +5107,8 @@ async function handleExecuteNext(request, env) {
     return jsonResponse({
       ok: false, executed: false, status: "blocked",
       reason: "KV não disponível neste ambiente.",
-      nextAction: null, operationalAction: null, audit_id: auditId,
+      nextAction: null, operationalAction: null,
+      evidence: null, rollback: null, audit_id: auditId,
     });
   }
 
@@ -5046,7 +5127,8 @@ async function handleExecuteNext(request, env) {
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
         reason: "Nenhum contrato encontrado.",
-        nextAction: null, operationalAction: null, audit_id: auditId,
+        nextAction: null, operationalAction: null,
+        evidence: null, rollback: null, audit_id: auditId,
       });
     }
 
@@ -5062,7 +5144,8 @@ async function handleExecuteNext(request, env) {
     return jsonResponse({
       ok: false, executed: false, status: "blocked",
       reason: "Falha ao localizar contrato ativo.",
-      nextAction: null, operationalAction: null, audit_id: auditId,
+      nextAction: null, operationalAction: null,
+      evidence: null, rollback: null, audit_id: auditId,
     }, 500);
   }
 
@@ -5070,7 +5153,8 @@ async function handleExecuteNext(request, env) {
     return jsonResponse({
       ok: false, executed: false, status: "blocked",
       reason: "Nenhum contrato ativo (todos terminais).",
-      nextAction: null, operationalAction: null, audit_id: auditId,
+      nextAction: null, operationalAction: null,
+      evidence: null, rollback: null, audit_id: auditId,
     });
   }
 
@@ -5078,12 +5162,29 @@ async function handleExecuteNext(request, env) {
   const nextAction        = resolveNextAction(state, decomposition);
   const operationalAction = buildOperationalAction(nextAction, contractId);
 
+  // PR10 — Computar evidência e rollback antes dos gates
+  const evidenceReport  = buildEvidenceReport(operationalAction.type, contractId, body);
+  const rollbackBlocked = buildRollbackRecommendation(operationalAction.type, contractId, false);
+
   // 5. Gate primário: can_execute — bloquear sem executar
   if (!operationalAction.can_execute) {
     return jsonResponse({
       ok: true, executed: false, status: "blocked",
       reason: operationalAction.block_reason || "Ação bloqueada.",
-      nextAction, operationalAction, audit_id: auditId,
+      nextAction, operationalAction,
+      evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+    });
+  }
+
+  // PR10 — Gate de evidência: campos obrigatórios ausentes → bloquear
+  if (evidenceReport.missing.length > 0) {
+    return jsonResponse({
+      ok: false, executed: false, status: "blocked",
+      reason: evidenceReport.missing.includes("evidence[]")
+        ? "Campo evidence é obrigatório, mesmo que vazio, para ack operacional mínimo. Validação atual é apenas de presença."
+        : `Evidência requerida ausente: ${evidenceReport.missing.join(", ")}.`,
+      nextAction, operationalAction,
+      evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
     });
   }
 
@@ -5105,19 +5206,27 @@ async function handleExecuteNext(request, env) {
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
         reason: "Falha interna ao executar ação.",
-        nextAction, operationalAction, audit_id: auditId,
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
       }, 500);
     }
 
     const executed = result.status === 200 && result.body?.ok === true;
+    // PR10 — resultado ambíguo: ok=undefined ou status 200 sem ok explícito → bloquear
+    const ambiguous = !executed && result.status === 200 && result.body?.ok !== false;
+    if (ambiguous) {
+      logNV("⚠️ [POST /contracts/execute-next] Resultado ambíguo de handleExecuteContract", { result: result.body });
+    }
     return jsonResponse({
       ok:               executed,
       executed,
       status:           executed ? "executed" : "blocked",
-      reason:           executed ? null : (result.body?.message || "Execução não concluída."),
+      reason:           executed ? null : (result.body?.message || (ambiguous ? "Resultado ambíguo. Execução bloqueada por segurança." : "Execução não concluída.")),
       nextAction,
       operationalAction,
       execution_result: result.body || null,
+      evidence:         evidenceReport,
+      rollback:         buildRollbackRecommendation(operationalAction.type, contractId, executed),
       audit_id:         auditId,
     }, executed ? 200 : (result.status || 422));
   }
@@ -5128,14 +5237,16 @@ async function handleExecuteNext(request, env) {
       return jsonResponse({
         ok: true, executed: false, status: "awaiting_approval",
         reason: "Aprovação humana explícita necessária. Envie { confirm: true, approved_by: '...' } (boolean estrito).",
-        nextAction, operationalAction, audit_id: auditId,
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
       });
     }
     if (!body.approved_by) {
       return jsonResponse({
         ok: false, executed: false, status: "awaiting_approval",
         reason: "Campo approved_by é obrigatório para aprovação humana.",
-        nextAction, operationalAction, audit_id: auditId,
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
       }, 400);
     }
 
@@ -5152,19 +5263,27 @@ async function handleExecuteNext(request, env) {
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
         reason: "Falha interna ao processar aprovação.",
-        nextAction, operationalAction, audit_id: auditId,
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
       }, 500);
     }
 
     const executed = result.status === 200 && result.body?.ok === true;
+    // PR10 — resultado ambíguo no close-final → bloquear
+    const ambiguous = !executed && result.status === 200 && result.body?.ok !== false;
+    if (ambiguous) {
+      logNV("⚠️ [POST /contracts/execute-next] Resultado ambíguo de handleCloseFinalContract", { result: result.body });
+    }
     return jsonResponse({
       ok:               executed,
       executed,
       status:           executed ? "executed" : "blocked",
-      reason:           executed ? null : (result.body?.message || "Aprovação não processada."),
+      reason:           executed ? null : (result.body?.message || (ambiguous ? "Resultado ambíguo. Aprovação bloqueada por segurança." : "Aprovação não processada.")),
       nextAction,
       operationalAction,
       execution_result: result.body || null,
+      evidence:         evidenceReport,
+      rollback:         buildRollbackRecommendation(operationalAction.type, contractId, executed),
       audit_id:         auditId,
     }, executed ? 200 : (result.status || 422));
   }
@@ -5176,7 +5295,8 @@ async function handleExecuteNext(request, env) {
   return jsonResponse({
     ok: false, executed: false, status: "blocked",
     reason: `Tipo de ação "${operationalAction.type}" não tem caminho seguro mapeado em execute-next.`,
-    nextAction, operationalAction, audit_id: auditId,
+    nextAction, operationalAction,
+    evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
   });
 }
 

@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr9-execute-next-supervisionado
-**Última tarefa:** PR9 — Worker-only — `handleExecuteNext()` criado em `nv-enavia.js`. Rota `POST /contracts/execute-next` com gates de segurança: bloqueia se `can_execute: false`, exige `confirm`+`approved_by` para approve, delega a handlers internos existentes. Sem alteração em Panel/Executor.
+**Branch ativa:** claude/pr10-gates-evidencias-rollback
+**Última tarefa:** PR10 — ajuste cirúrgico de honestidade em `handleExecuteNext`: `evidence` agora explicita `validation_level: "presence_only"` + `semantic_validation: false`; bloqueio por ausência de `evidence` deixa claro que o campo é ACK operacional mínimo mesmo quando vazio. Sem validação semântica profunda nesta PR. Sem alteração em Panel/Executor.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -13,7 +13,7 @@
 ## PRs do contrato operacional (PR8–PR13)
 - PR8 — contrato operacional de ações e estado: **concluída** ✅ (branch: `claude/pr8-operational-action-contract`)
 - PR9 — execute-next supervisionado: **concluída** ✅ (branch: `claude/pr9-execute-next-supervisionado`)
-- PR10 — gates, evidências e rollback: **pendente**
+- PR10 — gates, evidências e rollback: **concluída** ✅ (branch: `claude/pr10-gates-evidencias-rollback`) — ajuste final de honestidade aplicado na PR #158
 - PR11 — integração segura com executor: **pendente**
 - PR12 — botões operacionais no painel: **pendente**
 - PR13 — hardening final: **pendente**
@@ -61,9 +61,17 @@
 - Sem execução real. Sem alteração em Panel ou Executor.
 
 ## Decisões formalizadas em PR9
-- `handleExecuteNext(request, env)` — `nv-enavia.js:4991–5181`. Gate primário: `can_execute !== true` → bloqueio imediato. `execute_next` delega a `handleExecuteContract` via synthetic Request. `approve` exige `confirm: true` + `approved_by` antes de delegar a `handleCloseFinalContract`. Fallback: qualquer tipo sem caminho → bloqueado.
+- `handleExecuteNext(request, env)` — `nv-enavia.js`. Gate primário: `can_execute !== true` → bloqueio imediato. `execute_next` delega a `handleExecuteContract` via synthetic Request. `approve` exige `confirm === true` + `approved_by` antes de delegar a `handleCloseFinalContract`. Fallback: qualquer tipo sem caminho → bloqueado.
 - Nenhum executor externo chamado diretamente. Sem deploy. Sem produção automática.
-- Resposta canônica: `{ ok, executed, status, reason, nextAction, operationalAction, execution_result?, audit_id }`.
+
+## Decisões formalizadas em PR10
+- `buildEvidenceReport(opType, contractId, body)` — `nv-enavia.js:5003–5023`. Puro. Retorna `{ required, provided, missing }`.
+- `buildRollbackRecommendation(opType, contractId, executed)` — `nv-enavia.js:5025–5058`. Puro. Retorna `{ available, type, recommendation, command }`. Sem execução de rollback.
+- Gate de evidência adicionado: `evidenceReport.missing.length > 0` → `status: "blocked"`.
+- Gate de resultado ambíguo: status 200 sem `ok` explícito → bloqueado + log `⚠️`.
+- Todos os paths de `handleExecuteNext` incluem `evidence` + `rollback` (backward-compat).
+- Resposta canônica: `{ ok, executed, status, reason, nextAction, operationalAction, evidence, rollback, execution_result?, audit_id }`.
+- Ajuste final PR #158: `evidence` agora explicita limitação de escopo com `validation_level: "presence_only"` e `semantic_validation: false`. O bloqueio por ausência de `evidence` explica que o campo é obrigatório mesmo vazio, apenas como ACK operacional mínimo.
 
 ## Próxima etapa segura
-- PR10 — Worker-only — gates, evidências e rollback.
+- PR11 — Worker-only — integração segura com executor.

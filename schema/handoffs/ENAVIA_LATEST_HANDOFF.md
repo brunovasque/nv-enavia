@@ -1,36 +1,35 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR9 — Worker-only — `POST /contracts/execute-next` supervisionado
-**Para:** PR10 — Worker-only — gates, evidências e rollback
+**De:** PR10 — Worker-only — gates, evidências, rollback e honestidade de validação
+**Para:** PR11 — Worker-only — integração segura com executor
 
 ## O que foi feito nesta sessão
 
-### PR9 — `POST /contracts/execute-next` supervisionado
+### PR10 — gates, evidências e rollback
 
-**Handler criado:** `handleExecuteNext(request, env)` em `nv-enavia.js:4991–5181`.
+**Helpers puros criados em `nv-enavia.js:4991–5059`:**
 
-**Rota adicionada:** `POST /contracts/execute-next` (routing block do Worker).
+- `buildEvidenceReport(opType, contractId, body)` — compara `EVIDENCE_REQUIRED[opType]` com o que o chamador forneceu. Agora também explicita limitação da PR10: `validation_level: "presence_only"` + `semantic_validation: false`.
+- `buildRollbackRecommendation(opType, contractId, executed)` — retorna orientação de rollback sem executar. `{ available, type, recommendation, command }`.
 
-**Fluxo do endpoint:**
-1. Parse body → `confirm`, `approved_by`, `evidence`.
-2. Valida KV disponível.
-3. Localiza contrato ativo mais recente (não-terminal) via `rehydrateContract`.
-4. Chama `resolveNextAction` + `buildOperationalAction` (PR6 + PR8).
-5. Gate primário: `can_execute !== true` → `status: "blocked"`, sem execução.
-6. `execute_next` → synthetic Request → `handleExecuteContract` (handler interno existente).
-7. `approve` → gate humano (`confirm: true` + `approved_by` obrigatório) → `handleCloseFinalContract`.
-8. Fallback: tipo sem caminho mapeado → `status: "blocked"`.
+**Gates adicionados/fortalecidos em `handleExecuteNext`:**
 
-**Resposta canônica:** `{ ok, executed, status, reason, nextAction, operationalAction, execution_result?, audit_id }`.
+| Gate | Comportamento |
+|---|---|
+| Contrato ausente / KV indisponível | `status: "blocked"`, `evidence: null, rollback: null` |
+| Estado terminal | `status: "blocked"`, `evidence: null, rollback: null` |
+| `can_execute !== true` | bloqueado com `evidence` + `rollback` |
+| `evidenceReport.missing.length > 0` | bloqueado com `evidence` + `rollback`; ausência de `evidence` explica ACK operacional mínimo |
+| Resultado ambíguo (200 sem `ok` explícito) | bloqueado + log `⚠️` |
 
-**Reutilizações:**
-- `resolveNextAction`, `rehydrateContract` — importados de `contract-executor.js` (PR6).
-- `buildOperationalAction` — definido em `nv-enavia.js` (PR8).
-- `handleExecuteContract`, `handleCloseFinalContract` — importados de `contract-executor.js` (PR1–PR2).
+**Campos adicionados ao response (backward-compat):**
+- `evidence: { required, provided, missing, validation_level, semantic_validation }`
+- `rollback: { available, type, recommendation, command }`
 
 ### Alterações de código
-- `nv-enavia.js` — adição de `handleExecuteNext()` + rota `POST /contracts/execute-next`.
+- `nv-enavia.js` — helpers `buildEvidenceReport` + `buildRollbackRecommendation` + function body de `handleExecuteNext` enriquecido.
+- Ajuste final PR #158: reason do gate de ausência de `evidence` deixa explícito que o campo é obrigatório mesmo vazio, sem sugerir validação semântica profunda nesta PR.
 
 ## O que NÃO foi alterado (por escopo)
 - `panel/` — sem alteração
@@ -41,11 +40,12 @@
 ## Estado do contrato
 - **PR1–PR7: CONCLUÍDAS** (contrato anterior).
 - **PR8: CONCLUÍDA** ✅
-- **PR9: CONCLUÍDA** ✅ — endpoint supervisionado criado com gates de segurança.
+- **PR9: CONCLUÍDA** ✅
+- **PR10: CONCLUÍDA** ✅ — gates fortalecidos, evidência auditável, rollback recomendado.
 - Contrato ativo: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`.
 
 ## Próxima ação segura
-- PR10 — Worker-only — gates, evidências e rollback.
+- PR11 — Worker-only — integração segura com executor.
 
 ## Bloqueios
 - nenhum
