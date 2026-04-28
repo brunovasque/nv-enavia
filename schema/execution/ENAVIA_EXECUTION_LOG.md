@@ -4,6 +4,33 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR9 — Worker-only — `POST /contracts/execute-next` supervisionado
+
+- **Branch:** `claude/pr9-execute-next-supervisionado`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Criação de `handleExecuteNext` + rota `POST /contracts/execute-next`. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Handler criado:** `handleExecuteNext(request, env)` em `nv-enavia.js:4991–5181`.
+- **Fluxo do endpoint:**
+  1. Parse body (`confirm`, `approved_by`, `evidence`).
+  2. Valida KV disponível.
+  3. Localiza contrato ativo mais recente (não-terminal) via `rehydrateContract`.
+  4. Chama `resolveNextAction` + `buildOperationalAction`.
+  5. Gate primário: se `operationalAction.can_execute !== true` → retorna `status: "blocked"`.
+  6. `execute_next` → synthetic Request → `handleExecuteContract` (handler interno existente).
+  7. `approve` → gate humano (`confirm: true` + `approved_by`) → synthetic Request → `handleCloseFinalContract`.
+  8. Fallback: qualquer tipo sem caminho mapeado → `status: "blocked"`.
+- **Resposta canônica:** `{ ok, executed, status, reason, nextAction, operationalAction, execution_result?, audit_id }`.
+- **Smoke tests:**
+  - `git diff --name-only origin/main...HEAD` → somente `nv-enavia.js` + governança ✅.
+  - `block` quando `can_execute: false` ✅.
+  - `awaiting_approval` quando `approve` sem `confirm` ✅.
+  - `execute_next` delega a `handleExecuteContract` sem chamar executor externo ✅.
+  - Panel/Executor/`contract-executor.js` intocados ✅.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR10 — gates, evidências e rollback.
+
+---
+
 ## 2026-04-28 — PR8 Ajuste — Correção `contract_complete` em `buildOperationalAction`
 
 - **Branch:** `claude/pr8-operational-action-contract`

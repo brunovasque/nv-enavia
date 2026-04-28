@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr8-operational-action-contract
-**Última tarefa:** PR8 — Worker-only — shape canônico operacional `buildOperationalAction()` criado em `nv-enavia.js`. Campo `operationalAction` adicionado a `GET /contracts/loop-status`. Sem execução real. Sem alteração em Panel/Executor.
+**Branch ativa:** claude/pr9-execute-next-supervisionado
+**Última tarefa:** PR9 — Worker-only — `handleExecuteNext()` criado em `nv-enavia.js`. Rota `POST /contracts/execute-next` com gates de segurança: bloqueia se `can_execute: false`, exige `confirm`+`approved_by` para approve, delega a handlers internos existentes. Sem alteração em Panel/Executor.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -12,7 +12,7 @@
 
 ## PRs do contrato operacional (PR8–PR13)
 - PR8 — contrato operacional de ações e estado: **concluída** ✅ (branch: `claude/pr8-operational-action-contract`)
-- PR9 — execute-next supervisionado: **pendente**
+- PR9 — execute-next supervisionado: **concluída** ✅ (branch: `claude/pr9-execute-next-supervisionado`)
 - PR10 — gates, evidências e rollback: **pendente**
 - PR11 — integração segura com executor: **pendente**
 - PR12 — botões operacionais no painel: **pendente**
@@ -60,5 +60,10 @@
 - `GET /contracts/loop-status` enriquecido com `operationalAction` (aditivo). Paths sem contrato retornam `operationalAction: null`.
 - Sem execução real. Sem alteração em Panel ou Executor.
 
+## Decisões formalizadas em PR9
+- `handleExecuteNext(request, env)` — `nv-enavia.js:4991–5181`. Gate primário: `can_execute !== true` → bloqueio imediato. `execute_next` delega a `handleExecuteContract` via synthetic Request. `approve` exige `confirm: true` + `approved_by` antes de delegar a `handleCloseFinalContract`. Fallback: qualquer tipo sem caminho → bloqueado.
+- Nenhum executor externo chamado diretamente. Sem deploy. Sem produção automática.
+- Resposta canônica: `{ ok, executed, status, reason, nextAction, operationalAction, execution_result?, audit_id }`.
+
 ## Próxima etapa segura
-- PR9 — Worker-only — `POST /contracts/execute-next` supervisionado.
+- PR10 — Worker-only — gates, evidências e rollback.

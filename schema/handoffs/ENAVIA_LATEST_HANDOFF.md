@@ -1,35 +1,36 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR8 — Worker-only — contrato operacional de ações e estado
-**Para:** PR9 — Worker-only — `POST /contracts/execute-next` supervisionado
+**De:** PR9 — Worker-only — `POST /contracts/execute-next` supervisionado
+**Para:** PR10 — Worker-only — gates, evidências e rollback
 
 ## O que foi feito nesta sessão
 
-### PR8 — contrato operacional de ações e estado
+### PR9 — `POST /contracts/execute-next` supervisionado
 
-**Diagnóstico de rotas existentes:**
-- `GET /contracts/loop-status` — read-only, base do loop supervisionado (PR6).
-- `POST /contracts/execute` — executa micro-PR atual em TEST; requer `contract_id`, opcional `evidence[]`.
-- `POST /contracts/complete-task` — gate de aderência obrigatório; requer `contract_id`, `task_id`, `resultado`.
-- `POST /contracts/close-final` — gate final pesado; requer `contract_id`.
-- `POST /contracts/cancel` — cancelamento formal.
-- `POST /contracts/reject-plan` — rejeição formal do plano de decomposição.
+**Handler criado:** `handleExecuteNext(request, env)` em `nv-enavia.js:4991–5181`.
 
-**Shape canônico criado:** `buildOperationalAction(nextAction, contractId)` em `nv-enavia.js:4799–4835`.
+**Rota adicionada:** `POST /contracts/execute-next` (routing block do Worker).
 
-**Mapeamento `resolveNextAction.type` → tipo operacional:**
-| `nextAction.type` | `operationalAction.type` | `can_execute` |
-|---|---|---|
-| `start_task` / `start_micro_pr` | `execute_next` | `true` |
-| `awaiting_human_approval` | `approve` | `true` |
-| `contract_complete` | `close_final` | `true` |
-| `contract_blocked` / `phase_complete` / `plan_rejected` / `contract_cancelled` / `no_action` | `block` | `false` |
+**Fluxo do endpoint:**
+1. Parse body → `confirm`, `approved_by`, `evidence`.
+2. Valida KV disponível.
+3. Localiza contrato ativo mais recente (não-terminal) via `rehydrateContract`.
+4. Chama `resolveNextAction` + `buildOperationalAction` (PR6 + PR8).
+5. Gate primário: `can_execute !== true` → `status: "blocked"`, sem execução.
+6. `execute_next` → synthetic Request → `handleExecuteContract` (handler interno existente).
+7. `approve` → gate humano (`confirm: true` + `approved_by` obrigatório) → `handleCloseFinalContract`.
+8. Fallback: tipo sem caminho mapeado → `status: "blocked"`.
 
-**Campo `operationalAction` adicionado a `GET /contracts/loop-status`** — aditivo, backward-compat. Paths sem contrato retornam `operationalAction: null`.
+**Resposta canônica:** `{ ok, executed, status, reason, nextAction, operationalAction, execution_result?, audit_id }`.
+
+**Reutilizações:**
+- `resolveNextAction`, `rehydrateContract` — importados de `contract-executor.js` (PR6).
+- `buildOperationalAction` — definido em `nv-enavia.js` (PR8).
+- `handleExecuteContract`, `handleCloseFinalContract` — importados de `contract-executor.js` (PR1–PR2).
 
 ### Alterações de código
-- `nv-enavia.js` — adição de `buildOperationalAction()` + campo `operationalAction` em `handleGetLoopStatus`.
+- `nv-enavia.js` — adição de `handleExecuteNext()` + rota `POST /contracts/execute-next`.
 
 ## O que NÃO foi alterado (por escopo)
 - `panel/` — sem alteração
@@ -39,11 +40,12 @@
 
 ## Estado do contrato
 - **PR1–PR7: CONCLUÍDAS** (contrato anterior).
-- **PR8: CONCLUÍDA** ✅ — shape canônico operacional criado, sem execução real.
+- **PR8: CONCLUÍDA** ✅
+- **PR9: CONCLUÍDA** ✅ — endpoint supervisionado criado com gates de segurança.
 - Contrato ativo: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`.
 
 ## Próxima ação segura
-- PR9 — Worker-only — `POST /contracts/execute-next` supervisionado.
+- PR10 — Worker-only — gates, evidências e rollback.
 
 ## Bloqueios
 - nenhum

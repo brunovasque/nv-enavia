@@ -4989,6 +4989,198 @@ async function handleGetLoopStatus(env) {
 }
 
 // ============================================================================
+// PR9 — POST /contracts/execute-next (handler canônico, Worker-only)
+//
+// Loop operacional supervisionado: lê contrato ativo, resolve próxima ação,
+// aplica gates de segurança e executa somente quando for seguro.
+//
+// Regras duras:
+//   - Nunca executa se operationalAction.can_execute !== true.
+//   - Nunca executa "approve" sem confirm: true + approved_by explícito.
+//   - Nunca chama deploy, produção automática ou executor externo diretamente.
+//   - Reutiliza handleExecuteContract / handleCloseFinalContract (já importados).
+//   - Se tipo não tiver caminho seguro mapeado, bloqueia.
+//
+// Body esperado:
+//   { confirm?: true, approved_by?: string, evidence?: any[] }
+//
+// Resposta:
+//   { ok, executed, status, reason, nextAction, operationalAction, audit_id }
+// ============================================================================
+async function handleExecuteNext(request, env) {
+  const auditId     = `exec-next:${Date.now()}`;
+
+  // 1. Parse body — falha segura
+  let body = {};
+  try {
+    body = await request.json();
+  } catch (_) {
+    return jsonResponse({
+      ok: false, executed: false, status: "blocked",
+      reason: "Body JSON inválido.",
+      nextAction: null, operationalAction: null, audit_id: auditId,
+    }, 400);
+  }
+
+  // 2. KV obrigatório
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({
+      ok: false, executed: false, status: "blocked",
+      reason: "KV não disponível neste ambiente.",
+      nextAction: null, operationalAction: null, audit_id: auditId,
+    });
+  }
+
+  // 3. Localizar contrato ativo (mesmo padrão de handleGetLoopStatus)
+  const TERMINAL = ["completed", "cancelled", "failed"];
+  let contractId = null, state = null, decomposition = null;
+
+  try {
+    let index = [];
+    try {
+      const raw = await env.ENAVIA_BRAIN.get("contract:index");
+      if (raw) index = JSON.parse(raw);
+    } catch (_) {}
+
+    if (!Array.isArray(index) || index.length === 0) {
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: "Nenhum contrato encontrado.",
+        nextAction: null, operationalAction: null, audit_id: auditId,
+      });
+    }
+
+    for (let i = index.length - 1; i >= 0; i--) {
+      const { state: s, decomposition: d } = await rehydrateContract(env, index[i]);
+      if (!s) continue;
+      if (TERMINAL.includes(s.status_global)) continue;
+      contractId = index[i]; state = s; decomposition = d;
+      break;
+    }
+  } catch (err) {
+    logNV("🔴 [POST /contracts/execute-next] Falha ao localizar contrato", { error: String(err) });
+    return jsonResponse({
+      ok: false, executed: false, status: "blocked",
+      reason: "Falha ao localizar contrato ativo.",
+      nextAction: null, operationalAction: null, audit_id: auditId,
+    }, 500);
+  }
+
+  if (!state) {
+    return jsonResponse({
+      ok: false, executed: false, status: "blocked",
+      reason: "Nenhum contrato ativo (todos terminais).",
+      nextAction: null, operationalAction: null, audit_id: auditId,
+    });
+  }
+
+  // 4. Resolver próxima ação e shape operacional (PR6 + PR8)
+  const nextAction        = resolveNextAction(state, decomposition);
+  const operationalAction = buildOperationalAction(nextAction, contractId);
+
+  // 5. Gate primário: can_execute — bloquear sem executar
+  if (!operationalAction.can_execute) {
+    return jsonResponse({
+      ok: true, executed: false, status: "blocked",
+      reason: operationalAction.block_reason || "Ação bloqueada.",
+      nextAction, operationalAction, audit_id: auditId,
+    });
+  }
+
+  // 6. execute_next → delegar a handleExecuteContract (handler interno seguro)
+  if (operationalAction.type === "execute_next") {
+    let result;
+    try {
+      const syntheticReq = new Request("https://internal/contracts/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contract_id: contractId,
+          evidence: Array.isArray(body.evidence) ? body.evidence : [],
+        }),
+      });
+      result = await handleExecuteContract(syntheticReq, env);
+    } catch (err) {
+      logNV("🔴 [POST /contracts/execute-next] Falha ao delegar a handleExecuteContract", { error: String(err) });
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: "Falha interna ao executar ação.",
+        nextAction, operationalAction, audit_id: auditId,
+      }, 500);
+    }
+
+    const executed = result.status === 200 && result.body?.ok === true;
+    return jsonResponse({
+      ok:               executed,
+      executed,
+      status:           executed ? "executed" : "blocked",
+      reason:           executed ? null : (result.body?.message || "Execução não concluída."),
+      nextAction,
+      operationalAction,
+      execution_result: result.body || null,
+      audit_id:         auditId,
+    }, executed ? 200 : (result.status || 422));
+  }
+
+  // 7. approve → gate humano explícito antes de delegar a handleCloseFinalContract
+  if (operationalAction.type === "approve") {
+    if (!body.confirm) {
+      return jsonResponse({
+        ok: true, executed: false, status: "awaiting_approval",
+        reason: "Aprovação humana explícita necessária. Envie { confirm: true, approved_by: '...' }.",
+        nextAction, operationalAction, audit_id: auditId,
+      });
+    }
+    if (!body.approved_by) {
+      return jsonResponse({
+        ok: false, executed: false, status: "awaiting_approval",
+        reason: "Campo approved_by é obrigatório para aprovação humana.",
+        nextAction, operationalAction, audit_id: auditId,
+      }, 400);
+    }
+
+    let result;
+    try {
+      const syntheticReq = new Request("https://internal/contracts/close-final", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contract_id: contractId }),
+      });
+      result = await handleCloseFinalContract(syntheticReq, env);
+    } catch (err) {
+      logNV("🔴 [POST /contracts/execute-next] Falha ao delegar a handleCloseFinalContract", { error: String(err) });
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: "Falha interna ao processar aprovação.",
+        nextAction, operationalAction, audit_id: auditId,
+      }, 500);
+    }
+
+    const executed = result.status === 200 && result.body?.ok === true;
+    return jsonResponse({
+      ok:               executed,
+      executed,
+      status:           executed ? "executed" : "blocked",
+      reason:           executed ? null : (result.body?.message || "Aprovação não processada."),
+      nextAction,
+      operationalAction,
+      execution_result: result.body || null,
+      audit_id:         auditId,
+    }, executed ? 200 : (result.status || 422));
+  }
+
+  // 8. Fallback: tipo sem caminho seguro mapeado (não deve ocorrer se gates acima estão corretos)
+  logNV("⚠️ [POST /contracts/execute-next] Tipo operacional sem caminho seguro", {
+    opType: operationalAction.type, contractId,
+  });
+  return jsonResponse({
+    ok: false, executed: false, status: "blocked",
+    reason: `Tipo de ação "${operationalAction.type}" não tem caminho seguro mapeado em execute-next.`,
+    nextAction, operationalAction, audit_id: auditId,
+  });
+}
+
+// ============================================================================
 // 📋 P13 — GET /execution (handler canônico)
 //
 // Retorna a trilha de execução mais recente persistida no KV após o disparo
@@ -7195,6 +7387,11 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       // PR6 — GET /contracts/loop-status → Loop supervisionado: próxima ação + estado do loop
       if (method === "GET" && path === "/contracts/loop-status") {
         return await handleGetLoopStatus(env);
+      }
+
+      // PR9 — POST /contracts/execute-next → Loop operacional supervisionado com gates de segurança
+      if (method === "POST" && path === "/contracts/execute-next") {
+        return await handleExecuteNext(request, env);
       }
 
       // POST /contracts/execute → Execute current micro-PR in TEST (C1)
