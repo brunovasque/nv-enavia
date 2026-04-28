@@ -4,6 +4,28 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR14 — Worker-only — Executor real + Deploy Worker no loop operacional
+
+- **Branch:** `claude/pr14-executor-deploy-real-loop`
+- **Escopo:** Worker-only. Apenas `nv-enavia.js`. Sem alteração em Panel, Executor externo, Deploy Worker externo, `contract-executor.js` ou `executor/`.
+- **Helpers criados em `nv-enavia.js`:**
+  1. `callExecutorBridge(env, route, payload)` — chama `env.EXECUTOR.fetch` para `/audit` e `/propose`. Bloqueia se `env.EXECUTOR` ausente, resposta não-ok, ambígua ou `verdict:reject`. Retorna `{ ok, route, status, reason, data }`.
+  2. `callDeployBridge(env, action, payload)` — chama `env.DEPLOY_WORKER.fetch` apenas em modo seguro (`/apply-test`, `target_env:"test"`). Bloqueia ações de produção (approve/promote/prod), `target_env:prod` e ausência de binding. Retorna `{ ok, action, status, reason, data }`.
+- **`buildExecutorPathInfo` atualizado:** `execute_next` e `approve` agora refletem `uses_service_binding: true` e o novo `handler` chain com bridges.
+- **`handleExecuteNext` integrado:**
+  - `execute_next`: gates atuais → audit → propose → deploy (simulate) → handler interno KV.
+  - `approve`: gates atuais (confirm+approved_by) → audit → handler interno KV. Sem propose, sem deploy.
+  - Produção automaticamente bloqueada.
+  - Handler interno só roda depois de todos os bridges passarem.
+- **Response estendida:** `executor_audit`, `executor_propose`, `executor_status`, `executor_route`, `executor_block_reason`, `deploy_result`, `deploy_status`, `deploy_route`, `deploy_block_reason` em todos os paths.
+- **Smoke tests:**
+  - `tests/pr14-executor-deploy-real-loop.smoke.test.js` → **93 passed, 0 failed** ✅
+  - `tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅ (3 asserts atualizados para refletir mudança intencional de PR14 em `buildExecutorPathInfo`)
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** Novo contrato se necessário.
+
+---
+
 ## 2026-04-28 — PR13 — Worker-only — hardening final e encerramento do contrato PR8–PR13
 
 - **Branch:** `claude/pr13-hardening-final-operacional`

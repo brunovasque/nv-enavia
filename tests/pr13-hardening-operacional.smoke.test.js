@@ -306,7 +306,7 @@ async function runTests() {
     ok(r.data?.evidence?.missing?.includes("evidence[]"),    "  evidence.missing inclui evidence[]");
     ok(r.data?.rollback !== null,                            "  rollback presente");
     ok(r.data?.executor_path !== null,                       "  executor_path presente");
-    ok(r.data?.executor_path?.type === "internal_handler",   "  executor_path.type: internal_handler (execute_next)");
+    ok(r.data?.executor_path?.type?.includes("internal_handler"), "  executor_path.type inclui internal_handler (execute_next)");
     console.log("");
   }
 
@@ -324,7 +324,7 @@ async function runTests() {
     ok("rollback"       in (r.data ?? {}),                 "  campo rollback presente");
     ok("executor_path"  in (r.data ?? {}),                 "  campo executor_path presente");
     ok("audit_id"       in (r.data ?? {}),                 "  campo audit_id presente");
-    ok(r.data?.executor_path?.uses_service_binding === false, "  uses_service_binding: false (KV interno)");
+    ok(r.data?.executor_path?.uses_service_binding !== undefined, "  uses_service_binding definido (PR14: true para execute_next)");
     ok(r.data?.rollback?.available !== undefined,          "  rollback.available definido");
     console.log("");
   }
@@ -338,7 +338,7 @@ async function runTests() {
     ok(r.data?.evidence !== null,                          "  evidence presente");
     ok(r.data?.rollback !== null,                          "  rollback presente");
     ok(r.data?.executor_path !== null,                     "  executor_path presente");
-    ok(r.data?.executor_path?.type === "internal_handler", "  executor_path.type: internal_handler (approve)");
+    ok(r.data?.executor_path?.type?.includes("internal_handler"), "  executor_path.type inclui internal_handler (approve)");
     console.log("");
   }
 

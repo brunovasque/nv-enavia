@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr13-hardening-final-operacional
-**Última tarefa:** PR13 — Worker-only — hardening final. Diagnóstico das rotas `GET /contracts/loop-status` e `POST /contracts/execute-next`. CORS confirmado via `jsonResponse`/`withCORS`. Todos os 8 gates do execute-next confirmados. `env.EXECUTOR.fetch` confirmado como nunca chamado. Smoke test criado: `tests/pr13-hardening-operacional.smoke.test.js` → 91 passed, 0 failed. Sem alteração em Panel, Executor ou contract-executor.js. Contrato PR8–PR13 formalmente encerrado.
+**Branch ativa:** claude/pr14-executor-deploy-real-loop
+**Última tarefa:** PR14 — Worker-only — Executor real + Deploy Worker no loop operacional. Adicionados `callExecutorBridge` e `callDeployBridge` em `nv-enavia.js`. `handleExecuteNext` agora chama `/audit` + `/propose` via `env.EXECUTOR` e `/apply-test` via `env.DEPLOY_WORKER` (simulate/test) antes do handler interno. Produção bloqueada. Smoke tests: PR14 93/93 ✅, PR13 91/91 ✅. Sem alteração em Panel, Executor externo, Deploy Worker externo, `contract-executor.js` ou `executor/`.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -95,11 +95,22 @@
 
 - `GET /contracts/loop-status` e `POST /contracts/execute-next` — CORS confirmado via `jsonResponse()` → `withCORS()` internamente. Sem necessidade de wrapper manual.
 - 8 gates do execute-next verificados e documentados via smoke test: JSON inválido, sem KV, sem contrato, `can_execute:false`, evidence faltando, evidence presente, approve sem confirm, approve sem approved_by.
-- `env.EXECUTOR.fetch` confirmado como nunca chamado em nenhum path do execute-next — fluxo inteiramente KV, sem service binding para contratos.
-- Rollback confirmado como recomendação pura (`buildRollbackRecommendation`) — sem execução automática em nenhum path.
-- `Promise.race` confirmado como ausente — design correto: handlers mutam KV, race não cancela promise original (documentado em PR11).
+- `env.EXECUTOR.fetch` confirmado como nunca chamado em nenhum path do execute-next (fluxo KV puro naquela PR).
+- Rollback confirmado como recomendação pura (`buildRollbackRecommendation`) — sem execução automática.
+- `Promise.race` confirmado como ausente — design correto para handlers que mutam KV.
 - Smoke test: `tests/pr13-hardening-operacional.smoke.test.js` → 91 passed, 0 failed.
 - **Contrato `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`: FORMALMENTE ENCERRADO ✅**
 
+## Decisões formalizadas em PR14
+
+- `callExecutorBridge(env, route, payload)` — `nv-enavia.js`. Chama `env.EXECUTOR.fetch` para `/audit` e `/propose`. Gates: EXECUTOR ausente → blocked; resposta não-ok → failed; `ok:false` → blocked; `/audit` sem verdict → ambiguous; `verdict:reject` → blocked.
+- `callDeployBridge(env, action, payload)` — `nv-enavia.js`. Chama `env.DEPLOY_WORKER.fetch` somente via `/apply-test` com `target_env:"test"`. Guards: ações prod (approve/promote/rollback) bloqueadas; `target_env:prod` bloqueado; binding ausente → `deploy_status:"blocked"`.
+- `handleExecuteNext` — execute_next: audit → propose → deploy (simulate) → handler interno KV. Approve: confirm+approved_by gate → audit → handler interno KV. Sem propose, sem deploy para approve.
+- `buildExecutorPathInfo` atualizado: `execute_next` e `approve` agora têm `uses_service_binding:true` e chain completo no campo `handler`.
+- Response estendida com 9 campos novos: `executor_audit`, `executor_propose`, `executor_status`, `executor_route`, `executor_block_reason`, `deploy_result`, `deploy_status`, `deploy_route`, `deploy_block_reason`.
+- Produção automaticamente bloqueada. Handler interno só roda depois de todos os bridges passarem.
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` → 93 passed, 0 failed ✅.
+- `tests/pr13-hardening-operacional.smoke.test.js` atualizado (3 asserts ajustados para mudança intencional de PR14 em `buildExecutorPathInfo`) → 91 passed, 0 failed ✅.
+
 ## Próxima etapa segura
-- Nenhuma. Contrato PR8–PR13 concluído. Aguardando novo contrato.
+- Novo contrato se necessário. PR14 concluída.
