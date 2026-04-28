@@ -9,7 +9,7 @@ const LOOP_PAGE_SRC = readFileSync(
 
 describe("PR12 — LoopPage usa contract do loop-status", () => {
   it("exibe contrato/status/fase/task/updated_at a partir de loopData.contract", () => {
-    expect(LOOP_PAGE_SRC).toContain("const contract         = loopData?.contract         ?? null;");
+    expect(LOOP_PAGE_SRC).toContain("const contract = loopData?.contract ?? null;");
     expect(LOOP_PAGE_SRC).toContain('value={contract?.id}');
     expect(LOOP_PAGE_SRC).toContain('value={contract?.status}');
     expect(LOOP_PAGE_SRC).toContain('value={contract?.current_phase}');

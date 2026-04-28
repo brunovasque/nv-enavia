@@ -192,14 +192,14 @@ export default function LoopPage() {
     );
   }
 
-  const contract         = loopData?.contract         ?? null;
-  const loop             = loopData?.loop             ?? null;
-  const nextAction       = loopData?.nextAction       ?? null;
+  const contract = loopData?.contract ?? null;
+  const loop = loopData?.loop ?? null;
+  const nextAction = loopData?.nextAction ?? null;
   const operationalAction = loopData?.operationalAction ?? null;
-  const canProceed       = loop?.canProceed === true;
-  const canExecute       = operationalAction?.can_execute === true;
-  const opType           = operationalAction?.type ?? null;
-  const isApproveType    = opType === "approve";
+  const canProceed = loop?.canProceed === true;
+  const canExecute = operationalAction?.can_execute === true;
+  const opType = operationalAction?.type ?? null;
+  const isApproveType = opType === "approve";
 
   return (
     <div style={s.page} role="main">
