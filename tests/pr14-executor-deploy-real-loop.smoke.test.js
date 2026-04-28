@@ -117,7 +117,7 @@ function makeExecutorMock(responses = {}) {
         if (!resp) {
           return new Response(JSON.stringify({ ok: false, error: "Rota não mapeada no mock" }), { status: 500 });
         }
-        const body = Object.prototype.hasOwnProperty.call(resp, "rawBody")
+        const body = "rawBody" in resp
           ? resp.rawBody
           : JSON.stringify(resp.body);
         return new Response(body, { status: resp.status ?? 200 });
@@ -134,7 +134,7 @@ function makeDeployMock(response = { status: 200, body: { ok: true, action: "sim
     binding: {
       fetch: async (url, opts) => {
         calls.push({ url, body: opts?.body });
-        const body = Object.prototype.hasOwnProperty.call(response, "rawBody")
+        const body = "rawBody" in response
           ? response.rawBody
           : JSON.stringify(response.body);
         return new Response(body, { status: response.status ?? 200 });
