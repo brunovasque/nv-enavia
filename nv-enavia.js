@@ -10,6 +10,9 @@ import {
   handleResolvePlanRevision,
   handleCompleteTask,
   handleCloseFinalContract,
+  // PR6 — loop supervisionado
+  resolveNextAction,
+  rehydrateContract,
   readExecEvent,
   // Macro2-F5 — Functional logs
   readFunctionalLogs,
@@ -4773,6 +4776,139 @@ async function handlePlannerBridge(request, env) {
 }
 
 // ============================================================================
+// PR6 — GET /contracts/loop-status (handler canônico, Worker-only)
+//
+// Ciclo supervisionado mínimo: lê contrato ativo, resolve próxima ação via
+// resolveNextAction() e retorna estado legível para painel/operador.
+//
+// READ-ONLY — não dispara execução, não altera estado, não promove deploy.
+//
+// Supervisão:
+//   - canProceed: true → há ação disponível, operador pode chamar endpoint indicado
+//   - blocked: true → loop bloqueado por evidência ausente; blockReason indica causa
+//   - availableActions: endpoints que o operador pode chamar neste estado
+//
+// Honestidade:
+//   - Se não houver contrato ativo, retorna { contract: null, loop.canProceed: false }.
+//   - resolveNextAction() usa apenas dados do KV — sem inventar estado.
+// ============================================================================
+async function handleGetLoopStatus(env) {
+  const generatedAt = new Date().toISOString();
+
+  if (!env.ENAVIA_BRAIN) {
+    return jsonResponse({
+      ok: true,
+      generatedAt,
+      contract: null,
+      nextAction: { type: "no_kv", reason: "KV não disponível neste ambiente.", status: "error" },
+      loop: { supervised: true, canProceed: false, blocked: false, blockReason: null, availableActions: [] },
+    });
+  }
+
+  try {
+    // 1) Ler index de contratos para encontrar o contrato ativo mais recente
+    let index = [];
+    try {
+      const raw = await env.ENAVIA_BRAIN.get("contract:index");
+      if (raw) index = JSON.parse(raw);
+    } catch (_) { /* index ausente = sem contratos */ }
+
+    if (!Array.isArray(index) || index.length === 0) {
+      return jsonResponse({
+        ok: true,
+        generatedAt,
+        contract: null,
+        nextAction: { type: "no_contract", reason: "Nenhum contrato ativo encontrado.", status: "idle" },
+        loop: {
+          supervised: true,
+          canProceed: false,
+          blocked: false,
+          blockReason: null,
+          availableActions: ["POST /contracts"],
+        },
+      });
+    }
+
+    // 2) Encontrar o contrato ativo mais recente (mesmo padrão de handleGetActiveSurface)
+    const TERMINAL = ["completed", "cancelled", "failed"];
+    let contractId = null;
+    let state = null;
+    let decomposition = null;
+
+    for (let i = index.length - 1; i >= 0; i--) {
+      const { state: s, decomposition: d } = await rehydrateContract(env, index[i]);
+      if (!s) continue;
+      if (TERMINAL.includes(s.status_global)) continue;
+      contractId = index[i];
+      state = s;
+      decomposition = d;
+      break;
+    }
+
+    if (!state) {
+      return jsonResponse({
+        ok: true,
+        generatedAt,
+        contract: null,
+        nextAction: { type: "no_contract", reason: "Nenhum contrato ativo encontrado (todos terminais).", status: "idle" },
+        loop: {
+          supervised: true,
+          canProceed: false,
+          blocked: false,
+          blockReason: null,
+          availableActions: ["POST /contracts"],
+        },
+      });
+    }
+
+    // 3) Resolver próxima ação — função já existente em contract-executor.js
+    const nextAction = resolveNextAction(state, decomposition);
+
+    // 4) Derivar estado do loop a partir da próxima ação
+    const isBlocked = nextAction.status === "blocked";
+    const isReady   = nextAction.status === "ready";
+    const isIdle    = nextAction.status === "in_progress" || nextAction.type === "no_action";
+
+    let availableActions = [];
+    if (isReady) {
+      if (nextAction.type === "start_task" || nextAction.type === "start_micro_pr") {
+        availableActions = ["POST /contracts/execute"];
+      } else if (nextAction.type === "phase_complete") {
+        availableActions = ["POST /contracts/complete-task", "POST /contracts/execute"];
+      } else if (nextAction.type === "awaiting_human_approval") {
+        availableActions = ["POST /contracts/close-final"];
+      } else if (nextAction.type === "contract_complete") {
+        availableActions = [];
+      }
+    }
+
+    return jsonResponse({
+      ok: true,
+      generatedAt,
+      contract: {
+        id:            state.contract_id || contractId,
+        title:         state.contract_name || null,
+        status:        state.status_global || null,
+        current_phase: state.current_phase || null,
+        current_task:  state.current_task  || null,
+        updated_at:    state.updated_at    || null,
+      },
+      nextAction,
+      loop: {
+        supervised:       true,
+        canProceed:       isReady,
+        blocked:          isBlocked,
+        blockReason:      isBlocked ? nextAction.reason : null,
+        availableActions,
+      },
+    });
+  } catch (err) {
+    logNV("🔴 [GET /contracts/loop-status] Falha ao resolver loop", { error: String(err) });
+    return jsonResponse({ ok: false, error: "Falha ao resolver estado do loop supervisionado." }, 500);
+  }
+}
+
+// ============================================================================
 // 📋 P13 — GET /execution (handler canônico)
 //
 // Retorna a trilha de execução mais recente persistida no KV após o disparo
@@ -6974,6 +7110,11 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       if (method === "GET" && path === "/contracts/active-surface") {
         const result = await handleGetActiveSurface(env);
         return jsonResponse(result.body, result.status);
+      }
+
+      // PR6 — GET /contracts/loop-status → Loop supervisionado: próxima ação + estado do loop
+      if (method === "GET" && path === "/contracts/loop-status") {
+        return await handleGetLoopStatus(env);
       }
 
       // POST /contracts/execute → Execute current micro-PR in TEST (C1)
