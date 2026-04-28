@@ -1,27 +1,22 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr7-schemas-orquestracao
-**Última tarefa:** PR7 — Worker-only — diagnóstico formal de schemas desconectados. Nenhum schema integrado (critério: sem uso claro no ciclo atual).
+**Branch ativa:** claude/pr8-operational-action-contract
+**Última tarefa:** PR8 — Worker-only — shape canônico operacional `buildOperationalAction()` criado em `nv-enavia.js`. Campo `operationalAction` adicionado a `GET /contracts/loop-status`. Sem execução real. Sem alteração em Panel/Executor.
 
 ## Estado geral
-- Contrato ativo: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅
+- Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
+- Contrato ativo: `schema/contracts/active/CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` ✅
 - Estrutura de governança mínima: ✅
-- PR1 — active surface: **concluída** ✅ (branch: `claude/pr1-active-surface`, merged)
-- PR2 — executor governado: **concluída** ✅ (branch: `claude/pr2-executor-governado`, merged)
-- PR3 — panel backend real: **concluída** ✅ (branch: `claude/pr3-panel-backend-real`, merged)
-- PR4 — worker confiabilidade: **concluída** ✅ (branch: `claude/pr4-worker-confiabilidade`)
-- PR5 — observabilidade real: **concluída** ✅ (branch: `claude/pr5-observabilidade-real`, PR #153) — ajuste de coerência `summary.total` aplicado
-- PR6 — loop supervisionado: **concluída** ✅ (branch: `claude/pr6-loop-supervisionado`)
+- PR1–PR7: **CONCLUÍDAS** ✅ (contrato anterior)
 
-## PRs do contrato
-- PR1 — active surface: **concluída** ✅
-- PR2 — executor governado: **concluída** ✅
-- PR3 — panel backend real: **concluída** ✅
-- PR4 — worker confiabilidade: **concluída** ✅
-- PR5 — observabilidade real: **concluída** ✅ (ajuste de coerência `summary.total` aplicado)
-- PR6 — loop supervisionado: **concluída** ✅
-- PR7 — schemas orquestração: **concluída** ✅ (diagnóstico formal — nenhuma integração necessária)
+## PRs do contrato operacional (PR8–PR13)
+- PR8 — contrato operacional de ações e estado: **concluída** ✅ (branch: `claude/pr8-operational-action-contract`)
+- PR9 — execute-next supervisionado: **pendente**
+- PR10 — gates, evidências e rollback: **pendente**
+- PR11 — integração segura com executor: **pendente**
+- PR12 — botões operacionais no painel: **pendente**
+- PR13 — hardening final: **pendente**
 
 ## Decisões formalizadas em PR4
 - `executor.invalid` — corrigido para `https://enavia-executor.internal/audit`.
@@ -59,5 +54,11 @@
 ## Bloqueios
 - nenhum
 
+## Decisões formalizadas em PR8
+- `buildOperationalAction(nextAction, contractId)` — função pura em `nv-enavia.js:4799–4835`. Shape canônico: `{ action_id, contract_id, type, requires_human_approval, evidence_required, can_execute, block_reason }`.
+- Mapeamento: `start_task`/`start_micro_pr` → `execute_next`; `awaiting_human_approval` → `approve`; `contract_complete` → `close_final`; blocked states → `block`.
+- `GET /contracts/loop-status` enriquecido com `operationalAction` (aditivo). Paths sem contrato retornam `operationalAction: null`.
+- Sem execução real. Sem alteração em Panel ou Executor.
+
 ## Próxima etapa segura
-- Contrato PR1–PR7 concluído. Aguardar avaliação de novas iniciativas ou contrato subsequente.
+- PR9 — Worker-only — `POST /contracts/execute-next` supervisionado.
