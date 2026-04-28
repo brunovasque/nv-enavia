@@ -1,62 +1,41 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR11 — Worker-only — integração segura com executor
-**Para:** PR12 — Panel-only — botões operacionais no painel
+**De:** PR12 — Panel-only — botões operacionais no painel
+**Para:** PR13 — Worker-only — hardening final e encerramento
 
 ## O que foi feito nesta sessão
 
-### PR11 — integração segura com executor
+### PR12 — botões operacionais no painel
 
-**Diagnóstico realizado:**
-- `env.EXECUTOR.fetch` usado exclusivamente em `handleEngineerRequest` (`/engineer` proxy, `nv-enavia.js:2050`). Completamente separado do fluxo de contratos.
-- Caminho `handleExecuteNext → handleExecuteContract → executeCurrentMicroPr` é KV puro — sem Service Binding ao executor externo.
-- `executeCurrentMicroPr` tem gates internos suficientes: supervisor gate, task status check, TEST-only guard, active micro-PR check.
+**Arquivos criados:**
 
-**Adições em `nv-enavia.js`:**
+- `panel/src/api/endpoints/loop.js`:
+  - `fetchLoopStatus()` — GET /contracts/loop-status. Mock: retorna `null` com flag `mock: true`.
+  - `executeNext(body)` — POST /contracts/execute-next. Mock: retorna resposta honesta explicando backend necessário.
 
-1. `buildExecutorPathInfo(env, opType)` — helper puro:
-   - `execute_next` → `{ type: "internal_handler", handler: "handleExecuteContract → executeCurrentMicroPr", uses_service_binding: false, ... }`
-   - `approve` → `{ type: "internal_handler", handler: "handleCloseFinalContract", uses_service_binding: false, ... }`
-   - outros → `{ type: "blocked", handler: null, uses_service_binding: false, ... }`
+- `panel/src/pages/LoopPage.jsx`:
+  - Página `/loop` — Loop Operacional Supervisionado.
+  - Carrega `GET /contracts/loop-status` ao montar + botão Atualizar.
+  - Exibe: `loop.status_global`, `canProceed`, `blockReason`, `availableActions`.
+  - Exibe: `operationalAction` (type, can_execute, block_reason, evidence_required).
+  - Exibe: `nextAction` contratual em seção colapsável.
+  - Zona de execução: campo `approved_by` + botão desabilitado quando `can_execute: false`.
+  - Botão chama `POST /contracts/execute-next` com `{ confirm: true, approved_by, evidence: [] }`.
+  - Resultado inline: badge de status + motivo + detalhes (evidence, rollback, executor_path, execution_result).
+  - Backend bloqueia → motivo exibido. Sem decisão no front.
+  - Modo mock → aviso honesto com instrução para `VITE_NV_ENAVIA_URL`.
 
-2. Timeout local removido do fluxo `execute-next`:
-   - `handleExecuteContract` e `handleCloseFinalContract` podem alterar KV.
-   - `Promise.race` não cancela a Promise original.
-   - Sem `AbortSignal`/cancelamento real, timeout local seria inseguro.
-   - Timeout seguro fica para PR futura somente com handler cancelável/idempotente.
+**Arquivos alterados:**
 
-3. Campo `executor_path` adicionado a todos os paths de resposta:
-   - Paths antes do step 4 (body/KV/contrato): `executor_path: null`
-   - Paths após step 4: `executor_path: executorPathInfo`
+- `panel/src/api/index.js` — exports `fetchLoopStatus`, `executeNext`.
+- `panel/src/App.jsx` — rota `/loop` → `<LoopPage />`.
+- `panel/src/Sidebar.jsx` — item "Loop" com badge "PR12" entre Contrato e Saúde.
 
-**Resposta canônica atual (post-PR11):**
-```json
-{
-  "ok": true,
-  "executed": true,
-  "status": "executed",
-  "reason": null,
-  "nextAction": {},
-  "operationalAction": {},
-  "execution_result": {},
-  "evidence": { "required": [], "provided": [], "missing": [], "validation_level": "presence_only", "semantic_validation": false },
-  "rollback": { "available": true, "type": "manual_review", "recommendation": "...", "command": "..." },
-  "executor_path": { "type": "internal_handler", "handler": "handleExecuteContract → executeCurrentMicroPr", "uses_service_binding": false, "service_binding_available": true, "note": "Caminho interno KV. env.EXECUTOR não é chamado neste fluxo." },
-  "audit_id": "exec-next:..."
-}
-```
-
-### Alterações de código
-- `nv-enavia.js` — helper `buildExecutorPathInfo`, remoção do timeout local inseguro nos dois handlers, campo `executor_path` em todos os paths.
-
-### Smoke tests executados
-- `node --test tests/pr8-hardening-producao.smoke.test.js` → 41 passed, 0 failed.
-- `node --input-type=module <<'EOF' ... worker.fetch('/contracts/execute-next') ... EOF` → `executor_path` presente nos paths `blocked` e `awaiting_approval`; `EXECUTOR.fetch` não chamado.
-- `node --input-type=module <<'EOF' ... fs.readFileSync('./nv-enavia.js') ... EOF` → `handleExecuteNext` sem `Promise.race` e sem `env.EXECUTOR.fetch`.
+**Build:** `npx vite build` → 141 modules, 0 erros ✅.
 
 ## O que NÃO foi alterado (por escopo)
-- `panel/` — sem alteração
+- `nv-enavia.js` (Worker) — sem alteração
 - `contract-executor.js` — sem alteração
 - `executor/` — sem alteração
 - `wrangler.toml` — sem alteração
@@ -66,11 +45,12 @@
 - **PR8: CONCLUÍDA** ✅
 - **PR9: CONCLUÍDA** ✅
 - **PR10: CONCLUÍDA** ✅
-- **PR11: CONCLUÍDA** ✅ — caminho executor auditado, timeout local inseguro removido, `executor_path` no response.
+- **PR11: CONCLUÍDA** ✅
+- **PR12: CONCLUÍDA** ✅ — painel conectado ao loop operacional.
 - Contrato ativo: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`.
 
 ## Próxima ação segura
-- PR12 — Panel-only — botões operacionais no painel.
+- PR13 — Worker-only — hardening final e encerramento do contrato.
 
 ## Bloqueios
 - nenhum

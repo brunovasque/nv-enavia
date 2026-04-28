@@ -35,6 +35,7 @@ export { fetchHealth }                      from "./endpoints/health.js";
 export { fetchBrowserSession, grantBrowserArmPermission, BROWSER_SESSION_STATUS, GRANTABLE_BLOCK_LEVELS } from "./endpoints/browserSession.js";
 export { fetchContractSurface, CONTRACT_SURFACE_STATUS } from "./endpoints/contract.js";
 export { runPlanner, fetchLatestPlan }      from "./endpoints/planner.js";
+export { fetchLoopStatus, executeNext }     from "./endpoints/loop.js";
 
 // ── Plan mapper — public surface for page-level snapshot translation ─────────
 // Pages must import mapPlannerSnapshot from here, NOT from api/mappers/plan.js.

@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: "/memory",    label: "Memória",   icon: "🧠" },
   { path: "/execution", label: "Execução",  icon: "⚡" },
   { path: "/contract",  label: "Contrato",  icon: "📜" },
+  { path: "/loop",      label: "Loop",      icon: "▶", badge: "PR12" },
   { path: "/health",    label: "Saúde",     icon: "◆", badge: "P22" },
   { path: "/browser",   label: "Browser",   icon: "🌐" },
 ];
