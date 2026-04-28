@@ -1,41 +1,32 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR6 — Worker-only — loop contratual supervisionado
+**De:** PR6 (ajuste Codex) — `awaiting_human_approval` e `phase_complete` corrigidos em `handleGetLoopStatus`
 **Para:** PR7 — Worker-only — integrar schemas desconectados
 
-## O que foi feito nesta sessão
+## O que foi feito nesta sessão (ajuste pós-PR #154)
 
-### Diagnóstico antes do patch
-- `resolveNextAction(state, decomposition)` — já existia em `contract-executor.js` linha 1371. Implementação completa com 9 regras. Exportada, mas não importada no Worker.
-- `rehydrateContract(env, contractId)` — já existia, lê state + decomposition do KV em paralelo. Exportada, não importada.
-- Nenhum endpoint público `GET /contracts/loop-status` existia — não havia como consultar próxima ação sem disparar execução.
-- `consolidateAfterSave()` — avaliada: não pertence ao ciclo contratual. Mantida como dead code.
+### Problema 1 — `awaiting_human_approval` corrigido
+- `resolveNextAction` retorna `status: "awaiting_approval"` para esse tipo — nunca igual a `"ready"`.
+- O bloco original tinha a regra dentro de `if (isReady)` → nunca executava → `availableActions: []`.
+- Correção: extraída constante `isAwaitingApproval = nextAction.type === "awaiting_human_approval"`.
+- Regra movida para `else if (isAwaitingApproval)` fora do guard `isReady`.
+- `canProceed` atualizado para `isReady || isAwaitingApproval`.
 
-### `handleGetLoopStatus` — ADICIONADO (Worker-only, read-only)
-- **Import:** `resolveNextAction` e `rehydrateContract` adicionados aos imports de `contract-executor.js` (linhas 14–15).
-- **Handler:** `async function handleGetLoopStatus(env)` — read-only, sem KV put, sem dispatch.
-  - Lê `"contract:index"` do KV.
-  - Itera do mais recente ao mais antigo para encontrar contrato não-terminal.
-  - Chama `rehydrateContract(env, contractId)` para obter state + decomposition.
-  - Chama `resolveNextAction(state, decomposition)` — retorna tipo, motivo, status.
-  - Retorna `{ ok, generatedAt, contract, nextAction, loop }`.
-- **`loop.supervised: true`** — sempre; nunca automação cega.
-- **`loop.canProceed`** — `nextAction.status === "ready"`.
-- **`loop.blocked` / `loop.blockReason`** — derivados de `nextAction.status === "blocked"`.
-- **`loop.availableActions`** — endpoints disponíveis no estado atual (ex: `POST /contracts/execute` quando ready).
-- **Rota:** `GET /contracts/loop-status` adicionada após `GET /contracts/active-surface`.
+### Problema 2 — `phase_complete` corrigido
+- `complete-task` e `execute` exigem task `in_progress` — ambos falham deterministicamente quando `phase_complete`.
+- Removidos de `availableActions`.
+- Campo `guidance` adicionado (condicional via spread `...`) documentando ausência de endpoint de avanço de fase.
 
-## O que NÃO foi alterado (por escopo)
+## O que NÃO foi alterado
 - `panel/` — sem alteração
 - `contract-executor.js` — sem alteração
 - `executor/` — sem alteração
 - `wrangler.toml` — sem alteração
-- Todos os handlers existentes — sem alteração
 
 ## Estado do repo
 - Branch: `claude/pr6-loop-supervisionado`
-- Arquivo alterado: `nv-enavia.js` — 2 patches (imports + handler + rota, total 141 linhas inseridas)
+- Arquivo alterado: `nv-enavia.js` (patch cirúrgico em `handleGetLoopStatus`)
 
 ## Próxima ação segura (PR7)
 1. Após merge da PR6, criar branch `claude/pr7-schemas-orquestracao`.

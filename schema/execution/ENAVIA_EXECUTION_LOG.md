@@ -4,6 +4,21 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR6 Ajuste — Correções `awaiting_human_approval` e `phase_complete` em `handleGetLoopStatus`
+
+- **Branch:** `claude/pr6-loop-supervisionado`
+- **PR:** #154 — ajuste cirúrgico solicitado via comentário Codex
+- **Escopo:** Worker-only. `nv-enavia.js` apenas.
+- **Problema 1 corrigido:** `awaiting_human_approval` tem `status: "awaiting_approval"` — nunca entrava no guard `isReady`. Movido para `else if (isAwaitingApproval)` fora do bloco `isReady`. `canProceed` atualizado para `isReady || isAwaitingApproval`.
+- **Problema 2 corrigido:** `phase_complete` anunciava `complete-task`/`execute` que falham deterministicamente sem task `in_progress`. `availableActions` agora é `[]`; campo `guidance` documenta ausência de endpoint de avanço de fase.
+- **Smoke tests:** 3 cenários verificados via node (awaiting_human_approval, phase_complete, start_task). Handler read-only confirmado (sem KV put).
+- **Arquivos alterados:** `nv-enavia.js` (somente).
+- **Panel/Executor/contract-executor.js:** sem alteração.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** aguardar merge PR6, iniciar PR7 (`claude/pr7-schemas-orquestracao`) após autorização.
+
+---
+
 ## 2026-04-26 — Setup de governança
 
 - **Branch:** `claude/setup-governance-files`

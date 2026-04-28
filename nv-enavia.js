@@ -4865,22 +4865,31 @@ async function handleGetLoopStatus(env) {
     const nextAction = resolveNextAction(state, decomposition);
 
     // 4) Derivar estado do loop a partir da próxima ação
-    const isBlocked = nextAction.status === "blocked";
-    const isReady   = nextAction.status === "ready";
-    const isIdle    = nextAction.status === "in_progress" || nextAction.type === "no_action";
+    const isBlocked          = nextAction.status === "blocked";
+    const isReady            = nextAction.status === "ready";
+    const isAwaitingApproval = nextAction.type   === "awaiting_human_approval";
+    const isIdle             = nextAction.status === "in_progress" || nextAction.type === "no_action";
 
     let availableActions = [];
+    let guidance         = null;
+
     if (isReady) {
       if (nextAction.type === "start_task" || nextAction.type === "start_micro_pr") {
         availableActions = ["POST /contracts/execute"];
       } else if (nextAction.type === "phase_complete") {
-        availableActions = ["POST /contracts/complete-task", "POST /contracts/execute"];
-      } else if (nextAction.type === "awaiting_human_approval") {
-        availableActions = ["POST /contracts/close-final"];
+        // complete-task e execute exigem task in_progress — falhariam aqui deterministicamente.
+        // Não há endpoint de avanço de fase disponível; documentar em guidance.
+        guidance = "Phase complete. No phase-advance endpoint exists yet; manual phase transition required.";
       } else if (nextAction.type === "contract_complete") {
         availableActions = [];
       }
+    } else if (isAwaitingApproval) {
+      // awaiting_human_approval retorna status "awaiting_approval" (não "ready").
+      // Tratar fora do guard isReady para expor a ação humana disponível.
+      availableActions = ["POST /contracts/close-final"];
     }
+
+    const canProceed = isReady || isAwaitingApproval;
 
     return jsonResponse({
       ok: true,
@@ -4896,10 +4905,11 @@ async function handleGetLoopStatus(env) {
       nextAction,
       loop: {
         supervised:       true,
-        canProceed:       isReady,
+        canProceed,
         blocked:          isBlocked,
         blockReason:      isBlocked ? nextAction.reason : null,
         availableActions,
+        ...(guidance ? { guidance } : {}),
       },
     });
   } catch (err) {
