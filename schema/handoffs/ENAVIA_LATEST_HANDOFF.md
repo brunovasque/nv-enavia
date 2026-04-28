@@ -1,7 +1,7 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR10 — Worker-only — gates, evidências e rollback
+**De:** PR10 — Worker-only — gates, evidências, rollback e honestidade de validação
 **Para:** PR11 — Worker-only — integração segura com executor
 
 ## O que foi feito nesta sessão
@@ -10,7 +10,7 @@
 
 **Helpers puros criados em `nv-enavia.js:4991–5059`:**
 
-- `buildEvidenceReport(opType, contractId, body)` — compara `EVIDENCE_REQUIRED[opType]` com o que o chamador forneceu. Retorna `{ required, provided, missing }`.
+- `buildEvidenceReport(opType, contractId, body)` — compara `EVIDENCE_REQUIRED[opType]` com o que o chamador forneceu. Agora também explicita limitação da PR10: `validation_level: "presence_only"` + `semantic_validation: false`.
 - `buildRollbackRecommendation(opType, contractId, executed)` — retorna orientação de rollback sem executar. `{ available, type, recommendation, command }`.
 
 **Gates adicionados/fortalecidos em `handleExecuteNext`:**
@@ -20,15 +20,16 @@
 | Contrato ausente / KV indisponível | `status: "blocked"`, `evidence: null, rollback: null` |
 | Estado terminal | `status: "blocked"`, `evidence: null, rollback: null` |
 | `can_execute !== true` | bloqueado com `evidence` + `rollback` |
-| `evidenceReport.missing.length > 0` | bloqueado com `evidence` + `rollback` |
+| `evidenceReport.missing.length > 0` | bloqueado com `evidence` + `rollback`; ausência de `evidence` explica ACK operacional mínimo |
 | Resultado ambíguo (200 sem `ok` explícito) | bloqueado + log `⚠️` |
 
 **Campos adicionados ao response (backward-compat):**
-- `evidence: { required, provided, missing }`
+- `evidence: { required, provided, missing, validation_level, semantic_validation }`
 - `rollback: { available, type, recommendation, command }`
 
 ### Alterações de código
 - `nv-enavia.js` — helpers `buildEvidenceReport` + `buildRollbackRecommendation` + function body de `handleExecuteNext` enriquecido.
+- Ajuste final PR #158: reason do gate de ausência de `evidence` deixa explícito que o campo é obrigatório mesmo vazio, sem sugerir validação semântica profunda nesta PR.
 
 ## O que NÃO foi alterado (por escopo)
 - `panel/` — sem alteração

@@ -2,7 +2,7 @@
 
 **Data:** 2026-04-28
 **Branch ativa:** claude/pr10-gates-evidencias-rollback
-**Última tarefa:** PR10 — Worker-only — `buildEvidenceReport` + `buildRollbackRecommendation` criados. `handleExecuteNext` enriquecido: gate de evidência, gate de resultado ambíguo, campos `evidence` + `rollback` em todos os response paths. Backward-compat. Sem alteração em Panel/Executor.
+**Última tarefa:** PR10 — ajuste cirúrgico de honestidade em `handleExecuteNext`: `evidence` agora explicita `validation_level: "presence_only"` + `semantic_validation: false`; bloqueio por ausência de `evidence` deixa claro que o campo é ACK operacional mínimo mesmo quando vazio. Sem validação semântica profunda nesta PR. Sem alteração em Panel/Executor.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -13,7 +13,7 @@
 ## PRs do contrato operacional (PR8–PR13)
 - PR8 — contrato operacional de ações e estado: **concluída** ✅ (branch: `claude/pr8-operational-action-contract`)
 - PR9 — execute-next supervisionado: **concluída** ✅ (branch: `claude/pr9-execute-next-supervisionado`)
-- PR10 — gates, evidências e rollback: **concluída** ✅ (branch: `claude/pr10-gates-evidencias-rollback`)
+- PR10 — gates, evidências e rollback: **concluída** ✅ (branch: `claude/pr10-gates-evidencias-rollback`) — ajuste final de honestidade aplicado na PR #158
 - PR11 — integração segura com executor: **pendente**
 - PR12 — botões operacionais no painel: **pendente**
 - PR13 — hardening final: **pendente**
@@ -71,6 +71,7 @@
 - Gate de resultado ambíguo: status 200 sem `ok` explícito → bloqueado + log `⚠️`.
 - Todos os paths de `handleExecuteNext` incluem `evidence` + `rollback` (backward-compat).
 - Resposta canônica: `{ ok, executed, status, reason, nextAction, operationalAction, evidence, rollback, execution_result?, audit_id }`.
+- Ajuste final PR #158: `evidence` agora explicita limitação de escopo com `validation_level: "presence_only"` e `semantic_validation: false`. O bloqueio por ausência de `evidence` explica que o campo é obrigatório mesmo vazio, apenas como ACK operacional mínimo.
 
 ## Próxima etapa segura
 - PR11 — Worker-only — integração segura com executor.

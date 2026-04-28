@@ -4,6 +4,24 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR10 Ajuste — honestidade de validação em `execute-next`
+
+- **Branch:** `claude/pr10-gates-evidencias-rollback`
+- **PR:** #158
+- **Escopo:** Worker-only. Ajuste cirúrgico em `nv-enavia.js` apenas. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Problema tratado:** o gate de `evidence` já aceitava `evidence: []`, o que é correto como ACK operacional mínimo, mas o response ainda não deixava explícito que PR10 faz somente validação de presença, não validação semântica profunda.
+- **Patch aplicado:**
+  1. `buildEvidenceReport(...)` agora retorna também `validation_level: "presence_only"` e `semantic_validation: false`.
+  2. O bloqueio por ausência de `evidence` agora explica: campo obrigatório mesmo vazio para ACK operacional mínimo; validação atual é apenas de presença.
+  3. Mantido comportamento atual: sem campo `evidence` → bloqueado; com `evidence: []` → prossegue.
+- **Smoke tests:**
+  - `node --input-type=module <<'EOF' ... worker.fetch('/contracts/execute-next') ... EOF` → sem `evidence` retorna bloqueio com mensagem explícita + `validation_level`; com `evidence: []` mantém `missing: []` ✅
+  - `node tests/pr8-hardening-producao.smoke.test.js` → 41 passed, 0 failed ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR11 — integração segura com executor.
+
+---
+
 ## 2026-04-28 — PR10 — Worker-only — gates, evidências e rollback
 
 - **Branch:** `claude/pr10-gates-evidencias-rollback`

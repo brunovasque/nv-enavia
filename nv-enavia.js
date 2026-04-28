@@ -4995,7 +4995,8 @@ async function handleGetLoopStatus(env) {
 // Nenhum deles persiste estado ou executa ação.
 //
 // buildEvidenceReport: compara o que o contrato exige vs o que o chamador
-//   forneceu, retornando { required, provided, missing }.
+//   forneceu, retornando um relatório explícito de validação mínima por
+//   presença de campo (sem validação semântica profunda nesta PR10).
 //
 // buildRollbackRecommendation: retorna orientação de rollback sem executar.
 //   type: "no_state_change" | "manual_review"
@@ -5019,7 +5020,13 @@ function buildEvidenceReport(opType, contractId, body) {
 
   const missing = required.filter(f => !provided.includes(f));
 
-  return { required, provided, missing };
+  return {
+    required,
+    provided,
+    missing,
+    validation_level: "presence_only",
+    semantic_validation: false,
+  };
 }
 
 function buildRollbackRecommendation(opType, contractId, executed) {
@@ -5173,7 +5180,9 @@ async function handleExecuteNext(request, env) {
   if (evidenceReport.missing.length > 0) {
     return jsonResponse({
       ok: false, executed: false, status: "blocked",
-      reason: `Evidência requerida ausente: ${evidenceReport.missing.join(", ")}.`,
+      reason: evidenceReport.missing.includes("evidence[]")
+        ? "Campo evidence é obrigatório, mesmo que vazio, para ack operacional mínimo. Validação atual é apenas de presença."
+        : `Evidência requerida ausente: ${evidenceReport.missing.join(", ")}.`,
       nextAction, operationalAction,
       evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
     });
