@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr11-integracao-segura-executor
-**Última tarefa:** PR11 — integração segura com executor: diagnóstico confirmou que `handleExecuteNext → handleExecuteContract → executeCurrentMicroPr` é caminho KV puro (sem Service Binding). Mantido `buildExecutorPathInfo`, removido o timeout local via `Promise.race` por ser inseguro em handlers que alteram KV, e mantido `executor_path` em todos os paths de resposta. Sem alteração em Panel/Executor/contract-executor.js.
+**Branch ativa:** claude/pr12-panel-botoes-operacionais
+**Última tarefa:** PR12 — ajuste cirúrgico de feedback na PR #160: `LoopPage.jsx` passou a usar `loopData.contract` para contrato/status/fase/task/updated_at e `handleExecute` passou a preservar o payload canônico de bloqueio/erro retornado em `r.data`. Teste direcionado adicionado; suíte do painel e build passaram. Sem alteração em Worker/Executor/contract-executor.js.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -15,7 +15,7 @@
 - PR9 — execute-next supervisionado: **concluída** ✅ (branch: `claude/pr9-execute-next-supervisionado`)
 - PR10 — gates, evidências e rollback: **concluída** ✅ (branch: `claude/pr10-gates-evidencias-rollback`) — ajuste final de honestidade aplicado na PR #158
 - PR11 — integração segura com executor: **concluída** ✅ (branch: `claude/pr11-integracao-segura-executor`)
-- PR12 — botões operacionais no painel: **pendente**
+- PR12 — botões operacionais no painel: **concluída** ✅ (branch: `claude/pr12-panel-botoes-operacionais`)
 - PR13 — hardening final: **pendente**
 
 ## Decisões formalizadas em PR4
@@ -81,5 +81,15 @@
 - Timeout seguro fica para PR futura somente se existir handler cancelável/idempotente.
 - Campo `executor_path` aditivo em todos os paths de resposta (backward-compat): `null` antes do step 4; `executorPathInfo` após.
 
+## Decisões formalizadas em PR12
+- `fetchLoopStatus()` — `panel/src/api/endpoints/loop.js`. GET /contracts/loop-status. Modo mock retorna `null` com flag `mock:true` — sem fixture inventada.
+- `executeNext(body)` — mesma arquivo. POST /contracts/execute-next. Modo mock retorna resposta honesta explicando que backend é necessário.
+- `LoopPage` — `/loop` route. Exibe loop/nextAction/operationalAction/availableActions. Botão desabilitado quando `can_execute: false`. Mostra motivo de bloqueio. Seções colapsáveis: evidence, rollback, executor_path.
+- Body enviado: `{ confirm: true, approved_by: <input>, evidence: [] }`.
+- Modo mock: aviso honesto com instrução para configurar `VITE_NV_ENAVIA_URL`.
+- Build: 141 modules, 0 errors.
+- Ajuste PR #160: seção "Status do Loop" agora lê `loopData.contract.{id,status,current_phase,current_task,updated_at}`; `loop` fica restrito a `canProceed`, `blockReason`, `availableActions` e `guidance`.
+- Ajuste PR #160: `handleExecute` prioriza `r.data` mesmo quando `r.ok === false`, preservando `reason`, `evidence`, `rollback`, `executor_path` e `audit_id` do backend.
+
 ## Próxima etapa segura
-- PR12 — Panel-only — botões operacionais no painel.
+- PR13 — Worker-only — hardening final e encerramento.

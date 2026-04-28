@@ -4,6 +4,56 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR12 Ajuste — feedback da PR #160 na `LoopPage`
+
+- **Branch:** `claude/pr12-panel-botoes-operacionais`
+- **PR:** #160
+- **Escopo:** Panel-only. Ajuste cirúrgico em `panel/src/pages/LoopPage.jsx` + teste direcionado. Sem alteração em Worker, Executor, `contract-executor.js` ou `wrangler.toml`.
+- **Patch aplicado:**
+  1. Seção "Status do Loop" passou a usar `loopData.contract.{id,status,current_phase,current_task,updated_at}`.
+  2. `loop` ficou restrito aos campos de supervisão (`canProceed`, `blockReason`, `availableActions`, `guidance`).
+  3. `handleExecute` agora prioriza `r.data` mesmo com `r.ok === false`, preservando o payload canônico do backend.
+  4. Teste direcionado adicionado em `panel/src/__tests__/pr12-loop-page-contract-and-error-payload.test.js`.
+- **Smoke tests:**
+  - `npx vitest run src/__tests__/pr12-loop-page-contract-and-error-payload.test.js` → 4 testes, 4 passed ✅
+  - `npm test` → 31 arquivos, 894 testes passed ✅
+  - `npm run build` → 141 modules transformed, 0 errors ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR13 — Worker-only — hardening final.
+
+---
+
+## 2026-04-28 — PR12 — Panel-only — botões operacionais no painel
+
+- **Branch:** `claude/pr12-panel-botoes-operacionais`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Panel-only. Sem alteração em Worker, Executor, `contract-executor.js` ou `wrangler.toml`.
+- **Arquivos criados:**
+  - `panel/src/api/endpoints/loop.js` — `fetchLoopStatus()` (GET /contracts/loop-status) + `executeNext(body)` (POST /contracts/execute-next).
+  - `panel/src/pages/LoopPage.jsx` — página `/loop` com loop operacional completo.
+- **Arquivos alterados:**
+  - `panel/src/api/index.js` — exports de `fetchLoopStatus` e `executeNext`.
+  - `panel/src/App.jsx` — rota `/loop` → `<LoopPage />`.
+  - `panel/src\Sidebar.jsx` — item "Loop" com badge "PR12" entre Contrato e Saúde.
+- **Funcionalidades da LoopPage:**
+  1. `GET /contracts/loop-status` — carrega ao montar + botão Atualizar.
+  2. Exibe `loop.status_global`, `canProceed`, `blockReason`, `availableActions`.
+  3. Exibe `operationalAction` (type, can_execute, block_reason, evidence_required).
+  4. Exibe `nextAction` contratual em seção colapsável.
+  5. Zona de execução: campo `approved_by` + botão desabilitado quando `can_execute: false`.
+  6. Chama `POST /contracts/execute-next` com `{ confirm: true, approved_by, evidence: [] }`.
+  7. Exibe resultado com badge de status (EXECUTADO/BLOQUEADO/AGUARDANDO APROVAÇÃO/ERRO).
+  8. Seção colapsável de detalhes: `evidence`, `rollback`, `executor_path`, `execution_result`.
+  9. Em modo mock: aviso honesto ("configure VITE_NV_ENAVIA_URL").
+  10. Backend bloqueia → painel mostra motivo. Sem decisão no front.
+- **Smoke tests:**
+  - `npx vite build` → 141 modules transformed, 0 errors ✅.
+  - Aviso de chunk pré-existente, não relacionado às mudanças.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR13 — Worker-only — hardening final.
+
+---
+
 ## 2026-04-28 — PR11 — Worker-only — integração segura com executor
 
 - **Branch:** `claude/pr11-integracao-segura-executor`

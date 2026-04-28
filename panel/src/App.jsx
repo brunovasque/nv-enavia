@@ -7,6 +7,7 @@ import ExecutionPage from "./pages/ExecutionPage";
 import BrowserPage from "./pages/BrowserPage";
 import HealthPage from "./pages/HealthPage";
 import ContractPage from "./pages/ContractPage";
+import LoopPage from "./pages/LoopPage";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/memory" element={<MemoryPage />} />
         <Route path="/execution" element={<ExecutionPage />} />
         <Route path="/contract" element={<ContractPage />} />
+        <Route path="/loop" element={<LoopPage />} />
         <Route path="/browser" element={<BrowserPage />} />
         <Route path="/health" element={<HealthPage />} />
       </Route>
