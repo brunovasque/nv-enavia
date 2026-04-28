@@ -5124,10 +5124,10 @@ async function handleExecuteNext(request, env) {
 
   // 7. approve → gate humano explícito antes de delegar a handleCloseFinalContract
   if (operationalAction.type === "approve") {
-    if (!body.confirm) {
+    if (body.confirm !== true) {
       return jsonResponse({
         ok: true, executed: false, status: "awaiting_approval",
-        reason: "Aprovação humana explícita necessária. Envie { confirm: true, approved_by: '...' }.",
+        reason: "Aprovação humana explícita necessária. Envie { confirm: true, approved_by: '...' } (boolean estrito).",
         nextAction, operationalAction, audit_id: auditId,
       });
     }

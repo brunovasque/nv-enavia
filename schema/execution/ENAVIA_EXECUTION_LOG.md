@@ -4,6 +4,16 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR9 Ajuste — Gate booleano estrito em `handleExecuteNext`
+
+- **Branch:** `claude/pr9-execute-next-supervisionado`
+- **Problema:** Gate `if (!body.confirm)` aceitava truthy não booleanos (`"false"`, `"yes"`, `1`) como aprovação. Inseguro para gate humano.
+- **Correção:** `if (body.confirm !== true)` — boolean estrito. Apenas `true` (JS boolean) passa.
+- **Smoke tests:** `confirm: false` → bloqueado ✅; `confirm: "false"` → bloqueado ✅; `confirm: 1` → bloqueado ✅; `confirm: true` + `approved_by` → passa ✅; `execute_next` inalterado ✅.
+- **Bloqueios:** nenhum.
+
+---
+
 ## 2026-04-28 — PR9 — Worker-only — `POST /contracts/execute-next` supervisionado
 
 - **Branch:** `claude/pr9-execute-next-supervisionado`
