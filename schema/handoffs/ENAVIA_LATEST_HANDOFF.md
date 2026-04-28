@@ -1,68 +1,61 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR12 — ajuste cirúrgico de feedback na PR #160
-**Para:** PR13 — Worker-only — hardening final e encerramento
+**De:** PR13 — Worker-only — hardening final e encerramento
+**Para:** N/A — Contrato PR8–PR13 formalmente encerrado ✅
 
 ## O que foi feito nesta sessão
 
-### PR12 — ajuste cirúrgico na LoopPage
+### PR13 — Worker-only — hardening final
 
-- `panel/src/pages/LoopPage.jsx`:
-  - seção "Status do Loop" agora usa `loopData.contract` para exibir `id`, `status`, `current_phase`, `current_task` e `updated_at`;
-  - `loop` permaneceu apenas para `canProceed`, `blockReason`, `availableActions` e `guidance`;
-  - `handleExecute` agora preserva `r.data` mesmo quando `executeNext()` retorna `ok: false`, evitando esconder `reason`, `evidence`, `rollback`, `executor_path` e `audit_id`.
+**Diagnóstico realizado:**
 
-- `panel/src/__tests__/pr12-loop-page-contract-and-error-payload.test.js`:
-  - smoke test direcionado garantindo uso de `loopData.contract` e prioridade ao payload canônico do backend.
+- `GET /contracts/loop-status` — rota confirmada no routing block de `nv-enavia.js`. Retorna `{ ok, generatedAt, contract, nextAction, operationalAction, loop }`. CORS aplicado via `jsonResponse()` → `withCORS()` internamente.
+- `POST /contracts/execute-next` — rota confirmada. 8 gates verificados:
+  1. JSON inválido → 400 + bloqueado
+  2. Sem KV inicializado → tratado no outer catch
+  3. Sem contrato ativo → bloqueado
+  4. `can_execute: false` → bloqueado imediatamente
+  5. Evidence faltando (missing.length > 0) → bloqueado
+  6. Evidence presente (`evidence: []` = ACK mínimo) → prossegue
+  7. Approve sem `confirm: true` → bloqueado
+  8. Approve sem `approved_by` → bloqueado
+- `env.EXECUTOR.fetch` — confirmado como NUNCA chamado em nenhum path de execute-next (fluxo inteiramente KV).
+- Rollback — confirmado como recomendação pura (`buildRollbackRecommendation`), sem execução automática.
+- `Promise.race` — confirmado como ausente (removido em PR11 — handlers mutam KV, race não cancela a Promise original).
+- CORS — confirmado em todas as rotas via `jsonResponse()` → `withCORS()`.
 
-- **Validação:** `npx vitest run src/__tests__/pr12-loop-page-contract-and-error-payload.test.js`, `npm test`, `npm run build` ✅.
+**Arquivo criado:**
 
-### Histórico imediatamente anterior — PR12 — botões operacionais no painel
+- `tests/pr13-hardening-operacional.smoke.test.js`:
+  - Seção A (loop-status shape, CORS, no-KV, empty-index, active contract)
+  - Seção B (todos os gates do execute-next)
+  - Seção C (env.EXECUTOR isolado, rollback recomendação, status em todos os paths)
+  - Seção D (CORS no execute-next, OPTIONS preflight)
+  - **Resultado: 91 passed, 0 failed ✅**
 
-**Arquivos criados:**
-
-- `panel/src/api/endpoints/loop.js`:
-  - `fetchLoopStatus()` — GET /contracts/loop-status. Mock: retorna `null` com flag `mock: true`.
-  - `executeNext(body)` — POST /contracts/execute-next. Mock: retorna resposta honesta explicando backend necessário.
-
-- `panel/src/pages/LoopPage.jsx`:
-  - Página `/loop` — Loop Operacional Supervisionado.
-  - Carrega `GET /contracts/loop-status` ao montar + botão Atualizar.
-  - Exibe: `loop.status_global`, `canProceed`, `blockReason`, `availableActions`.
-  - Exibe: `operationalAction` (type, can_execute, block_reason, evidence_required).
-  - Exibe: `nextAction` contratual em seção colapsável.
-  - Zona de execução: campo `approved_by` + botão desabilitado quando `can_execute: false`.
-  - Botão chama `POST /contracts/execute-next` com `{ confirm: true, approved_by, evidence: [] }`.
-  - Resultado inline: badge de status + motivo + detalhes (evidence, rollback, executor_path, execution_result).
-  - Backend bloqueia → motivo exibido. Sem decisão no front.
-  - Modo mock → aviso honesto com instrução para `VITE_NV_ENAVIA_URL`.
-
-**Arquivos alterados:**
-
-- `panel/src/api/index.js` — exports `fetchLoopStatus`, `executeNext`.
-- `panel/src/App.jsx` — rota `/loop` → `<LoopPage />`.
-- `panel/src/Sidebar.jsx` — item "Loop" com badge "PR12" entre Contrato e Saúde.
-
-**Build:** `npx vite build` → 141 modules, 0 erros ✅.
-
-## O que NÃO foi alterado (por escopo)
-- `nv-enavia.js` (Worker) — sem alteração
+**Arquivos NÃO alterados (por escopo):**
+- `nv-enavia.js` — sem alteração
 - `contract-executor.js` — sem alteração
 - `executor/` — sem alteração
 - `wrangler.toml` — sem alteração
+- `panel/` — sem alteração
 
 ## Estado do contrato
-- **PR1–PR7: CONCLUÍDAS** (contrato anterior).
+
+- **PR1–PR7: CONCLUÍDAS** ✅ (contrato `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md`)
 - **PR8: CONCLUÍDA** ✅
 - **PR9: CONCLUÍDA** ✅
 - **PR10: CONCLUÍDA** ✅
 - **PR11: CONCLUÍDA** ✅
-- **PR12: CONCLUÍDA** ✅ — painel conectado ao loop operacional.
-- Contrato ativo: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`.
+- **PR12: CONCLUÍDA** ✅
+- **PR13: CONCLUÍDA** ✅
+- **Contrato `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`: FORMALMENTE ENCERRADO ✅**
 
 ## Próxima ação segura
-- PR13 — Worker-only — hardening final e encerramento do contrato.
+
+- Nenhuma. Contrato PR8–PR13 concluído. Aguardando novo contrato ou tarefa.
 
 ## Bloqueios
+
 - nenhum
