@@ -5082,32 +5082,212 @@ function buildRollbackRecommendation(opType, contractId, executed) {
 //   - Timeout seguro fica para PR futura, se houver handler cancelável/idempotente.
 // ============================================================================
 function buildExecutorPathInfo(env, opType) {
-  const serviceBindingAvailable = !!(env && env.EXECUTOR);
+  const serviceBindingAvailable     = !!(env && env.EXECUTOR);
+  const deployBindingAvailable      = !!(env && env.DEPLOY_WORKER);
   if (opType === "execute_next") {
     return {
-      type:                      "internal_handler",
-      handler:                   "handleExecuteContract → executeCurrentMicroPr",
-      uses_service_binding:      false,
-      service_binding_available: serviceBindingAvailable,
-      note:                      "Caminho interno KV. env.EXECUTOR não é chamado neste fluxo.",
+      type:                       "executor_bridge + internal_handler",
+      handler:                    "callExecutorBridge(/audit) → callExecutorBridge(/propose) → callDeployBridge(simulate) → handleExecuteContract",
+      uses_service_binding:       true,
+      service_binding_available:  serviceBindingAvailable,
+      deploy_binding_available:   deployBindingAvailable,
+      note:                       "PR14: audit + propose via env.EXECUTOR, deploy via env.DEPLOY_WORKER (simulate/test). Handler interno KV só roda depois dos bridges.",
     };
   }
   if (opType === "approve") {
     return {
-      type:                      "internal_handler",
-      handler:                   "handleCloseFinalContract",
-      uses_service_binding:      false,
-      service_binding_available: serviceBindingAvailable,
-      note:                      "Caminho interno KV. env.EXECUTOR não é chamado neste fluxo.",
+      type:                       "executor_bridge + internal_handler",
+      handler:                    "callExecutorBridge(/audit) → handleCloseFinalContract",
+      uses_service_binding:       true,
+      service_binding_available:  serviceBindingAvailable,
+      deploy_binding_available:   deployBindingAvailable,
+      note:                       "PR14: audit via env.EXECUTOR antes de fechar contrato. Approve não chama propose nem deploy direto.",
     };
   }
   return {
-    type:                      "blocked",
-    handler:                   null,
-    uses_service_binding:      false,
-    service_binding_available: serviceBindingAvailable,
-    note:                      "Ação bloqueada. Nenhum handler chamado.",
+    type:                       "blocked",
+    handler:                    null,
+    uses_service_binding:       false,
+    service_binding_available:  serviceBindingAvailable,
+    deploy_binding_available:   deployBindingAvailable,
+    note:                       "Ação bloqueada. Nenhum handler chamado.",
   };
+}
+
+// ============================================================================
+// PR14 — callExecutorBridge (Worker-only, puro)
+//
+// Chama env.EXECUTOR.fetch para /audit ou /propose.
+// Retorna envelope estável: { ok, route, status, reason, data }.
+//
+// Regras:
+//   - env.EXECUTOR ausente → blocked imediato.
+//   - Resposta não-ok → failed.
+//   - Resposta sem ok explícito mas ambígua → ambiguous.
+//   - /audit com verdict:reject → blocked.
+//   - /audit sem verdict → ambiguous.
+//   - Qualquer exceção → failed.
+// ============================================================================
+async function callExecutorBridge(env, route, payload) {
+  if (typeof env?.EXECUTOR?.fetch !== "function") {
+    return {
+      ok: false, route, status: "blocked",
+      reason: "env.EXECUTOR não disponível. Service Binding 'EXECUTOR' não configurado.",
+      data: null,
+    };
+  }
+  try {
+    const res = await env.EXECUTOR.fetch("https://enavia-executor.internal" + route, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    let data = null;
+    let rawText = "";
+    try {
+      rawText = await res.text();
+      data = JSON.parse(rawText);
+    } catch (_) {
+      return {
+        ok: false, route, status: "ambiguous",
+        reason: "Resposta do Executor não é JSON válido.",
+        data: { raw: rawText.slice(0, 500) },
+      };
+    }
+    if (!res.ok) {
+      return {
+        ok: false, route, status: "failed",
+        reason: `Executor retornou status ${res.status}.`,
+        data,
+      };
+    }
+    if (data === null || typeof data !== "object") {
+      return {
+        ok: false, route, status: "ambiguous",
+        reason: "Resposta do Executor não é JSON objeto válido.",
+        data,
+      };
+    }
+    if ("ok" in data && data.ok === false) {
+      return {
+        ok: false, route, status: "blocked",
+        reason: data.error || data.reason || data.message || "Executor retornou ok:false.",
+        data,
+      };
+    }
+    if (route === "/audit") {
+      const verdict = data?.result?.verdict || data?.audit?.verdict || null;
+      if (verdict === "reject") {
+        return {
+          ok: false, route, status: "blocked",
+          reason: `Audit reprovado. Verdict: reject. Risk: ${data?.result?.risk_level || data?.audit?.risk_level || "unknown"}.`,
+          data,
+        };
+      }
+      if (!verdict) {
+        return {
+          ok: false, route, status: "ambiguous",
+          reason: "Audit sem verdict explícito. Resposta ambígua bloqueada por segurança.",
+          data,
+        };
+      }
+    }
+    return { ok: true, route, status: "passed", reason: null, data };
+  } catch (err) {
+    return {
+      ok: false, route, status: "failed",
+      reason: `Falha ao chamar Executor (${route}): ${String(err)}`,
+      data: null,
+    };
+  }
+}
+
+// ============================================================================
+// PR14 — callDeployBridge (Worker-only, puro)
+//
+// Chama env.DEPLOY_WORKER.fetch apenas em modo seguro (simulate/apply-test/test).
+// Produção bloqueada explicitamente nesta PR.
+// Retorna envelope estável: { ok, action, status, reason, data }.
+//
+// Regras:
+//   - Ações de produção (approve/promote/prod) → blocked imediato.
+//   - target_env prod/production → blocked.
+//   - env.DEPLOY_WORKER ausente → blocked com deploy_status:"blocked".
+//   - Resposta não-ok → failed.
+//   - Resposta ambígua → ambiguous.
+// ============================================================================
+async function callDeployBridge(env, action, payload) {
+  const PROD_ACTIONS = ["approve", "promote", "prod", "production", "rollback"];
+  if (PROD_ACTIONS.includes(String(action).toLowerCase())) {
+    return {
+      ok: false, action, status: "blocked",
+      reason: `Ação "${action}" para produção bloqueada nesta PR. Apenas simulate/apply-test/test permitido.`,
+      data: null,
+    };
+  }
+  const targetEnv = (payload?.target_env || "").toLowerCase();
+  if (targetEnv === "prod" || targetEnv === "production") {
+    return {
+      ok: false, action, status: "blocked",
+      reason: "target_env production/prod bloqueado. Use test ou simulate.",
+      data: null,
+    };
+  }
+  if (typeof env?.DEPLOY_WORKER?.fetch !== "function") {
+    return {
+      ok: false, action: "blocked", status: "blocked",
+      reason: "env.DEPLOY_WORKER não disponível. Service Binding 'DEPLOY_WORKER' não configurado. Deploy bloqueado por segurança.",
+      data: null,
+    };
+  }
+  try {
+    const safePayload = { ...payload, target_env: "test", deploy_action: "simulate" };
+    const res = await env.DEPLOY_WORKER.fetch("https://deploy-worker.internal/apply-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(safePayload),
+    });
+    let data = null;
+    let rawText = "";
+    try {
+      rawText = await res.text();
+      data = JSON.parse(rawText);
+    } catch (_) {
+      return {
+        ok: false, action, status: "ambiguous",
+        reason: "Resposta do Deploy Worker não é JSON válido.",
+        data: { raw: rawText.slice(0, 500) },
+      };
+    }
+    if (!res.ok) {
+      return {
+        ok: false, action, status: "failed",
+        reason: `Deploy Worker retornou status ${res.status}.`,
+        data,
+      };
+    }
+    if (data === null || typeof data !== "object") {
+      return {
+        ok: false, action, status: "ambiguous",
+        reason: "Resposta do Deploy Worker não é JSON objeto válido.",
+        data,
+      };
+    }
+    if ("ok" in data && data.ok === false) {
+      return {
+        ok: false, action, status: "failed",
+        reason: data.error || data.reason || data.message || "Deploy Worker retornou ok:false.",
+        data,
+      };
+    }
+    return { ok: true, action: "simulate", status: "passed", reason: null, data };
+  } catch (err) {
+    return {
+      ok: false, action, status: "failed",
+      reason: `Falha ao chamar Deploy Worker: ${String(err)}`,
+      data: null,
+    };
+  }
 }
 
 // ============================================================================
@@ -5240,11 +5420,93 @@ async function handleExecuteNext(request, env) {
     });
   }
 
-  // 6. execute_next → delegar a handleExecuteContract
+  // 6. execute_next — PR14: Executor audit + propose + Deploy Bridge antes do handler interno.
   // Sem timeout local artificial: o handler pode persistir KV e não há
   // cancelamento real. Timeout local seria inseguro porque a resposta poderia
   // voltar "bloqueada" enquanto a mutação continuaria em background.
   if (operationalAction.type === "execute_next") {
+    // PR14 — Step A: Executor /audit (obrigatório antes de executar)
+    const _auditPayload = {
+      source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
+      contract_id: contractId, nextAction, operationalAction,
+      evidence: Array.isArray(body.evidence) ? body.evidence : [],
+      approved_by: body.approved_by || null,
+      audit_id: auditId, timestamp: new Date().toISOString(),
+    };
+    const executorAuditResult = await callExecutorBridge(env, "/audit", _auditPayload);
+    if (!executorAuditResult.ok) {
+      logNV("🔴 [POST /contracts/execute-next] Executor /audit bloqueou (execute_next)", { auditResult: executorAuditResult });
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: executorAuditResult.reason || "Audit bloqueado pelo Executor.",
+        executor_audit: executorAuditResult, executor_propose: null,
+        executor_status: executorAuditResult.status, executor_route: "/audit",
+        executor_block_reason: executorAuditResult.reason,
+        deploy_result: null, deploy_status: "not_reached", deploy_route: null,
+        deploy_block_reason: "Audit bloqueou antes do deploy.",
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
+      });
+    }
+
+    // PR14 — Step B: Executor /propose (apenas execute_next)
+    const _proposePayload = {
+      source: "nv-enavia", mode: "contract_execute_next", executor_action: "propose",
+      workerId: "nv-enavia",
+      patch: { type: "contract_action", content: JSON.stringify(nextAction) },
+      prompt: `Proposta supervisionada para ação contratual: ${operationalAction.type}`,
+      intent: "propose",
+      contract_id: contractId, nextAction, operationalAction,
+      evidence: Array.isArray(body.evidence) ? body.evidence : [],
+      approved_by: body.approved_by || null,
+      audit_id: auditId, timestamp: new Date().toISOString(),
+    };
+    const executorProposeResult = await callExecutorBridge(env, "/propose", _proposePayload);
+    if (!executorProposeResult.ok) {
+      logNV("🔴 [POST /contracts/execute-next] Executor /propose bloqueou (execute_next)", { proposeResult: executorProposeResult });
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: executorProposeResult.reason || "Propose bloqueado pelo Executor.",
+        executor_audit: executorAuditResult, executor_propose: executorProposeResult,
+        executor_status: executorProposeResult.status, executor_route: "/propose",
+        executor_block_reason: executorProposeResult.reason,
+        deploy_result: null, deploy_status: "not_reached", deploy_route: null,
+        deploy_block_reason: "Propose bloqueou antes do deploy.",
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
+      });
+    }
+
+    // PR14 — Step C: Deploy Worker (modo simulate/apply-test/test apenas)
+    const _deployPayload = {
+      source: "nv-enavia", mode: "contract_execute_next",
+      deploy_action: "simulate", target_env: "test",
+      contract_id: contractId, nextAction, operationalAction,
+      executor_audit: executorAuditResult.data,
+      executor_propose: executorProposeResult.data,
+      audit_id: auditId, timestamp: new Date().toISOString(),
+    };
+    const deployResult = await callDeployBridge(env, "simulate", _deployPayload);
+    if (!deployResult.ok) {
+      logNV("🔴 [POST /contracts/execute-next] Deploy Worker bloqueou (execute_next)", { deployResult });
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: deployResult.reason || "Deploy Worker bloqueou ou não disponível.",
+        executor_audit: executorAuditResult, executor_propose: executorProposeResult,
+        executor_status: "passed", executor_route: "/propose",
+        executor_block_reason: null,
+        deploy_result: deployResult, deploy_status: deployResult.status,
+        deploy_route: deployResult.action === "blocked" ? null : "/apply-test",
+        deploy_block_reason: deployResult.reason,
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
+      });
+    }
+
+    // PR14 — Step D: Após audit + propose + deploy seguro, delegar ao handler interno
     let result;
     try {
       const syntheticReq = new Request("https://internal/contracts/execute", {
@@ -5261,6 +5523,11 @@ async function handleExecuteNext(request, env) {
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
         reason: "Falha interna ao executar ação.",
+        executor_audit: executorAuditResult, executor_propose: executorProposeResult,
+        executor_status: "passed", executor_route: "/propose",
+        executor_block_reason: null,
+        deploy_result: deployResult, deploy_status: deployResult.status,
+        deploy_route: "/apply-test", deploy_block_reason: null,
         nextAction, operationalAction,
         evidence: evidenceReport, rollback: rollbackBlocked,
         executor_path: executorPathInfo, audit_id: auditId,
@@ -5274,12 +5541,19 @@ async function handleExecuteNext(request, env) {
       logNV("⚠️ [POST /contracts/execute-next] Resultado ambíguo de handleExecuteContract", { result: result.body });
     }
     return jsonResponse({
-      ok:               executed,
-      executed,
+      ok: executed, executed,
       status:           executed ? "executed" : "blocked",
       reason:           executed ? null : (result.body?.message || (ambiguous ? "Resultado ambíguo. Execução bloqueada por segurança." : "Execução não concluída.")),
-      nextAction,
-      operationalAction,
+      executor_audit:   executorAuditResult,
+      executor_propose: executorProposeResult,
+      executor_status:  "passed",
+      executor_route:   "/propose",
+      executor_block_reason: null,
+      deploy_result:    deployResult,
+      deploy_status:    deployResult.status,
+      deploy_route:     "/apply-test",
+      deploy_block_reason: null,
+      nextAction, operationalAction,
       execution_result: result.body || null,
       evidence:         evidenceReport,
       rollback:         buildRollbackRecommendation(operationalAction.type, contractId, executed),
@@ -5288,7 +5562,9 @@ async function handleExecuteNext(request, env) {
     }, executed ? 200 : (result.status || 422));
   }
 
-  // 7. approve → gate humano explícito antes de delegar a handleCloseFinalContract
+  // 7. approve — PR14: Executor audit antes do handler interno.
+  // Gate humano (confirm + approved_by) é verificado ANTES do audit para
+  // evitar chamadas desnecessárias ao Executor com dados incompletos.
   // Mesmo motivo do step 6: sem cancelamento real, timeout local aqui seria
   // inseguro para handlers que podem alterar estado persistido no KV.
   if (operationalAction.type === "approve") {
@@ -5311,6 +5587,32 @@ async function handleExecuteNext(request, env) {
       }, 400);
     }
 
+    // PR14 — Step A: Executor /audit (obrigatório para approve também)
+    const _auditPayloadApprove = {
+      source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
+      contract_id: contractId, nextAction, operationalAction,
+      evidence: Array.isArray(body.evidence) ? body.evidence : [],
+      approved_by: body.approved_by,
+      audit_id: auditId, timestamp: new Date().toISOString(),
+    };
+    const executorAuditApproveResult = await callExecutorBridge(env, "/audit", _auditPayloadApprove);
+    if (!executorAuditApproveResult.ok) {
+      logNV("🔴 [POST /contracts/execute-next] Executor /audit bloqueou (approve)", { auditResult: executorAuditApproveResult });
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: executorAuditApproveResult.reason || "Audit bloqueado pelo Executor.",
+        executor_audit: executorAuditApproveResult, executor_propose: null,
+        executor_status: executorAuditApproveResult.status, executor_route: "/audit",
+        executor_block_reason: executorAuditApproveResult.reason,
+        deploy_result: null, deploy_status: "not_applicable", deploy_route: null,
+        deploy_block_reason: "Approve não usa deploy direto.",
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
+      });
+    }
+
+    // PR14 — Step B: Após audit, delegar ao handler interno
     let result;
     try {
       const syntheticReq = new Request("https://internal/contracts/close-final", {
@@ -5324,6 +5626,11 @@ async function handleExecuteNext(request, env) {
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
         reason: "Falha interna ao processar aprovação.",
+        executor_audit: executorAuditApproveResult, executor_propose: null,
+        executor_status: "passed", executor_route: "/audit",
+        executor_block_reason: null,
+        deploy_result: null, deploy_status: "not_applicable", deploy_route: null,
+        deploy_block_reason: "Approve não usa deploy direto.",
         nextAction, operationalAction,
         evidence: evidenceReport, rollback: rollbackBlocked,
         executor_path: executorPathInfo, audit_id: auditId,
@@ -5337,12 +5644,19 @@ async function handleExecuteNext(request, env) {
       logNV("⚠️ [POST /contracts/execute-next] Resultado ambíguo de handleCloseFinalContract", { result: result.body });
     }
     return jsonResponse({
-      ok:               executed,
-      executed,
+      ok: executed, executed,
       status:           executed ? "executed" : "blocked",
       reason:           executed ? null : (result.body?.message || (ambiguous ? "Resultado ambíguo. Aprovação bloqueada por segurança." : "Aprovação não processada.")),
-      nextAction,
-      operationalAction,
+      executor_audit:   executorAuditApproveResult,
+      executor_propose: null,
+      executor_status:  "passed",
+      executor_route:   "/audit",
+      executor_block_reason: null,
+      deploy_result:    null,
+      deploy_status:    "not_applicable",
+      deploy_route:     null,
+      deploy_block_reason: "Approve não usa deploy direto.",
+      nextAction, operationalAction,
       execution_result: result.body || null,
       evidence:         evidenceReport,
       rollback:         buildRollbackRecommendation(operationalAction.type, contractId, executed),
