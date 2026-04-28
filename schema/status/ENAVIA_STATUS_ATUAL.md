@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr6-loop-supervisionado
-**Última tarefa:** PR6 — Worker-only — loop contratual supervisionado em `nv-enavia.js`.
+**Branch ativa:** claude/pr7-schemas-orquestracao
+**Última tarefa:** PR7 — Worker-only — diagnóstico formal de schemas desconectados. Nenhum schema integrado (critério: sem uso claro no ciclo atual).
 
 ## Estado geral
 - Contrato ativo: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅
@@ -21,7 +21,7 @@
 - PR4 — worker confiabilidade: **concluída** ✅
 - PR5 — observabilidade real: **concluída** ✅ (ajuste de coerência `summary.total` aplicado)
 - PR6 — loop supervisionado: **concluída** ✅
-- PR7 — schemas orquestração: pendente
+- PR7 — schemas orquestração: **concluída** ✅ (diagnóstico formal — nenhuma integração necessária)
 
 ## Decisões formalizadas em PR4
 - `executor.invalid` — corrigido para `https://enavia-executor.internal/audit`.
@@ -46,9 +46,18 @@
 - `phase_complete`: removidos `complete-task`/`execute` (falham deterministicamente sem task in_progress). `availableActions: []` + campo `guidance` documenta ausência de endpoint de avanço de fase.
 - Panel e Executor: sem alteração.
 
+## Decisões formalizadas em PR7
+- 21 schemas já conectados (14 via `nv-enavia.js`, 7 via `contract-executor.js`).
+- 9 schemas desconectados avaliados; nenhum integrado:
+  - `contract-active-state`, `contract-adherence-engine`, `contract-cognitive-advisor`, `contract-cognitive-orchestrator`: mecanismo de estado KV paralelo ao existente — risco de estado duplicado sem refatoração.
+  - `contract-ingestion`: upstream do ciclo; sem endpoint consumidor.
+  - `enavia-capabilities`, `enavia-constitution`, `enavia-identity`: conteúdo estático sem fluxo consumidor; identidade já coberta por `enavia-cognitive-runtime`.
+  - `planner-memory-audit`: diagnóstico PM1-PM9 sem endpoint consumidor; memória funciona.
+- `consolidateAfterSave()` — mantida como dead code; formalmente fora do escopo de PR7.
+- **Contrato PR1–PR7: FORMALMENTE CONCLUÍDO.**
+
 ## Bloqueios
 - nenhum
 
 ## Próxima etapa segura
-- Aguardar merge da PR6 e autorização para iniciar PR7 (schemas orquestração) em branch `claude/pr7-schemas-orquestracao`.
-- PR7 é Worker-only: mapear schemas desconectados, integrar somente os necessários à orquestração atual.
+- Contrato PR1–PR7 concluído. Aguardar avaliação de novas iniciativas ou contrato subsequente.
