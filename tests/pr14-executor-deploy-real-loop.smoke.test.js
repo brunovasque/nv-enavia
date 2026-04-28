@@ -12,11 +12,13 @@
 //      A2. audit retorna ok:false → executor_status:blocked
 //      A3. audit retorna verdict:reject → executor_status:blocked
 //      A4. audit sem verdict → executor_status:ambiguous
+//      A5. propose HTTP 200 + body não JSON → executor_status:ambiguous
 //
 //   B. callDeployBridge — gates de segurança
 //      B1. ação de prod (promote) bloqueada imediatamente
 //      B2. target_env:prod bloqueado imediatamente
 //      B3. sem env.DEPLOY_WORKER → deploy_status:blocked
+//      B4. deploy HTTP 200 + body não JSON → deploy_status:ambiguous
 //
 //   C. Fluxo integrado execute_next
 //      C1. sem executor: response inclui executor_block_reason, deploy_status:not_reached
@@ -42,9 +44,11 @@ import { strict as assert } from "node:assert";
 // ── Helpers de KV ────────────────────────────────────────────────────────────
 
 function makeKV(db = {}) {
+  const writes = [];
   return {
+    writes,
     get: async (key) => db[key] ?? null,
-    put: async (key, val) => { db[key] = val; },
+    put: async (key, val) => { writes.push({ key, val }); db[key] = val; },
     list: async () => ({ keys: [] }),
   };
 }
@@ -113,7 +117,10 @@ function makeExecutorMock(responses = {}) {
         if (!resp) {
           return new Response(JSON.stringify({ ok: false, error: "Rota não mapeada no mock" }), { status: 500 });
         }
-        return new Response(JSON.stringify(resp.body), { status: resp.status ?? 200 });
+        const body = Object.prototype.hasOwnProperty.call(resp, "rawBody")
+          ? resp.rawBody
+          : JSON.stringify(resp.body);
+        return new Response(body, { status: resp.status ?? 200 });
       },
     },
   };
@@ -127,7 +134,10 @@ function makeDeployMock(response = { status: 200, body: { ok: true, action: "sim
     binding: {
       fetch: async (url, opts) => {
         calls.push({ url, body: opts?.body });
-        return new Response(JSON.stringify(response.body), { status: response.status ?? 200 });
+        const body = Object.prototype.hasOwnProperty.call(response, "rawBody")
+          ? response.rawBody
+          : JSON.stringify(response.body);
+        return new Response(body, { status: response.status ?? 200 });
       },
     },
   };
@@ -444,6 +454,11 @@ async function runTests() {
 
   {
     console.log("  C3. propose falha: deploy:not_reached, handler interno não chamado");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
     const execMock = makeExecutorMock({
       "/audit": { body: AUDIT_OK_BODY },
       "/propose": { body: { ok: false, error: "Propose rejeitado" } },
@@ -451,11 +466,7 @@ async function runTests() {
     let deployCalled = false;
     const env = {
       ...BASE_ENV,
-      ENAVIA_BRAIN: makeKV({
-        "contract:index":                     JSON.stringify(["ct-pr14-001"]),
-        "contract:ct-pr14-001:state":         STATE_START_TASK,
-        "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
-      }),
+      ENAVIA_BRAIN: kv,
       EXECUTOR: execMock.binding,
       DEPLOY_WORKER: {
         fetch: async () => {
@@ -469,6 +480,43 @@ async function runTests() {
     ok(r.data?.deploy_status === "not_reached",         "  deploy_status: not_reached");
     ok(r.data?.executor_propose?.ok === false,          "  executor_propose.ok: false");
     ok(!deployCalled,                                   "  Deploy Worker NÃO chamado");
+    ok(kv.writes.length === 0,                          "  handler interno NÃO executado");
+    console.log("");
+  }
+
+  {
+    console.log("  C3b. propose com JSON inválido → ambiguous, deploy:not_reached, handler interno não chamado");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({
+      "/audit": { body: AUDIT_OK_BODY },
+      "/propose": { status: 200, rawBody: "<<<not-json>>>" },
+    });
+    let deployCalled = false;
+    const env = {
+      ...BASE_ENV,
+      ENAVIA_BRAIN: kv,
+      EXECUTOR: execMock.binding,
+      DEPLOY_WORKER: {
+        fetch: async () => {
+          deployCalled = true;
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        },
+      },
+    };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                    "  status: blocked");
+    ok(r.data?.executor_status === "ambiguous",         "  executor_status: ambiguous");
+    ok(r.data?.executor_route === "/propose",           "  executor_route: /propose");
+    ok(r.data?.executor_propose?.ok === false,          "  executor_propose.ok: false");
+    ok(r.data?.executor_propose?.status === "ambiguous","  executor_propose.status: ambiguous");
+    ok(r.data?.executor_propose?.reason === "Resposta do Executor não é JSON válido.", "  reason de JSON inválido no Executor");
+    ok(r.data?.deploy_status === "not_reached",         "  deploy_status: not_reached");
+    ok(!deployCalled,                                   "  Deploy Worker NÃO chamado");
+    ok(kv.writes.length === 0,                          "  handler interno NÃO executado");
     console.log("");
   }
 
@@ -481,6 +529,33 @@ async function runTests() {
     ok(r.data?.executor_audit?.status === "passed",  "  executor_audit.status: passed");
     ok(r.data?.executor_propose?.status === "passed","  executor_propose.status: passed");
     ok(typeof r.data?.deploy_block_reason === "string", "  deploy_block_reason presente");
+    console.log("");
+  }
+
+  {
+    console.log("  C4b. deploy com JSON inválido → ambiguous, handler interno não chamado");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
+    const deployMock = makeDeployMock({ status: 200, rawBody: "<<deploy-not-json>>" });
+    const env = {
+      ...BASE_ENV,
+      ENAVIA_BRAIN: kv,
+      EXECUTOR: execMock.binding,
+      DEPLOY_WORKER: deployMock.binding,
+    };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                        "  status: blocked");
+    ok(r.data?.executor_status === "passed",                "  executor_status: passed");
+    ok(r.data?.deploy_status === "ambiguous",               "  deploy_status: ambiguous");
+    ok(r.data?.deploy_result?.ok === false,                 "  deploy_result.ok: false");
+    ok(r.data?.deploy_result?.status === "ambiguous",       "  deploy_result.status: ambiguous");
+    ok(r.data?.deploy_result?.reason === "Resposta do Deploy Worker não é JSON válido.", "  reason de JSON inválido no Deploy Worker");
+    ok(deployMock.calls.length === 1,                       "  Deploy Worker chamado uma vez");
+    ok(kv.writes.length === 0,                              "  handler interno NÃO executado");
     console.log("");
   }
 

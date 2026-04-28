@@ -1,14 +1,43 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR14 — Worker-only — Executor real + Deploy Worker no loop operacional
+**De:** PR14 — ajuste P1 na PR #162
 **Para:** Novo contrato (se necessário)
 
 ## O que foi feito nesta sessão
 
-### PR14 — Worker-only — Executor real + Deploy Worker
+### PR14 — ajuste P1 na PR #162
 
-**Helpers criados em `nv-enavia.js`:**
+**Patch cirúrgico em `nv-enavia.js`:**
+
+1. `callExecutorBridge(env, route, payload)`:
+   - Se `JSON.parse(rawText)` falha, retorna imediatamente:
+     - `ok: false`
+     - `status: "ambiguous"`
+     - `reason: "Resposta do Executor não é JSON válido."`
+     - `data: { raw: rawText.slice(0, 500) }`
+   - Não segue para o fluxo normal e não pode retornar `passed` com body ilegível.
+
+2. `callDeployBridge(env, action, payload)`:
+   - Se `JSON.parse(rawText)` falha, retorna imediatamente:
+     - `ok: false`
+     - `status: "ambiguous"`
+     - `reason: "Resposta do Deploy Worker não é JSON válido."`
+     - `data: { raw: rawText.slice(0, 500) }`
+   - Não segue para o fluxo normal e não pode retornar `passed` com body ilegível.
+
+**Smoke tests ampliados em `tests/pr14-executor-deploy-real-loop.smoke.test.js`:**
+
+- Executor `/propose` com HTTP 200 + body não-JSON → `status: "blocked"` no endpoint, `executor_status: "ambiguous"`, deploy não chamado e handler interno não executado.
+- Deploy Worker com HTTP 200 + body não-JSON → `status: "blocked"` no endpoint, `deploy_status: "ambiguous"` e handler interno não executado.
+- `makeKV()` agora registra `writes` para provar que o handler interno não roda nesses cenários.
+
+**Resultados smoke tests desta sessão:**
+
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **111 passed, 0 failed** ✅
+- `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+
+**Contexto anterior preservado da PR14:**
 
 1. `callExecutorBridge(env, route, payload)`:
    - Chama `env.EXECUTOR.fetch("https://enavia-executor.internal" + route, ...)`
@@ -54,13 +83,13 @@
 - `panel/` — sem alteração
 - `wrangler.toml` — sem alteração (bindings EXECUTOR e DEPLOY_WORKER já existiam)
 
-**Resultados smoke tests:**
-- `tests/pr14-executor-deploy-real-loop.smoke.test.js` → **93 passed, 0 failed ✅**
+**Resultados smoke tests anteriores da PR14:**
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` → **93 passed, 0 failed ✅** (antes do ajuste P1)
 - `tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed ✅**
 
 ## Próxima ação segura
 
-- Nenhuma. PR14 concluída. Aguardando novo contrato.
+- Aguardar revisão/aprovação da PR #162 após o ajuste P1.
 
 ## Bloqueios
 

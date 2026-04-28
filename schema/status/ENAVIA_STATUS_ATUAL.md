@@ -2,7 +2,7 @@
 
 **Data:** 2026-04-28
 **Branch ativa:** claude/pr14-executor-deploy-real-loop
-**Última tarefa:** PR14 — Worker-only — Executor real + Deploy Worker no loop operacional. Adicionados `callExecutorBridge` e `callDeployBridge` em `nv-enavia.js`. `handleExecuteNext` agora chama `/audit` + `/propose` via `env.EXECUTOR` e `/apply-test` via `env.DEPLOY_WORKER` (simulate/test) antes do handler interno. Produção bloqueada. Smoke tests: PR14 93/93 ✅, PR13 91/91 ✅. Sem alteração em Panel, Executor externo, Deploy Worker externo, `contract-executor.js` ou `executor/`.
+**Última tarefa:** PR14 — ajuste P1 na PR #162 (Worker-only). `callExecutorBridge` e `callDeployBridge` agora retornam imediatamente `ok:false`, `status:"ambiguous"` e motivo explícito quando o HTTP 200 traz body não-JSON, impedindo qualquer path `passed` com resposta ilegível. Smoke tests: PR14 111/111 ✅, PR13 91/91 ✅. Sem alteração em Panel, Executor externo, Deploy Worker externo, `contract-executor.js` ou `executor/`.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -112,5 +112,13 @@
 - `tests/pr14-executor-deploy-real-loop.smoke.test.js` → 93 passed, 0 failed ✅.
 - `tests/pr13-hardening-operacional.smoke.test.js` atualizado (3 asserts ajustados para mudança intencional de PR14 em `buildExecutorPathInfo`) → 91 passed, 0 failed ✅.
 
+## Ajuste P1 na PR14 — comentários Codex (PR #162)
+
+- `callExecutorBridge(...)` agora retorna imediatamente `{ ok:false, status:"ambiguous", reason:"Resposta do Executor não é JSON válido.", data:{ raw } }` quando `JSON.parse` falha em `/audit` ou `/propose`.
+- `callDeployBridge(...)` agora retorna imediatamente `{ ok:false, status:"ambiguous", reason:"Resposta do Deploy Worker não é JSON válido.", data:{ raw } }` quando `JSON.parse` falha.
+- Confirmado por smoke test que `/propose` com body não-JSON bloqueia antes do deploy.
+- Confirmado por smoke test que Deploy Worker com body não-JSON bloqueia antes do handler interno.
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado para esses cenários → **111 passed, 0 failed** ✅.
+
 ## Próxima etapa segura
-- Novo contrato se necessário. PR14 concluída.
+- Aguardar revisão da PR #162 após o ajuste P1.

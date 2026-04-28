@@ -5148,7 +5148,11 @@ async function callExecutorBridge(env, route, payload) {
       rawText = await res.text();
       data = JSON.parse(rawText);
     } catch (_) {
-      data = { raw: rawText.slice(0, 500) };
+      return {
+        ok: false, route, status: "ambiguous",
+        reason: "Resposta do Executor não é JSON válido.",
+        data: { raw: rawText.slice(0, 500) },
+      };
     }
     if (!res.ok) {
       return {
@@ -5249,7 +5253,11 @@ async function callDeployBridge(env, action, payload) {
       rawText = await res.text();
       data = JSON.parse(rawText);
     } catch (_) {
-      data = { raw: rawText.slice(0, 500) };
+      return {
+        ok: false, action, status: "ambiguous",
+        reason: "Resposta do Deploy Worker não é JSON válido.",
+        data: { raw: rawText.slice(0, 500) },
+      };
     }
     if (!res.ok) {
       return {

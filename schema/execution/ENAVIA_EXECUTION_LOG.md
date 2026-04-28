@@ -4,6 +4,31 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR14 ajuste P1 — bloquear JSON inválido em bridges do Executor/Deploy
+
+- **Branch:** `claude/pr14-executor-deploy-real-loop`
+- **PR:** #162
+- **Escopo:** Worker-only. Ajuste cirúrgico em `nv-enavia.js` + smoke tests da PR14. Sem alteração em Panel, Executor externo, Deploy Worker externo, `contract-executor.js`, `executor/` ou `wrangler.toml`.
+- **Diagnóstico:**
+  1. `callExecutorBridge(...)` convertia parse inválido para `{ raw: ... }`; como isso é objeto, o fluxo ainda podia cair em `status: "passed"`.
+  2. `callDeployBridge(...)` tinha o mesmo problema.
+  3. Isso permitia tratar body HTTP 200 ilegível como resposta válida, o que é inseguro.
+- **Patch aplicado:**
+  1. `callExecutorBridge(...)` agora retorna imediatamente `ok:false`, `status:"ambiguous"`, `reason:"Resposta do Executor não é JSON válido."` e `data:{ raw }` quando `JSON.parse` falha.
+  2. `callDeployBridge(...)` agora retorna imediatamente `ok:false`, `status:"ambiguous"`, `reason:"Resposta do Deploy Worker não é JSON válido."` e `data:{ raw }` quando `JSON.parse` falha.
+  3. `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado com:
+     - `/propose` HTTP 200 + body não-JSON → bloqueia antes do deploy.
+     - Deploy Worker HTTP 200 + body não-JSON → bloqueia antes do handler interno.
+     - `makeKV().writes` para provar ausência de execução do handler interno.
+- **Smoke tests:**
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **111 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **CI/Actions investigado:** run `Addressing comment on PR #162` (`25080312763`) encontrada em andamento; sem job falho no momento da inspeção.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** aguardar revisão do ajuste P1 na PR #162.
+
+---
+
 ## 2026-04-28 — PR14 — Worker-only — Executor real + Deploy Worker no loop operacional
 
 - **Branch:** `claude/pr14-executor-deploy-real-loop`
