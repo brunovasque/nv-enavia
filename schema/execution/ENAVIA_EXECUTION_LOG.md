@@ -4,6 +4,38 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR10 — Worker-only — gates, evidências e rollback
+
+- **Branch:** `claude/pr10-gates-evidencias-rollback`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Adição de helpers puros + enriquecimento de `handleExecuteNext`. Sem persistência nova. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Helpers criados (puros, `nv-enavia.js:4991–5059`):**
+  - `buildEvidenceReport(opType, contractId, body)` → `{ required, provided, missing }`.
+  - `buildRollbackRecommendation(opType, contractId, executed)` → `{ available, type, recommendation, command }`.
+- **Gates adicionados a `handleExecuteNext`:**
+  1. Contrato ausente / KV indisponível → `status: "blocked"`, `evidence: null, rollback: null`.
+  2. Estado terminal → `status: "blocked"`, `evidence: null, rollback: null`.
+  3. `can_execute !== true` → bloqueado com `evidence` + `rollback`.
+  4. `evidenceReport.missing.length > 0` → bloqueado com `evidence` + `rollback`.
+  5. `approve` sem `confirm === true` → `status: "awaiting_approval"`.
+  6. `approve` sem `approved_by` → 400.
+  7. Resultado ambíguo (status 200 sem `ok` explícito) → bloqueado + log de aviso.
+  8. Tipo sem caminho seguro → `status: "blocked"`.
+- **Campos adicionados ao response (backward-compat):**
+  - `evidence: { required, provided, missing }` — auditabilidade de evidências.
+  - `rollback: { available, type, recommendation, command }` — orientação de rollback sem execução.
+- **Smoke tests:**
+  - `execute_next` sem `evidence` no body → `missing: ["evidence[]"]` → bloqueado ✅.
+  - `execute_next` com `evidence: []` no body → `missing: []` → prossegue ✅.
+  - `approve` sem `confirm` → `awaiting_approval` com `evidence` + `rollback` ✅.
+  - Execução sucedida → `rollback: { available: true, type: "manual_review" }` ✅.
+  - Bloqueio → `rollback: { available: false, type: "no_state_change" }` ✅.
+  - Panel/Executor/`contract-executor.js` intocados ✅.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR11 — integração segura com executor.
+
+---
+
 ## 2026-04-28 — PR9 Ajuste — Gate booleano estrito em `handleExecuteNext`
 
 - **Branch:** `claude/pr9-execute-next-supervisionado`
