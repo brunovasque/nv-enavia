@@ -4,6 +4,30 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR13 — Worker-only — hardening final e encerramento do contrato PR8–PR13
+
+- **Branch:** `claude/pr13-hardening-final-operacional`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Diagnóstico e testes de hardening. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Diagnóstico:**
+  1. CORS confirmado: `jsonResponse()` chama `withCORS()` internamente em todas as respostas.
+  2. `GET /contracts/loop-status` confirmado no routing block; resposta inclui `ok`, `generatedAt`, `contract`, `nextAction`, `operationalAction`, `loop`.
+  3. `POST /contracts/execute-next` confirmado com 8 gates: JSON inválido, sem KV, sem contrato, `can_execute:false`, evidence faltando, evidence presente, approve sem `confirm`, approve sem `approved_by`.
+  4. `env.EXECUTOR.fetch` confirmado como NÃO chamado em nenhum path do execute-next (fluxo inteiramente KV).
+  5. Rollback confirmado como recomendação pura — sem execução automática.
+  6. `Promise.race` ausente — design correto para handlers que mutam KV.
+- **Smoke test criado:** `tests/pr13-hardening-operacional.smoke.test.js`
+  - Seção A: shape do loop-status, CORS, sem KV, index vazio, contrato ativo
+  - Seção B: todos os gates do execute-next
+  - Seção C: isolamento do executor, rollback como recomendação, status presente em todos os paths
+  - Seção D: CORS no execute-next, OPTIONS preflight
+  - **Resultado: 91 passed, 0 failed ✅**
+- **Bloqueios:** nenhum.
+- **Contrato PR8–PR13: FORMALMENTE ENCERRADO ✅**
+- **Próxima etapa segura:** Nenhuma. Contrato concluído.
+
+---
+
 ## 2026-04-28 — PR12 Ajuste — feedback da PR #160 na `LoopPage`
 
 - **Branch:** `claude/pr12-panel-botoes-operacionais`

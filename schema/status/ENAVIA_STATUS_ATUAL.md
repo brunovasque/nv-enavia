@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-28
-**Branch ativa:** claude/pr12-panel-botoes-operacionais
-**Última tarefa:** PR12 — ajuste cirúrgico de feedback na PR #160: `LoopPage.jsx` passou a usar `loopData.contract` para contrato/status/fase/task/updated_at e `handleExecute` passou a preservar o payload canônico de bloqueio/erro retornado em `r.data`. Teste direcionado adicionado; suíte do painel e build passaram. Sem alteração em Worker/Executor/contract-executor.js.
+**Branch ativa:** claude/pr13-hardening-final-operacional
+**Última tarefa:** PR13 — Worker-only — hardening final. Diagnóstico das rotas `GET /contracts/loop-status` e `POST /contracts/execute-next`. CORS confirmado via `jsonResponse`/`withCORS`. Todos os 8 gates do execute-next confirmados. `env.EXECUTOR.fetch` confirmado como nunca chamado. Smoke test criado: `tests/pr13-hardening-operacional.smoke.test.js` → 91 passed, 0 failed. Sem alteração em Panel, Executor ou contract-executor.js. Contrato PR8–PR13 formalmente encerrado.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -16,7 +16,7 @@
 - PR10 — gates, evidências e rollback: **concluída** ✅ (branch: `claude/pr10-gates-evidencias-rollback`) — ajuste final de honestidade aplicado na PR #158
 - PR11 — integração segura com executor: **concluída** ✅ (branch: `claude/pr11-integracao-segura-executor`)
 - PR12 — botões operacionais no painel: **concluída** ✅ (branch: `claude/pr12-panel-botoes-operacionais`)
-- PR13 — hardening final: **pendente**
+- PR13 — hardening final: **concluída** ✅ (branch: `claude/pr13-hardening-final-operacional`)
 
 ## Decisões formalizadas em PR4
 - `executor.invalid` — corrigido para `https://enavia-executor.internal/audit`.
@@ -91,5 +91,15 @@
 - Ajuste PR #160: seção "Status do Loop" agora lê `loopData.contract.{id,status,current_phase,current_task,updated_at}`; `loop` fica restrito a `canProceed`, `blockReason`, `availableActions` e `guidance`.
 - Ajuste PR #160: `handleExecute` prioriza `r.data` mesmo quando `r.ok === false`, preservando `reason`, `evidence`, `rollback`, `executor_path` e `audit_id` do backend.
 
+## Decisões formalizadas em PR13
+
+- `GET /contracts/loop-status` e `POST /contracts/execute-next` — CORS confirmado via `jsonResponse()` → `withCORS()` internamente. Sem necessidade de wrapper manual.
+- 8 gates do execute-next verificados e documentados via smoke test: JSON inválido, sem KV, sem contrato, `can_execute:false`, evidence faltando, evidence presente, approve sem confirm, approve sem approved_by.
+- `env.EXECUTOR.fetch` confirmado como nunca chamado em nenhum path do execute-next — fluxo inteiramente KV, sem service binding para contratos.
+- Rollback confirmado como recomendação pura (`buildRollbackRecommendation`) — sem execução automática em nenhum path.
+- `Promise.race` confirmado como ausente — design correto: handlers mutam KV, race não cancela promise original (documentado em PR11).
+- Smoke test: `tests/pr13-hardening-operacional.smoke.test.js` → 91 passed, 0 failed.
+- **Contrato `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`: FORMALMENTE ENCERRADO ✅**
+
 ## Próxima etapa segura
-- PR13 — Worker-only — hardening final e encerramento.
+- Nenhuma. Contrato PR8–PR13 concluído. Aguardando novo contrato.
