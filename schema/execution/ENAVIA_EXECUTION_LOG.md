@@ -4,6 +4,33 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR11 — Worker-only — integração segura com executor
+
+- **Branch:** `claude/pr11-integracao-segura-executor`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Diagnóstico do caminho executor + auditoria, sem timeout local inseguro. Sem alteração em Panel, Executor ou `contract-executor.js`.
+- **Diagnóstico realizado:**
+  - `env.EXECUTOR.fetch` é usado APENAS em `handleEngineerRequest` (rota `/engineer`, proxy direto). NÃO é usado no fluxo de contratos.
+  - Caminho `handleExecuteNext → handleExecuteContract → executeCurrentMicroPr` é integralmente KV puro. Sem Service Binding.
+  - `executeCurrentMicroPr` tem supervisor gate, task status check, TEST-only guard e active micro-PR check — gates suficientes.
+- **Alterações em `nv-enavia.js`:**
+  1. Helper puro `buildExecutorPathInfo(env, opType)` — retorna `{ type, handler, uses_service_binding, service_binding_available, note }`.
+  2. `handleExecuteContract` (step 6) mantido sem `Promise.race`: o handler pode alterar KV, e timeout local não cancela a Promise original.
+  3. `handleCloseFinalContract` (step 7) mantido sem `Promise.race`: mesmo motivo acima.
+  4. Código documenta explicitamente que, sem `AbortSignal`/cancelamento real, timeout local seria inseguro.
+  5. Timeout seguro fica para PR futura somente com handler cancelável/idempotente.
+  6. Campo `executor_path` adicionado a todos os paths de resposta (aditivo backward-compat). Paths antes do step 4: `null`. Paths após: `executorPathInfo`.
+- **Campos novos no response (backward-compat):**
+  - `executor_path: { type, handler, uses_service_binding, service_binding_available, note }`
+- **Smoke tests:**
+  - `node --test tests/pr8-hardening-producao.smoke.test.js` → 41 passed, 0 failed.
+  - `node --input-type=module <<'EOF' ... worker.fetch('/contracts/execute-next') ... EOF` → `executor_path` presente nos paths `blocked` e `awaiting_approval`; `EXECUTOR.fetch` não chamado.
+  - `node --input-type=module <<'EOF' ... fs.readFileSync('./nv-enavia.js') ... EOF` → `handleExecuteNext` sem `Promise.race` e sem `env.EXECUTOR.fetch`.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR12 — Panel-only — botões operacionais no painel.
+
+---
+
 ## 2026-04-28 — PR10 Ajuste — honestidade de validação em `execute-next`
 
 - **Branch:** `claude/pr10-gates-evidencias-rollback`

@@ -5066,6 +5066,51 @@ function buildRollbackRecommendation(opType, contractId, executed) {
 }
 
 // ============================================================================
+// PR11 — buildExecutorPathInfo (Worker-only, pure)
+//
+// Retorna auditoria do caminho de execução: qual handler será chamado e se
+// env.EXECUTOR (Service Binding) é ou não usado neste fluxo.
+//
+// Diagnóstico PR11 confirmou:
+//   - execute_next → handleExecuteContract → executeCurrentMicroPr (KV puro)
+//   - approve      → handleCloseFinalContract (KV puro)
+//   - env.EXECUTOR.fetch é usado APENAS em handleEngineerRequest (/engineer proxy)
+//   - O fluxo de contratos NÃO passa pelo Service Binding do executor externo.
+//   - Timeout local cancelável NÃO foi aplicado: esses handlers podem alterar KV
+//     e uma corrida local de Promises não cancela a execução original.
+//   - Sem AbortSignal/cancelamento real, responder timeout aqui seria inseguro.
+//   - Timeout seguro fica para PR futura, se houver handler cancelável/idempotente.
+// ============================================================================
+function buildExecutorPathInfo(env, opType) {
+  const serviceBindingAvailable = !!(env && env.EXECUTOR);
+  if (opType === "execute_next") {
+    return {
+      type:                      "internal_handler",
+      handler:                   "handleExecuteContract → executeCurrentMicroPr",
+      uses_service_binding:      false,
+      service_binding_available: serviceBindingAvailable,
+      note:                      "Caminho interno KV. env.EXECUTOR não é chamado neste fluxo.",
+    };
+  }
+  if (opType === "approve") {
+    return {
+      type:                      "internal_handler",
+      handler:                   "handleCloseFinalContract",
+      uses_service_binding:      false,
+      service_binding_available: serviceBindingAvailable,
+      note:                      "Caminho interno KV. env.EXECUTOR não é chamado neste fluxo.",
+    };
+  }
+  return {
+    type:                      "blocked",
+    handler:                   null,
+    uses_service_binding:      false,
+    service_binding_available: serviceBindingAvailable,
+    note:                      "Ação bloqueada. Nenhum handler chamado.",
+  };
+}
+
+// ============================================================================
 // PR9 — POST /contracts/execute-next (handler canônico, Worker-only)
 //
 // Loop operacional supervisionado: lê contrato ativo, resolve próxima ação,
@@ -5081,10 +5126,12 @@ function buildRollbackRecommendation(opType, contractId, executed) {
 // Body esperado:
 //   { confirm?: true, approved_by?: string, evidence?: any[] }
 //
-// Resposta (PR10 — enriquecida):
+// Resposta (PR11 — enriquecida com executor_path):
 //   { ok, executed, status, reason, nextAction, operationalAction,
-//     evidence: { required, provided, missing }, rollback: { available, type,
-//     recommendation, command }, execution_result?, audit_id }
+//     evidence: { required, provided, missing, validation_level, semantic_validation },
+//     rollback: { available, type, recommendation, command },
+//     executor_path: { type, handler, uses_service_binding, service_binding_available, note },
+//     execution_result?, audit_id }
 // ============================================================================
 async function handleExecuteNext(request, env) {
   const auditId = `exec-next:${Date.now()}`;
@@ -5098,7 +5145,7 @@ async function handleExecuteNext(request, env) {
       ok: false, executed: false, status: "blocked",
       reason: "Body JSON inválido.",
       nextAction: null, operationalAction: null,
-      evidence: null, rollback: null, audit_id: auditId,
+      evidence: null, rollback: null, executor_path: null, audit_id: auditId,
     }, 400);
   }
 
@@ -5108,7 +5155,7 @@ async function handleExecuteNext(request, env) {
       ok: false, executed: false, status: "blocked",
       reason: "KV não disponível neste ambiente.",
       nextAction: null, operationalAction: null,
-      evidence: null, rollback: null, audit_id: auditId,
+      evidence: null, rollback: null, executor_path: null, audit_id: auditId,
     });
   }
 
@@ -5128,7 +5175,7 @@ async function handleExecuteNext(request, env) {
         ok: false, executed: false, status: "blocked",
         reason: "Nenhum contrato encontrado.",
         nextAction: null, operationalAction: null,
-        evidence: null, rollback: null, audit_id: auditId,
+        evidence: null, rollback: null, executor_path: null, audit_id: auditId,
       });
     }
 
@@ -5145,7 +5192,7 @@ async function handleExecuteNext(request, env) {
       ok: false, executed: false, status: "blocked",
       reason: "Falha ao localizar contrato ativo.",
       nextAction: null, operationalAction: null,
-      evidence: null, rollback: null, audit_id: auditId,
+      evidence: null, rollback: null, executor_path: null, audit_id: auditId,
     }, 500);
   }
 
@@ -5154,7 +5201,7 @@ async function handleExecuteNext(request, env) {
       ok: false, executed: false, status: "blocked",
       reason: "Nenhum contrato ativo (todos terminais).",
       nextAction: null, operationalAction: null,
-      evidence: null, rollback: null, audit_id: auditId,
+      evidence: null, rollback: null, executor_path: null, audit_id: auditId,
     });
   }
 
@@ -5166,13 +5213,17 @@ async function handleExecuteNext(request, env) {
   const evidenceReport  = buildEvidenceReport(operationalAction.type, contractId, body);
   const rollbackBlocked = buildRollbackRecommendation(operationalAction.type, contractId, false);
 
+  // PR11 — Registrar caminho de execução para auditoria
+  const executorPathInfo = buildExecutorPathInfo(env, operationalAction.type);
+
   // 5. Gate primário: can_execute — bloquear sem executar
   if (!operationalAction.can_execute) {
     return jsonResponse({
       ok: true, executed: false, status: "blocked",
       reason: operationalAction.block_reason || "Ação bloqueada.",
       nextAction, operationalAction,
-      evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+      evidence: evidenceReport, rollback: rollbackBlocked,
+      executor_path: executorPathInfo, audit_id: auditId,
     });
   }
 
@@ -5184,11 +5235,15 @@ async function handleExecuteNext(request, env) {
         ? "Campo evidence é obrigatório, mesmo que vazio, para ack operacional mínimo. Validação atual é apenas de presença."
         : `Evidência requerida ausente: ${evidenceReport.missing.join(", ")}.`,
       nextAction, operationalAction,
-      evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+      evidence: evidenceReport, rollback: rollbackBlocked,
+      executor_path: executorPathInfo, audit_id: auditId,
     });
   }
 
-  // 6. execute_next → delegar a handleExecuteContract (handler interno seguro)
+  // 6. execute_next → delegar a handleExecuteContract
+  // Sem timeout local artificial: o handler pode persistir KV e não há
+  // cancelamento real. Timeout local seria inseguro porque a resposta poderia
+  // voltar "bloqueada" enquanto a mutação continuaria em background.
   if (operationalAction.type === "execute_next") {
     let result;
     try {
@@ -5207,7 +5262,8 @@ async function handleExecuteNext(request, env) {
         ok: false, executed: false, status: "blocked",
         reason: "Falha interna ao executar ação.",
         nextAction, operationalAction,
-        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
       }, 500);
     }
 
@@ -5227,18 +5283,22 @@ async function handleExecuteNext(request, env) {
       execution_result: result.body || null,
       evidence:         evidenceReport,
       rollback:         buildRollbackRecommendation(operationalAction.type, contractId, executed),
+      executor_path:    executorPathInfo,
       audit_id:         auditId,
     }, executed ? 200 : (result.status || 422));
   }
 
   // 7. approve → gate humano explícito antes de delegar a handleCloseFinalContract
+  // Mesmo motivo do step 6: sem cancelamento real, timeout local aqui seria
+  // inseguro para handlers que podem alterar estado persistido no KV.
   if (operationalAction.type === "approve") {
     if (body.confirm !== true) {
       return jsonResponse({
         ok: true, executed: false, status: "awaiting_approval",
         reason: "Aprovação humana explícita necessária. Envie { confirm: true, approved_by: '...' } (boolean estrito).",
         nextAction, operationalAction,
-        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
       });
     }
     if (!body.approved_by) {
@@ -5246,7 +5306,8 @@ async function handleExecuteNext(request, env) {
         ok: false, executed: false, status: "awaiting_approval",
         reason: "Campo approved_by é obrigatório para aprovação humana.",
         nextAction, operationalAction,
-        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
       }, 400);
     }
 
@@ -5264,7 +5325,8 @@ async function handleExecuteNext(request, env) {
         ok: false, executed: false, status: "blocked",
         reason: "Falha interna ao processar aprovação.",
         nextAction, operationalAction,
-        evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
       }, 500);
     }
 
@@ -5284,6 +5346,7 @@ async function handleExecuteNext(request, env) {
       execution_result: result.body || null,
       evidence:         evidenceReport,
       rollback:         buildRollbackRecommendation(operationalAction.type, contractId, executed),
+      executor_path:    executorPathInfo,
       audit_id:         auditId,
     }, executed ? 200 : (result.status || 422));
   }
@@ -5296,7 +5359,8 @@ async function handleExecuteNext(request, env) {
     ok: false, executed: false, status: "blocked",
     reason: `Tipo de ação "${operationalAction.type}" não tem caminho seguro mapeado em execute-next.`,
     nextAction, operationalAction,
-    evidence: evidenceReport, rollback: rollbackBlocked, audit_id: auditId,
+    evidence: evidenceReport, rollback: rollbackBlocked,
+    executor_path: executorPathInfo, audit_id: auditId,
   });
 }
 
