@@ -15,20 +15,18 @@
 
 **Adições em `nv-enavia.js`:**
 
-1. `EXECUTE_NEXT_INTERNAL_TIMEOUT_MS = 15_000` — constante de timeout.
-
-2. `buildExecutorPathInfo(env, opType)` — helper puro:
+1. `buildExecutorPathInfo(env, opType)` — helper puro:
    - `execute_next` → `{ type: "internal_handler", handler: "handleExecuteContract → executeCurrentMicroPr", uses_service_binding: false, ... }`
    - `approve` → `{ type: "internal_handler", handler: "handleCloseFinalContract", uses_service_binding: false, ... }`
    - outros → `{ type: "blocked", handler: null, uses_service_binding: false, ... }`
 
-3. `handleExecuteContract` (step 6) envolto em `Promise.race` com timeout de 15s.
+2. Timeout local removido do fluxo `execute-next`:
+   - `handleExecuteContract` e `handleCloseFinalContract` podem alterar KV.
+   - `Promise.race` não cancela a Promise original.
+   - Sem `AbortSignal`/cancelamento real, timeout local seria inseguro.
+   - Timeout seguro fica para PR futura somente com handler cancelável/idempotente.
 
-4. `handleCloseFinalContract` (step 7) envolto em `Promise.race` com timeout de 15s.
-
-5. Timeout distinguível por prefixo `EXECUTE_NEXT_TIMEOUT:` — mensagem específica ao usuário.
-
-6. Campo `executor_path` adicionado a todos os paths de resposta:
+3. Campo `executor_path` adicionado a todos os paths de resposta:
    - Paths antes do step 4 (body/KV/contrato): `executor_path: null`
    - Paths após step 4: `executor_path: executorPathInfo`
 
@@ -50,7 +48,12 @@
 ```
 
 ### Alterações de código
-- `nv-enavia.js` — constante `EXECUTE_NEXT_INTERNAL_TIMEOUT_MS`, helper `buildExecutorPathInfo`, `Promise.race` nos dois handlers, campo `executor_path` em todos os paths.
+- `nv-enavia.js` — helper `buildExecutorPathInfo`, remoção do timeout local inseguro nos dois handlers, campo `executor_path` em todos os paths.
+
+### Smoke tests executados
+- `node --test tests/pr8-hardening-producao.smoke.test.js` → 41 passed, 0 failed.
+- `node --input-type=module <<'EOF' ... worker.fetch('/contracts/execute-next') ... EOF` → `executor_path` presente nos paths `blocked` e `awaiting_approval`; `EXECUTOR.fetch` não chamado.
+- `node --input-type=module <<'EOF' ... fs.readFileSync('./nv-enavia.js') ... EOF` → `handleExecuteNext` sem `Promise.race` e sem `env.EXECUTOR.fetch`.
 
 ## O que NÃO foi alterado (por escopo)
 - `panel/` — sem alteração
@@ -63,7 +66,7 @@
 - **PR8: CONCLUÍDA** ✅
 - **PR9: CONCLUÍDA** ✅
 - **PR10: CONCLUÍDA** ✅
-- **PR11: CONCLUÍDA** ✅ — caminho executor auditado, timeout adicionado, `executor_path` no response.
+- **PR11: CONCLUÍDA** ✅ — caminho executor auditado, timeout local inseguro removido, `executor_path` no response.
 - Contrato ativo: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`.
 
 ## Próxima ação segura

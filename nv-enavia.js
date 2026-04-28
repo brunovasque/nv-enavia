@@ -5076,9 +5076,11 @@ function buildRollbackRecommendation(opType, contractId, executed) {
 //   - approve      → handleCloseFinalContract (KV puro)
 //   - env.EXECUTOR.fetch é usado APENAS em handleEngineerRequest (/engineer proxy)
 //   - O fluxo de contratos NÃO passa pelo Service Binding do executor externo.
+//   - Timeout local cancelável NÃO foi aplicado: esses handlers podem alterar KV
+//     e uma corrida local de Promises não cancela a execução original.
+//   - Sem AbortSignal/cancelamento real, responder timeout aqui seria inseguro.
+//   - Timeout seguro fica para PR futura, se houver handler cancelável/idempotente.
 // ============================================================================
-const EXECUTE_NEXT_INTERNAL_TIMEOUT_MS = 15_000;
-
 function buildExecutorPathInfo(env, opType) {
   const serviceBindingAvailable = !!(env && env.EXECUTOR);
   if (opType === "execute_next") {
@@ -5238,7 +5240,10 @@ async function handleExecuteNext(request, env) {
     });
   }
 
-  // 6. execute_next → delegar a handleExecuteContract (handler interno seguro, PR11: com timeout)
+  // 6. execute_next → delegar a handleExecuteContract
+  // Sem timeout local artificial: o handler pode persistir KV e não há
+  // cancelamento real. Timeout local seria inseguro porque a resposta poderia
+  // voltar "bloqueada" enquanto a mutação continuaria em background.
   if (operationalAction.type === "execute_next") {
     let result;
     try {
@@ -5250,20 +5255,12 @@ async function handleExecuteNext(request, env) {
           evidence: Array.isArray(body.evidence) ? body.evidence : [],
         }),
       });
-      result = await Promise.race([
-        handleExecuteContract(syntheticReq, env),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`EXECUTE_NEXT_TIMEOUT:${EXECUTE_NEXT_INTERNAL_TIMEOUT_MS}ms`)), EXECUTE_NEXT_INTERNAL_TIMEOUT_MS)
-        ),
-      ]);
+      result = await handleExecuteContract(syntheticReq, env);
     } catch (err) {
-      const isTimeout = String(err.message).startsWith("EXECUTE_NEXT_TIMEOUT:");
-      logNV(isTimeout ? "⏱️ [POST /contracts/execute-next] Timeout em handleExecuteContract" : "🔴 [POST /contracts/execute-next] Falha ao delegar a handleExecuteContract", { error: String(err) });
+      logNV("🔴 [POST /contracts/execute-next] Falha ao delegar a handleExecuteContract", { error: String(err) });
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
-        reason: isTimeout
-          ? `Timeout interno após ${EXECUTE_NEXT_INTERNAL_TIMEOUT_MS}ms em handleExecuteContract. Nenhuma mudança de estado garantida.`
-          : "Falha interna ao executar ação.",
+        reason: "Falha interna ao executar ação.",
         nextAction, operationalAction,
         evidence: evidenceReport, rollback: rollbackBlocked,
         executor_path: executorPathInfo, audit_id: auditId,
@@ -5291,7 +5288,9 @@ async function handleExecuteNext(request, env) {
     }, executed ? 200 : (result.status || 422));
   }
 
-  // 7. approve → gate humano explícito antes de delegar a handleCloseFinalContract (PR11: com timeout)
+  // 7. approve → gate humano explícito antes de delegar a handleCloseFinalContract
+  // Mesmo motivo do step 6: sem cancelamento real, timeout local aqui seria
+  // inseguro para handlers que podem alterar estado persistido no KV.
   if (operationalAction.type === "approve") {
     if (body.confirm !== true) {
       return jsonResponse({
@@ -5319,20 +5318,12 @@ async function handleExecuteNext(request, env) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contract_id: contractId }),
       });
-      result = await Promise.race([
-        handleCloseFinalContract(syntheticReq, env),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`EXECUTE_NEXT_TIMEOUT:${EXECUTE_NEXT_INTERNAL_TIMEOUT_MS}ms`)), EXECUTE_NEXT_INTERNAL_TIMEOUT_MS)
-        ),
-      ]);
+      result = await handleCloseFinalContract(syntheticReq, env);
     } catch (err) {
-      const isTimeout = String(err.message).startsWith("EXECUTE_NEXT_TIMEOUT:");
-      logNV(isTimeout ? "⏱️ [POST /contracts/execute-next] Timeout em handleCloseFinalContract" : "🔴 [POST /contracts/execute-next] Falha ao delegar a handleCloseFinalContract", { error: String(err) });
+      logNV("🔴 [POST /contracts/execute-next] Falha ao delegar a handleCloseFinalContract", { error: String(err) });
       return jsonResponse({
         ok: false, executed: false, status: "blocked",
-        reason: isTimeout
-          ? `Timeout interno após ${EXECUTE_NEXT_INTERNAL_TIMEOUT_MS}ms em handleCloseFinalContract. Nenhuma mudança de estado garantida.`
-          : "Falha interna ao processar aprovação.",
+        reason: "Falha interna ao processar aprovação.",
         nextAction, operationalAction,
         evidence: evidenceReport, rollback: rollbackBlocked,
         executor_path: executorPathInfo, audit_id: auditId,

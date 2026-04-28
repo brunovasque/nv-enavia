@@ -2,7 +2,7 @@
 
 **Data:** 2026-04-28
 **Branch ativa:** claude/pr11-integracao-segura-executor
-**Última tarefa:** PR11 — integração segura com executor: diagnóstico confirmou que `handleExecuteNext → handleExecuteContract → executeCurrentMicroPr` é caminho KV puro (sem Service Binding). Adicionado `buildExecutorPathInfo`, timeout de 15s via `Promise.race` em ambos os handlers internos, e campo `executor_path` em todos os paths de resposta. Sem alteração em Panel/Executor/contract-executor.js.
+**Última tarefa:** PR11 — integração segura com executor: diagnóstico confirmou que `handleExecuteNext → handleExecuteContract → executeCurrentMicroPr` é caminho KV puro (sem Service Binding). Mantido `buildExecutorPathInfo`, removido o timeout local via `Promise.race` por ser inseguro em handlers que alteram KV, e mantido `executor_path` em todos os paths de resposta. Sem alteração em Panel/Executor/contract-executor.js.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -76,9 +76,9 @@
 ## Decisões formalizadas em PR11
 - Diagnóstico: `env.EXECUTOR.fetch` usado APENAS em `handleEngineerRequest` (`/engineer` proxy). Fluxo de contratos é inteiramente KV.
 - `buildExecutorPathInfo(env, opType)` — helper puro, retorna `{ type, handler, uses_service_binding, service_binding_available, note }`.
-- `EXECUTE_NEXT_INTERNAL_TIMEOUT_MS = 15_000` — constante de timeout para handlers internos.
-- `Promise.race` aplicado sobre `handleExecuteContract` e `handleCloseFinalContract` com timeout de 15s.
-- Timeout distingue-se de outras falhas via prefixo `EXECUTE_NEXT_TIMEOUT:` na mensagem de erro.
+- Timeout local removido de `handleExecuteContract` e `handleCloseFinalContract`: ambos podem alterar KV, e `Promise.race` não cancela a Promise original.
+- Sem `AbortSignal`/cancelamento real, responder timeout local seria inseguro porque o handler poderia continuar mutando estado após a resposta.
+- Timeout seguro fica para PR futura somente se existir handler cancelável/idempotente.
 - Campo `executor_path` aditivo em todos os paths de resposta (backward-compat): `null` antes do step 4; `executorPathInfo` após.
 
 ## Próxima etapa segura
