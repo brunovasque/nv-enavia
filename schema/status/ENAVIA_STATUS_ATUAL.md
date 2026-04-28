@@ -2,7 +2,7 @@
 
 **Data:** 2026-04-28
 **Branch ativa:** claude/pr12-panel-botoes-operacionais
-**Última tarefa:** PR12 — Panel-only — botões operacionais no painel: criados `loop.js` (API), `LoopPage.jsx` (página `/loop`); rota e item de sidebar adicionados. Painel consulta `GET /contracts/loop-status`, exibe nextAction/operationalAction/evidence/rollback/executor_path e executa `POST /contracts/execute-next`. Build passou sem erros. Sem alteração em Worker/Executor/contract-executor.js.
+**Última tarefa:** PR12 — ajuste cirúrgico de feedback na PR #160: `LoopPage.jsx` passou a usar `loopData.contract` para contrato/status/fase/task/updated_at e `handleExecute` passou a preservar o payload canônico de bloqueio/erro retornado em `r.data`. Teste direcionado adicionado; suíte do painel e build passaram. Sem alteração em Worker/Executor/contract-executor.js.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -88,6 +88,8 @@
 - Body enviado: `{ confirm: true, approved_by: <input>, evidence: [] }`.
 - Modo mock: aviso honesto com instrução para configurar `VITE_NV_ENAVIA_URL`.
 - Build: 141 modules, 0 errors.
+- Ajuste PR #160: seção "Status do Loop" agora lê `loopData.contract.{id,status,current_phase,current_task,updated_at}`; `loop` fica restrito a `canProceed`, `blockReason`, `availableActions` e `guidance`.
+- Ajuste PR #160: `handleExecute` prioriza `r.data` mesmo quando `r.ok === false`, preservando `reason`, `evidence`, `rollback`, `executor_path` e `audit_id` do backend.
 
 ## Próxima etapa segura
 - PR13 — Worker-only — hardening final e encerramento.

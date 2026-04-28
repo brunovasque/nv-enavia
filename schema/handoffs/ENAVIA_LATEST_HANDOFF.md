@@ -1,12 +1,24 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-28
-**De:** PR12 — Panel-only — botões operacionais no painel
+**De:** PR12 — ajuste cirúrgico de feedback na PR #160
 **Para:** PR13 — Worker-only — hardening final e encerramento
 
 ## O que foi feito nesta sessão
 
-### PR12 — botões operacionais no painel
+### PR12 — ajuste cirúrgico na LoopPage
+
+- `panel/src/pages/LoopPage.jsx`:
+  - seção "Status do Loop" agora usa `loopData.contract` para exibir `id`, `status`, `current_phase`, `current_task` e `updated_at`;
+  - `loop` permaneceu apenas para `canProceed`, `blockReason`, `availableActions` e `guidance`;
+  - `handleExecute` agora preserva `r.data` mesmo quando `executeNext()` retorna `ok: false`, evitando esconder `reason`, `evidence`, `rollback`, `executor_path` e `audit_id`.
+
+- `panel/src/__tests__/pr12-loop-page-contract-and-error-payload.test.js`:
+  - smoke test direcionado garantindo uso de `loopData.contract` e prioridade ao payload canônico do backend.
+
+- **Validação:** `npx vitest run src/__tests__/pr12-loop-page-contract-and-error-payload.test.js`, `npm test`, `npm run build` ✅.
+
+### Histórico imediatamente anterior — PR12 — botões operacionais no painel
 
 **Arquivos criados:**
 

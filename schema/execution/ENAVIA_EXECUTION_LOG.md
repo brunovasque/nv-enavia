@@ -4,6 +4,25 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR12 Ajuste — feedback da PR #160 na `LoopPage`
+
+- **Branch:** `claude/pr12-panel-botoes-operacionais`
+- **PR:** #160
+- **Escopo:** Panel-only. Ajuste cirúrgico em `panel/src/pages/LoopPage.jsx` + teste direcionado. Sem alteração em Worker, Executor, `contract-executor.js` ou `wrangler.toml`.
+- **Patch aplicado:**
+  1. Seção "Status do Loop" passou a usar `loopData.contract.{id,status,current_phase,current_task,updated_at}`.
+  2. `loop` ficou restrito aos campos de supervisão (`canProceed`, `blockReason`, `availableActions`, `guidance`).
+  3. `handleExecute` agora prioriza `r.data` mesmo com `r.ok === false`, preservando o payload canônico do backend.
+  4. Teste direcionado adicionado em `panel/src/__tests__/pr12-loop-page-contract-and-error-payload.test.js`.
+- **Smoke tests:**
+  - `npx vitest run src/__tests__/pr12-loop-page-contract-and-error-payload.test.js` → 4 testes, 4 passed ✅
+  - `npm test` → 31 arquivos, 894 testes passed ✅
+  - `npm run build` → 141 modules transformed, 0 errors ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR13 — Worker-only — hardening final.
+
+---
+
 ## 2026-04-28 — PR12 — Panel-only — botões operacionais no painel
 
 - **Branch:** `claude/pr12-panel-botoes-operacionais`

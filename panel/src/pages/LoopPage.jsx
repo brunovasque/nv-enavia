@@ -122,8 +122,10 @@ export default function LoopPage() {
       evidence:    [],
     };
     const r = await executeNext(body);
-    if (r.ok) {
+    if (r.data) {
       setExecResult(r.data);
+    } else if (r.ok) {
+      setExecResult(null);
     } else {
       setExecResult({
         ok: false,
@@ -190,9 +192,11 @@ export default function LoopPage() {
     );
   }
 
+  const contract         = loopData?.contract         ?? null;
   const loop             = loopData?.loop             ?? null;
   const nextAction       = loopData?.nextAction       ?? null;
   const operationalAction = loopData?.operationalAction ?? null;
+  const canProceed       = loop?.canProceed === true;
   const canExecute       = operationalAction?.can_execute === true;
   const opType           = operationalAction?.type ?? null;
   const isApproveType    = opType === "approve";
@@ -202,24 +206,27 @@ export default function LoopPage() {
       <_Header onRefresh={loadStatus} refreshing={false} />
 
       {/* ── Loop status overview ───────────────────────────────────────────── */}
-      {loop && (
-        <Card title="Status do Loop" icon="◆" accent={loop.canProceed ? "#10B981" : "#EF4444"}>
-          <FieldRow label="Contrato"       value={loop.contract_id} mono />
-          <FieldRow label="Status global"  value={loop.status_global} />
-          <FieldRow label="Pode prosseguir" value={loop.canProceed ? "Sim" : "Não"} />
-          {loop.blockReason && (
+      {(contract || loop) && (
+        <Card title="Status do Loop" icon="◆" accent={canProceed ? "#10B981" : "#EF4444"}>
+          <FieldRow label="Contrato"        value={contract?.id} mono />
+          <FieldRow label="Status"          value={contract?.status} />
+          <FieldRow label="Fase atual"      value={contract?.current_phase} />
+          <FieldRow label="Task atual"      value={contract?.current_task} mono />
+          <FieldRow label="Atualizado em"   value={contract?.updated_at} mono muted />
+          <FieldRow label="Pode prosseguir" value={canProceed ? "Sim" : "Não"} />
+          {loop?.blockReason && (
             <div style={s.blockReasonBox} data-testid="loop-block-reason">
               <span style={s.blockReasonLabel}>Motivo do bloqueio:</span>
               <span style={s.blockReasonText}>{loop.blockReason}</span>
             </div>
           )}
-          {loop.guidance && (
+          {loop?.guidance && (
             <div style={{ ...s.blockReasonBox, borderColor: "rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.05)" }}>
               <span style={{ ...s.blockReasonLabel, color: "#F59E0B" }}>Orientação:</span>
               <span style={s.blockReasonText}>{loop.guidance}</span>
             </div>
           )}
-          {loop.availableActions?.length > 0 && (
+          {loop?.availableActions?.length > 0 && (
             <div style={s.fieldRow}>
               <span style={s.fieldLabel}>Ações disponíveis</span>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
