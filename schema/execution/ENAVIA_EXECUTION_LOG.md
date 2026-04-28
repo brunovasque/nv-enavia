@@ -4,6 +4,21 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR6 Ajuste — Correções `awaiting_human_approval` e `phase_complete` em `handleGetLoopStatus`
+
+- **Branch:** `claude/pr6-loop-supervisionado`
+- **PR:** #154 — ajuste cirúrgico solicitado via comentário Codex
+- **Escopo:** Worker-only. `nv-enavia.js` apenas.
+- **Problema 1 corrigido:** `awaiting_human_approval` tem `status: "awaiting_approval"` — nunca entrava no guard `isReady`. Movido para `else if (isAwaitingApproval)` fora do bloco `isReady`. `canProceed` atualizado para `isReady || isAwaitingApproval`.
+- **Problema 2 corrigido:** `phase_complete` anunciava `complete-task`/`execute` que falham deterministicamente sem task `in_progress`. `availableActions` agora é `[]`; campo `guidance` documenta ausência de endpoint de avanço de fase.
+- **Smoke tests:** 3 cenários verificados via node (awaiting_human_approval, phase_complete, start_task). Handler read-only confirmado (sem KV put).
+- **Arquivos alterados:** `nv-enavia.js` (somente).
+- **Panel/Executor/contract-executor.js:** sem alteração.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** aguardar merge PR6, iniciar PR7 (`claude/pr7-schemas-orquestracao`) após autorização.
+
+---
+
 ## 2026-04-26 — Setup de governança
 
 - **Branch:** `claude/setup-governance-files`
@@ -141,3 +156,38 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Alterações em Panel/Executor:** nenhuma.
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** PR6 — Worker-only — loop contratual supervisionado.
+
+---
+
+## 2026-04-28 — PR6 — Worker-only — loop contratual supervisionado
+
+- **Branch:** `claude/pr6-loop-supervisionado`
+- **Escopo:** Worker-only. Sem alterar Panel, Executor, `contract-executor.js`, `executor/`, `panel/` ou `wrangler.toml`.
+- **Diagnóstico:**
+  - `resolveNextAction(state, decomposition)` já existe em `contract-executor.js` linha 1371 — 9 regras, retorna `{ type, phase_id, task_id, micro_pr_candidate_id, reason, status }`. Já é exportada.
+  - `rehydrateContract(env, contractId)` já existe — lê state + decomposition do KV via `Promise.all`.
+  - Ambas já exportadas mas NÃO importadas no Worker.
+  - Não havia endpoint público `GET /contracts/loop-status` — operador/painel não conseguia consultar próxima ação sem disparar execução.
+  - `TERMINAL_STATUSES = ["completed", "cancelled", "failed"]` — não exportada; usada inline.
+- **Patches em `nv-enavia.js`:**
+  1. **Import:** `resolveNextAction` e `rehydrateContract` adicionados aos imports de `contract-executor.js`.
+  2. **Handler:** `async function handleGetLoopStatus(env)` adicionado — read-only, lê index, encontra contrato ativo, chama `resolveNextAction`, retorna `{ ok, generatedAt, contract, nextAction, loop }`.
+  3. **Rota:** `GET /contracts/loop-status` adicionado ao router, após `GET /contracts/active-surface`.
+- **Shape de resposta:**
+  - `loop.supervised: true` — sempre; nunca automação cega.
+  - `loop.canProceed` — derivado de `nextAction.status === "ready"`.
+  - `loop.blocked` / `loop.blockReason` — derivados de `nextAction.status === "blocked"`.
+  - `loop.availableActions` — lista de endpoints disponíveis no estado atual.
+- **Garantias:**
+  - Zero KV puts no handler — puramente leitura.
+  - Sem dispatch ao executor.
+  - Backward-compat total — nova rota, endpoints existentes intocados.
+- **Smoke tests:**
+  - `git diff --name-only` → somente `nv-enavia.js` ✅
+  - `grep "resolveNextAction" nv-enavia.js` → importado na linha 14, usado na linha 4865 ✅
+  - `grep "rehydrateContract" nv-enavia.js` → importado na linha 15, usado na linha 4839 ✅
+  - `grep "loop-status" nv-enavia.js` → handler + rota presentes ✅
+  - Verificação estrutural via node: handler sem KV put, `supervised: true`, `canProceed`, `blockReason` todos presentes ✅
+- **Alterações em Panel/Executor:** nenhuma.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR7 — Worker-only — integrar schemas desconectados.
