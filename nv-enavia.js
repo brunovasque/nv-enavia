@@ -4793,7 +4793,7 @@ async function handlePlannerBridge(request, env) {
 // Mapeamento resolveNextAction.type → tipo operacional:
 //   start_task / start_micro_pr  → execute_next  (POST /contracts/execute)
 //   awaiting_human_approval      → approve        (POST /contracts/close-final)
-//   contract_complete            → close_final    (POST /contracts/close-final)
+//   contract_complete            → block          (contrato já concluído, sem ação)
 //   contract_blocked / phase_complete / plan_rejected / no_action → block
 // ============================================================================
 function buildOperationalAction(nextAction, contractId) {
@@ -4801,7 +4801,7 @@ function buildOperationalAction(nextAction, contractId) {
     start_task:              "execute_next",
     start_micro_pr:          "execute_next",
     awaiting_human_approval: "approve",
-    contract_complete:       "close_final",
+    contract_complete:       "block",    // contrato já concluído — sem ação disponível
     contract_blocked:        "block",
     phase_complete:          "block",
     plan_rejected:           "block",
@@ -4830,7 +4830,11 @@ function buildOperationalAction(nextAction, contractId) {
     requires_human_approval: requiresHuman,
     evidence_required:       EVIDENCE_MAP[opType] ?? [],
     can_execute:             canExecute,
-    block_reason:            canExecute ? null : (nextAction.reason || "Ação bloqueada."),
+    block_reason:            canExecute ? null : (
+      nextAction.type === "contract_complete"
+        ? "Contrato já concluído. Nenhuma ação adicional disponível."
+        : (nextAction.reason || "Ação bloqueada.")
+    ),
   };
 }
 

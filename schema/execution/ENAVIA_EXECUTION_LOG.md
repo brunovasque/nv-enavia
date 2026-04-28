@@ -4,6 +4,16 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR8 Ajuste — Correção `contract_complete` em `buildOperationalAction`
+
+- **Branch:** `claude/pr8-operational-action-contract`
+- **Problema:** `contract_complete` mapeava para `close_final` → `can_execute: true`. Inconsistente com PR6, onde `contract_complete` não expunha `availableActions`. Contrato já concluído não deve anunciar ação executável.
+- **Correção:** `contract_complete` → `"block"` no `OP_TYPE_MAP`. `block_reason` específico: `"Contrato já concluído. Nenhuma ação adicional disponível."`.
+- **Smoke tests:** `contract_complete` → `can_execute: false` ✅; `awaiting_human_approval` → `approve`/`can_execute: true` ✅; `start_task`/`start_micro_pr` → `execute_next`/`can_execute: true` ✅; Panel/Executor intocados ✅.
+- **Bloqueios:** nenhum.
+
+---
+
 ## 2026-04-28 — PR8 — Worker-only — contrato operacional de ações e estado
 
 - **Branch:** `claude/pr8-operational-action-contract`
