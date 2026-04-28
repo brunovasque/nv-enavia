@@ -4776,6 +4776,69 @@ async function handlePlannerBridge(request, env) {
 }
 
 // ============================================================================
+// PR8 — buildOperationalAction (Worker-only, pure)
+//
+// Transforma o nextAction produzido por resolveNextAction() em um shape
+// canônico de ação operacional. Read-only — não executa nem altera estado.
+//
+// Shape canônico:
+//   action_id              — id determinístico baseado em contrato + tipo + contexto
+//   contract_id            — contrato ao qual a ação pertence
+//   type                   — execute_next | approve | close_final | block
+//   requires_human_approval — true quando depende de decisão humana
+//   evidence_required      — campos mínimos esperados pelo endpoint-alvo
+//   can_execute            — false se a ação está bloqueada
+//   block_reason           — motivo do bloqueio (null quando can_execute=true)
+//
+// Mapeamento resolveNextAction.type → tipo operacional:
+//   start_task / start_micro_pr  → execute_next  (POST /contracts/execute)
+//   awaiting_human_approval      → approve        (POST /contracts/close-final)
+//   contract_complete            → block          (contrato já concluído, sem ação)
+//   contract_blocked / phase_complete / plan_rejected / no_action → block
+// ============================================================================
+function buildOperationalAction(nextAction, contractId) {
+  const OP_TYPE_MAP = {
+    start_task:              "execute_next",
+    start_micro_pr:          "execute_next",
+    awaiting_human_approval: "approve",
+    contract_complete:       "block",    // contrato já concluído — sem ação disponível
+    contract_blocked:        "block",
+    phase_complete:          "block",
+    plan_rejected:           "block",
+    contract_cancelled:      "block",
+    no_action:               "block",
+  };
+
+  const EVIDENCE_MAP = {
+    execute_next: ["contract_id", "evidence[]"],
+    approve:      ["contract_id"],
+    close_final:  ["contract_id"],
+    reject:       ["contract_id"],
+    block:        [],
+  };
+
+  const opType        = OP_TYPE_MAP[nextAction.type] ?? "block";
+  const canExecute    = opType !== "block";
+  const requiresHuman = opType === "approve" || opType === "reject" || opType === "close_final";
+  const contextKey    = nextAction.task_id || nextAction.phase_id || nextAction.micro_pr_candidate_id || nextAction.type;
+  const actionId      = `op:${contractId}:${opType}:${contextKey}`;
+
+  return {
+    action_id:               actionId,
+    contract_id:             contractId,
+    type:                    opType,
+    requires_human_approval: requiresHuman,
+    evidence_required:       EVIDENCE_MAP[opType] ?? [],
+    can_execute:             canExecute,
+    block_reason:            canExecute ? null : (
+      nextAction.type === "contract_complete"
+        ? "Contrato já concluído. Nenhuma ação adicional disponível."
+        : (nextAction.reason || "Ação bloqueada.")
+    ),
+  };
+}
+
+// ============================================================================
 // PR6 — GET /contracts/loop-status (handler canônico, Worker-only)
 //
 // Ciclo supervisionado mínimo: lê contrato ativo, resolve próxima ação via
@@ -4801,6 +4864,7 @@ async function handleGetLoopStatus(env) {
       generatedAt,
       contract: null,
       nextAction: { type: "no_kv", reason: "KV não disponível neste ambiente.", status: "error" },
+      operationalAction: null,
       loop: { supervised: true, canProceed: false, blocked: false, blockReason: null, availableActions: [] },
     });
   }
@@ -4819,6 +4883,7 @@ async function handleGetLoopStatus(env) {
         generatedAt,
         contract: null,
         nextAction: { type: "no_contract", reason: "Nenhum contrato ativo encontrado.", status: "idle" },
+        operationalAction: null,
         loop: {
           supervised: true,
           canProceed: false,
@@ -4851,6 +4916,7 @@ async function handleGetLoopStatus(env) {
         generatedAt,
         contract: null,
         nextAction: { type: "no_contract", reason: "Nenhum contrato ativo encontrado (todos terminais).", status: "idle" },
+        operationalAction: null,
         loop: {
           supervised: true,
           canProceed: false,
@@ -4863,6 +4929,9 @@ async function handleGetLoopStatus(env) {
 
     // 3) Resolver próxima ação — função já existente em contract-executor.js
     const nextAction = resolveNextAction(state, decomposition);
+
+    // PR8 — shape canônico de ação operacional
+    const operationalAction = buildOperationalAction(nextAction, contractId);
 
     // 4) Derivar estado do loop a partir da próxima ação
     const isBlocked          = nextAction.status === "blocked";
@@ -4903,6 +4972,7 @@ async function handleGetLoopStatus(env) {
         updated_at:    state.updated_at    || null,
       },
       nextAction,
+      operationalAction, // PR8 — shape canônico de ação operacional
       loop: {
         supervised:       true,
         canProceed,

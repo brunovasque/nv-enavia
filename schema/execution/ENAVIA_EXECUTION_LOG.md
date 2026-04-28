@@ -4,6 +4,43 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-28 — PR8 Ajuste — Correção `contract_complete` em `buildOperationalAction`
+
+- **Branch:** `claude/pr8-operational-action-contract`
+- **Problema:** `contract_complete` mapeava para `close_final` → `can_execute: true`. Inconsistente com PR6, onde `contract_complete` não expunha `availableActions`. Contrato já concluído não deve anunciar ação executável.
+- **Correção:** `contract_complete` → `"block"` no `OP_TYPE_MAP`. `block_reason` específico: `"Contrato já concluído. Nenhuma ação adicional disponível."`.
+- **Smoke tests:** `contract_complete` → `can_execute: false` ✅; `awaiting_human_approval` → `approve`/`can_execute: true` ✅; `start_task`/`start_micro_pr` → `execute_next`/`can_execute: true` ✅; Panel/Executor intocados ✅.
+- **Bloqueios:** nenhum.
+
+---
+
+## 2026-04-28 — PR8 — Worker-only — contrato operacional de ações e estado
+
+- **Branch:** `claude/pr8-operational-action-contract`
+- **Contrato:** `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md`
+- **Escopo:** Worker-only. Diagnóstico de rotas + criação de shape canônico `buildOperationalAction`. Sem execução real. Sem alteração em Panel ou Executor.
+- **Diagnóstico de rotas:**
+  - `GET /contracts/loop-status` (PR6) — read-only, retorna `nextAction` + `loop`. Base para o loop operacional.
+  - `POST /contracts/execute` — requer `contract_id`, opcional `evidence[]`. Executa micro-PR atual em TEST.
+  - `POST /contracts/complete-task` — requer `contract_id`, `task_id`, `resultado`. Gate de aderência obrigatório.
+  - `POST /contracts/close-final` — requer `contract_id`. Gate final pesado do contrato.
+  - `POST /contracts/cancel` — cancelamento formal.
+  - `POST /contracts/reject-plan` — rejeição formal do plano de decomposição.
+- **Mapeamento `nextAction.type` → tipo operacional:**
+  - `start_task` / `start_micro_pr` → `execute_next` (endpoint: `POST /contracts/execute`)
+  - `awaiting_human_approval` → `approve` (endpoint: `POST /contracts/close-final`)
+  - `contract_complete` → `close_final` (endpoint: `POST /contracts/close-final`)
+  - `contract_blocked` / `phase_complete` / `plan_rejected` / `contract_cancelled` / `no_action` → `block`
+- **Código adicionado:**
+  - `buildOperationalAction(nextAction, contractId)` — função pura em `nv-enavia.js` (~4799–4835). Produz o shape canônico: `{ action_id, contract_id, type, requires_human_approval, evidence_required, can_execute, block_reason }`.
+  - `GET /contracts/loop-status` enriquecido com campo `operationalAction` (aditivo, backward-compat).
+- **Smoke tests:** `git diff --stat origin/main...HEAD` → somente `nv-enavia.js` + governança ✅.
+- **Alterações em Panel/Executor:** nenhuma.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** PR9 — `POST /contracts/execute-next` supervisionado.
+
+---
+
 ## 2026-04-28 — PR7 — Worker-only — diagnóstico de schemas desconectados
 
 - **Branch:** `claude/pr7-schemas-orquestracao`
