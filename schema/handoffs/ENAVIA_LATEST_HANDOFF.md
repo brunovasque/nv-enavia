@@ -27,6 +27,7 @@ Sem trocar essa ordem, o payload do Executor `/audit` agora usa o target real do
   - `target: { system: "cloudflare_worker", workerId }`
   - `context: { require_live_read: true }`
 - O `/propose` reaproveita o mesmo `workerId` resolvido.
+- `buildExecutorTargetPayload(workerId)` centraliza a montagem do bloco `{ workerId, target }` para `/audit`, `/propose` e `approve`.
 - Se não existir alvo confiável, o Worker bloqueia antes de chamar o Executor com:
   - `status: "blocked"`
   - `reason: "target worker ausente para auditoria segura"`
@@ -43,7 +44,7 @@ Sem trocar essa ordem, o payload do Executor `/audit` agora usa o target real do
 - `node --check nv-enavia.js` → OK ✅
 - `node --check contract-executor.js` → OK ✅
 - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
-- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **158 passed, 0 failed** ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **161 passed, 0 failed** ✅
 - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima ação segura

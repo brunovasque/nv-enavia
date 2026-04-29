@@ -2,7 +2,7 @@
 
 **Data:** 2026-04-29
 **Branch ativa:** `copilot/investigate-risk-level-audit`
-**Última tarefa:** Correção cirúrgica — `nv-enavia.js` agora resolve o `workerId` do Executor `/audit` a partir do contrato/execução atual, sem hardcode. O fluxo `POST /contracts/execute-next` passou a bloquear com `target worker ausente para auditoria segura` quando não existe alvo confiável, envia `workerId` + `target.workerId` + `context.require_live_read:true` no `/audit`, e reutiliza o mesmo alvo dinâmico no `/propose`. Smoke tests PR14 ampliados para cobrir bloqueio sem target e consistência do target dinâmico em `execute_next` e `approve`.
+**Última tarefa:** Correção cirúrgica — `nv-enavia.js` agora resolve o `workerId` do Executor `/audit` a partir do contrato/execução atual, sem hardcode. O fluxo `POST /contracts/execute-next` passou a bloquear com `target worker ausente para auditoria segura` quando não existe alvo confiável, envia `workerId` + `target.workerId` + `context.require_live_read:true` no `/audit`, reutiliza o mesmo alvo dinâmico no `/propose`, e consolidou um helper local para montar o bloco `{ workerId, target }` sem duplicação. Smoke tests PR14 ampliados para cobrir bloqueio sem target, consistência do target dinâmico em `execute_next` e `approve`, e leitura segura dos payloads de teste.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)

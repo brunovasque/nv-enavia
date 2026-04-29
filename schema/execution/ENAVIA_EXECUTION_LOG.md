@@ -7,7 +7,7 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 ## 2026-04-29 — FIX — target dinâmico para o Executor `/audit` em `POST /contracts/execute-next`
 
 - **Branch:** `copilot/investigate-risk-level-audit`
-- **Commit:** `e779fad`
+- **Commit de código:** `d3e0ee2`
 - **Escopo:** Worker-only. Sem tocar em painel, executor externo, KV runtime ou relaxamento do gate de recibo.
 - **Problema:** o loop operacional chamava o Executor `/audit` com payload pobre, sem alvo confiável. Isso permitia `workerId` hardcoded no `/propose` e deixava o `/audit` sem `workerId`/`target.workerId`, o que inviabiliza auditoria segura do alvo real.
 - **Correção:**
@@ -24,6 +24,9 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
      - `status: "blocked"`
      - `reason: "target worker ausente para auditoria segura"`
   5. Se houver ambiguidade de múltiplos workers, o fluxo também bloqueia sem assumir um alvo artificial.
+  6. Follow-up pós-code-review:
+     - helper `buildExecutorTargetPayload(workerId)` evita duplicação do bloco `{ workerId, target }`;
+     - testes PR14 agora validam payloads com null-check antes de fazer parse.
 - **Smoke tests atualizados (`tests/pr14-executor-deploy-real-loop.smoke.test.js`):**
   - fixture `execute_next` agora inclui micro-PR TEST com `target_workers`.
   - fixture `approve` agora inclui `current_execution.handoff_used.scope.workers`.
@@ -34,7 +37,7 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
   - `node --check nv-enavia.js` → OK ✅
   - `node --check contract-executor.js` → OK ✅
   - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
-  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **158 passed, 0 failed** ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **161 passed, 0 failed** ✅
   - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** rodar o loop real em TEST com contrato/micro-PR contendo `target_workers` explícito e confirmar se o `/audit` do Executor retorna `risk_level` coerente com o alvo real, sem alterar o gate de recibo.
