@@ -78,7 +78,7 @@ jobs:
 
       - name: Validate generated config (no placeholders remaining)
         run: |
-          if grep -q "REPLACE_WITH_REAL_" wrangler.executor.generated.toml; then
+          if grep -v '^[[:space:]]*#' wrangler.executor.generated.toml | grep -q "REPLACE_WITH_REAL_"; then
             echo "Placeholders não substituídos no generated config. Verifique os secrets."
             exit 1
           fi

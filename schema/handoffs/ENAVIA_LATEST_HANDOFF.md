@@ -1,12 +1,53 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** INFRA-ONLY — Deploy separado do Executor
-**Para:** Deploy real em TEST (`enavia-executor-test`) e smoke de `/audit`
+**De:** FIX — Validação falso-positivo no deploy-executor
+**Para:** Deploy real em TEST (`enavia-executor-test`)
 
 ## O que foi feito nesta sessão
 
-### INFRA-ONLY — Deploy separado do enavia-executor
+### FIX cirúrgico — `deploy-executor.yml` validação de comentários
+
+**Problema:** Passo "Validate generated config (no placeholders remaining)" usava:
+```bash
+grep -q "REPLACE_WITH_REAL_" wrangler.executor.generated.toml
+```
+Esse grep capturava o texto `REPLACE_WITH_REAL_*` em **linhas de comentário** do arquivo gerado, mesmo com todos os IDs já substituídos. Falso positivo.
+
+**Correção aplicada (patch cirúrgico):**
+```bash
+if grep -v '^[[:space:]]*#' wrangler.executor.generated.toml | grep -q "REPLACE_WITH_REAL_"; then
+```
+Filtra linhas comentadas antes de buscar placeholders.
+
+**Arquivo alterado:**
+- `.github/workflows/deploy-executor.yml` — somente o passo de validação
+
+**Não tocado:**
+- `nv-enavia.js` — intacto
+- `executor/` — intacto
+- `panel/` — intacto
+- `wrangler.toml` / `wrangler.executor.template.toml` — intactos
+- KV / bindings / secrets — intactos
+
+**Evidência:**
+- Grep antigo → "FALSO POSITIVO detectado" ✅ (confirma o bug)
+- Grep novo → "OK: nenhum placeholder fora de comentários" ✅ (confirma a correção)
+- Validação YAML → **YAML válido** ✅
+
+## Próxima ação segura
+
+1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
+2. Verificar smoke: `POST https://enavia-executor-test.brunovasque.workers.dev/audit` → `result.verdict` + `audit.verdict` presentes.
+3. Se TEST OK, rodar `target_env=prod`.
+
+## Bloqueios
+
+- nenhum
+
+---
+
+
 
 **Diagnóstico confirmado:**
 - O workflow `deploy.yml` / `wrangler.toml` publica apenas `nv-enavia`. O Executor (`enavia-executor`) não era deployado a partir deste repo.
