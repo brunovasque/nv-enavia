@@ -89,6 +89,52 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate KV namespace IDs against Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ENAVIA_BRAIN_KV_ID: ${{ secrets.ENAVIA_BRAIN_KV_ID }}
+          ENAVIA_BRAIN_TEST_KV_ID: ${{ secrets.ENAVIA_BRAIN_TEST_KV_ID }}
+          ENAVIA_GIT_KV_ID: ${{ secrets.ENAVIA_GIT_KV_ID }}
+          ENAVIA_GIT_TEST_KV_ID: ${{ secrets.ENAVIA_GIT_TEST_KV_ID }}
+          GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
+          GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
+        run: |
+          KV_LIST_JSON=$(npx wrangler kv namespace list 2>/dev/null)
+          if [ -z "$KV_LIST_JSON" ]; then
+            echo "ERRO: Não foi possível listar KV namespaces. Verifique CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID."
+            exit 1
+          fi
+
+          check_kv() {
+            local secret_name="$1"
+            local secret_value="$2"
+            local binding_name="$3"
+            if echo "$KV_LIST_JSON" | grep -q "\"$secret_value\""; then
+              echo "  ${secret_name}: OK  (binding: ${binding_name})"
+            else
+              echo "  ${secret_name}: INVALID  (binding: ${binding_name})"
+              echo "INVALID" >> /tmp/kv_check_failures
+            fi
+          }
+
+          rm -f /tmp/kv_check_failures
+          echo "KV CHECK:"
+          check_kv "ENAVIA_BRAIN_KV_ID"      "$ENAVIA_BRAIN_KV_ID"      "ENAVIA_BRAIN"
+          check_kv "ENAVIA_BRAIN_TEST_KV_ID" "$ENAVIA_BRAIN_TEST_KV_ID" "ENAVIA_BRAIN_TEST"
+          check_kv "ENAVIA_GIT_KV_ID"        "$ENAVIA_GIT_KV_ID"        "ENAVIA_GIT"
+          check_kv "ENAVIA_GIT_TEST_KV_ID"   "$ENAVIA_GIT_TEST_KV_ID"   "ENAVIA_GIT_TEST"
+          check_kv "GIT_KV_ID"               "$GIT_KV_ID"               "GIT_KV"
+          check_kv "GIT_KV_TEST_ID"          "$GIT_KV_TEST_ID"          "GIT_KV_TEST"
+
+          if [ -f /tmp/kv_check_failures ]; then
+            echo ""
+            echo "FALHA: Um ou mais KV namespace IDs são inválidos na conta Cloudflare."
+            echo "Corrija os secrets antes de fazer o deploy."
+            exit 1
+          fi
+          echo "Todos os KV namespace IDs validados com sucesso."
+
       - name: Install executor dependencies (acorn)
         run: npm install --prefix executor
 
