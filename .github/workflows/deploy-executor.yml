@@ -94,10 +94,13 @@ jobs:
             echo "KV namespace resolvido por title: $title"
           }
 
+          # Titles devem bater exatamente com os namespaces existentes na Cloudflare.
           ENAVIA_BRAIN_KV_ID=$(get_kv_id_by_title "enavia-brain")
           ENAVIA_BRAIN_TEST_KV_ID=$(get_kv_id_by_title "enavia-brain-test")
           ENAVIA_GIT_KV_ID=$(get_kv_id_by_title "ENAVIA_GIT")
           ENAVIA_GIT_TEST_KV_ID=$(get_kv_id_by_title "ENAVIA_GIT_TEST")
+          # O template mantém bindings GIT_KV separados, mas eles apontam para os
+          # mesmos namespaces resolvidos de ENAVIA_GIT/ENAVIA_GIT_TEST.
           GIT_KV_ID="$ENAVIA_GIT_KV_ID"
           GIT_KV_TEST_ID="$ENAVIA_GIT_TEST_KV_ID"
 
