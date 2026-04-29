@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/fix-validate-kv-namespace-ids`
-**Última tarefa:** FIX cirúrgico — correção da etapa `Validate KV namespace IDs against Cloudflare` no `deploy-executor.yml`. O workflow agora separa stdout/stderr de `npx wrangler kv namespace list`, valida se stdout é JSON array antes do parse, mostra erro claro quando o Wrangler não retorna JSON válido e continua verificando os 6 KV secrets/bindings sem expor valores. YAML e smoke local validados. Sem alteração em `nv-enavia.js`, `executor/src/index.js`, painel ou KV runtime.
+**Branch ativa:** `copilot/improve-validate-kv-namespace-ids`
+**Última tarefa:** Diagnóstico cirúrgico — etapa `Validate KV namespace IDs against Cloudflare` no `deploy-executor.yml` passou a imprimir, antes da validação dos 6 secrets, a lista ordenada e única de TÍTULOS/NAMES dos KV namespaces visíveis para o token/conta do GitHub Actions (`jq -r '.[] | (.title // .name // empty)'`). NUNCA imprime IDs nem valores de secrets. Permite distinguir se a falha em `*_TEST_KV_ID` é problema de conta/token (namespaces ausentes) ou de valor salvo no secret (namespaces presentes). YAML validado. Sem alteração em `nv-enavia.js`, `executor/src/index.js`, painel ou KV runtime.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)

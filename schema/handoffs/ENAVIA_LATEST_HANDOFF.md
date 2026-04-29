@@ -1,6 +1,38 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
+**De:** DIAGNÓSTICO — Listar TÍTULOS dos KV namespaces visíveis para o token do GitHub Actions
+**Para:** Reexecutar `Deploy enavia-executor` em TEST e usar a lista impressa para decidir se o problema é conta/token ou valor dos secrets `*_TEST_KV_ID`
+
+## O que foi feito nesta sessão (diagnóstico)
+
+### Patch cirúrgico — `.github/workflows/deploy-executor.yml`
+
+Na etapa `Validate KV namespace IDs against Cloudflare`, logo após validar que `wrangler kv namespace list` retornou um JSON array (e ANTES da validação dos 6 secrets `check_kv`), passamos a imprimir os títulos/nomes dos KV namespaces visíveis para o token/conta do GitHub Actions:
+
+```bash
+echo "KV namespaces visíveis nesta conta/token:"
+jq -r '.[] | (.title // .name // empty)' /tmp/kv_namespaces.json \
+  | sort -u \
+  | sed 's/^/- /'
+echo ""
+```
+
+**Garantias do patch:**
+- Não imprime IDs (apenas `.title` ou, na falta dele, `.name`).
+- Não imprime nenhum valor de secret.
+- Não altera a validação dos 6 secrets que vem em seguida — ela continua intacta.
+- Escopo workflow-only: apenas `.github/workflows/deploy-executor.yml`. Não toca em `nv-enavia.js`, executor runtime, painel ou KV runtime.
+
+### Critério de diagnóstico para a próxima execução
+
+1. Se `enavia-brain-test`, `ENAVIA_GIT_TEST` e `enavia-executor-test` **não** aparecerem na lista visível → o problema é `CLOUDFLARE_ACCOUNT_ID` / token / conta usada pelo GitHub Actions.
+2. Se aparecerem → o problema é o valor salvo nos secrets `ENAVIA_BRAIN_TEST_KV_ID`, `ENAVIA_GIT_TEST_KV_ID`, `GIT_KV_TEST_ID`.
+
+---
+
+## Histórico (sessão anterior)
+
 **De:** FIX — Robustez do diagnóstico de KV namespace IDs
 **Para:** Reexecutar `Deploy enavia-executor` em TEST com parse confiável do retorno do Wrangler
 
