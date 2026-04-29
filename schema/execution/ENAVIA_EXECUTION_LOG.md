@@ -4,6 +4,43 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — target dinâmico para o Executor `/audit` em `POST /contracts/execute-next`
+
+- **Branch:** `copilot/investigate-risk-level-audit`
+- **Commit:** `e779fad`
+- **Escopo:** Worker-only. Sem tocar em painel, executor externo, KV runtime ou relaxamento do gate de recibo.
+- **Problema:** o loop operacional chamava o Executor `/audit` com payload pobre, sem alvo confiável. Isso permitia `workerId` hardcoded no `/propose` e deixava o `/audit` sem `workerId`/`target.workerId`, o que inviabiliza auditoria segura do alvo real.
+- **Correção:**
+  1. `nv-enavia.js` passou a importar `buildExecutionHandoff`.
+  2. Novo helper `resolveAuditTargetWorker(state, decomposition, nextAction)` resolve o alvo em ordem segura:
+     - `state.current_execution.handoff_used.scope.workers`
+     - micro-PR da `nextAction`
+     - `buildExecutionHandoff(...).scope.workers`
+     - `state.scope.workers`
+  3. Se existir exatamente um alvo confiável:
+     - `/audit` recebe `workerId`, `target.workerId` e `context.require_live_read:true`;
+     - `/propose` reutiliza o mesmo `workerId`.
+  4. Se não houver alvo confiável, `POST /contracts/execute-next` bloqueia antes do Executor com:
+     - `status: "blocked"`
+     - `reason: "target worker ausente para auditoria segura"`
+  5. Se houver ambiguidade de múltiplos workers, o fluxo também bloqueia sem assumir um alvo artificial.
+- **Smoke tests atualizados (`tests/pr14-executor-deploy-real-loop.smoke.test.js`):**
+  - fixture `execute_next` agora inclui micro-PR TEST com `target_workers`.
+  - fixture `approve` agora inclui `current_execution.handoff_used.scope.workers`.
+  - novo cenário `C0`: bloqueio explícito sem target worker confiável, sem chamar Executor nem Deploy Worker.
+  - cenário `C5`: valida que `/audit` recebe `workerId` dinâmico, `target.workerId` consistente e `context.require_live_read:true`.
+  - cenário `D1`: valida `workerId` dinâmico também no path `approve`.
+- **Validações locais:**
+  - `node --check nv-enavia.js` → OK ✅
+  - `node --check contract-executor.js` → OK ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **158 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** rodar o loop real em TEST com contrato/micro-PR contendo `target_workers` explícito e confirmar se o `/audit` do Executor retorna `risk_level` coerente com o alvo real, sem alterar o gate de recibo.
+
+---
+
 ## 2026-04-29 — FIX — registrar recibo de audit aprovado antes do `/apply-test` (revisão pós-review)
 
 - **Branch:** `copilot/nv-enavia-register-audit-receipt`
