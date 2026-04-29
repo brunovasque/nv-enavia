@@ -4,6 +4,19 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — Validação falso-positivo no deploy-executor (comentários)
+
+- **Branch:** `copilot/fix-validate-generated-config`
+- **Escopo:** Apenas `.github/workflows/deploy-executor.yml`. Nenhuma alteração em `nv-enavia.js`, `executor/`, `panel/`, `wrangler.toml`, KV.
+- **Problema:** Passo "Validate generated config (no placeholders remaining)" usava `grep -q "REPLACE_WITH_REAL_"` que capturava o texto `REPLACE_WITH_REAL_*` em linhas de comentário do `wrangler.executor.generated.toml`, mesmo após todos os IDs terem sido substituídos.
+- **Correção:** Substituído por `grep -v '^[[:space:]]*#' ... | grep -q "REPLACE_WITH_REAL_"` para ignorar linhas comentadas antes de buscar placeholders.
+- **Evidência:** Grep antigo → "FALSO POSITIVO detectado"; grep novo → "OK: nenhum placeholder fora de comentários" ✅
+- **Validação YAML:** `python3 yaml.safe_load(...)` → **YAML válido** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** rodar workflow `Deploy enavia-executor` com `target_env=test`.
+
+---
+
 ## 2026-04-29 — INFRA-ONLY — Deploy separado para o Executor (enavia-executor-test / enavia-executor)
 
 - **Branch:** `copilot/create-separate-deploy-executor`

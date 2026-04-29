@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/create-separate-deploy-executor`
-**Última tarefa:** INFRA-ONLY — Deploy separado para o Executor (revisão). Abordagem template+secrets: `wrangler.executor.toml` → `wrangler.executor.template.toml`; workflow gera `wrangler.executor.generated.toml` com KV IDs de GitHub Secrets. Conflito documental em `executor/wrangler.toml` resolvido. `.gitignore` criado. Smoke tests: 33/33 ✅.
+**Branch ativa:** `copilot/fix-validate-generated-config`
+**Última tarefa:** FIX cirúrgico — validação falso-positivo no `deploy-executor.yml`. O passo "Validate generated config" usava `grep -q "REPLACE_WITH_REAL_"` que disparava em linhas comentadas. Corrigido para ignorar comentários com `grep -v '^[[:space:]]*#'`. YAML validado. Sem alteração em nv-enavia.js, executor, painel ou KV.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
