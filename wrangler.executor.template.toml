@@ -1,11 +1,17 @@
-# wrangler.executor.toml — Config de deploy do enavia-executor
+# wrangler.executor.template.toml — Template de deploy do enavia-executor
 #
-# Usado exclusivamente pelo workflow deploy-executor.yml.
-# Não altera wrangler.toml (Worker principal nv-enavia).
+# TEMPLATE — NÃO usar diretamente para deploy.
+# O workflow deploy-executor.yml gera wrangler.executor.generated.toml
+# substituindo os placeholders REPLACE_WITH_REAL_* pelos GitHub Secrets
+# correspondentes antes de chamar o wrangler.
 #
-# Para deploy real, os KV namespace IDs abaixo devem ser preenchidos
-# com os valores reais do Cloudflare Dashboard (ou via wrangler kv:namespace list).
-# Não commitar valores reais — configure via GitHub Secrets ou Cloudflare Dashboard.
+# Secrets necessários no repositório:
+#   ENAVIA_BRAIN_KV_ID        — KV ENAVIA_BRAIN (PROD)
+#   ENAVIA_BRAIN_TEST_KV_ID   — KV ENAVIA_BRAIN (TEST)
+#   ENAVIA_GIT_KV_ID          — KV ENAVIA_GIT (PROD)
+#   ENAVIA_GIT_TEST_KV_ID     — KV ENAVIA_GIT (TEST)
+#   GIT_KV_ID                 — KV GIT_KV (PROD)
+#   GIT_KV_TEST_ID            — KV GIT_KV (TEST)
 
 name = "enavia-executor"
 main = "executor/src/index.js"

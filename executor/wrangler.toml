@@ -1,13 +1,20 @@
 # executor/wrangler.toml
 #
-# Espelho governado do wrangler.toml do enavia-executor.
-# Fonte original: https://github.com/brunovasque/enavia-executor/blob/main/wrangler.toml
+# Referência de configuração do enavia-executor para rastreabilidade interna.
+# Mantida em sincronia com o repo externo brunovasque/enavia-executor.
 #
-# IMPORTANTE: Este arquivo é usado apenas como referência de configuração
-# para rastreabilidade dentro do repo nv-enavia.
-# O deploy real do executor continua sendo feito a partir do repo externo
-# brunovasque/enavia-executor, com o CI/CD e secrets próprios daquele repo.
-# Não faça deploy a partir desta pasta sem coordenar com o repo externo.
+# FONTE DE DEPLOY OPERACIONAL (a partir desta PR):
+#   O repo nv-enavia agora é fonte operacional de deploy do Executor via:
+#     - wrangler.executor.template.toml  — template com placeholders
+#     - .github/workflows/deploy-executor.yml — workflow que gera e deploya
+#
+# O repo externo brunovasque/enavia-executor pode continuar sendo usado para
+# deploy independente, mas a versão canônica do código está em executor/src/index.js
+# neste repo (nv-enavia), versionada e governada aqui.
+#
+# Para deploy a partir deste repo: use o workflow deploy-executor.yml.
+# Para deploy a partir do repo externo: coordenar manualmente — o código
+# pode divergir se as mudanças não forem sincronizadas entre os dois repos.
 
 name = "enavia-executor"
 main = "src/index.js"

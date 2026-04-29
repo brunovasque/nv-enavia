@@ -1,0 +1,3 @@
+# Arquivo gerado em runtime pelo workflow deploy-executor.yml
+# Nunca commitar — contém KV namespace IDs reais.
+wrangler.executor.generated.toml
