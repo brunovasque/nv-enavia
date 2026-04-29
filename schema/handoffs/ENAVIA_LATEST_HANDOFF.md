@@ -24,6 +24,8 @@ Como fonte de verdade para resolver IDs por `.title`.
 - `GIT_KV_ID` ← mesmo ID resolvido de `ENAVIA_GIT`
 - `GIT_KV_TEST_ID` ← mesmo ID resolvido de `ENAVIA_GIT_TEST`
 
+`GIT_KV` permanece como binding lógico separado para compatibilidade com o código existente do executor, apontando para os mesmos namespaces físicos de `ENAVIA_GIT`/`ENAVIA_GIT_TEST`.
+
 **Garantias do patch:**
 - O workflow continua exigindo apenas `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
 - Os 6 secrets manuais de KV ID não são mais exigidos nem referenciados.
