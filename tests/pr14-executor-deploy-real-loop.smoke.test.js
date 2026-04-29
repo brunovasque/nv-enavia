@@ -805,8 +805,12 @@ async function runTests() {
     ok(deployMock.calls.some(c => c.pathname === "/__internal__/audit"), "  Deploy Worker recebeu recibo em /__internal__/audit");
     ok(deployMock.calls.some(c => c.pathname === "/apply-test"), "  Deploy Worker recebeu /apply-test");
     ok(r.data?.deploy_result?.audit_receipt?.ok === true,        "  deploy_result.audit_receipt.ok: true");
-    const auditPayload = JSON.parse(execMock.calls.find(c => c.pathname === "/audit").body);
-    const proposePayload = JSON.parse(execMock.calls.find(c => c.pathname === "/propose").body);
+    const auditCall = execMock.calls.find(c => c.pathname === "/audit");
+    const proposeCall = execMock.calls.find(c => c.pathname === "/propose");
+    ok(!!auditCall,                                              "  payload de /audit disponível");
+    ok(!!proposeCall,                                            "  payload de /propose disponível");
+    const auditPayload = JSON.parse(auditCall?.body || "{}");
+    const proposePayload = JSON.parse(proposeCall?.body || "{}");
     ok(auditPayload.workerId === "nv-enavia",                     "  /audit usa workerId dinâmico do contrato");
     ok(auditPayload.target?.workerId === auditPayload.workerId,   "  /audit envia target.workerId consistente");
     ok(auditPayload.context?.require_live_read === true,          "  /audit exige live read");
@@ -825,7 +829,9 @@ async function runTests() {
       { confirm: true, approved_by: "tester", evidence: [] }, env);
     ok(r.data?.executor_audit !== null && r.data?.executor_audit !== undefined, "  executor_audit presente");
     ok(execMock.calls.some(c => c.pathname === "/audit"),  "  /audit chamado");
-    const auditPayload = JSON.parse(execMock.calls.find(c => c.pathname === "/audit").body);
+    const auditCall = execMock.calls.find(c => c.pathname === "/audit");
+    ok(!!auditCall,                                         "  payload de /audit disponível no approve");
+    const auditPayload = JSON.parse(auditCall?.body || "{}");
     ok(auditPayload.workerId === "nv-enavia",              "  approve usa workerId dinâmico");
     ok(auditPayload.target?.workerId === auditPayload.workerId, "  approve envia target.workerId consistente");
     console.log("");

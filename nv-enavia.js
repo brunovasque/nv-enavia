@@ -4912,6 +4912,13 @@ function resolveAuditTargetWorker(state, decomposition, nextAction) {
   };
 }
 
+function buildExecutorTargetPayload(workerId) {
+  return {
+    workerId,
+    target: { system: "cloudflare_worker", workerId },
+  };
+}
+
 // ============================================================================
 // PR6 — GET /contracts/loop-status (handler canônico, Worker-only)
 //
@@ -5650,8 +5657,7 @@ async function handleExecuteNext(request, env) {
     // PR14 — Step A: Executor /audit (obrigatório antes de executar)
     const _auditPayload = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
-      workerId: auditTargetResolution.workerId,
-      target: { system: "cloudflare_worker", workerId: auditTargetResolution.workerId },
+      ...buildExecutorTargetPayload(auditTargetResolution.workerId),
       context: { require_live_read: true },
       contract_id: contractId, nextAction, operationalAction,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
@@ -5678,8 +5684,7 @@ async function handleExecuteNext(request, env) {
     // PR14 — Step B: Executor /propose (apenas execute_next)
     const _proposePayload = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "propose",
-      workerId: auditTargetResolution.workerId,
-      target: { system: "cloudflare_worker", workerId: auditTargetResolution.workerId },
+      ...buildExecutorTargetPayload(auditTargetResolution.workerId),
       patch: { type: "contract_action", content: JSON.stringify(nextAction) },
       prompt: `Proposta supervisionada para ação contratual: ${operationalAction.type}`,
       intent: "propose",
@@ -5832,8 +5837,7 @@ async function handleExecuteNext(request, env) {
     // PR14 — Step A: Executor /audit (obrigatório para approve também)
     const _auditPayloadApprove = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
-      workerId: auditTargetResolution.workerId,
-      target: { system: "cloudflare_worker", workerId: auditTargetResolution.workerId },
+      ...buildExecutorTargetPayload(auditTargetResolution.workerId),
       context: { require_live_read: true },
       contract_id: contractId, nextAction, operationalAction,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
