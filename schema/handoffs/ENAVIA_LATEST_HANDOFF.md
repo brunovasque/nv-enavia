@@ -57,9 +57,9 @@
 
 - KV namespace IDs reais não commitados (por segurança). Deploy real requer preenchimento manual no `wrangler.executor.toml` ou injeção via Cloudflare Dashboard.
 
-## O que foi feito nesta sessão
+---
 
-### PR15 — EXECUTOR-ONLY: `/audit` agora emite `verdict` e `risk_level`
+## Histórico anterior: PR15 — EXECUTOR-ONLY: `/audit` agora emite `verdict` e `risk_level`
 
 **Diagnóstico:**
 - Smoke real em TEST mostrou que `POST /contracts/execute-next` no `nv-enavia` chamava o binding `EXECUTOR`, o `/audit` respondia HTTP 200 com JSON válido, e mesmo assim o Worker bloqueava com:
