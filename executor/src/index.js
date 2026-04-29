@@ -7,6 +7,10 @@ import {
   normalizeAuditRiskLevel,
   normalizeAuditVerdict,
 } from "./audit-response.js";
+import {
+  createCloudflareCredentialsError,
+  resolveCloudflareCredentials,
+} from "./cloudflare-credentials.mjs";
 
 // ============================================================
 // 📜 CANONICAL BOUNDARY — EXECUTOR × DEPLOY-WORKER
@@ -652,14 +656,14 @@ if (METHOD === "POST" && pathname === "/audit") {
       );
     }
 
-    const accountId = env?.CF_ACCOUNT_ID || env?.CLOUDFLARE_ACCOUNT_ID || null;
-    const apiToken = env?.CF_API_TOKEN || env?.CLOUDFLARE_API_TOKEN || null;
+    const { accountId, apiToken, presence } = resolveCloudflareCredentials(env);
 
     if (!accountId || !apiToken) {
       return withCORS(
         errorResponse(
           "CF_ACCOUNT_ID/CF_API_TOKEN ausentes no Executor.",
           500,
+          presence,
         ),
       );
     }
@@ -1103,12 +1107,15 @@ if (METHOD === "POST" && pathname === "/propose") {
       );
     }
 
-    const accountId = env?.CF_ACCOUNT_ID || env?.CLOUDFLARE_ACCOUNT_ID || null;
-    const apiToken = env?.CF_API_TOKEN || env?.CLOUDFLARE_API_TOKEN || null;
+    const { accountId, apiToken, presence } = resolveCloudflareCredentials(env);
 
     if (!accountId || !apiToken) {
       return withCORS(
-        errorResponse("CF_ACCOUNT_ID/CF_API_TOKEN ausentes no Executor.", 500)
+        errorResponse(
+          "CF_ACCOUNT_ID/CF_API_TOKEN ausentes no Executor.",
+          500,
+          presence,
+        )
       );
     }
 
@@ -4035,9 +4042,17 @@ const freshnessMaxMs =
       });
     } else {
       try {
+        const { accountId, apiToken } = resolveCloudflareCredentials(env);
+        if (!accountId || !apiToken) {
+          throw createCloudflareCredentialsError(
+            env,
+            "CF_ACCOUNT_ID/CF_API_TOKEN ausentes no ambiente do Executor",
+          );
+        }
+
         const snap = await fetchCurrentWorkerSnapshot({
-          accountId: env.CF_ACCOUNT_ID,
-          apiToken: env.CF_API_TOKEN,
+          accountId,
+          apiToken,
           scriptName: resolvedWorkerName,
         });
         
@@ -4074,7 +4089,13 @@ const freshnessMaxMs =
           title: "Falha ao ler código do worker alvo",
           description:
             "A leitura do código do worker alvo falhou via Cloudflare API.",
-          detail: err?.message || String(err),
+          detail:
+            err?.details && typeof err.details === "object"
+              ? {
+                  message: err?.message || String(err),
+                  ...err.details,
+                }
+              : err?.message || String(err),
           scope: "isolated",
           riskLevel: "critical",
         });
@@ -5372,13 +5393,14 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
 // Fonte única — usado por resolveScriptName (antes estava dentro do fetch handler)
 // ============================================================
 async function listCloudflareWorkerScripts(env) {
-  const accountId =
-    (env?.CF_ACCOUNT_ID || env?.CLOUDFLARE_ACCOUNT_ID || env?.CLOUDFLARE_ACCOUNT || "").trim();
-  const apiToken =
-    (env?.CF_API_TOKEN || env?.CLOUDFLARE_API_TOKEN || env?.CF_TOKEN || "").trim();
+  const { accountId, apiToken } = resolveCloudflareCredentials(env);
 
-  if (!accountId) throw new Error("CF_ACCOUNT_ID ausente no env do enavia-executor.");
-  if (!apiToken) throw new Error("CF_API_TOKEN ausente no env do enavia-executor.");
+  if (!accountId || !apiToken) {
+    throw createCloudflareCredentialsError(
+      env,
+      "CF_ACCOUNT_ID/CF_API_TOKEN ausentes no env do enavia-executor.",
+    );
+  }
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`;
 
@@ -6603,20 +6625,13 @@ if (mode === "engineer") {
           const scriptName = await resolveWorkerScriptName({ env, workerId });
     
           // credenciais CF no ambiente do EXECUTOR (não do ENAVIA)
-          const accountId =
-            env?.CF_ACCOUNT_ID ||
-            env?.CLOUDFLARE_ACCOUNT_ID ||
-            env?.CF_ACCOUNT ||
-            null;
-    
-          const apiToken =
-            env?.CF_API_TOKEN ||
-            env?.CLOUDFLARE_API_TOKEN ||
-            env?.CF_TOKEN ||
-            null;
-    
+          const { accountId, apiToken } = resolveCloudflareCredentials(env);
+
           if (!accountId || !apiToken) {
-            throw new Error("CF_ACCOUNT_ID/CF_API_TOKEN ausentes no ambiente do Executor");
+            throw createCloudflareCredentialsError(
+              env,
+              "CF_ACCOUNT_ID/CF_API_TOKEN ausentes no ambiente do Executor",
+            );
           }
     
           // ✅ caminho canônico (igual o /audit): snapshot live
@@ -6685,7 +6700,11 @@ if (mode === "engineer") {
               http_status: 422,
               reason: "live_read_failed",
               context_used: false,
-              context_summary: { target, error: String(err?.message || err) },
+              context_summary: {
+                target,
+                error: String(err?.message || err),
+                ...(err?.details && typeof err.details === "object" ? err.details : {}),
+              },
               suggestions: [],
               message: "require_live_read=true e a leitura LIVE do worker-alvo falhou. Sugestões bloqueadas.",
             };
@@ -6697,6 +6716,7 @@ if (mode === "engineer") {
           context_summary = {
             target,
             error: String(err?.message || err),
+            ...(err?.details && typeof err.details === "object" ? err.details : {}),
           };
         }
       }

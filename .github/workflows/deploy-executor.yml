@@ -136,7 +136,9 @@ jobs:
         run: node --check executor/src/index.js
 
       - name: Run executor contract tests
-        run: node executor/tests/executor.contract.test.js
+        run: |
+          node executor/tests/executor.contract.test.js
+          node --test executor/tests/cloudflare-credentials.test.js
 
       - name: Deploy Executor TEST
         if: ${{ github.event.inputs.target_env == 'test' }}
@@ -146,33 +148,44 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.executor.generated.toml --env test
 
-      - name: Smoke TEST — POST /audit (verdict check)
+      - name: Smoke TEST — POST /audit live read
         if: ${{ github.event.inputs.target_env == 'test' }}
         run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
+          RESPONSE_FILE="$(mktemp)"
+          HTTP_CODE=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
             -X POST \
             -H "Content-Type: application/json" \
-            -d '{"executor_action":"audit","workerId":"nv-enavia","constraints":{"read_only":true,"no_auto_apply":true},"context":{"execution_id":"smoke-test"}}' \
+            -d '{"executor_action":"audit","workerId":"nv-enavia","target":{"system":"cloudflare_worker","workerId":"nv-enavia"},"constraints":{"read_only":true,"no_auto_apply":true},"context":{"execution_id":"smoke-test","require_live_read":true}}' \
             https://enavia-executor-test.brunovasque.workers.dev/audit)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
           echo "POST /audit → HTTP $HTTP_CODE"
-          echo "Body: $BODY"
-          [ "$HTTP_CODE" -eq 200 ] || { echo "Smoke FAILED: /audit returned $HTTP_CODE"; exit 1; }
-          echo "$BODY" | node -e "
-            const chunks = [];
-            process.stdin.on('data', c => chunks.push(c));
-            process.stdin.on('end', () => {
-              const body = JSON.parse(chunks.join(''));
-              const resultVerdict = body?.result?.verdict;
-              const auditVerdict = body?.audit?.verdict;
-              if (!resultVerdict) { console.error('FAILED: result.verdict ausente'); process.exit(1); }
-              if (!auditVerdict) { console.error('FAILED: audit.verdict ausente'); process.exit(1); }
-              console.log('result.verdict:', resultVerdict);
-              console.log('audit.verdict:', auditVerdict);
-              console.log('Smoke PASSED');
-            });
-          "
+          [ "$HTTP_CODE" -eq 200 ] || { echo "Smoke FAILED: /audit returned $HTTP_CODE"; cat "$RESPONSE_FILE"; exit 1; }
+          node - "$RESPONSE_FILE" <<'NODE'
+          const fs = require("node:fs");
+          const responsePath = process.argv[2];
+          const body = JSON.parse(fs.readFileSync(responsePath, "utf8"));
+          const text = JSON.stringify(body);
+          const proof =
+            body?.result?.context_proof ||
+            body?.context_proof ||
+            body?.result?.context_summary ||
+            body?.context_summary ||
+            null;
+
+          if (text.includes("CF_ACCOUNT_ID/CF_API_TOKEN ausentes")) {
+            console.error("FAILED: credenciais Cloudflare ausentes no smoke live-read.");
+            console.error(JSON.stringify(body, null, 2));
+            process.exit(1);
+          }
+
+          if (!proof?.snapshot_fingerprint) {
+            console.error("FAILED: smoke live-read sem prova de snapshot.");
+            console.error(JSON.stringify(body, null, 2));
+            process.exit(1);
+          }
+
+          console.log("snapshot_fingerprint:", proof.snapshot_fingerprint);
+          console.log("Smoke PASSED");
+          NODE
 
       - name: Deploy Executor PROD
         if: ${{ github.event.inputs.target_env == 'prod' }}
