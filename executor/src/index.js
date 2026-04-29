@@ -3,6 +3,10 @@
 // Bundled by wrangler/esbuild at deploy time.
 // ============================================================
 import { parse as acornParse } from "acorn";
+import {
+  normalizeAuditRiskLevel,
+  normalizeAuditVerdict,
+} from "./audit-response.js";
 
 // ============================================================
 // 📜 CANONICAL BOUNDARY — EXECUTOR × DEPLOY-WORKER
@@ -988,18 +992,37 @@ if (METHOD === "POST" && pathname === "/audit") {
         });
       }
 
+      // ============================================================
+      // PR15 — verdict/risk_level explícitos no envelope /audit
+      // O Worker (nv-enavia.js, callExecutorBridge) exige
+      // data.result.verdict ou data.audit.verdict. Sem isso, classifica
+      // como "Audit sem verdict explícito. Resposta ambígua bloqueada
+      // por segurança." A aprovação só ocorre com sinal explícito
+      // de sucesso (`ok === true` e `error !== true`).
+      // ============================================================
+      const auditVerdict = normalizeAuditVerdict(execResult);
+      const auditRiskLevel = normalizeAuditRiskLevel(execResult, riskReport);
+
+      const baseResult =
+        execResult && typeof execResult === "object" ? execResult : {};
+      const resultWithVerdict = {
+        ...baseResult,
+        verdict: auditVerdict,
+        risk_level: auditRiskLevel,
+        ...(canonicalMap ? { map: canonicalMap } : {}),
+      };
+
       return withCORS(
         jsonResponse({
           system: SYSTEM_NAME,
           executor: "core_v2",
           route: "/audit",
           received_action: action,
-          result: canonicalMap
-            ? {
-                ...execResult,
-                map: canonicalMap,
-              }
-            : execResult,
+          result: resultWithVerdict,
+          audit: {
+            verdict: resultWithVerdict.verdict,
+            risk_level: resultWithVerdict.risk_level,
+          },
           evidence,
           ...(pipeline ? { pipeline } : {}),
         }),

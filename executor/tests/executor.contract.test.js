@@ -11,6 +11,10 @@
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import {
+  normalizeAuditRiskLevel,
+  normalizeAuditVerdict,
+} from "../src/audit-response.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -195,6 +199,61 @@ if (wranglerContent) {
     "wrangler.toml não contém IDs reais de produção (sanitizado)"
   );
 }
+
+// ============================================================================
+// Group 6 — Contrato do verdict/risk_level do /audit
+// ============================================================================
+console.log("\nGroup 6 — Contrato do verdict/risk_level do /audit");
+
+assert(
+  normalizeAuditVerdict({ ok: true }) === "approve",
+  "execResult.ok === true gera verdict: approve"
+);
+
+assert(
+  normalizeAuditVerdict({ ok: false }) === "reject",
+  "execResult.ok === false gera verdict: reject"
+);
+
+assert(
+  normalizeAuditVerdict({}) === "reject",
+  "execResult vazio gera verdict: reject"
+);
+
+assert(
+  normalizeAuditVerdict({ error: true }) === "reject",
+  "execResult.error === true gera verdict: reject"
+);
+
+assert(
+  normalizeAuditVerdict({ ok: true, verdict: "approve" }) === "approve",
+  "verdict approve com ok:true é preservado"
+);
+
+assert(
+  normalizeAuditVerdict({ verdict: "reject" }) === "reject",
+  "verdict reject é preservado"
+);
+
+assert(
+  normalizeAuditVerdict({ ok: true, verdict: "passed" }) === "approve",
+  "verdict inválido não é preservado e é recalculado a partir de ok:true"
+);
+
+assert(
+  normalizeAuditVerdict({ verdict: "approve" }) === "reject",
+  "verdict approve sem ok:true explícito não é preservado"
+);
+
+assert(
+  normalizeAuditRiskLevel({}, null) === "low",
+  "risk_level faz fallback seguro para low"
+);
+
+assert(
+  normalizeAuditRiskLevel({ risk_level: "medium" }, { level: "" }) === "medium",
+  "risk_level preserva valor string válido de execResult"
+);
 
 // ============================================================================
 // Resultado final

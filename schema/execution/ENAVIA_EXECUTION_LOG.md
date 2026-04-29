@@ -485,3 +485,60 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Alterações em Panel/Executor:** nenhuma.
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** PR7 — Worker-only — integrar schemas desconectados.
+
+---
+
+## 2026-04-29 — PR15: EXECUTOR-ONLY: contrato `/audit` com verdict explícito
+
+- **Branch:** `copilot/fix-audit-response-contract`
+- **Escopo:** EXECUTOR-ONLY. Nenhuma mudança em Worker `nv-enavia`, Painel, Deploy Worker ou KV.
+- **Problema observado em smoke real TEST:**
+  - `POST /contracts` → 201, `GET /contracts/loop-status` → contrato ativo, `POST /contracts/execute-next` → chama binding `EXECUTOR`.
+  - `POST /audit` no Executor real (`enavia-executor-test`) respondia HTTP 200 com JSON válido, mas sem `verdict`.
+  - `nv-enavia.js → callExecutorBridge` (linha 5179) bloqueava com: `Audit sem verdict explícito. Resposta ambígua bloqueada por segurança.`
+- **Patch cirúrgico:**
+  - `executor/src/index.js` — handler `POST /audit` (return final, ~linha 991): injeta `verdict` (`approve`/`reject`) e `risk_level` no objeto `result`, e adiciona campo top-level `audit: { verdict, risk_level }` espelhando os mesmos valores. Restante do envelope (`system`, `executor`, `route`, `received_action`, `evidence`, `pipeline`, `result.map`) preservado.
+  - `executor/CONTRACT.md` — exemplo de Response 200 atualizado e nota PR15 explicando o mapeamento.
+- **Mapeamento determinístico:**
+  - `execResult.ok === false` → `verdict: "reject"`.
+  - Caso contrário → `verdict: "approve"`.
+  - `risk_level` deriva de `riskReport.risk_level | level | risk`, fallback `execResult.risk_level`, fallback final `"low"`.
+- **Garantias:**
+  - Zero alteração em comportamento dos demais handlers (`/propose`, `/engineer`, `/health`, `/boundary`, `/status`).
+  - Compatível com ambos os ramos do contrato do Worker (`data.result.verdict` e `data.audit.verdict`).
+  - Não altera lógica do core_v2 — apenas o envelope de resposta do `/audit`.
+- **Smoke tests:**
+  - `node --check executor/src/index.js` → OK ✅
+  - `node executor/tests/executor.contract.test.js` → 23/23 ✅
+  - Mocks em `tests/pr14-executor-deploy-real-loop.smoke.test.js` confirmam o formato esperado pelo Worker (`result: { verdict: "approve", risk_level: "low" }`).
+- **Rollback:** `git revert <commit>` desta PR; arquivos afetados isolados em `executor/src/index.js`, `executor/CONTRACT.md` e governança.
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** deploy do Executor em TEST e re-rodar smoke real `execute-next` para confirmar `executor_status: "passed"`.
+
+### 2026-04-29 — follow-up PR15: regra conservadora do `verdict`
+
+- **Origem:** comentário de revisão na PR (`comment_id: 4340101564`).
+- **Risco apontado:** a primeira versão do patch aprovava qualquer caso que não fosse `ok === false`, o que ainda permitia `approve` em payload vazio, `error:true`, `status:"failed"` ou `ok` ausente.
+- **Correção aplicada (Executor-only):**
+  - Novo helper puro `executor/src/audit-response.js`.
+  - `normalizeAuditVerdict(execResult)`:
+    - retorna `"approve"` somente com `execResult.ok === true` **e** `execResult.error !== true`;
+    - retorna `"reject"` em qualquer outro caso;
+    - preserva `execResult.verdict` apenas quando já for `"approve"` (com sucesso explícito) ou `"reject"`;
+    - descarta valores inválidos como `"passed"` e recalcula de forma conservadora.
+  - `normalizeAuditRiskLevel(execResult, riskReport)`:
+    - aceita apenas valores string não-vazios vindos de `riskReport` ou `execResult.risk_level`;
+    - fallback final seguro `"low"`.
+- **Arquivos alterados:**
+  - `executor/src/audit-response.js`
+  - `executor/src/index.js`
+  - `executor/tests/executor.contract.test.js`
+  - `executor/CONTRACT.md`
+  - governança (`schema/status`, `schema/handoffs`, `schema/execution`)
+- **Testes:**
+  - `node executor/tests/executor.contract.test.js` → 33/33 ✅
+  - `node --check executor/src/index.js` → OK ✅
+  - `node --check executor/src/audit-response.js` → OK ✅
+  - `node --check executor/tests/executor.contract.test.js` → OK ✅
+- **Escopo preservado:** sem mudanças em `nv-enavia.js`, `panel/`, Deploy Worker, KV ou `wrangler.toml`.
+- **Próxima etapa segura:** deploy do Executor em TEST e repetir o smoke real do loop para validar o mesmo comportamento no binding `EXECUTOR`.

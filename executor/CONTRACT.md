@@ -109,16 +109,40 @@ Diagnóstico completo do worker-alvo (snapshot, hash, mapa canônico).
 **Response 200:**
 ```json
 {
-  "ok": true,
-  "audit": {
+  "system": "ENAVIA_EXECUTOR",
+  "executor": "core_v2",
+  "route": "/audit",
+  "received_action": { ... },
+  "result": {
+    "ok": true,
     "verdict": "approve | reject",
     "risk_level": "low | medium | high | critical",
-    "snapshot": "...",
-    "hash": "...",
-    "route_map": [ ... ]
-  }
+    "mode": "noop | kv_patch | module_patch | ...",
+    "...": "demais campos do core_v2"
+  },
+  "audit": {
+    "verdict": "approve | reject",
+    "risk_level": "low | medium | high | critical"
+  },
+  "evidence": { "target": { ... }, "snapshot": { ... }, "anchors": [ ... ], "invariants": [ ... ], "steps": [ ... ] },
+  "pipeline": { "execution_id": "...", "stage": "audit", "risk_level": "...", "staging": { ... }, "proof": { ... } }
 }
 ```
+
+> **PR15 — contrato `/audit` com verdict explícito.**
+> Os campos `result.verdict` e `result.risk_level` são sempre emitidos
+> (espelhados também em `audit.verdict` / `audit.risk_level`).
+> O Worker (`nv-enavia.js → callExecutorBridge`) lê `data.result.verdict`
+> ou `data.audit.verdict`. Sem esses campos a resposta era classificada
+> como `"Audit sem verdict explícito. Resposta ambígua bloqueada por segurança."`.
+> Regra conservadora:
+> - `verdict:"approve"` somente quando `execResult.ok === true`
+>   **e** `execResult.error !== true`;
+> - `verdict:"reject"` em qualquer outro caso;
+> - `execResult.verdict` só é preservado quando já for exatamente
+>   `"approve"` (com sucesso explícito) ou `"reject"`.
+> `risk_level` deriva de `riskReport` quando disponível, depois de
+> `execResult.risk_level`, com fallback seguro `"low"`.
 
 ---
 

@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-28
-**Branch ativa:** claude/pr14-executor-deploy-real-loop
-**Última tarefa:** PR14 — ajuste P1 na PR #162 (Worker-only). `callExecutorBridge` e `callDeployBridge` agora retornam imediatamente `ok:false`, `status:"ambiguous"` e motivo explícito quando o HTTP 200 traz body não-JSON, impedindo qualquer path `passed` com resposta ilegível. Smoke tests: PR14 111/111 ✅, PR13 91/91 ✅. Sem alteração em Panel, Executor externo, Deploy Worker externo, `contract-executor.js` ou `executor/`.
+**Data:** 2026-04-29
+**Branch ativa:** copilot/fix-audit-response-contract
+**Última tarefa:** PR15 — EXECUTOR-ONLY. Ajuste conservador no contrato de resposta do `POST /audit`: `verdict:"approve"` agora só sai com sucesso explícito (`execResult.ok === true` e `execResult.error !== true`); qualquer outro caso cai em `reject`. `execResult.verdict` só é preservado quando já for exatamente `"approve"` (com sucesso explícito) ou `"reject"`. Regra extraída para `executor/src/audit-response.js` e coberta por testes focados. Nenhuma alteração no Worker `nv-enavia`, no Painel, no Deploy Worker ou em KV. Smoke do contrato do Executor: 33/33 ✅.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
