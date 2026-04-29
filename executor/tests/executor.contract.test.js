@@ -104,6 +104,11 @@ if (srcContent) {
   );
 
   assert(
+    srcContent.includes('GIT_KV.put("git:code:latest", code)'),
+    "src/index.js mantém alias legado git:code:latest sincronizado"
+  );
+
+  assert(
     srcContent.includes("/boundary"),
     "src/index.js contém rota /boundary"
   );

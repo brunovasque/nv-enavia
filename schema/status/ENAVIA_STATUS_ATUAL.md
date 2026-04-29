@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/port-cloudflare-credentials-fix`
-**Última tarefa:** Correção cirúrgica — o runtime do Executor neste repo agora resolve credenciais Cloudflare por helper canônico único (`executor/src/cloudflare-credentials.mjs`) com aliases consistentes para account/token, diagnóstico seguro só com booleans `has_*`, e uso compartilhado em `/audit`, `/propose`, leitura live do worker-alvo, listagem de scripts e caminhos internos de snapshot. O smoke de `.github/workflows/deploy-executor.yml` passou a chamar `POST /audit` com `workerId`, `target.workerId` e `context.require_live_read:true`, falhando se faltar prova de snapshot live ou se aparecer erro de credenciais ausentes. Teste focado do helper adicionado em `executor/tests/cloudflare-credentials.test.js`.
+**Branch ativa:** `copilot/bootstrap-snapshot-canonico-executor-kv`
+**Última tarefa:** Correção cirúrgica — o Executor agora mantém o alias legado `git:code:latest` sincronizado sempre que salva snapshot canônico no KV, e o workflow `.github/workflows/deploy-executor.yml` faz bootstrap explícito do snapshot do runtime TEST logo após o deploy via `POST /apply-patch`, antes do smoke live-read em `/audit`. Isso elimina o finding crítico do self-audit quando o runtime recém-publicado ainda não tem snapshot canônico no namespace `ENAVIA_GIT_TEST`.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -55,6 +55,18 @@
 - nenhum
 
 ## Decisões formalizadas nesta sessão
+- `saveVersion(...)` em `executor/src/index.js` agora grava, no mesmo commit lógico de snapshot:
+  - `git:snap:<id>`
+  - `git:code:<id>`
+  - `git:code:latest`
+  - `git:index`
+  - `git:latest`
+- O alias legado `git:code:latest` volta a ser mantido como espelho do snapshot recém-salvo, sem alterar o lookup canônico do self-audit.
+- O workflow `deploy-executor.yml` agora, em `target_env=test`, executa:
+  1. deploy do runtime `enavia-executor-test`;
+  2. bootstrap do snapshot canônico via `POST /apply-patch` com o `executor/src/index.js` do commit atual;
+  3. smoke `POST /audit` live-read.
+- O bootstrap falha cedo se `/apply-patch` não devolver `meta.id` e `code_length` válidos.
 - `resolveCloudflareCredentials(env)` é a única fonte canônica para aliases:
   - account: `CF_ACCOUNT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT`, `CLOUDFLARE_ACCOUNT`
   - token: `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_TOKEN`
@@ -161,5 +173,9 @@
   - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima etapa segura
-- Rodar o workflow `Deploy enavia-executor` em `target_env=test` para publicar o patch no runtime `enavia-executor-test`.
-- Confirmar no smoke do workflow que `POST /audit` com `context.require_live_read:true` retorna `snapshot_fingerprint` e não retorna diagnóstico de credenciais ausentes.
+- Rodar o workflow `Deploy enavia-executor` em `target_env=test` para publicar o patch e executar o novo bootstrap de snapshot no namespace `ENAVIA_GIT_TEST`.
+- Confirmar no log do workflow:
+  - `POST /apply-patch → HTTP 200`
+  - `executor snapshot version_id: ...`
+  - `POST /audit → HTTP 200`
+  - `snapshot_fingerprint: ...`

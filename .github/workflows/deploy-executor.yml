@@ -148,6 +148,66 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.executor.generated.toml --env test
 
+      - name: Bootstrap canonical Executor snapshot TEST
+        if: ${{ github.event.inputs.target_env == 'test' }}
+        run: |
+          PAYLOAD_FILE="$(mktemp)"
+          RESPONSE_FILE="$(mktemp)"
+
+          cleanup() {
+            rm -f "$PAYLOAD_FILE" "$RESPONSE_FILE"
+          }
+          trap cleanup EXIT
+
+          node - "$PAYLOAD_FILE" <<'NODE'
+          const fs = require("node:fs");
+          const payloadPath = process.argv[2];
+          const shortSha = (process.env.GITHUB_SHA || "local").slice(0, 12);
+          const code = fs.readFileSync("executor/src/index.js", "utf8");
+          const payload = {
+            new_code: code,
+            author: "github-actions[bot]",
+            message: `bootstrap canonical executor snapshot after test deploy (${shortSha})`,
+            auto_deploy: false
+          };
+          fs.writeFileSync(payloadPath, JSON.stringify(payload));
+          NODE
+
+          HTTP_CODE=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data-binary @"$PAYLOAD_FILE" \
+            https://enavia-executor-test.brunovasque.workers.dev/apply-patch)
+          echo "POST /apply-patch → HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || {
+            echo "Bootstrap FAILED: /apply-patch returned $HTTP_CODE"
+            cat "$RESPONSE_FILE"
+            exit 1
+          }
+
+          node - "$RESPONSE_FILE" <<'NODE'
+          const fs = require("node:fs");
+          const responsePath = process.argv[2];
+          const body = JSON.parse(fs.readFileSync(responsePath, "utf8"));
+          const versionId = body?.meta?.id || null;
+          const codeLength = body?.meta?.code_length || 0;
+
+          if (!versionId || typeof versionId !== "string") {
+            console.error("FAILED: bootstrap sem meta.id canônico.");
+            console.error(JSON.stringify(body, null, 2));
+            process.exit(1);
+          }
+
+          if (!Number.isFinite(codeLength) || codeLength <= 0) {
+            console.error("FAILED: bootstrap sem code_length válido.");
+            console.error(JSON.stringify(body, null, 2));
+            process.exit(1);
+          }
+
+          console.log("executor snapshot version_id:", versionId);
+          console.log("Bootstrap PASSED");
+          NODE
+
       - name: Smoke TEST — POST /audit live read
         if: ${{ github.event.inputs.target_env == 'test' }}
         run: |
