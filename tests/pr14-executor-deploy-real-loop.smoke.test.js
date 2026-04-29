@@ -820,6 +820,9 @@ async function runTests() {
     ok(proposePayload.workerId === auditPayload.workerId,         "  /propose reutiliza a mesma fonte de verdade");
     ok(deployApplyPayload.workerId === auditPayload.workerId,     "  /apply-test reutiliza o mesmo workerId dinâmico");
     ok(deployApplyPayload.target?.workerId === deployApplyPayload.workerId, "  /apply-test envia target.workerId consistente");
+    ok(typeof deployApplyPayload.patch === "object" && deployApplyPayload.patch !== null, "  /apply-test recebe patch (object)");
+    ok(typeof deployApplyPayload.patch?.content === "string" && deployApplyPayload.patch.content.length > 0, "  /apply-test patch.content não vazio");
+    ok(deployApplyPayload.patch?.content === proposePayload.patch?.content, "  /apply-test patch.content consistente com /propose");
     console.log("");
   }
 
@@ -889,6 +892,7 @@ async function runTests() {
   {
     console.log("  E1. deploy nunca chamado antes de audit+propose passarem");
     const callOrder = [];
+    const applyPayloads = [];
     const env = {
       ...BASE_ENV,
       ENAVIA_BRAIN: makeKV({
@@ -906,9 +910,10 @@ async function runTests() {
         },
       },
       DEPLOY_WORKER: {
-        fetch: async (url) => {
+        fetch: async (url, opts) => {
           const p = new URL(url).pathname;
           callOrder.push("deploy:" + p);
+          if (p === "/apply-test") applyPayloads.push(JSON.parse(opts?.body || "{}"));
           return new Response(JSON.stringify({ ok: true, action: "simulate", status: "passed" }), { status: 200 });
         },
       },
@@ -924,6 +929,8 @@ async function runTests() {
       ok(auditIdx < proposeIdx,                 "  audit chamado antes de propose");
       ok(proposeIdx < deployAuditIdx,           "  propose chamado antes do recibo no Deploy Worker");
       ok(deployAuditIdx < deployApplyIdx,       "  recibo no Deploy Worker chamado antes do /apply-test");
+      const ap = applyPayloads[0] || {};
+      ok(typeof ap.patch?.content === "string" && ap.patch.content.length > 0, "  /apply-test recebe patch.content não vazio");
     } else {
       // deploy pode não ter sido chamado se handler interno bloqueou — isso é ok
       ok(true, "  deploy não chamado mas ordem audit→propose mantida");

@@ -5715,6 +5715,7 @@ async function handleExecuteNext(request, env) {
       source: "nv-enavia", mode: "contract_execute_next",
       deploy_action: "simulate", target_env: "test",
       ...buildExecutorTargetPayload(auditTargetResolution.workerId),
+      patch: { type: "contract_action", content: JSON.stringify(nextAction) },
       contract_id: contractId, nextAction, operationalAction,
       execution_id: auditId,
       executor_audit: executorAuditResult.data,

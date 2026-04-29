@@ -1,19 +1,20 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/nv-enavia-include-target-workerid`
-**Última tarefa:** Correção cirúrgica Worker-only — o payload enviado por `callDeployBridge(...)/apply-test` agora reaproveita o mesmo target dinâmico já resolvido para `/audit` e `/propose`, incluindo `workerId` e `target.workerId`. Isso fecha o bloqueio real em TEST onde o Deploy Worker devolvia HTTP 400 com `target.workerId obrigatório`.
+**Branch ativa:** `copilot/fix-nv-enavia-payload`
+**Última tarefa:** Correção cirúrgica Worker-only — o `_deployPayload` enviado por `callDeployBridge(...)/apply-test` agora inclui `patch: { type: "contract_action", content: JSON.stringify(nextAction) }`, reutilizando o mesmo shape já montado para `_proposePayload`. Isso fecha o novo bloqueio real em TEST onde o Deploy Worker devolvia HTTP 400 com `patch.content obrigatório` (após a PR174 já ter corrigido `target.workerId`).
 
 ## Decisões formalizadas nesta sessão
-- `handleExecuteNext` agora inclui `...buildExecutorTargetPayload(auditTargetResolution.workerId)` também no `_deployPayload` enviado ao `DEPLOY_WORKER /apply-test`.
-- O alvo do deploy passa a reutilizar exatamente a mesma fonte de verdade dinâmica do audit/propose; nenhum `workerId` hardcoded novo foi introduzido.
-- `tests/pr14-executor-deploy-real-loop.smoke.test.js` agora valida explicitamente que `/apply-test` recebe:
-  - `workerId === "nv-enavia"`
-  - `target.workerId === workerId`
+- `handleExecuteNext` → step C (`_deployPayload`) agora inclui `patch: { type: "contract_action", content: JSON.stringify(nextAction) }`.
+- O patch reutiliza exatamente o mesmo shape e fonte de verdade do `_proposePayload` — sem duplicação de lógica, sem patch inventado.
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado com 3 novos asserts em C5 e E1 validando:
+  - `/apply-test` recebe `patch` como objeto;
+  - `patch.content` não vazio;
+  - `patch.content` consistente com o campo enviado ao `/propose`.
 - Validações desta sessão:
   - `node --check nv-enavia.js` ✅
   - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` ✅
-  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **164 passed, 0 failed** ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **168 passed, 0 failed** ✅
   - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Estado geral
