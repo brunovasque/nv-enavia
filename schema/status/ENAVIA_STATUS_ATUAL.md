@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/investigate-risk-level-audit`
-**Última tarefa:** Correção cirúrgica — `nv-enavia.js` agora resolve o `workerId` do Executor `/audit` a partir do contrato/execução atual, sem hardcode. O fluxo `POST /contracts/execute-next` passou a bloquear com `target worker ausente para auditoria segura` quando não existe alvo confiável, envia `workerId` + `target.workerId` + `context.require_live_read:true` no `/audit`, reutiliza o mesmo alvo dinâmico no `/propose`, e consolidou um helper local para montar o bloco `{ workerId, target }` sem duplicação. Smoke tests PR14 ampliados para cobrir bloqueio sem target, consistência do target dinâmico em `execute_next` e `approve`, e leitura segura dos payloads de teste.
+**Branch ativa:** `copilot/port-cloudflare-credentials-fix`
+**Última tarefa:** Correção cirúrgica — o runtime do Executor neste repo agora resolve credenciais Cloudflare por helper canônico único (`executor/src/cloudflare-credentials.mjs`) com aliases consistentes para account/token, diagnóstico seguro só com booleans `has_*`, e uso compartilhado em `/audit`, `/propose`, leitura live do worker-alvo, listagem de scripts e caminhos internos de snapshot. O smoke de `.github/workflows/deploy-executor.yml` passou a chamar `POST /audit` com `workerId`, `target.workerId` e `context.require_live_read:true`, falhando se faltar prova de snapshot live ou se aparecer erro de credenciais ausentes. Teste focado do helper adicionado em `executor/tests/cloudflare-credentials.test.js`.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -53,6 +53,21 @@
 
 ## Bloqueios
 - nenhum
+
+## Decisões formalizadas nesta sessão
+- `resolveCloudflareCredentials(env)` é a única fonte canônica para aliases:
+  - account: `CF_ACCOUNT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT`, `CLOUDFLARE_ACCOUNT`
+  - token: `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_TOKEN`
+- Diagnóstico de credenciais ausentes expõe apenas:
+  - `has_CF_ACCOUNT_ID`
+  - `has_CLOUDFLARE_ACCOUNT_ID`
+  - `has_CF_ACCOUNT`
+  - `has_CLOUDFLARE_ACCOUNT`
+  - `has_CF_API_TOKEN`
+  - `has_CLOUDFLARE_API_TOKEN`
+  - `has_CF_TOKEN`
+- Nenhum valor de credencial é retornado em `/audit`, `/propose` ou helpers internos quando as credenciais faltam.
+- O workflow `deploy-executor.yml` agora valida o ramo real de live read usado por `nv-enavia`.
 
 ## Decisão operacional — Deploy Executor KV por title
 
@@ -146,5 +161,5 @@
   - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima etapa segura
-- Rodar smoke real do loop operacional em TEST com `DEPLOY_WORKER` real para confirmar que o recibo `POST /audit` satisfaz o gate interno do `/apply-test`.
-- Se TEST passar, manter a ordem canônica `AUDIT → PROPOSE → APPLY TEST → DEPLOY TEST → APPROVE → PROMOTE` sem novos ajustes de fluxo.
+- Rodar o workflow `Deploy enavia-executor` em `target_env=test` para publicar o patch no runtime `enavia-executor-test`.
+- Confirmar no smoke do workflow que `POST /audit` com `context.require_live_read:true` retorna `snapshot_fingerprint` e não retorna diagnóstico de credenciais ausentes.

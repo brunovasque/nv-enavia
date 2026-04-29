@@ -4,6 +4,40 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — resolução canônica de credenciais Cloudflare no runtime do Executor
+
+- **Branch:** `copilot/port-cloudflare-credentials-fix`
+- **Commit de código:** `f73744b`
+- **Escopo:** Executor-only + workflow do executor. Sem alteração em `nv-enavia.js`, painel, Deploy Worker ou gates de `risk_level`.
+- **Problema:** o runtime `enavia-executor-test` publicado por este repo ainda resolvia credenciais Cloudflare de forma divergente entre `/audit`, `/propose`, listagem de scripts e live-read interno. Isso fazia o ramo `context.require_live_read:true` falhar com `CF_ACCOUNT_ID/CF_API_TOKEN ausentes no Executor.` mesmo quando os secrets existiam sob aliases compatíveis.
+- **Correção:**
+  1. Novo helper `executor/src/cloudflare-credentials.mjs` com:
+     - `resolveCloudflareCredentials(env)`
+     - `getCloudflareCredentialPresence(env)`
+     - `createCloudflareCredentialsError(env, message)`
+  2. Aliases suportados de forma canônica:
+     - account: `CF_ACCOUNT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT`, `CLOUDFLARE_ACCOUNT`
+     - token: `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_TOKEN`
+  3. `/audit` e `/propose` agora usam o helper único e retornam apenas booleans `has_*` quando as credenciais faltam.
+  4. Caminhos internos de Cloudflare API (`listCloudflareWorkerScripts`, live-read do worker alvo em `/audit`/`engineer`, snapshot helpers) foram alinhados ao mesmo resolver.
+  5. Erros internos de live-read por credenciais ausentes propagam apenas `message` + booleans `has_*`, sem valores de credenciais.
+  6. `.github/workflows/deploy-executor.yml` agora:
+     - roda `node --test executor/tests/cloudflare-credentials.test.js`;
+     - faz smoke `POST /audit` com `workerId`, `target.workerId` e `context.require_live_read:true`;
+     - falha se a resposta mencionar credenciais ausentes;
+     - falha se não houver `snapshot_fingerprint`.
+- **Testes executados:**
+  - `node --check executor/src/index.js` → OK ✅
+  - `node --check executor/src/cloudflare-credentials.mjs` → OK ✅
+  - `node --check executor/tests/cloudflare-credentials.test.js` → OK ✅
+  - `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
+  - `node --test executor/tests/cloudflare-credentials.test.js` → **4 passed, 0 failed** ✅
+  - `python3 -c "import yaml; yaml.safe_load(...deploy-executor.yml...)"` → **YAML válido** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** disparar `Deploy enavia-executor` em TEST para publicar o patch e confirmar o smoke live-read no runtime `enavia-executor-test`.
+
+---
+
 ## 2026-04-29 — FIX — target dinâmico para o Executor `/audit` em `POST /contracts/execute-next`
 
 - **Branch:** `copilot/investigate-risk-level-audit`
