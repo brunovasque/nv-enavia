@@ -1,58 +1,52 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — Resolver target worker dinâmico para o Executor `/audit`
-**Para:** Validar em TEST que o `risk_level` do `/audit` deixa de depender de payload pobre e passa a refletir o alvo real do contrato
+**De:** FIX — Portar resolução canônica de credenciais Cloudflare para o Executor operacional deste repo
+**Para:** Publicar em TEST e validar live-read real no runtime `enavia-executor-test`
 
 ## O que foi feito nesta sessão
 
-### Patch cirúrgico — `nv-enavia.js` + smoke test PR14
+### Patch cirúrgico — `executor/src/index.js` + helper novo + smoke de deploy
 
-O fluxo `POST /contracts/execute-next` mantido em `nv-enavia.js` continua com a ordem:
-
-```txt
-AUDIT → PROPOSE → APPLY TEST → DEPLOY TEST → APPROVE → PROMOTE
-```
-
-Sem trocar essa ordem, o payload do Executor `/audit` agora usa o target real do contrato/execução em vez de assumir `workerId: "nv-enavia"`.
+O fluxo operacional do Worker `nv-enavia` continua chamando o Executor com live-read, mas o runtime governado por este repo agora resolve credenciais Cloudflare de forma canônica:
 
 **Detalhes do patch:**
-- `resolveAuditTargetWorker(...)` consolida a fonte canônica do alvo em ordem segura:
-  1. `state.current_execution.handoff_used.scope.workers`
-  2. `nextAction.micro_pr_candidate.target_workers`
-  3. `buildExecutionHandoff(...).scope.workers`
-  4. `state.scope.workers`
-- Se existir exatamente 1 alvo confiável, `handleExecuteNext` envia no `/audit`:
-  - `workerId`
-  - `target: { system: "cloudflare_worker", workerId }`
-  - `context: { require_live_read: true }`
-- O `/propose` reaproveita o mesmo `workerId` resolvido.
-- `buildExecutorTargetPayload(workerId)` centraliza a montagem do bloco `{ workerId, target }` para `/audit`, `/propose` e `approve`.
-- Se não existir alvo confiável, o Worker bloqueia antes de chamar o Executor com:
-  - `status: "blocked"`
-  - `reason: "target worker ausente para auditoria segura"`
-- Se houver múltiplos alvos conflitantes, o Worker também bloqueia sem assumir alvo artificial.
+- Novo helper `executor/src/cloudflare-credentials.mjs`:
+  - `resolveCloudflareCredentials(env)`
+  - `getCloudflareCredentialPresence(env)`
+  - `createCloudflareCredentialsError(env, message)`
+- Aliases aceitos:
+  - account: `CF_ACCOUNT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT`, `CLOUDFLARE_ACCOUNT`
+  - token: `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_TOKEN`
+- `/audit` e `/propose` agora usam o mesmo resolver canônico antes de qualquer live read.
+- Leituras internas de snapshot/script list (`fetchCurrentWorkerSnapshot` callers e `listCloudflareWorkerScripts`) também foram alinhadas ao mesmo helper.
+- Quando credenciais faltam, o runtime retorna apenas booleans `has_*`; nenhum valor real é exposto.
+- O caminho `engineer` também propaga apenas diagnóstico seguro quando o live read falha por credenciais ausentes.
+- `.github/workflows/deploy-executor.yml` agora:
+  - roda o teste focado do helper;
+  - faz smoke `POST /audit` com `workerId`, `target.workerId` e `context.require_live_read:true`;
+  - falha se não houver `snapshot_fingerprint`;
+  - falha se a resposta mencionar credenciais ausentes.
 
 **Garantias do patch:**
-- A ordem canônica **não mudou**.
-- `validateExecutorAuditForReceipt` continua intocado.
-- O Worker não baixa `risk_level` artificialmente.
-- O Executor só recebe `/audit` quando há alvo contratual confiável.
-- Escopo Worker-only: sem alteração em painel, executor externo, workflow do executor ou `wrangler.toml`.
+- Escopo Executor-only + workflow do executor. `nv-enavia.js`, painel e Deploy Worker não foram alterados.
+- Nenhum gate de `risk_level` foi relaxado.
+- Nenhum valor de secret é retornado no diagnóstico.
+- O smoke pós-deploy cobre o mesmo ramo de live read que quebrou em produção TEST.
 
 **Validações locais:**
-- `node --check nv-enavia.js` → OK ✅
-- `node --check contract-executor.js` → OK ✅
-- `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
-- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **161 passed, 0 failed** ✅
-- `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- `node --check executor/src/index.js` → OK ✅
+- `node --check executor/src/cloudflare-credentials.mjs` → OK ✅
+- `node --check executor/tests/cloudflare-credentials.test.js` → OK ✅
+- `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
+- `node --test executor/tests/cloudflare-credentials.test.js` → **4 passed, 0 failed** ✅
+- `python3 -c "yaml.safe_load(...deploy-executor.yml...)"` → **YAML válido** ✅
 
 ## Próxima ação segura
 
-1. Rodar o loop real em TEST com contrato/micro-PR que tenha `target_workers` explícito.
-2. Capturar o payload real do `/audit` e confirmar `workerId === target.workerId`.
-3. Comparar o `risk_level` do `/audit` no mesmo Executor TEST antes/depois do enriquecimento do target.
-4. Se ainda vier `high`, analisar os `findings` do próprio Executor no alvo real em vez de relaxar o gate.
+1. Rodar o workflow `Deploy enavia-executor` com `target_env=test`.
+2. Confirmar no smoke que o `/audit` real devolve prova de snapshot live.
+3. Se o smoke falhar por credenciais ausentes, verificar secrets do Worker `enavia-executor-test` sem mudar o contrato de diagnóstico seguro.
 
 ## Bloqueios
 
