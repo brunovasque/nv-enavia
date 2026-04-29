@@ -19,11 +19,12 @@
 //      B2. target_env:prod bloqueado imediatamente
 //      B3. sem env.DEPLOY_WORKER → deploy_status:blocked
 //      B4. /apply-test HTTP 200 + body não JSON → deploy_status:ambiguous
-//      B4a. executor_audit ausente → blocked antes de registrar recibo
-//      B4b. verdict reject → blocked antes de registrar recibo
-//      B4c. verdict ausente → blocked antes de registrar recibo
-//      B4d. verdict approve + high risk → blocked antes de registrar recibo
-//      B4e. verdict approve + critical risk → blocked antes de registrar recibo
+//      B4a. verdict não-approve (ex: "conditional") → gate de validação bloqueia antes de /__internal__/audit
+//      B4b. verdict reject → executor bridge bloqueia (deploy_status: not_reached)
+//      B4c. verdict ausente → executor bridge bloqueia (deploy_status: not_reached)
+//      B4d. verdict approve + high risk → gate de validação bloqueia
+//      B4e. verdict approve + critical risk → gate de validação bloqueia
+//      B4f. verdict approve + risk_level desconhecido → gate de validação bloqueia
 //
 //   C. Fluxo integrado execute_next
 //      C1. sem executor: response inclui executor_block_reason, deploy_status:not_reached
@@ -527,6 +528,28 @@ async function runTests() {
     ok(r.data?.deploy_status === "blocked",                   "  deploy_status: blocked (risk critical)");
     ok(r.data?.deploy_block_reason?.includes("Gate de validação"), "  reason menciona gate de validação");
     ok(r.data?.deploy_block_reason?.includes("critical"),     "  reason menciona risco critical");
+    ok(deployMock.calls.length === 0,                         "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
+  {
+    console.log("  B4f. verdict approve + risk_level desconhecido → gate de validação bloqueia (sem fabricação)");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({
+      "/audit":   { body: { ok: true, route: "/audit", result: { verdict: "approve", risk_level: "unknown-level" } } },
+      "/propose": { body: PROPOSE_OK_BODY },
+    });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                          "  status: blocked");
+    ok(r.data?.deploy_status === "blocked",                   "  deploy_status: blocked (risk desconhecido)");
+    ok(r.data?.deploy_block_reason?.includes("Gate de validação"), "  reason menciona gate de validação");
+    ok(r.data?.deploy_block_reason?.includes("Risk level não identificado"), "  reason menciona fabricação evitada");
     ok(deployMock.calls.length === 0,                         "  Deploy Worker NÃO chamado");
     console.log("");
   }

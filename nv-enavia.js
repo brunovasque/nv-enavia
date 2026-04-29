@@ -5250,10 +5250,18 @@ function validateExecutorAuditForReceipt(executorAudit) {
       reason: `Risk level "${risk_level}" não permite registro de recibo. Apenas low/medium aceitável.`,
     };
   }
+  if (risk_level === null) {
+    return {
+      ok: false,
+      verdict,
+      risk_level: null,
+      reason: "Risk level não identificado no resultado do audit do Executor. Recibo não registrado para evitar fabricação de dados.",
+    };
+  }
   return {
     ok: true,
     verdict,
-    risk_level: risk_level || "medium",
+    risk_level,
     reason: null,
   };
 }
