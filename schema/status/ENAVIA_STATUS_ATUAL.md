@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/fix-kv-secret-validation`
-**Última tarefa:** FIX cirúrgico — validação KV namespace IDs contra Cloudflare no `deploy-executor.yml`. Nova etapa `Validate KV namespace IDs against Cloudflare` adicionada após `Setup Node`. Chama `npx wrangler kv namespace list`, verifica cada um dos 6 KV secrets/bindings, imprime `OK` ou `INVALID` sem expor valores, e falha antes do deploy se algum for inválido. YAML validado. Sem alteração em `nv-enavia.js`, `executor/src/index.js`, painel ou KV runtime.
+**Branch ativa:** `copilot/fix-validate-kv-namespace-ids`
+**Última tarefa:** FIX cirúrgico — correção da etapa `Validate KV namespace IDs against Cloudflare` no `deploy-executor.yml`. O workflow agora separa stdout/stderr de `npx wrangler kv namespace list`, valida se stdout é JSON array antes do parse, mostra erro claro quando o Wrangler não retorna JSON válido e continua verificando os 6 KV secrets/bindings sem expor valores. YAML e smoke local validados. Sem alteração em `nv-enavia.js`, `executor/src/index.js`, painel ou KV runtime.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)

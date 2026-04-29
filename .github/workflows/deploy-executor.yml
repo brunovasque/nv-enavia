@@ -100,10 +100,29 @@ jobs:
           GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
           GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
         run: |
-          KV_LIST_JSON=$(npx wrangler kv namespace list 2>&1)
-          if [ $? -ne 0 ] || [ -z "$KV_LIST_JSON" ]; then
-            echo "ERRO: Não foi possível listar KV namespaces. Verifique CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID."
-            echo "Saída do wrangler: $KV_LIST_JSON"
+          cleanup() {
+            rm -f /tmp/kv_check_failures /tmp/kv_namespaces.json /tmp/wrangler_kv_list.err
+          }
+          trap cleanup EXIT
+
+          set +e
+          npx wrangler kv namespace list > /tmp/kv_namespaces.json 2> /tmp/wrangler_kv_list.err
+          WRANGLER_STATUS=$?
+          set -e
+
+          if [ "$WRANGLER_STATUS" -ne 0 ]; then
+            echo "ERRO: wrangler kv namespace list falhou."
+            echo "stderr:"
+            cat /tmp/wrangler_kv_list.err
+            exit 1
+          fi
+
+          if ! jq -e 'type == "array"' /tmp/kv_namespaces.json > /dev/null 2>&1; then
+            echo "ERRO: wrangler kv namespace list não retornou JSON array válido."
+            echo "stderr:"
+            cat /tmp/wrangler_kv_list.err
+            echo "stdout preview:"
+            head -n 20 /tmp/kv_namespaces.json
             exit 1
           fi
 
@@ -111,7 +130,7 @@ jobs:
             local secret_name="$1"
             local secret_value="$2"
             local binding_name="$3"
-            if echo "$KV_LIST_JSON" | jq -e ".[] | select(.id == \"$secret_value\")" > /dev/null 2>&1; then
+            if jq -e --arg id "$secret_value" '.[] | select(.id == $id)' /tmp/kv_namespaces.json > /dev/null 2>&1; then
               echo "  ${secret_name}: OK  (binding: ${binding_name})"
             else
               echo "  ${secret_name}: INVALID  (binding: ${binding_name})"
@@ -119,7 +138,6 @@ jobs:
             fi
           }
 
-          rm -f /tmp/kv_check_failures
           echo "KV CHECK:"
           check_kv "ENAVIA_BRAIN_KV_ID"      "$ENAVIA_BRAIN_KV_ID"      "ENAVIA_BRAIN"
           check_kv "ENAVIA_BRAIN_TEST_KV_ID" "$ENAVIA_BRAIN_TEST_KV_ID" "ENAVIA_BRAIN_TEST"

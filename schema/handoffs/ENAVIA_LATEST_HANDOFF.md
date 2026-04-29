@@ -1,27 +1,26 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — Validação KV namespace IDs contra Cloudflare
-**Para:** Deploy real em TEST (`enavia-executor-test`) com diagnóstico claro de KV inválidos
+**De:** FIX — Robustez do diagnóstico de KV namespace IDs
+**Para:** Reexecutar `Deploy enavia-executor` em TEST com parse confiável do retorno do Wrangler
 
 ## O que foi feito nesta sessão
 
-### FIX cirúrgico — `deploy-executor.yml` — etapa de validação KV contra Cloudflare
+### FIX cirúrgico — `deploy-executor.yml` — separar stdout/stderr do Wrangler e validar JSON antes do check de KV
 
-**Problema:** Deploy falhava com:
+**Problema:** o diagnóstico novo tinha um bug próprio. A etapa:
+```bash
+KV_LIST_JSON=$(npx wrangler kv namespace list 2>&1)
 ```
-KV namespace '***' is not valid. Please verify the namespace_id in your configuration. [code: 10042]
-```
-O GitHub mascarava o valor com `***`, tornando impossível saber qual dos 6 KV secrets/bindings estava inválido.
+misturava stderr com stdout. Se o Wrangler emitisse warning/banner/erro parcial, o conteúdo deixava de ser JSON puro e todos os 6 checks podiam cair como `INVALID`, mesmo com IDs corretos.
 
 **Correção aplicada (patch cirúrgico):**
 
-Nova etapa `Validate KV namespace IDs against Cloudflare` inserida **após** `Setup Node` e **antes** de qualquer `wrangler deploy`:
-
 ```bash
-KV_LIST_JSON=$(npx wrangler kv namespace list 2>/dev/null)
-# check_kv() verifica se o ID está no JSON sem imprimir o valor
-# Falha com mensagem clara se algum for INVALID
+npx wrangler kv namespace list > /tmp/kv_namespaces.json 2> /tmp/wrangler_kv_list.err
+# se o comando falhar: imprime stderr e encerra
+# se stdout não for JSON array válido: imprime stderr + preview do stdout e encerra
+# check_kv() usa jq --arg id em /tmp/kv_namespaces.json sem imprimir o secret
 ```
 
 **Output esperado no workflow:**
@@ -29,17 +28,13 @@ KV_LIST_JSON=$(npx wrangler kv namespace list 2>/dev/null)
 KV CHECK:
   ENAVIA_BRAIN_KV_ID: OK  (binding: ENAVIA_BRAIN)
   ENAVIA_BRAIN_TEST_KV_ID: OK  (binding: ENAVIA_BRAIN_TEST)
-  ENAVIA_GIT_KV_ID: INVALID  (binding: ENAVIA_GIT)
-  ENAVIA_GIT_TEST_KV_ID: OK  (binding: ENAVIA_GIT_TEST)
-  GIT_KV_ID: OK  (binding: GIT_KV)
-  GIT_KV_TEST_ID: OK  (binding: GIT_KV_TEST)
-
-FALHA: Um ou mais KV namespace IDs são inválidos na conta Cloudflare.
-Corrija os secrets antes de fazer o deploy.
+  ...
 ```
 
+Se o problema for parse/JSON, a etapa agora falha com mensagem explícita de JSON inválido em vez de marcar todos os bindings como `INVALID`.
+
 **Arquivo alterado:**
-- `.github/workflows/deploy-executor.yml` — somente nova etapa adicionada
+- `.github/workflows/deploy-executor.yml` — somente ajuste cirúrgico na etapa `Validate KV namespace IDs against Cloudflare`
 
 **Não tocado:**
 - `nv-enavia.js` — intacto
@@ -49,14 +44,16 @@ Corrija os secrets antes de fazer o deploy.
 - KV / bindings / secrets — intactos
 
 **Evidência:**
+- `node --check executor/src/index.js` → OK ✅
+- `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
 - Validação YAML → **YAML válido** ✅
 
 ## Próxima ação segura
 
 1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
-2. Observar o output da etapa `Validate KV namespace IDs against Cloudflare`.
-3. O binding que aparecer como `INVALID` é o que precisa ter o secret corrigido no GitHub.
-4. Após corrigir o(s) secret(s) inválido(s), re-rodar o workflow.
+2. Observar a etapa `Validate KV namespace IDs against Cloudflare`.
+3. Se o Wrangler devolver JSON válido, apenas o(s) binding(s) realmente incorreto(s) deve(m) aparecer como `INVALID`.
+4. Se o Wrangler não devolver JSON válido, usar o stderr mostrado pelo workflow para corrigir autenticação/configuração antes de reexecutar.
 
 ## Bloqueios
 

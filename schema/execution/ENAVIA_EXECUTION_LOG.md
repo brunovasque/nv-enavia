@@ -4,6 +4,25 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — Robustez do parse na validação de KV namespace IDs (deploy-executor.yml)
+
+- **Branch:** `copilot/fix-validate-kv-namespace-ids`
+- **Escopo:** Apenas `.github/workflows/deploy-executor.yml`. Nenhuma alteração em `nv-enavia.js`, `executor/src/index.js`, `panel/`, `wrangler.toml`, bindings ou KV runtime.
+- **Problema:** a etapa `Validate KV namespace IDs against Cloudflare` capturava `npx wrangler kv namespace list 2>&1` dentro de `KV_LIST_JSON`. Qualquer warning/banner em stderr contaminava o stdout e o `jq` passava a falhar para todos os checks, gerando falso-positivo de 6 secrets `INVALID`.
+- **Correção:** stdout e stderr separados em arquivos temporários:
+  1. `npx wrangler kv namespace list > /tmp/kv_namespaces.json 2> /tmp/wrangler_kv_list.err`
+  2. Se o comando falhar, o workflow imprime erro claro + stderr e encerra.
+  3. Se stdout não for JSON array válido, o workflow imprime erro claro + stderr + preview curto do stdout e encerra.
+  4. `check_kv()` passou a consultar `/tmp/kv_namespaces.json` com `jq --arg id`, sem expor secret.
+- **Validações locais:**
+  - `node --check executor/src/index.js` → OK ✅
+  - `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
+  - `python3 yaml.safe_load(...)` em `.github/workflows/deploy-executor.yml` → **YAML válido** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** reexecutar o workflow `Deploy enavia-executor` em `target_env=test` e observar se a etapa passa a distinguir erro de parse JSON vs. KV ID realmente inválido.
+
+---
+
 ## 2026-04-29 — FIX — Validação KV namespace IDs contra Cloudflare (deploy-executor.yml)
 
 - **Branch:** `copilot/fix-kv-secret-validation`
