@@ -4,6 +4,31 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — registrar recibo de audit aprovado antes do `/apply-test`
+
+- **Branch:** `copilot/nv-enavia-register-audit-receipt`
+- **Escopo:** Worker-only. Ajuste cirúrgico em `nv-enavia.js` + smoke test `tests/pr14-executor-deploy-real-loop.smoke.test.js`. Sem alteração em Panel, Executor externo, workflow do executor, KV runtime ou `wrangler.toml`.
+- **Problema:** o fluxo `POST /contracts/execute-next` chamava `DEPLOY_WORKER /apply-test` após `EXECUTOR /audit` + `EXECUTOR /propose`, mas não registrava antes o recibo `AUDIT:` que o Deploy Worker exige como gate de segurança. Isso quebrava o fluxo mesmo com a ordem canônica correta.
+- **Correção:**
+  1. `callDeployBridge(...)` agora força `execution_id` consistente com `audit_id`.
+  2. Antes do `/apply-test`, o bridge registra `POST /audit` no `DEPLOY_WORKER` com `audit: { ok: true, verdict: "approve", risk_level }`.
+  3. Só chama `POST /apply-test` quando o recibo em `/audit` passa.
+  4. `deploy_route` passou a refletir a rota real atingida (`/audit` ou `/apply-test`).
+  5. `deploy_result.audit_receipt` foi adicionado de forma aditiva para rastreabilidade/debug.
+- **Smoke tests atualizados:** `tests/pr14-executor-deploy-real-loop.smoke.test.js`
+  - valida ordem `executor:/audit → executor:/propose → deploy:/audit → deploy:/apply-test`;
+  - valida bloqueio quando o recibo em `DEPLOY_WORKER /audit` falha;
+  - valida JSON inválido apenas em `/apply-test` sem perder o recibo já aceito.
+- **Validações locais:**
+  - `node --check nv-enavia.js` → OK ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **122 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** validar o mesmo fluxo com `DEPLOY_WORKER` real em TEST para confirmar que o gate `AUDIT:` foi satisfeito antes do `/apply-test`.
+
+---
+
 ## 2026-04-29 — FIX — Resolver KV namespace IDs por title (deploy-executor.yml)
 
 - **Branch:** `copilot/update-deploy-executor-workflow`

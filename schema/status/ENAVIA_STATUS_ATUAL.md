@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/update-deploy-executor-workflow`
-**Última tarefa:** Correção cirúrgica — `.github/workflows/deploy-executor.yml` não depende mais dos 6 secrets manuais de KV ID. O workflow agora exige apenas `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`, roda `npx wrangler kv namespace list`, resolve os IDs internamente por `.title` (`enavia-brain`, `enavia-brain-test`, `ENAVIA_GIT`, `ENAVIA_GIT_TEST`) e gera `wrangler.executor.generated.toml` sem imprimir IDs no log. YAML validado e smoke local de resolução por title executado. Sem alteração em `nv-enavia.js`, executor runtime, painel, KV runtime ou `wrangler.toml` principal.
+**Branch ativa:** `copilot/nv-enavia-register-audit-receipt`
+**Última tarefa:** Correção cirúrgica — `nv-enavia.js` agora registra um recibo de audit aprovado no `DEPLOY_WORKER` via `POST /audit` antes de chamar `POST /apply-test` no fluxo `POST /contracts/execute-next`. O payload de deploy passou a carregar `execution_id` consistente com `audit_id`; o bridge só segue para `/apply-test` quando o recibo é aceito; e `deploy_route`/`deploy_result.audit_receipt` agora refletem a etapa real atingida. Smoke tests do PR14 ampliados para validar ordem `audit → propose → deploy:/audit → deploy:/apply-test`, bloqueio quando o recibo falha e JSON inválido apenas em `/apply-test`.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -127,8 +127,24 @@
 - Confirmado por smoke test que Deploy Worker com body não-JSON bloqueia antes do handler interno.
 - `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado para esses cenários → **111 passed, 0 failed** ✅.
 
+## Ajuste follow-up PR14 — recibo de audit aprovado antes do `/apply-test`
+
+- `callDeployBridge(env, action, payload)` agora executa dois passos no `DEPLOY_WORKER` em TEST:
+  1. `POST /audit` para registrar o recibo do audit aprovado.
+  2. `POST /apply-test` somente se o recibo anterior passar.
+- O bridge força `execution_id` estável a partir de `audit_id`, preserva `audit_id` no payload e envia `audit: { ok: true, verdict: "approve", risk_level }` para o recibo.
+- Se o recibo em `/audit` falhar, o fluxo retorna bloqueado antes do `/apply-test`; `deploy_route` passa a mostrar a rota real atingida (`/audit` ou `/apply-test`).
+- `deploy_result` agora inclui `audit_receipt` de forma aditiva para auditoria/debug sem quebrar compatibilidade.
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado para validar:
+  - ordem `executor:/audit → executor:/propose → deploy:/audit → deploy:/apply-test`;
+  - bloqueio quando `DEPLOY_WORKER /audit` retorna `ok:false`;
+  - JSON inválido isolado em `/apply-test` sem perder o recibo já gravado.
+- Validações desta sessão:
+  - `node --check nv-enavia.js` ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **122 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+
 ## Próxima etapa segura
-- Preencher IDs reais de KV namespace no `wrangler.executor.toml` (PROD e TEST).
-- Rodar o workflow `Deploy enavia-executor` com `target_env=test` no GitHub Actions.
-- Verificar smoke embutido: `POST /audit` em `enavia-executor-test` deve retornar `result.verdict` e `audit.verdict`.
-- Se TEST passar, rodar com `target_env=prod` para atualizar `enavia-executor` (PROD).
+- Rodar smoke real do loop operacional em TEST com `DEPLOY_WORKER` real para confirmar que o recibo `POST /audit` satisfaz o gate interno do `/apply-test`.
+- Se TEST passar, manter a ordem canônica `AUDIT → PROPOSE → APPLY TEST → DEPLOY TEST → APPROVE → PROMOTE` sem novos ajustes de fluxo.

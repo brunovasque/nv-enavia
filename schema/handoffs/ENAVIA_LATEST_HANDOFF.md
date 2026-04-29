@@ -1,51 +1,56 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — Resolver KV namespace IDs automaticamente por title no deploy do Executor
-**Para:** Reexecutar `Deploy enavia-executor` em TEST sem depender de secrets manuais de KV ID
+**De:** FIX — Registrar recibo de audit aprovado no Deploy Worker antes do `/apply-test`
+**Para:** Validar o loop operacional em TEST com `DEPLOY_WORKER` real após o recibo obrigatório
 
 ## O que foi feito nesta sessão
 
-### Patch cirúrgico — `.github/workflows/deploy-executor.yml`
+### Patch cirúrgico — `nv-enavia.js` + smoke test PR14
 
-O workflow `Deploy enavia-executor` foi alterado para usar a própria lista retornada por:
+O fluxo `POST /contracts/execute-next` mantido em `nv-enavia.js` continua com a ordem:
 
-```bash
-npx wrangler kv namespace list > /tmp/kv_namespaces.json
+```txt
+AUDIT → PROPOSE → APPLY TEST → DEPLOY TEST → APPROVE → PROMOTE
 ```
 
-Como fonte de verdade para resolver IDs por `.title`.
+Sem trocar essa ordem, o `callDeployBridge(...)` agora registra primeiro um recibo de audit aprovado em:
 
-**Mapeamento aplicado:**
-- `ENAVIA_BRAIN_KV_ID` ← title `enavia-brain`
-- `ENAVIA_BRAIN_TEST_KV_ID` ← title `enavia-brain-test`
-- `ENAVIA_GIT_KV_ID` ← title `ENAVIA_GIT`
-- `ENAVIA_GIT_TEST_KV_ID` ← title `ENAVIA_GIT_TEST`
-- `GIT_KV_ID` ← mesmo ID resolvido de `ENAVIA_GIT`
-- `GIT_KV_TEST_ID` ← mesmo ID resolvido de `ENAVIA_GIT_TEST`
+```txt
+POST https://deploy-worker.internal/audit
+```
 
-`GIT_KV` permanece como binding lógico separado para compatibilidade com o código existente do executor, apontando para os mesmos namespaces físicos de `ENAVIA_GIT`/`ENAVIA_GIT_TEST`.
+E só depois chama:
+
+```txt
+POST https://deploy-worker.internal/apply-test
+```
+
+**Detalhes do patch:**
+- `execution_id` do bridge de deploy agora é preenchido a partir do `audit_id` do `execute-next`, para casar o recibo com o gate do Deploy Worker.
+- O recibo envia `audit: { ok: true, verdict: "approve", risk_level }` e preserva `executor_audit` no payload para rastreabilidade.
+- Se `DEPLOY_WORKER /audit` falhar, o fluxo bloqueia antes do `/apply-test`.
+- `deploy_route` passou a refletir a rota real atingida (`/audit` ou `/apply-test`).
+- `deploy_result.audit_receipt` foi adicionado de forma aditiva para depuração/auditoria.
 
 **Garantias do patch:**
-- O workflow continua exigindo apenas `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
-- Os 6 secrets manuais de KV ID não são mais exigidos nem referenciados.
-- Se faltar algum title obrigatório, o workflow falha antes do deploy com `ERRO: KV namespace obrigatório não encontrado: <title>`.
-- A mensagem de erro mostra apenas o title faltante, nunca o ID.
-- Os IDs resolvidos não são impressos no log.
-- `wrangler.executor.generated.toml` continua sendo o arquivo gerado.
-- O `.gitignore` continua protegendo `wrangler.executor.generated.toml`.
-- Escopo workflow-only: sem alteração em `nv-enavia.js`, executor runtime, painel, KV runtime ou `wrangler.toml` principal.
+- A ordem canônica **não mudou**.
+- `/apply-test` continua bloqueado quando faltar o recibo de audit.
+- O handler interno KV continua rodando apenas depois de audit, propose e deploy seguro passarem.
+- Escopo Worker-only: sem alteração em painel, executor externo, workflow do executor ou `wrangler.toml`.
 
 **Validações locais:**
-- `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/deploy-executor.yml'))"` → YAML válido ✅
-- Smoke local com `/tmp/kv_namespaces.json` sintético → gerou TOML sem placeholders fora de comentários e sem imprimir IDs no output ✅
+- `node --check nv-enavia.js` → OK ✅
+- `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **122 passed, 0 failed** ✅
+- `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima ação segura
 
-1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
-2. Confirmar que a etapa `Resolve KV namespace IDs from Cloudflare titles` lista apenas titles e mostra `KV namespace resolvido por title: ...`.
-3. Confirmar deploy TEST e smoke `/audit`.
-4. Se TEST passar, rodar `target_env=prod`.
+1. Rodar o fluxo real em TEST com `DEPLOY_WORKER`/`EXECUTOR` reais.
+2. Confirmar que o Deploy Worker recebe primeiro `POST /audit`.
+3. Confirmar que o `/apply-test` deixa de bloquear por ausência de `AUDIT:`.
+4. Se TEST passar, seguir sem alterar a ordem operacional.
 
 ## Bloqueios
 
