@@ -19,6 +19,11 @@
 //      B2. target_env:prod bloqueado imediatamente
 //      B3. sem env.DEPLOY_WORKER → deploy_status:blocked
 //      B4. /apply-test HTTP 200 + body não JSON → deploy_status:ambiguous
+//      B4a. executor_audit ausente → blocked antes de registrar recibo
+//      B4b. verdict reject → blocked antes de registrar recibo
+//      B4c. verdict ausente → blocked antes de registrar recibo
+//      B4d. verdict approve + high risk → blocked antes de registrar recibo
+//      B4e. verdict approve + critical risk → blocked antes de registrar recibo
 //
 //   C. Fluxo integrado execute_next
 //      C1. sem executor: response inclui executor_block_reason, deploy_status:not_reached
@@ -129,7 +134,7 @@ function makeExecutorMock(responses = {}) {
 
 // Cria DEPLOY_WORKER mock com resposta configurável
 function makeDeployMock(response = {
-  "/audit": { status: 200, body: { ok: true, status: "recorded" } },
+  "/__internal__/audit": { status: 200, body: { ok: true, status: "recorded" } },
   "/apply-test": { status: 200, body: { ok: true, action: "simulate", status: "passed" } },
 }) {
   const calls = [];
@@ -418,6 +423,114 @@ async function runTests() {
     console.log("");
   }
 
+  {
+    console.log("  B4a. verdict não-approve (ex: \"conditional\") → gate de validação bloqueia antes de /__internal__/audit");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    // verdict "conditional" passa pelo callExecutorBridge (não é reject nem null)
+    // mas é capturado pela validateExecutorAuditForReceipt (não é "approve")
+    const execMock = makeExecutorMock({
+      "/audit":   { body: { ok: true, route: "/audit", result: { verdict: "conditional", risk_level: "low" } } },
+      "/propose": { body: PROPOSE_OK_BODY },
+    });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                          "  status: blocked");
+    ok(r.data?.deploy_status === "blocked",                   "  deploy_status: blocked (gate de validação)");
+    ok(r.data?.deploy_block_reason?.includes("Gate de validação"), "  reason menciona gate de validação");
+    ok(r.data?.deploy_block_reason?.includes("conditional"),  "  reason menciona verdict conditional");
+    ok(deployMock.calls.length === 0,                         "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
+  {
+    console.log("  B4b. verdict reject → executor bridge bloqueia (deploy_status: not_reached, Deploy Worker NÃO chamado)");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({
+      "/audit":   { body: { ok: true, route: "/audit", result: { verdict: "reject", risk_level: "high" } } },
+      "/propose": { body: PROPOSE_OK_BODY },
+    });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",              "  status: blocked");
+    ok(r.data?.deploy_status === "not_reached",   "  deploy_status: not_reached (bloqueado pelo executor)");
+    ok(deployMock.calls.length === 0,             "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
+  {
+    console.log("  B4c. verdict ausente → executor bridge bloqueia (deploy_status: not_reached, Deploy Worker NÃO chamado)");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({
+      "/audit":   { body: { ok: true, route: "/audit", result: { risk_level: "low" } } }, // sem verdict
+      "/propose": { body: PROPOSE_OK_BODY },
+    });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",              "  status: blocked");
+    ok(r.data?.deploy_status === "not_reached",   "  deploy_status: not_reached (bloqueado pelo executor)");
+    ok(deployMock.calls.length === 0,             "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
+  {
+    console.log("  B4d. verdict approve + high risk → blocked antes de registrar recibo em /__internal__/audit");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({
+      "/audit":   { body: { ok: true, route: "/audit", result: { verdict: "approve", risk_level: "high" } } },
+      "/propose": { body: PROPOSE_OK_BODY },
+    });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                          "  status: blocked");
+    ok(r.data?.deploy_status === "blocked",                   "  deploy_status: blocked (risk high)");
+    ok(r.data?.deploy_block_reason?.includes("Gate de validação"), "  reason menciona gate de validação");
+    ok(r.data?.deploy_block_reason?.includes("high"),         "  reason menciona risco high");
+    ok(deployMock.calls.length === 0,                         "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
+  {
+    console.log("  B4e. verdict approve + critical risk → blocked antes de registrar recibo em /__internal__/audit");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({
+      "/audit":   { body: { ok: true, route: "/audit", result: { verdict: "approve", risk_level: "critical" } } },
+      "/propose": { body: PROPOSE_OK_BODY },
+    });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                          "  status: blocked");
+    ok(r.data?.deploy_status === "blocked",                   "  deploy_status: blocked (risk critical)");
+    ok(r.data?.deploy_block_reason?.includes("Gate de validação"), "  reason menciona gate de validação");
+    ok(r.data?.deploy_block_reason?.includes("critical"),     "  reason menciona risco critical");
+    ok(deployMock.calls.length === 0,                         "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
   // ── C. Fluxo integrado execute_next ──────────────────────────────────────
 
   console.log("C. Fluxo integrado execute_next\n");
@@ -548,7 +661,7 @@ async function runTests() {
     });
     const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
     const deployMock = makeDeployMock({
-      "/audit": { status: 200, body: { ok: false, error: "AUDIT_RECEIPT_REQUIRED" } },
+      "/__internal__/audit": { status: 200, body: { ok: false, error: "AUDIT_RECEIPT_REQUIRED" } },
       "/apply-test": { status: 200, body: { ok: true, action: "simulate", status: "passed" } },
     });
     const env = {
@@ -560,9 +673,9 @@ async function runTests() {
     const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
     ok(r.data?.status === "blocked",                        "  status: blocked");
     ok(r.data?.deploy_status === "failed",                  "  deploy_status: failed");
-    ok(r.data?.deploy_route === "/audit",                   "  deploy_route: /audit");
+    ok(r.data?.deploy_route === "/__internal__/audit",      "  deploy_route: /__internal__/audit");
     ok(r.data?.deploy_block_reason?.includes("recibo de audit aprovado"), "  bloqueio menciona recibo de audit");
-    ok(deployMock.calls.filter(c => c.pathname === "/audit").length === 1,      "  /audit chamado uma vez");
+    ok(deployMock.calls.filter(c => c.pathname === "/__internal__/audit").length === 1, "  /__internal__/audit chamado uma vez");
     ok(deployMock.calls.filter(c => c.pathname === "/apply-test").length === 0, "  /apply-test NÃO chamado");
     ok(kv.writes.length === 0,                              "  handler interno NÃO executado");
     console.log("");
@@ -577,7 +690,7 @@ async function runTests() {
     });
     const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
     const deployMock = makeDeployMock({
-      "/audit": { status: 200, body: { ok: true, status: "recorded" } },
+      "/__internal__/audit": { status: 200, body: { ok: true, status: "recorded" } },
       "/apply-test": { status: 200, rawBody: "<<deploy-not-json>>" },
     });
     const env = {
@@ -593,7 +706,7 @@ async function runTests() {
     ok(r.data?.deploy_result?.ok === false,                 "  deploy_result.ok: false");
     ok(r.data?.deploy_result?.status === "ambiguous",       "  deploy_result.status: ambiguous");
     ok(r.data?.deploy_result?.reason === "Resposta do Deploy Worker não é JSON válido.", "  reason de JSON inválido no Deploy Worker");
-    ok(deployMock.calls.filter(c => c.pathname === "/audit").length === 1,      "  /audit chamado uma vez");
+    ok(deployMock.calls.filter(c => c.pathname === "/__internal__/audit").length === 1, "  /__internal__/audit chamado uma vez");
     ok(deployMock.calls.filter(c => c.pathname === "/apply-test").length === 1, "  /apply-test chamado uma vez");
     ok(kv.writes.length === 0,                              "  handler interno NÃO executado");
     console.log("");
@@ -615,7 +728,7 @@ async function runTests() {
     // Executor deve ter sido chamado em /audit e /propose
     ok(execMock.calls.some(c => c.pathname === "/audit"),   "  /audit chamado");
     ok(execMock.calls.some(c => c.pathname === "/propose"), "  /propose chamado");
-    ok(deployMock.calls.some(c => c.pathname === "/audit"),      "  Deploy Worker recebeu recibo em /audit");
+    ok(deployMock.calls.some(c => c.pathname === "/__internal__/audit"), "  Deploy Worker recebeu recibo em /__internal__/audit");
     ok(deployMock.calls.some(c => c.pathname === "/apply-test"), "  Deploy Worker recebeu /apply-test");
     ok(r.data?.deploy_result?.audit_receipt?.ok === true,        "  deploy_result.audit_receipt.ok: true");
     console.log("");
@@ -709,7 +822,7 @@ async function runTests() {
     await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
     const auditIdx   = callOrder.indexOf("executor:/audit");
     const proposeIdx = callOrder.indexOf("executor:/propose");
-    const deployAuditIdx = callOrder.indexOf("deploy:/audit");
+    const deployAuditIdx = callOrder.indexOf("deploy:/__internal__/audit");
     const deployApplyIdx = callOrder.indexOf("deploy:/apply-test");
     ok(auditIdx !== -1,                         "  audit foi chamado");
     ok(proposeIdx !== -1,                       "  propose foi chamado");

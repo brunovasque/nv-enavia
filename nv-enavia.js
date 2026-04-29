@@ -5202,21 +5202,60 @@ async function callExecutorBridge(env, route, payload) {
   }
 }
 
-function extractDeployAuditRiskLevel(payload) {
+function extractDeployAuditRiskLevel(executorAudit) {
   const candidates = [
-    payload?.executor_audit?.result?.risk_level,
-    payload?.executor_audit?.audit?.risk_level,
-    payload?.executor_audit?.risk_level,
-    payload?.executor_audit?.result?.risk,
-    payload?.executor_audit?.audit?.risk,
-    payload?.executor_audit?.risk,
+    executorAudit?.result?.risk_level,
+    executorAudit?.audit?.risk_level,
+    executorAudit?.risk_level,
+    executorAudit?.result?.risk,
+    executorAudit?.audit?.risk,
+    executorAudit?.risk,
   ];
   for (const candidate of candidates) {
-    if (candidate === "low" || candidate === "medium" || candidate === "high") {
+    if (candidate === "low" || candidate === "medium" || candidate === "high" || candidate === "critical") {
       return candidate;
     }
   }
-  return "low";
+  return null;
+}
+
+function validateExecutorAuditForReceipt(executorAudit) {
+  if (!executorAudit || typeof executorAudit !== "object") {
+    return {
+      ok: false,
+      verdict: null,
+      risk_level: null,
+      reason: "executor_audit ausente. Não é possível registrar recibo sem audit real do Executor.",
+    };
+  }
+  const verdict =
+    executorAudit?.result?.verdict ||
+    executorAudit?.audit?.verdict ||
+    executorAudit?.verdict ||
+    null;
+  if (verdict !== "approve") {
+    return {
+      ok: false,
+      verdict,
+      risk_level: null,
+      reason: `Verdict do Executor não é "approve" (atual: ${JSON.stringify(verdict)}). Recibo não registrado.`,
+    };
+  }
+  const risk_level = extractDeployAuditRiskLevel(executorAudit);
+  if (risk_level === "high" || risk_level === "critical") {
+    return {
+      ok: false,
+      verdict,
+      risk_level,
+      reason: `Risk level "${risk_level}" não permite registro de recibo. Apenas low/medium aceitável.`,
+    };
+  }
+  return {
+    ok: true,
+    verdict,
+    risk_level: risk_level || "medium",
+    reason: null,
+  };
 }
 
 async function callDeployWorkerJson(env, path, payload) {
@@ -5272,7 +5311,8 @@ async function callDeployWorkerJson(env, path, payload) {
 //   - Ações de produção (approve/promote/prod) → blocked imediato.
 //   - target_env prod/production → blocked.
 //   - env.DEPLOY_WORKER ausente → blocked com deploy_status:"blocked".
-//   - Antes do /apply-test, registra recibo de audit aprovado em /audit.
+//   - Antes do /apply-test, valida executor_audit (verdict approve, risco aceitável)
+//     e registra recibo em /__internal__/audit.
 //   - Resposta não-ok → failed.
 //   - Resposta ambígua → ambiguous.
 // ============================================================================
@@ -5309,6 +5349,19 @@ async function callDeployBridge(env, action, payload) {
       target_env: "test",
       deploy_action: "simulate",
     };
+
+    // ── Gate de validação do audit real do Executor ───────────────────────────
+    // Nunca registrar recibo com audit.ok=true sem prova real de aprovação.
+    const auditValidation = validateExecutorAuditForReceipt(safePayload.executor_audit);
+    if (!auditValidation.ok) {
+      return {
+        ok: false, action, route: null, status: "blocked",
+        reason: `Gate de validação do audit bloqueou registro do recibo: ${auditValidation.reason}`,
+        data: null,
+        audit_validation: auditValidation,
+      };
+    }
+
     const auditReceiptPayload = {
       execution_id: executionId,
       audit_id: safePayload.audit_id,
@@ -5320,12 +5373,12 @@ async function callDeployBridge(env, action, payload) {
       timestamp: safePayload.timestamp || new Date().toISOString(),
       audit: {
         ok: true,
-        verdict: "approve",
-        risk_level: extractDeployAuditRiskLevel(safePayload),
+        verdict: auditValidation.verdict,
+        risk_level: auditValidation.risk_level,
       },
       executor_audit: safePayload.executor_audit || null,
     };
-    const auditReceiptResult = await callDeployWorkerJson(env, "/audit", auditReceiptPayload);
+    const auditReceiptResult = await callDeployWorkerJson(env, "/__internal__/audit", auditReceiptPayload);
     if (!auditReceiptResult.ok) {
       return {
         ok: false, action, route: auditReceiptResult.route, status: auditReceiptResult.status,
