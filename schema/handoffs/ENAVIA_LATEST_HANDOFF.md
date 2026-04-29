@@ -1,45 +1,41 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — bootstrap do snapshot canônico do Executor no KV após deploy TEST
-**Para:** Rodar `Deploy enavia-executor` em TEST e confirmar bootstrap + self-audit sem finding crítico de snapshot ausente
+**De:** FIX — incluir `target.workerId` no payload do Deploy Worker `/apply-test`
+**Para:** Revalidar o loop real em TEST e confirmar que o `/apply-test` não retorna mais HTTP 400 por `target.workerId obrigatório`
 
 ## O que foi feito nesta sessão
 
-### Patch cirúrgico — `executor/src/index.js` + `.github/workflows/deploy-executor.yml`
+### Patch cirúrgico — `nv-enavia.js` + `tests/pr14-executor-deploy-real-loop.smoke.test.js`
 
-O fluxo operacional do Worker `nv-enavia` continua chamando o Executor com live-read, mas o runtime governado por este repo agora também passa a nascer com snapshot bootstrapado no KV TEST logo após o deploy:
+O loop operacional do Worker `nv-enavia` já resolvia o target worker dinâmico para `/audit` e `/propose`, mas o payload enviado ao Deploy Worker `/apply-test` seguia sem `target.workerId`. O patch desta sessão alinha o deploy à mesma fonte de verdade dinâmica:
 
 **Detalhes do patch:**
-- `saveVersion(...)` em `executor/src/index.js` agora também grava `git:code:latest` junto do snapshot canônico (`git:latest` + `git:code:<id>`), preservando compatibilidade com lookup legado do self-audit.
-- `.github/workflows/deploy-executor.yml` agora, em `target_env=test`:
-  - faz o deploy do runtime `enavia-executor-test`;
-  - monta um payload com `executor/src/index.js`;
-  - chama `POST /apply-patch` no runtime recém-publicado com `auto_deploy:false`;
-  - falha se o bootstrap não devolver `meta.id` e `code_length` válidos;
-  - só depois roda o smoke `POST /audit` com `context.require_live_read:true`.
+- `nv-enavia.js` (`handleExecuteNext` → step de deploy):
+  - `_deployPayload` agora inclui `...buildExecutorTargetPayload(auditTargetResolution.workerId)`;
+  - o `DEPLOY_WORKER /apply-test` passa a receber `workerId` e `target.workerId` coerentes com o mesmo worker já auditado/proposto;
+  - nenhum worker hardcoded novo foi introduzido.
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js`:
+  - novo assert de payload confirma que `/apply-test` recebe `workerId`;
+  - novo assert confirma `target.workerId === workerId`.
 
 **Garantias do patch:**
-- Escopo Executor-only + workflow do executor. `nv-enavia.js`, painel e Deploy Worker não foram alterados.
-- Nenhum gate de `risk_level` foi relaxado.
-- Nenhum valor de secret é retornado no workflow.
-- O bootstrap reutiliza o caminho nativo `/apply-patch` do próprio Executor em vez de escrever KV “por fora”.
-- O smoke pós-bootstrap cobre o mesmo ramo de live read que estava bloqueando por snapshot ausente.
+- Escopo Worker-only. Executor, Panel, Deploy Worker externo e recibo `/__internal__/audit` não foram alterados.
+- O deploy reaproveita a mesma resolução dinâmica já validada em `/audit` e `/propose`.
+- Nenhum gate de `risk_level`, `verdict` ou ambiente TEST/PROD foi relaxado.
 
 **Validações locais:**
-- `node --check executor/src/index.js` → OK ✅
-- `node executor/tests/executor.contract.test.js` → **34 passed, 0 failed** ✅
-- `node --test executor/tests/cloudflare-credentials.test.js` → **4 passed, 0 failed** ✅
-- `python3 -c "yaml.safe_load(...deploy-executor.yml...)"` → **YAML válido** ✅
+- `node --check nv-enavia.js` → OK ✅
+- `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **164 passed, 0 failed** ✅
+- `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima ação segura
 
-1. Rodar o workflow `Deploy enavia-executor` com `target_env=test`.
-2. Confirmar no job:
-   - `POST /apply-patch → HTTP 200`
-   - `executor snapshot version_id: ...`
-3. Confirmar no smoke que o `/audit` real devolve `snapshot_fingerprint` e não volta a emitir `Snapshot canônico do executor ausente no KV`.
-4. Se o smoke ainda falhar, inspecionar apenas o retorno do bootstrap e o namespace `ENAVIA_GIT_TEST`, sem alterar Worker/Panel.
+1. Rodar o fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real.
+2. Confirmar no payload/log do `DEPLOY_WORKER /apply-test` que agora existem `workerId` e `target.workerId`.
+3. Confirmar que o erro HTTP 400 `target.workerId obrigatório` desapareceu.
+4. Se ainda surgir novo 400 contratual, diagnosticar só o próximo campo obrigatório faltante, sem tocar Panel/Executor.
 
 ## Bloqueios
 

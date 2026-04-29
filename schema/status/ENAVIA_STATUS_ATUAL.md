@@ -1,8 +1,20 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/bootstrap-snapshot-canonico-executor-kv`
-**Última tarefa:** Correção cirúrgica — o Executor agora mantém o alias legado `git:code:latest` sincronizado sempre que salva snapshot canônico no KV, e o workflow `.github/workflows/deploy-executor.yml` faz bootstrap explícito do snapshot do runtime TEST logo após o deploy via `POST /apply-patch`, antes do smoke live-read em `/audit`. Isso elimina o finding crítico do self-audit quando o runtime recém-publicado ainda não tem snapshot canônico no namespace `ENAVIA_GIT_TEST`.
+**Branch ativa:** `copilot/nv-enavia-include-target-workerid`
+**Última tarefa:** Correção cirúrgica Worker-only — o payload enviado por `callDeployBridge(...)/apply-test` agora reaproveita o mesmo target dinâmico já resolvido para `/audit` e `/propose`, incluindo `workerId` e `target.workerId`. Isso fecha o bloqueio real em TEST onde o Deploy Worker devolvia HTTP 400 com `target.workerId obrigatório`.
+
+## Decisões formalizadas nesta sessão
+- `handleExecuteNext` agora inclui `...buildExecutorTargetPayload(auditTargetResolution.workerId)` também no `_deployPayload` enviado ao `DEPLOY_WORKER /apply-test`.
+- O alvo do deploy passa a reutilizar exatamente a mesma fonte de verdade dinâmica do audit/propose; nenhum `workerId` hardcoded novo foi introduzido.
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` agora valida explicitamente que `/apply-test` recebe:
+  - `workerId === "nv-enavia"`
+  - `target.workerId === workerId`
+- Validações desta sessão:
+  - `node --check nv-enavia.js` ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **164 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -53,33 +65,6 @@
 
 ## Bloqueios
 - nenhum
-
-## Decisões formalizadas nesta sessão
-- `saveVersion(...)` em `executor/src/index.js` agora grava, no mesmo commit lógico de snapshot:
-  - `git:snap:<id>`
-  - `git:code:<id>`
-  - `git:code:latest`
-  - `git:index`
-  - `git:latest`
-- O alias legado `git:code:latest` volta a ser mantido como espelho do snapshot recém-salvo, sem alterar o lookup canônico do self-audit.
-- O workflow `deploy-executor.yml` agora, em `target_env=test`, executa:
-  1. deploy do runtime `enavia-executor-test`;
-  2. bootstrap do snapshot canônico via `POST /apply-patch` com o `executor/src/index.js` do commit atual;
-  3. smoke `POST /audit` live-read.
-- O bootstrap falha cedo se `/apply-patch` não devolver `meta.id` e `code_length` válidos.
-- `resolveCloudflareCredentials(env)` é a única fonte canônica para aliases:
-  - account: `CF_ACCOUNT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT`, `CLOUDFLARE_ACCOUNT`
-  - token: `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_TOKEN`
-- Diagnóstico de credenciais ausentes expõe apenas:
-  - `has_CF_ACCOUNT_ID`
-  - `has_CLOUDFLARE_ACCOUNT_ID`
-  - `has_CF_ACCOUNT`
-  - `has_CLOUDFLARE_ACCOUNT`
-  - `has_CF_API_TOKEN`
-  - `has_CLOUDFLARE_API_TOKEN`
-  - `has_CF_TOKEN`
-- Nenhum valor de credencial é retornado em `/audit`, `/propose` ou helpers internos quando as credenciais faltam.
-- O workflow `deploy-executor.yml` agora valida o ramo real de live read usado por `nv-enavia`.
 
 ## Decisão operacional — Deploy Executor KV por title
 
@@ -173,9 +158,6 @@
   - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima etapa segura
-- Rodar o workflow `Deploy enavia-executor` em `target_env=test` para publicar o patch e executar o novo bootstrap de snapshot no namespace `ENAVIA_GIT_TEST`.
-- Confirmar no log do workflow:
-  - `POST /apply-patch → HTTP 200`
-  - `executor snapshot version_id: ...`
-  - `POST /audit → HTTP 200`
-  - `snapshot_fingerprint: ...`
+- Rodar novamente o fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real.
+- Confirmar no log/resposta que o `DEPLOY_WORKER /apply-test` deixa de falhar com `target.workerId obrigatório`.
+- Se ainda houver bloqueio, inspecionar apenas o próximo campo obrigatório faltante no contrato real do `/apply-test`, sem alterar Panel ou Executor.
