@@ -130,7 +130,7 @@ jobs:
             local secret_name="$1"
             local secret_value="$2"
             local binding_name="$3"
-            if jq -e --arg id "$secret_value" '.[] | select(.id == $id)' /tmp/kv_namespaces.json > /dev/null; then
+            if jq -e --arg id "$secret_value" '.[] | select(.id == $id)' /tmp/kv_namespaces.json > /dev/null 2>&1; then
               echo "  ${secret_name}: OK  (binding: ${binding_name})"
             else
               echo "  ${secret_name}: INVALID  (binding: ${binding_name})"
