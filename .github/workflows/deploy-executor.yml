@@ -50,6 +50,22 @@ jobs:
           GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
           GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
         run: |
+          # KV namespace IDs do Cloudflare são strings hex (a-f0-9) de até 32 caracteres.
+          # Validar formato antes de injetar no TOML para evitar quebra de sintaxe.
+          validate_kv_id() {
+            local name="$1"
+            local value="$2"
+            if ! echo "$value" | grep -qE '^[a-f0-9A-F]{16,64}$'; then
+              echo "Formato inválido para $name: esperado hex [a-fA-F0-9], 16-64 caracteres."
+              exit 1
+            fi
+          }
+          validate_kv_id "ENAVIA_BRAIN_KV_ID"      "$ENAVIA_BRAIN_KV_ID"
+          validate_kv_id "ENAVIA_BRAIN_TEST_KV_ID" "$ENAVIA_BRAIN_TEST_KV_ID"
+          validate_kv_id "ENAVIA_GIT_KV_ID"        "$ENAVIA_GIT_KV_ID"
+          validate_kv_id "ENAVIA_GIT_TEST_KV_ID"   "$ENAVIA_GIT_TEST_KV_ID"
+          validate_kv_id "GIT_KV_ID"               "$GIT_KV_ID"
+          validate_kv_id "GIT_KV_TEST_ID"          "$GIT_KV_TEST_ID"
           sed \
             -e "s/REPLACE_WITH_REAL_ENAVIA_BRAIN_ID/${ENAVIA_BRAIN_KV_ID}/g" \
             -e "s/REPLACE_WITH_REAL_ENAVIA_BRAIN_TEST_ID/${ENAVIA_BRAIN_TEST_KV_ID}/g" \
