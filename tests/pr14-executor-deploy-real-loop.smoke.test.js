@@ -807,14 +807,19 @@ async function runTests() {
     ok(r.data?.deploy_result?.audit_receipt?.ok === true,        "  deploy_result.audit_receipt.ok: true");
     const auditCall = execMock.calls.find(c => c.pathname === "/audit");
     const proposeCall = execMock.calls.find(c => c.pathname === "/propose");
+    const deployApplyCall = deployMock.calls.find(c => c.pathname === "/apply-test");
     ok(!!auditCall,                                              "  payload de /audit disponível");
     ok(!!proposeCall,                                            "  payload de /propose disponível");
+    ok(!!deployApplyCall,                                        "  payload de /apply-test disponível");
     const auditPayload = JSON.parse(auditCall?.body || "{}");
     const proposePayload = JSON.parse(proposeCall?.body || "{}");
+    const deployApplyPayload = JSON.parse(deployApplyCall?.body || "{}");
     ok(auditPayload.workerId === "nv-enavia",                     "  /audit usa workerId dinâmico do contrato");
     ok(auditPayload.target?.workerId === auditPayload.workerId,   "  /audit envia target.workerId consistente");
     ok(auditPayload.context?.require_live_read === true,          "  /audit exige live read");
     ok(proposePayload.workerId === auditPayload.workerId,         "  /propose reutiliza a mesma fonte de verdade");
+    ok(deployApplyPayload.workerId === auditPayload.workerId,     "  /apply-test reutiliza o mesmo workerId dinâmico");
+    ok(deployApplyPayload.target?.workerId === deployApplyPayload.workerId, "  /apply-test envia target.workerId consistente");
     console.log("");
   }
 
