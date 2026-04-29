@@ -5202,17 +5202,125 @@ async function callExecutorBridge(env, route, payload) {
   }
 }
 
+function extractDeployAuditRiskLevel(executorAudit) {
+  const candidates = [
+    executorAudit?.result?.risk_level,
+    executorAudit?.audit?.risk_level,
+    executorAudit?.risk_level,
+    executorAudit?.result?.risk,
+    executorAudit?.audit?.risk,
+    executorAudit?.risk,
+  ];
+  for (const candidate of candidates) {
+    if (candidate === "low" || candidate === "medium" || candidate === "high" || candidate === "critical") {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function validateExecutorAuditForReceipt(executorAudit) {
+  if (!executorAudit || typeof executorAudit !== "object") {
+    return {
+      ok: false,
+      verdict: null,
+      risk_level: null,
+      reason: "executor_audit ausente. Não é possível registrar recibo sem audit real do Executor.",
+    };
+  }
+  const verdict =
+    executorAudit?.result?.verdict ||
+    executorAudit?.audit?.verdict ||
+    executorAudit?.verdict ||
+    null;
+  if (verdict !== "approve") {
+    return {
+      ok: false,
+      verdict,
+      risk_level: null,
+      reason: `Verdict do Executor não é "approve" (atual: ${JSON.stringify(verdict)}). Recibo não registrado.`,
+    };
+  }
+  const risk_level = extractDeployAuditRiskLevel(executorAudit);
+  if (risk_level === "high" || risk_level === "critical") {
+    return {
+      ok: false,
+      verdict,
+      risk_level,
+      reason: `Risk level "${risk_level}" não permite registro de recibo. Apenas low/medium aceitável.`,
+    };
+  }
+  if (risk_level === null) {
+    return {
+      ok: false,
+      verdict,
+      risk_level: null,
+      reason: "Risk level não identificado no resultado do audit do Executor. Recibo não registrado para evitar fabricação de dados.",
+    };
+  }
+  return {
+    ok: true,
+    verdict,
+    risk_level,
+    reason: null,
+  };
+}
+
+async function callDeployWorkerJson(env, path, payload) {
+  const res = await env.DEPLOY_WORKER.fetch(`https://deploy-worker.internal${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  let data = null;
+  let rawText = "";
+  try {
+    rawText = await res.text();
+    data = JSON.parse(rawText);
+  } catch (_) {
+    return {
+      ok: false, route: path, status: "ambiguous",
+      reason: "Resposta do Deploy Worker não é JSON válido.",
+      data: { raw: rawText.slice(0, 500) },
+    };
+  }
+  if (!res.ok) {
+    return {
+      ok: false, route: path, status: "failed",
+      reason: `Deploy Worker retornou status ${res.status}.`,
+      data,
+    };
+  }
+  if (data === null || typeof data !== "object") {
+    return {
+      ok: false, route: path, status: "ambiguous",
+      reason: "Resposta do Deploy Worker não é JSON objeto válido.",
+      data,
+    };
+  }
+  if ("ok" in data && data.ok === false) {
+    return {
+      ok: false, route: path, status: "failed",
+      reason: data.error || data.reason || data.message || "Deploy Worker retornou ok:false.",
+      data,
+    };
+  }
+  return { ok: true, route: path, status: "passed", reason: null, data };
+}
+
 // ============================================================================
 // PR14 — callDeployBridge (Worker-only, puro)
 //
 // Chama env.DEPLOY_WORKER.fetch apenas em modo seguro (simulate/apply-test/test).
 // Produção bloqueada explicitamente nesta PR.
-// Retorna envelope estável: { ok, action, status, reason, data }.
+// Retorna envelope estável: { ok, action, route, status, reason, data }.
 //
 // Regras:
 //   - Ações de produção (approve/promote/prod) → blocked imediato.
 //   - target_env prod/production → blocked.
 //   - env.DEPLOY_WORKER ausente → blocked com deploy_status:"blocked".
+//   - Antes do /apply-test, valida executor_audit (verdict approve, risco aceitável)
+//     e registra recibo em /__internal__/audit.
 //   - Resposta não-ok → failed.
 //   - Resposta ambígua → ambiguous.
 // ============================================================================
@@ -5220,7 +5328,7 @@ async function callDeployBridge(env, action, payload) {
   const PROD_ACTIONS = ["approve", "promote", "prod", "production", "rollback"];
   if (PROD_ACTIONS.includes(String(action).toLowerCase())) {
     return {
-      ok: false, action, status: "blocked",
+      ok: false, action, route: null, status: "blocked",
       reason: `Ação "${action}" para produção bloqueada nesta PR. Apenas simulate/apply-test/test permitido.`,
       data: null,
     };
@@ -5228,62 +5336,82 @@ async function callDeployBridge(env, action, payload) {
   const targetEnv = (payload?.target_env || "").toLowerCase();
   if (targetEnv === "prod" || targetEnv === "production") {
     return {
-      ok: false, action, status: "blocked",
+      ok: false, action, route: null, status: "blocked",
       reason: "target_env production/prod bloqueado. Use test ou simulate.",
       data: null,
     };
   }
   if (typeof env?.DEPLOY_WORKER?.fetch !== "function") {
     return {
-      ok: false, action: "blocked", status: "blocked",
+      ok: false, action: "blocked", route: null, status: "blocked",
       reason: "env.DEPLOY_WORKER não disponível. Service Binding 'DEPLOY_WORKER' não configurado. Deploy bloqueado por segurança.",
       data: null,
     };
   }
   try {
-    const safePayload = { ...payload, target_env: "test", deploy_action: "simulate" };
-    const res = await env.DEPLOY_WORKER.fetch("https://deploy-worker.internal/apply-test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(safePayload),
-    });
-    let data = null;
-    let rawText = "";
-    try {
-      rawText = await res.text();
-      data = JSON.parse(rawText);
-    } catch (_) {
+    const executionId = String(payload?.execution_id || payload?.audit_id || `exec-next:${Date.now()}`);
+    const safePayload = {
+      ...payload,
+      execution_id: executionId,
+      audit_id: payload?.audit_id || executionId,
+      target_env: "test",
+      deploy_action: "simulate",
+    };
+
+    // ── Gate de validação do audit real do Executor ───────────────────────────
+    // Nunca registrar recibo com audit.ok=true sem prova real de aprovação.
+    const auditValidation = validateExecutorAuditForReceipt(safePayload.executor_audit);
+    if (!auditValidation.ok) {
       return {
-        ok: false, action, status: "ambiguous",
-        reason: "Resposta do Deploy Worker não é JSON válido.",
-        data: { raw: rawText.slice(0, 500) },
+        ok: false, action, route: null, status: "blocked",
+        reason: `Gate de validação do audit bloqueou registro do recibo: ${auditValidation.reason}`,
+        data: null,
+        audit_validation: auditValidation,
       };
     }
-    if (!res.ok) {
+
+    const auditReceiptPayload = {
+      execution_id: executionId,
+      audit_id: safePayload.audit_id,
+      source: safePayload.source || "nv-enavia",
+      mode: safePayload.mode || "contract_execute_next",
+      contract_id: safePayload.contract_id || null,
+      nextAction: safePayload.nextAction || null,
+      operationalAction: safePayload.operationalAction || null,
+      timestamp: safePayload.timestamp || new Date().toISOString(),
+      audit: {
+        ok: true,
+        verdict: auditValidation.verdict,
+        risk_level: auditValidation.risk_level,
+      },
+      executor_audit: safePayload.executor_audit || null,
+    };
+    const auditReceiptResult = await callDeployWorkerJson(env, "/__internal__/audit", auditReceiptPayload);
+    if (!auditReceiptResult.ok) {
       return {
-        ok: false, action, status: "failed",
-        reason: `Deploy Worker retornou status ${res.status}.`,
-        data,
+        ok: false, action, route: auditReceiptResult.route, status: auditReceiptResult.status,
+        reason: `Não foi possível registrar recibo de audit aprovado antes do /apply-test. ${auditReceiptResult.reason}`,
+        data: auditReceiptResult.data,
+        audit_receipt: auditReceiptResult,
       };
     }
-    if (data === null || typeof data !== "object") {
+    const applyTestResult = await callDeployWorkerJson(env, "/apply-test", safePayload);
+    if (!applyTestResult.ok) {
       return {
-        ok: false, action, status: "ambiguous",
-        reason: "Resposta do Deploy Worker não é JSON objeto válido.",
-        data,
+        ok: false, action, route: applyTestResult.route, status: applyTestResult.status,
+        reason: applyTestResult.reason,
+        data: applyTestResult.data,
+        audit_receipt: auditReceiptResult,
       };
     }
-    if ("ok" in data && data.ok === false) {
-      return {
-        ok: false, action, status: "failed",
-        reason: data.error || data.reason || data.message || "Deploy Worker retornou ok:false.",
-        data,
-      };
-    }
-    return { ok: true, action: "simulate", status: "passed", reason: null, data };
+    return {
+      ok: true, action: "simulate", route: applyTestResult.route, status: "passed", reason: null,
+      data: applyTestResult.data,
+      audit_receipt: auditReceiptResult,
+    };
   } catch (err) {
     return {
-      ok: false, action, status: "failed",
+      ok: false, action, route: null, status: "failed",
       reason: `Falha ao chamar Deploy Worker: ${String(err)}`,
       data: null,
     };
@@ -5484,6 +5612,7 @@ async function handleExecuteNext(request, env) {
       source: "nv-enavia", mode: "contract_execute_next",
       deploy_action: "simulate", target_env: "test",
       contract_id: contractId, nextAction, operationalAction,
+      execution_id: auditId,
       executor_audit: executorAuditResult.data,
       executor_propose: executorProposeResult.data,
       audit_id: auditId, timestamp: new Date().toISOString(),
@@ -5498,7 +5627,7 @@ async function handleExecuteNext(request, env) {
         executor_status: "passed", executor_route: "/propose",
         executor_block_reason: null,
         deploy_result: deployResult, deploy_status: deployResult.status,
-        deploy_route: deployResult.action === "blocked" ? null : "/apply-test",
+        deploy_route: deployResult.route || null,
         deploy_block_reason: deployResult.reason,
         nextAction, operationalAction,
         evidence: evidenceReport, rollback: rollbackBlocked,
@@ -5527,7 +5656,7 @@ async function handleExecuteNext(request, env) {
         executor_status: "passed", executor_route: "/propose",
         executor_block_reason: null,
         deploy_result: deployResult, deploy_status: deployResult.status,
-        deploy_route: "/apply-test", deploy_block_reason: null,
+        deploy_route: deployResult.route || null, deploy_block_reason: null,
         nextAction, operationalAction,
         evidence: evidenceReport, rollback: rollbackBlocked,
         executor_path: executorPathInfo, audit_id: auditId,
@@ -5551,7 +5680,7 @@ async function handleExecuteNext(request, env) {
       executor_block_reason: null,
       deploy_result:    deployResult,
       deploy_status:    deployResult.status,
-      deploy_route:     "/apply-test",
+      deploy_route:     deployResult.route || null,
       deploy_block_reason: null,
       nextAction, operationalAction,
       execution_result: result.body || null,

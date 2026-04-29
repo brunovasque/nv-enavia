@@ -4,6 +4,39 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — registrar recibo de audit aprovado antes do `/apply-test` (revisão pós-review)
+
+- **Branch:** `copilot/nv-enavia-register-audit-receipt`
+- **Escopo:** Worker-only. Correção dos dois bloqueios apontados no code review da PR:
+  1. Rota de registro do recibo: `/audit` → `/__internal__/audit` (rota canônica confirmada)
+  2. Validação forte antes de registrar o recibo: nova função `validateExecutorAuditForReceipt`
+- **Correções desta sessão:**
+  1. Rota do recibo corrigida para `/__internal__/audit`.
+  2. `validateExecutorAuditForReceipt(executorAudit)` valida obrigatoriamente:
+     - `executor_audit` existe e é objeto.
+     - `verdict` extraído de `result.verdict | audit.verdict | verdict` é exatamente `"approve"`.
+     - `risk_level` extraído não é `"high"` nem `"critical"`.
+     - `risk_level` **desconhecido/null** retorna erro (sem default silencioso para "low" ou "medium").
+  3. `extractDeployAuditRiskLevel` atualizado para incluir `"critical"` e retornar `null` para níveis desconhecidos.
+  4. O campo `audit.ok=true` só é incluído no payload do recibo após validação bem-sucedida com dados reais.
+  5. `deploy_route` reflete rota real (`/__internal__/audit` ou `/apply-test`).
+- **Smoke tests ampliados (`tests/pr14-executor-deploy-real-loop.smoke.test.js`):**
+  - B4a: verdict "conditional" (passa executor bridge, falha no gate de validação).
+  - B4b: verdict "reject" → executor bridge bloqueia (deploy_status: not_reached).
+  - B4c: verdict ausente → executor bridge bloqueia (deploy_status: not_reached).
+  - B4d: verdict "approve" + risk_level "high" → gate de validação bloqueia.
+  - B4e: verdict "approve" + risk_level "critical" → gate de validação bloqueia.
+  - B4f: verdict "approve" + risk_level desconhecido → gate de validação bloqueia (sem fabricação).
+  - Todas as asserções de rota no mock de deploy atualizadas para `/__internal__/audit`.
+- **Validações locais:**
+  - `node --check nv-enavia.js` → OK ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **148 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** validar o fluxo real em TEST com `DEPLOY_WORKER` real para confirmar que `POST /__internal__/audit` é aceito antes do `/apply-test`.
+
+---
+
 ## 2026-04-29 — FIX — Resolver KV namespace IDs por title (deploy-executor.yml)
 
 - **Branch:** `copilot/update-deploy-executor-workflow`
