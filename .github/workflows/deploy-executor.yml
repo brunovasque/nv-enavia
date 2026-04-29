@@ -78,6 +78,7 @@ jobs:
 
             if [ -z "$id" ] || [ "$id" = "null" ]; then
               echo "ERRO: KV namespace obrigatório não encontrado: $title" >&2
+              echo "Verifique em Cloudflare Workers & Pages > KV se o namespace existe com esse title exato (case-sensitive)." >&2
               exit 1
             fi
 
