@@ -1,12 +1,65 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** PR15 — EXECUTOR-ONLY: contrato `/audit` com verdict explícito
-**Para:** Próxima rodada de smoke real TEST (Worker chamando Executor)
+**De:** INFRA-ONLY — Deploy separado do Executor
+**Para:** Deploy real em TEST (`enavia-executor-test`) e smoke de `/audit`
 
 ## O que foi feito nesta sessão
 
-### PR15 — EXECUTOR-ONLY: `/audit` agora emite `verdict` e `risk_level`
+### INFRA-ONLY — Deploy separado do enavia-executor
+
+**Diagnóstico confirmado:**
+- O workflow `deploy.yml` / `wrangler.toml` publica apenas `nv-enavia`. O Executor (`enavia-executor`) não era deployado a partir deste repo.
+- `executor/wrangler.toml` existia só como referência (com placeholders `REPLACE_WITH_REAL_ID` e aviso "não faça deploy daqui").
+- `executor/src/index.js` importa `acorn` — necessário `package.json` com a dependência para o wrangler/esbuild resolver.
+
+**Arquivos criados (infra-only):**
+
+1. `wrangler.executor.toml` (raiz do repo)
+   - `main = "executor/src/index.js"`
+   - PROD: `name = "enavia-executor"`, PROD vars
+   - TEST via `[env.test]`: `name = "enavia-executor-test"`, TEST vars
+   - KV namespaces: ENAVIA_BRAIN, ENAVIA_GIT, GIT_KV com placeholders — devem ser preenchidos antes do deploy real
+
+2. `executor/package.json`
+   - Declara `acorn ^8.16.0` como dependência
+   - O workflow faz `npm install --prefix executor` antes do deploy
+
+3. `.github/workflows/deploy-executor.yml`
+   - Trigger: `workflow_dispatch` com input `target_env: test | prod`
+   - Valida secrets, verifica placeholders no `wrangler.executor.toml`, roda `node --check`, roda contrato tests
+   - TEST: `wrangler deploy --config wrangler.executor.toml --env test`
+   - PROD: `wrangler deploy --config wrangler.executor.toml`
+   - Smoke TEST embutido: `POST /audit` valida `result.verdict` e `audit.verdict`
+
+**Não tocado:**
+- `nv-enavia.js` — intacto
+- `wrangler.toml` — intacto
+- `executor/src/index.js` / `executor/src/audit-response.js` — intactos
+- `executor/wrangler.toml` (referência) — intacto
+- `panel/` — intacto
+- `contract-executor.js` — intacto
+- KV / bindings / secrets — intactos
+
+**Testes executados:**
+- `node --check executor/src/index.js` → OK ✅
+- `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
+- Validação YAML: `python3 yaml.safe_load(...)` → **YAML válido** ✅
+
+## Próxima ação segura
+
+1. Preencher IDs reais de KV no `wrangler.executor.toml` (obter via Cloudflare Dashboard ou `wrangler kv:namespace list`).
+2. Rodar workflow `Deploy enavia-executor` → `target_env=test`.
+3. Verificar smoke: `POST https://enavia-executor-test.brunovasque.workers.dev/audit` → `result.verdict` + `audit.verdict` presentes.
+4. Se TEST OK, rodar `target_env=prod` para publicar `enavia-executor`.
+
+## Bloqueios
+
+- KV namespace IDs reais não commitados (por segurança). Deploy real requer preenchimento manual no `wrangler.executor.toml` ou injeção via Cloudflare Dashboard.
+
+---
+
+## Histórico anterior: PR15 — EXECUTOR-ONLY: `/audit` agora emite `verdict` e `risk_level`
 
 **Diagnóstico:**
 - Smoke real em TEST mostrou que `POST /contracts/execute-next` no `nv-enavia` chamava o binding `EXECUTOR`, o `/audit` respondia HTTP 200 com JSON válido, e mesmo assim o Worker bloqueava com:

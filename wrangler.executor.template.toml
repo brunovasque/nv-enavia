@@ -1,0 +1,62 @@
+# wrangler.executor.template.toml — Template de deploy do enavia-executor
+#
+# TEMPLATE — NÃO usar diretamente para deploy.
+# O workflow deploy-executor.yml gera wrangler.executor.generated.toml
+# substituindo os placeholders REPLACE_WITH_REAL_* pelos GitHub Secrets
+# correspondentes antes de chamar o wrangler.
+#
+# Secrets necessários no repositório:
+#   ENAVIA_BRAIN_KV_ID        — KV ENAVIA_BRAIN (PROD)
+#   ENAVIA_BRAIN_TEST_KV_ID   — KV ENAVIA_BRAIN (TEST)
+#   ENAVIA_GIT_KV_ID          — KV ENAVIA_GIT (PROD)
+#   ENAVIA_GIT_TEST_KV_ID     — KV ENAVIA_GIT (TEST)
+#   GIT_KV_ID                 — KV GIT_KV (PROD)
+#   GIT_KV_TEST_ID            — KV GIT_KV (TEST)
+
+name = "enavia-executor"
+main = "executor/src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[vars]
+CF_WORKER_NAME_NV_ENAVIA = "nv-enavia"
+DEPLOY_WORKER_URL = "https://deploy-worker.brunovasque.workers.dev"
+ENAVIA_ENV = "production"
+OPENAI_CODE_MODEL = "gpt-5.2"
+TARGET_WORKER_NAME = "nv-enavia"
+
+[[kv_namespaces]]
+binding = "ENAVIA_BRAIN"
+id = "REPLACE_WITH_REAL_ENAVIA_BRAIN_ID"
+
+[[kv_namespaces]]
+binding = "ENAVIA_GIT"
+id = "REPLACE_WITH_REAL_ENAVIA_GIT_ID"
+
+[[kv_namespaces]]
+binding = "GIT_KV"
+id = "REPLACE_WITH_REAL_GIT_KV_ID"
+
+# ── Ambiente TEST ──────────────────────────────────────────────────────────────
+[env.test]
+name = "enavia-executor-test"
+workers_dev = true
+
+[env.test.vars]
+CF_WORKER_NAME_NV_ENAVIA = "enavia-worker-teste"
+DEPLOY_WORKER_URL = "https://deploy-worker-test.brunovasque.workers.dev"
+ENAVIA_ENV = "test"
+OPENAI_CODE_MODEL = "gpt-5.2"
+TARGET_WORKER_NAME = "enavia-worker-teste"
+
+[[env.test.kv_namespaces]]
+binding = "ENAVIA_BRAIN"
+id = "REPLACE_WITH_REAL_ENAVIA_BRAIN_TEST_ID"
+
+[[env.test.kv_namespaces]]
+binding = "ENAVIA_GIT"
+id = "REPLACE_WITH_REAL_ENAVIA_GIT_TEST_ID"
+
+[[env.test.kv_namespaces]]
+binding = "GIT_KV"
+id = "REPLACE_WITH_REAL_GIT_KV_TEST_ID"
