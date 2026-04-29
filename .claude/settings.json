@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(cd *)",
+      "Bash(pwd)",
+      "Bash(ls *)",
+      "Bash(dir *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(powershell *)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Glob(*)",
+      "Grep(*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(del /s *)",
+      "Bash(format *)"
+    ]
+  }
+}
