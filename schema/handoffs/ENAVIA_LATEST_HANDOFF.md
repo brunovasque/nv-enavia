@@ -1,8 +1,55 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** DIAGNÓSTICO — Listar TÍTULOS dos KV namespaces visíveis para o token do GitHub Actions
-**Para:** Reexecutar `Deploy enavia-executor` em TEST e usar a lista impressa para decidir se o problema é conta/token ou valor dos secrets `*_TEST_KV_ID`
+**De:** FIX — Resolver KV namespace IDs automaticamente por title no deploy do Executor
+**Para:** Reexecutar `Deploy enavia-executor` em TEST sem depender de secrets manuais de KV ID
+
+## O que foi feito nesta sessão
+
+### Patch cirúrgico — `.github/workflows/deploy-executor.yml`
+
+O workflow `Deploy enavia-executor` foi alterado para usar a própria lista retornada por:
+
+```bash
+npx wrangler kv namespace list > /tmp/kv_namespaces.json
+```
+
+Como fonte de verdade para resolver IDs por `.title`.
+
+**Mapeamento aplicado:**
+- `ENAVIA_BRAIN_KV_ID` ← title `enavia-brain`
+- `ENAVIA_BRAIN_TEST_KV_ID` ← title `enavia-brain-test`
+- `ENAVIA_GIT_KV_ID` ← title `ENAVIA_GIT`
+- `ENAVIA_GIT_TEST_KV_ID` ← title `ENAVIA_GIT_TEST`
+- `GIT_KV_ID` ← mesmo ID resolvido de `ENAVIA_GIT`
+- `GIT_KV_TEST_ID` ← mesmo ID resolvido de `ENAVIA_GIT_TEST`
+
+**Garantias do patch:**
+- O workflow continua exigindo apenas `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
+- Os 6 secrets manuais de KV ID não são mais exigidos nem referenciados.
+- Se faltar algum title obrigatório, o workflow falha antes do deploy com `ERRO: KV namespace obrigatório não encontrado: <title>`.
+- A mensagem de erro mostra apenas o title faltante, nunca o ID.
+- Os IDs resolvidos não são impressos no log.
+- `wrangler.executor.generated.toml` continua sendo o arquivo gerado.
+- O `.gitignore` continua protegendo `wrangler.executor.generated.toml`.
+- Escopo workflow-only: sem alteração em `nv-enavia.js`, executor runtime, painel, KV runtime ou `wrangler.toml` principal.
+
+**Validações locais:**
+- `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/deploy-executor.yml'))"` → YAML válido ✅
+- Smoke local com `/tmp/kv_namespaces.json` sintético → gerou TOML sem placeholders fora de comentários e sem imprimir IDs no output ✅
+
+## Próxima ação segura
+
+1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
+2. Confirmar que a etapa `Resolve KV namespace IDs from Cloudflare titles` lista apenas titles e mostra `KV namespace resolvido por title: ...`.
+3. Confirmar deploy TEST e smoke `/audit`.
+4. Se TEST passar, rodar `target_env=prod`.
+
+## Bloqueios
+
+- nenhum
+
+---
 
 ## O que foi feito nesta sessão (diagnóstico)
 
