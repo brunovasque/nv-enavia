@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/improve-validate-kv-namespace-ids`
-**Última tarefa:** Diagnóstico cirúrgico — etapa `Validate KV namespace IDs against Cloudflare` no `deploy-executor.yml` passou a imprimir, antes da validação dos 6 secrets, a lista ordenada e única de TÍTULOS/NAMES dos KV namespaces visíveis para o token/conta do GitHub Actions (`jq -r '.[] | (.title // .name // empty)'`). NUNCA imprime IDs nem valores de secrets. Permite distinguir se a falha em `*_TEST_KV_ID` é problema de conta/token (namespaces ausentes) ou de valor salvo no secret (namespaces presentes). YAML validado. Sem alteração em `nv-enavia.js`, `executor/src/index.js`, painel ou KV runtime.
+**Branch ativa:** `copilot/update-deploy-executor-workflow`
+**Última tarefa:** Correção cirúrgica — `.github/workflows/deploy-executor.yml` não depende mais dos 6 secrets manuais de KV ID. O workflow agora exige apenas `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`, roda `npx wrangler kv namespace list`, resolve os IDs internamente por `.title` (`enavia-brain`, `enavia-brain-test`, `ENAVIA_GIT`, `ENAVIA_GIT_TEST`) e gera `wrangler.executor.generated.toml` sem imprimir IDs no log. YAML validado e smoke local de resolução por title executado. Sem alteração em `nv-enavia.js`, executor runtime, painel, KV runtime ou `wrangler.toml` principal.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -53,6 +53,13 @@
 
 ## Bloqueios
 - nenhum
+
+## Decisão operacional — Deploy Executor KV por title
+
+- `deploy-executor.yml` passou a usar os KV namespaces visíveis ao token/conta do GitHub Actions como fonte de verdade.
+- Secrets manuais `ENAVIA_BRAIN_KV_ID`, `ENAVIA_BRAIN_TEST_KV_ID`, `ENAVIA_GIT_KV_ID`, `ENAVIA_GIT_TEST_KV_ID`, `GIT_KV_ID` e `GIT_KV_TEST_ID` não são mais exigidos nem usados pelo workflow.
+- Se faltar algum title obrigatório, o workflow falha antes do deploy mostrando apenas o title faltante.
+- IDs resolvidos são usados somente internamente para gerar `wrangler.executor.generated.toml`; não são impressos no log.
 
 ## Decisões formalizadas em PR8
 - `buildOperationalAction(nextAction, contractId)` — função pura em `nv-enavia.js:4799–4835`. Shape canônico: `{ action_id, contract_id, type, requires_human_approval, evidence_required, can_execute, block_reason }`.

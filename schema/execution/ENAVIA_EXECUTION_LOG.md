@@ -4,6 +4,28 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — Resolver KV namespace IDs por title (deploy-executor.yml)
+
+- **Branch:** `copilot/update-deploy-executor-workflow`
+- **Commit:** `80fd164`
+- **Escopo:** Apenas `.github/workflows/deploy-executor.yml`. Nenhuma alteração em `nv-enavia.js`, executor runtime, painel, KV runtime, `wrangler.toml` principal ou bindings.
+- **Problema:** o token/conta do GitHub Actions enxerga o namespace `enavia-brain-test`, mas o secret manual `ENAVIA_BRAIN_TEST_KV_ID` continuava validando como `INVALID`. Depender de 6 secrets manuais de KV ID gerava fragilidade e tentativa cega.
+- **Correção:** o workflow passou a rodar `npx wrangler kv namespace list > /tmp/kv_namespaces.json` e resolver internamente os IDs pelo `.title`:
+  - PROD: `enavia-brain`, `ENAVIA_GIT`.
+  - TEST: `enavia-brain-test`, `ENAVIA_GIT_TEST`.
+  - `GIT_KV_ID` reutiliza o ID resolvido de `ENAVIA_GIT`.
+  - `GIT_KV_TEST_ID` reutiliza o ID resolvido de `ENAVIA_GIT_TEST`.
+- **Segurança de logs:** o workflow imprime apenas titles/nomes e mensagens `KV namespace resolvido por title: <title>`. IDs não são impressos. Em erro de namespace ausente, a falha mostra apenas o title obrigatório faltante.
+- **Secrets:** os 6 secrets manuais de KV ID não são mais exigidos nem referenciados no workflow. Continuam obrigatórios apenas `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
+- **Arquivo gerado:** `wrangler.executor.generated.toml` continua sendo gerado a partir de `wrangler.executor.template.toml`.
+- **Validações locais:**
+  - `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/deploy-executor.yml')); print('YAML válido')"` → YAML válido ✅
+  - Smoke local com `/tmp/kv_namespaces.json` sintético → resolução por title OK, TOML sem placeholders fora de comentários e output sem IDs ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** reexecutar `Deploy enavia-executor` em `target_env=test` e validar o deploy/smoke real.
+
+---
+
 ## 2026-04-29 — DIAGNÓSTICO — Listar TÍTULOS dos KV namespaces visíveis na conta/token (deploy-executor.yml)
 
 - **Branch:** `copilot/improve-validate-kv-namespace-ids`

@@ -25,83 +25,22 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ENAVIA_BRAIN_KV_ID: ${{ secrets.ENAVIA_BRAIN_KV_ID }}
-          ENAVIA_BRAIN_TEST_KV_ID: ${{ secrets.ENAVIA_BRAIN_TEST_KV_ID }}
-          ENAVIA_GIT_KV_ID: ${{ secrets.ENAVIA_GIT_KV_ID }}
-          ENAVIA_GIT_TEST_KV_ID: ${{ secrets.ENAVIA_GIT_TEST_KV_ID }}
-          GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
-          GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"    || (echo "Missing CLOUDFLARE_API_TOKEN" && exit 1)
           test -n "$CLOUDFLARE_ACCOUNT_ID"   || (echo "Missing CLOUDFLARE_ACCOUNT_ID" && exit 1)
-          test -n "$ENAVIA_BRAIN_KV_ID"      || (echo "Missing ENAVIA_BRAIN_KV_ID" && exit 1)
-          test -n "$ENAVIA_BRAIN_TEST_KV_ID" || (echo "Missing ENAVIA_BRAIN_TEST_KV_ID" && exit 1)
-          test -n "$ENAVIA_GIT_KV_ID"        || (echo "Missing ENAVIA_GIT_KV_ID" && exit 1)
-          test -n "$ENAVIA_GIT_TEST_KV_ID"   || (echo "Missing ENAVIA_GIT_TEST_KV_ID" && exit 1)
-          test -n "$GIT_KV_ID"               || (echo "Missing GIT_KV_ID" && exit 1)
-          test -n "$GIT_KV_TEST_ID"          || (echo "Missing GIT_KV_TEST_ID" && exit 1)
-
-      - name: Generate wrangler config from template + secrets
-        env:
-          ENAVIA_BRAIN_KV_ID: ${{ secrets.ENAVIA_BRAIN_KV_ID }}
-          ENAVIA_BRAIN_TEST_KV_ID: ${{ secrets.ENAVIA_BRAIN_TEST_KV_ID }}
-          ENAVIA_GIT_KV_ID: ${{ secrets.ENAVIA_GIT_KV_ID }}
-          ENAVIA_GIT_TEST_KV_ID: ${{ secrets.ENAVIA_GIT_TEST_KV_ID }}
-          GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
-          GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
-        run: |
-          # KV namespace IDs do Cloudflare são strings hex (a-f0-9) de até 32 caracteres.
-          # Validar formato antes de injetar no TOML para evitar quebra de sintaxe.
-          validate_kv_id() {
-            local name="$1"
-            local value="$2"
-            if ! echo "$value" | grep -qE '^[a-f0-9A-F]{16,64}$'; then
-              echo "Formato inválido para $name: esperado hex [a-fA-F0-9], 16-64 caracteres."
-              exit 1
-            fi
-          }
-          validate_kv_id "ENAVIA_BRAIN_KV_ID"      "$ENAVIA_BRAIN_KV_ID"
-          validate_kv_id "ENAVIA_BRAIN_TEST_KV_ID" "$ENAVIA_BRAIN_TEST_KV_ID"
-          validate_kv_id "ENAVIA_GIT_KV_ID"        "$ENAVIA_GIT_KV_ID"
-          validate_kv_id "ENAVIA_GIT_TEST_KV_ID"   "$ENAVIA_GIT_TEST_KV_ID"
-          validate_kv_id "GIT_KV_ID"               "$GIT_KV_ID"
-          validate_kv_id "GIT_KV_TEST_ID"          "$GIT_KV_TEST_ID"
-          sed \
-            -e "s/REPLACE_WITH_REAL_ENAVIA_BRAIN_ID/${ENAVIA_BRAIN_KV_ID}/g" \
-            -e "s/REPLACE_WITH_REAL_ENAVIA_BRAIN_TEST_ID/${ENAVIA_BRAIN_TEST_KV_ID}/g" \
-            -e "s/REPLACE_WITH_REAL_ENAVIA_GIT_ID/${ENAVIA_GIT_KV_ID}/g" \
-            -e "s/REPLACE_WITH_REAL_ENAVIA_GIT_TEST_ID/${ENAVIA_GIT_TEST_KV_ID}/g" \
-            -e "s/REPLACE_WITH_REAL_GIT_KV_ID/${GIT_KV_ID}/g" \
-            -e "s/REPLACE_WITH_REAL_GIT_KV_TEST_ID/${GIT_KV_TEST_ID}/g" \
-            wrangler.executor.template.toml > wrangler.executor.generated.toml
-          echo "wrangler.executor.generated.toml gerado."
-
-      - name: Validate generated config (no placeholders remaining)
-        run: |
-          if grep -v '^[[:space:]]*#' wrangler.executor.generated.toml | grep -q "REPLACE_WITH_REAL_"; then
-            echo "Placeholders não substituídos no generated config. Verifique os secrets."
-            exit 1
-          fi
-          echo "Config gerado sem placeholders — OK."
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Validate KV namespace IDs against Cloudflare
+      - name: Resolve KV namespace IDs from Cloudflare titles
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ENAVIA_BRAIN_KV_ID: ${{ secrets.ENAVIA_BRAIN_KV_ID }}
-          ENAVIA_BRAIN_TEST_KV_ID: ${{ secrets.ENAVIA_BRAIN_TEST_KV_ID }}
-          ENAVIA_GIT_KV_ID: ${{ secrets.ENAVIA_GIT_KV_ID }}
-          ENAVIA_GIT_TEST_KV_ID: ${{ secrets.ENAVIA_GIT_TEST_KV_ID }}
-          GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
-          GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
         run: |
           cleanup() {
-            rm -f /tmp/kv_check_failures /tmp/kv_namespaces.json /tmp/wrangler_kv_list.err
+            rm -f /tmp/kv_namespaces.json /tmp/wrangler_kv_list.err
           }
           trap cleanup EXIT
 
@@ -121,46 +60,74 @@ jobs:
             echo "ERRO: wrangler kv namespace list não retornou JSON array válido."
             echo "stderr:"
             cat /tmp/wrangler_kv_list.err
-            echo "stdout preview:"
-            head -n 20 /tmp/kv_namespaces.json
             exit 1
           fi
 
-          # Diagnóstico: listar somente os títulos/nomes dos KV namespaces visíveis
-          # para o token/conta do GitHub Actions. NUNCA imprimir IDs nem secrets.
+          # Diagnóstico seguro: listar somente os títulos/nomes dos KV namespaces
+          # visíveis para o token/conta do GitHub Actions. NUNCA imprimir IDs.
           echo "KV namespaces visíveis nesta conta/token:"
           jq -r '.[] | (.title // .name // empty)' /tmp/kv_namespaces.json \
             | sort -u \
             | sed 's/^/- /'
           echo ""
 
-          check_kv() {
-            local secret_name="$1"
-            local secret_value="$2"
-            local binding_name="$3"
-            if jq -e --arg id "$secret_value" '.[] | select(.id == $id)' /tmp/kv_namespaces.json > /dev/null 2>&1; then
-              echo "  ${secret_name}: OK  (binding: ${binding_name})"
-            else
-              echo "  ${secret_name}: INVALID  (binding: ${binding_name})"
-              echo "INVALID" >> /tmp/kv_check_failures
+          get_kv_id_by_title() {
+            local title="$1"
+            local id
+            id=$(jq -r --arg title "$title" '.[] | select(.title == $title) | .id' /tmp/kv_namespaces.json | head -n 1)
+
+            if [ -z "$id" ] || [ "$id" = "null" ]; then
+              echo "ERRO: KV namespace obrigatório não encontrado: $title" >&2
+              echo "Verifique em Cloudflare Workers & Pages > KV se o namespace existe com esse title exato (case-sensitive)." >&2
+              exit 1
             fi
+
+            printf "%s" "$id"
           }
 
-          echo "KV CHECK:"
-          check_kv "ENAVIA_BRAIN_KV_ID"      "$ENAVIA_BRAIN_KV_ID"      "ENAVIA_BRAIN"
-          check_kv "ENAVIA_BRAIN_TEST_KV_ID" "$ENAVIA_BRAIN_TEST_KV_ID" "ENAVIA_BRAIN_TEST"
-          check_kv "ENAVIA_GIT_KV_ID"        "$ENAVIA_GIT_KV_ID"        "ENAVIA_GIT"
-          check_kv "ENAVIA_GIT_TEST_KV_ID"   "$ENAVIA_GIT_TEST_KV_ID"   "ENAVIA_GIT_TEST"
-          check_kv "GIT_KV_ID"               "$GIT_KV_ID"               "GIT_KV"
-          check_kv "GIT_KV_TEST_ID"          "$GIT_KV_TEST_ID"          "GIT_KV_TEST"
+          validate_kv_id() {
+            local title="$1"
+            local value="$2"
+            if ! echo "$value" | grep -qE '^[a-f0-9A-F]{16,64}$'; then
+              echo "ERRO: KV namespace obrigatório tem ID em formato inválido: $title"
+              exit 1
+            fi
+            echo "KV namespace resolvido por title: $title"
+          }
 
-          if [ -f /tmp/kv_check_failures ]; then
-            echo ""
-            echo "FALHA: Um ou mais KV namespace IDs são inválidos na conta Cloudflare."
-            echo "Corrija os secrets antes de fazer o deploy."
+          # Titles abaixo devem bater exatamente com os titles dos KV namespaces na Cloudflare (case-sensitive).
+          # Verificar em Workers & Pages > KV se algum title obrigatório não for encontrado.
+          ENAVIA_BRAIN_KV_ID=$(get_kv_id_by_title "enavia-brain")
+          ENAVIA_BRAIN_TEST_KV_ID=$(get_kv_id_by_title "enavia-brain-test")
+          ENAVIA_GIT_KV_ID=$(get_kv_id_by_title "ENAVIA_GIT")
+          ENAVIA_GIT_TEST_KV_ID=$(get_kv_id_by_title "ENAVIA_GIT_TEST")
+          # Compatibilidade com o código existente do executor: GIT_KV segue como binding lógico
+          # separado, apontando para os namespaces físicos ENAVIA_GIT/ENAVIA_GIT_TEST.
+          GIT_KV_ID="$ENAVIA_GIT_KV_ID"
+          GIT_KV_TEST_ID="$ENAVIA_GIT_TEST_KV_ID"
+
+          validate_kv_id "enavia-brain" "$ENAVIA_BRAIN_KV_ID"
+          validate_kv_id "enavia-brain-test" "$ENAVIA_BRAIN_TEST_KV_ID"
+          validate_kv_id "ENAVIA_GIT" "$ENAVIA_GIT_KV_ID"
+          validate_kv_id "ENAVIA_GIT_TEST" "$ENAVIA_GIT_TEST_KV_ID"
+
+          sed \
+            -e "s/REPLACE_WITH_REAL_ENAVIA_BRAIN_ID/${ENAVIA_BRAIN_KV_ID}/g" \
+            -e "s/REPLACE_WITH_REAL_ENAVIA_BRAIN_TEST_ID/${ENAVIA_BRAIN_TEST_KV_ID}/g" \
+            -e "s/REPLACE_WITH_REAL_ENAVIA_GIT_ID/${ENAVIA_GIT_KV_ID}/g" \
+            -e "s/REPLACE_WITH_REAL_ENAVIA_GIT_TEST_ID/${ENAVIA_GIT_TEST_KV_ID}/g" \
+            -e "s/REPLACE_WITH_REAL_GIT_KV_ID/${GIT_KV_ID}/g" \
+            -e "s/REPLACE_WITH_REAL_GIT_KV_TEST_ID/${GIT_KV_TEST_ID}/g" \
+            wrangler.executor.template.toml > wrangler.executor.generated.toml
+          echo "wrangler.executor.generated.toml gerado com KV IDs resolvidos por title."
+
+      - name: Validate generated config (no placeholders remaining)
+        run: |
+          if grep -v '^[[:space:]]*#' wrangler.executor.generated.toml | grep -q "REPLACE_WITH_REAL_"; then
+            echo "Placeholders não substituídos no generated config. Verifique os KV namespaces obrigatórios."
             exit 1
           fi
-          echo "Todos os KV namespace IDs validados com sucesso."
+          echo "Config gerado sem placeholders — OK."
 
       - name: Install executor dependencies (acorn)
         run: npm install --prefix executor
