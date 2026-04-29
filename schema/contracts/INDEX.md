@@ -38,6 +38,6 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR0** — Docs-only — Loop obrigatório de execução por PR (em andamento)
+**PR17** — PR-DIAG — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase.
 
-Após PR0: **PR17** — PR-DIAG — Diagnóstico do estado atual do loop de skills.
+Contexto: o principal gap documentado é que o sistema chega em `phase_complete`, mas falta o mecanismo supervisionado de avanço de fase. PR17 é diagnóstico puro — sem alterar runtime.

@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29
+**Data:** 2026-04-29 (atualizado após feedback PR0)
 **Branch ativa:** `claude/pr0-docs-loop-obrigatorio`
-**Última tarefa:** PR0 — Docs-only — Loop obrigatório de execução por PR. `CLAUDE.md` atualizado com seção `Loop obrigatório de execução por PR` (17 passos + regras de bloqueio); referência fixa ao contrato PR1–PR7 removida; novo contrato ativo `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` criado; `schema/contracts/INDEX.md` criado. Sem alteração em runtime.
+**Última tarefa:** PR0 — Docs-only — Loop obrigatório de execução por PR. `CLAUDE.md` atualizado com seção `Loop obrigatório de execução por PR` (17 passos + regras de bloqueio); referência fixa ao contrato PR1–PR7 removida; novo contrato ativo `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` criado; `schema/contracts/INDEX.md` criado. Contrato PR17–PR30 reestruturado por feedback: priorizando loop `phase_complete → advance-phase` antes das skills. Sem alteração em runtime.
 
 ## Contrato ativo
 
@@ -16,14 +16,15 @@
 | `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
 | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
 
-## Decisões formalizadas em PR0
+## Decisões formalizadas em PR0 (revisão pós-feedback)
 
 - `CLAUDE.md` seção `## 4. Loop obrigatório de execução por PR` adicionada com 17 passos e regras de bloqueio explícitas.
 - Referência fixa ao `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` como contrato ativo exclusivo removida.
 - Agente orientado a identificar contrato ativo via `schema/contracts/INDEX.md`.
 - `schema/contracts/INDEX.md` criado como índice central.
 - `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` criado como novo contrato ativo.
-- Próxima PR autorizada pelo novo contrato: **PR17** (PR-DIAG).
+- **Contrato reestruturado por feedback @brunovasque:** nova ordem prioriza loop `phase_complete → advance-phase` (PR17–PR21) antes de System Map (PR22–PR25) e skills (PR26–PR29).
+- Próxima PR autorizada pelo contrato: **PR17** (PR-DIAG — `phase_complete` e avanço de fase).
 - Escopo Docs-only: nenhum arquivo de runtime alterado.
 
 ## Decisões formalizadas em sessão anterior (PR15/PR16 fixes)

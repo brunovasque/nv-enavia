@@ -4,7 +4,35 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-04-29 — PR0 — Docs-only — Loop obrigatório de execução por PR
+## 2026-04-29 — PR0 (revisão) — Reestruturação do contrato PR17–PR30 por feedback
+
+- **Branch:** `claude/pr0-docs-loop-obrigatorio`
+- **Tipo:** `PR-DOCS` (revisão pós-feedback)
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **Escopo:** Docs-only. Sem alteração em Worker, Panel, Executor, Deploy Worker, workflows, JS/TS/JSX/TSX.
+- **Motivo:** Feedback @brunovasque: contrato original priorizava "loop de skills" cedo demais. Gap real é o mecanismo de avanço de fase (`phase_complete → advance-phase`). Skills só devem entrar após loop perfeito + System/Tool Registry.
+- **Alterações:**
+  1. `schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — seções 2, 4, 6–13 reestruturadas:
+     - Seção 2: objetivo macro revisado com 4 frentes em ordem estrita de dependência.
+     - Seção 4: nova ordem obrigatória de PRs (PR17=DIAG phase_complete, PR18=IMPL advance-phase, PR19=PROVA ciclo completo, PR20=IMPL loop-status in_progress, PR21=PROVA, PR22–PR25=DOCS system map, PR26–PR29=DOCS skills, PR30=fechamento).
+     - Seções 6–13: detalhamento de cada PR com objetivo, pré-requisito, escopo e critérios de aceite.
+  2. `schema/contracts/INDEX.md` — "Próxima PR autorizada" atualizada para PR17 com contexto do gap.
+  3. `schema/status/ENAVIA_STATUS_ATUAL.md` — decisões de PR0 atualizadas com revisão.
+  4. `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — próxima ação e descrição do contrato atualizadas.
+  5. `schema/execution/ENAVIA_EXECUTION_LOG.md` — este bloco.
+- **Smoke tests:**
+  - `git diff --name-only` — confirma Docs-only ✅
+  - Contrato contém `phase_complete` como prioridade antes de skills ✅
+  - PR17 é PR-DIAG read-only ✅
+  - Skills (PR26–PR29) só entram após PR21 e PR25 ✅
+  - Nenhum endpoint de skills antes de PR26 ✅
+  - Governança atualizada (status, handoff, execution log, INDEX.md) ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa autorizada:** PR17 — PR-DIAG — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase.
+
+---
+
+
 
 - **Branch:** `claude/pr0-docs-loop-obrigatorio`
 - **Tipo:** `PR-DOCS`

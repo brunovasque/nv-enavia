@@ -22,13 +22,13 @@
    - Seção 7 (Regras de execução) atualizada para listar todos os escopos possíveis de PR.
    - Formato de resposta (seção 9) atualizado com campos: Tipo da PR, Contrato ativo, PR anterior validada, INDEX.md.
 
-2. **`schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`** (criado):
+2. **`schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`** (criado + reestruturado por feedback):
    - Novo contrato ativo.
    - Registra histórico: PR1–PR7 (encerrado), PR8–PR16 (encerrado + fixes).
-   - Define objetivo macro: Loop de Skills + System Map.
-   - Define ordem obrigatória: PR0, PR17–PR30.
-   - Detalha PR0–PR22 com escopos, pré-requisitos e critérios de aceite.
-   - PR26–PR30 reservadas para expansão.
+   - **Objetivo macro revisado:** (1) Loop contratual perfeito via `phase_complete → advance-phase`; (2) System Map + Tool Registry; (3) Skills supervisionadas (apenas após loops e registry prontos); (4) Governança de loop formalizada.
+   - **Nova ordem obrigatória:** PR0, PR17–PR30 com prioridade `phase_complete` antes de skills.
+   - Detalha PR0–PR29 com escopos, pré-requisitos e critérios de aceite.
+   - PR30 = fechamento/hardening/handoff final.
 
 3. **`schema/contracts/INDEX.md`** (criado):
    - Índice central de todos os contratos do repo.
@@ -52,9 +52,11 @@
 
 ## Próxima ação autorizada
 
-**PR17** — `PR-DIAG` — Diagnóstico do estado atual do loop de skills.
+**PR17** — `PR-DIAG` — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase.
 
-Pré-requisito: PR0 concluída (esta PR).
+**Contexto do gap:** O sistema chega em `phase_complete` via `loop-status`, mas falta o mecanismo supervisionado de avanço de fase (`advance-phase`). O ciclo completo esperado é: `execute-next → complete-task → phase_complete → advance-phase → próxima task/fase`. PR17 é diagnóstico puro — mapear o que existe e o que precisa ser criado sem alterar runtime.
+
+Pré-requisito: PR0 concluída (esta PR, incluindo revisão pós-feedback).
 
 ## Bloqueios
 
