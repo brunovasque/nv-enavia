@@ -4,6 +4,26 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — enviar `target.workerId` no payload do Deploy Worker `/apply-test`
+
+- **Branch:** `copilot/nv-enavia-include-target-workerid`
+- **Commit de código:** `354d9be`
+- **Escopo:** Worker-only. Sem alteração em Executor, Panel, Deploy Worker externo ou bindings.
+- **Problema:** o loop operacional já resolvia o target worker dinâmico para `POST /audit` e `POST /propose`, mas o `_deployPayload` enviado por `callDeployBridge(...)/apply-test` não carregava `workerId`/`target.workerId`. Em TEST isso gerava bloqueio real no Deploy Worker com HTTP 400 e erro `target.workerId obrigatório`.
+- **Correção:**
+  1. `nv-enavia.js` (`handleExecuteNext`, step C do execute_next) agora inclui `...buildExecutorTargetPayload(auditTargetResolution.workerId)` no `_deployPayload`.
+  2. O payload de `/apply-test` passa a reutilizar exatamente a mesma fonte de verdade dinâmica já usada em `/audit` e `/propose`.
+  3. `tests/pr14-executor-deploy-real-loop.smoke.test.js` foi ampliado para validar explicitamente que `/apply-test` recebe `workerId` e `target.workerId` consistente.
+- **Testes executados:**
+  - `node --check nv-enavia.js` → OK ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **164 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** revalidar o fluxo real em TEST com `DEPLOY_WORKER` real e confirmar que `/apply-test` deixa de retornar `target.workerId obrigatório`.
+
+---
+
 ## 2026-04-29 — FIX — bootstrap do snapshot canônico do Executor no KV após deploy TEST
 
 - **Branch:** `copilot/bootstrap-snapshot-canonico-executor-kv`
