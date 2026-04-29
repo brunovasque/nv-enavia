@@ -4,6 +4,59 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR0 (revisão) — Reestruturação do contrato PR17–PR30 por feedback
+
+- **Branch:** `claude/pr0-docs-loop-obrigatorio`
+- **Tipo:** `PR-DOCS` (revisão pós-feedback)
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **Escopo:** Docs-only. Sem alteração em Worker, Panel, Executor, Deploy Worker, workflows, JS/TS/JSX/TSX.
+- **Motivo:** Feedback @brunovasque: contrato original priorizava "loop de skills" cedo demais. Gap real é o mecanismo de avanço de fase (`phase_complete → advance-phase`). Skills só devem entrar após loop perfeito + System/Tool Registry.
+- **Alterações:**
+  1. `schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — seções 2, 4, 6–13 reestruturadas:
+     - Seção 2: objetivo macro revisado com 4 frentes em ordem estrita de dependência.
+     - Seção 4: nova ordem obrigatória de PRs (PR17=DIAG phase_complete, PR18=IMPL advance-phase, PR19=PROVA ciclo completo, PR20=IMPL loop-status in_progress, PR21=PROVA, PR22–PR25=DOCS system map, PR26–PR29=DOCS skills, PR30=fechamento).
+     - Seções 6–13: detalhamento de cada PR com objetivo, pré-requisito, escopo e critérios de aceite.
+  2. `schema/contracts/INDEX.md` — "Próxima PR autorizada" atualizada para PR17 com contexto do gap.
+  3. `schema/status/ENAVIA_STATUS_ATUAL.md` — decisões de PR0 atualizadas com revisão.
+  4. `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — próxima ação e descrição do contrato atualizadas.
+  5. `schema/execution/ENAVIA_EXECUTION_LOG.md` — este bloco.
+- **Smoke tests:**
+  - `git diff --name-only` — confirma Docs-only ✅
+  - Contrato contém `phase_complete` como prioridade antes de skills ✅
+  - PR17 é PR-DIAG read-only ✅
+  - Skills (PR26–PR29) só entram após PR21 e PR25 ✅
+  - Nenhum endpoint de skills antes de PR26 ✅
+  - Governança atualizada (status, handoff, execution log, INDEX.md) ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa autorizada:** PR17 — PR-DIAG — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase.
+
+---
+
+
+
+- **Branch:** `claude/pr0-docs-loop-obrigatorio`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` (criado nesta PR)
+- **Escopo:** Docs-only. Sem alteração em Worker, Panel, Executor, Deploy Worker, workflows, JS/TS/JSX/TSX.
+- **Alterações:**
+  1. `CLAUDE.md` — adicionada seção `## Loop obrigatório de execução por PR` (seção 4, 17 passos + regras de bloqueio); referência fixa ao contrato `PR1–PR7` removida; orientação para localizar contrato ativo em `schema/contracts/active/`; seções renumeradas 4→5, 5→6, 6→7, 7→8, 8→9; `schema/contracts/INDEX.md` adicionado à estrutura obrigatória.
+  2. `schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — criado. Novo contrato ativo PR17–PR30.
+  3. `schema/contracts/INDEX.md` — criado. Índice central de todos os contratos.
+  4. Governança: status, handoff, execution log atualizados.
+- **Histórico de contratos:**
+  - PR1–PR7: `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` — Encerrado ✅
+  - PR8–PR16: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` (+ fixes PR14–PR16) — Encerrado ✅
+  - Novo: `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — Ativo 🟢
+- **Smoke tests:**
+  - `git diff --name-only` — confirma Docs-only ✅
+  - `CLAUDE.md` contém `Loop obrigatório de execução por PR` ✅
+  - `CLAUDE.md` não fixa mais `PR1–PR7` como contrato ativo exclusivo ✅
+  - Status, handoff, execution log e INDEX.md atualizados ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa autorizada:** PR17 — PR-DIAG — Diagnóstico do estado atual do loop de skills.
+
+---
+
 ## 2026-04-29 — PR16 — Fix: execute-next inicia task queued antes de delegar execução
 
 - **Branch:** `claude/pr16-fix-execute-next-starttask`
