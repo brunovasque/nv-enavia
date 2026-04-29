@@ -440,6 +440,7 @@ const WORKER_SCRIPT_MAP = {
       await Promise.all([
         GIT_KV.put(`git:snap:${id}`, JSON.stringify(meta)),
         GIT_KV.put(`git:code:${id}`, code),
+        GIT_KV.put("git:code:latest", code),
         saveIndex(index),
         setLatestVersionId(id),
       ]);
