@@ -1,0 +1,11 @@
+{
+  "name": "enavia-executor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Executor do sistema ENAVIA (Cloudflare Worker)",
+  "main": "src/index.js",
+  "type": "module",
+  "dependencies": {
+    "acorn": "^8.16.0"
+  }
+}

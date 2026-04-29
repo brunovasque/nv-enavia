@@ -1,0 +1,56 @@
+# wrangler.executor.toml — Config de deploy do enavia-executor
+#
+# Usado exclusivamente pelo workflow deploy-executor.yml.
+# Não altera wrangler.toml (Worker principal nv-enavia).
+#
+# Para deploy real, os KV namespace IDs abaixo devem ser preenchidos
+# com os valores reais do Cloudflare Dashboard (ou via wrangler kv:namespace list).
+# Não commitar valores reais — configure via GitHub Secrets ou Cloudflare Dashboard.
+
+name = "enavia-executor"
+main = "executor/src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[vars]
+CF_WORKER_NAME_NV_ENAVIA = "nv-enavia"
+DEPLOY_WORKER_URL = "https://deploy-worker.brunovasque.workers.dev"
+ENAVIA_ENV = "production"
+OPENAI_CODE_MODEL = "gpt-5.2"
+TARGET_WORKER_NAME = "nv-enavia"
+
+[[kv_namespaces]]
+binding = "ENAVIA_BRAIN"
+id = "REPLACE_WITH_REAL_ENAVIA_BRAIN_ID"
+
+[[kv_namespaces]]
+binding = "ENAVIA_GIT"
+id = "REPLACE_WITH_REAL_ENAVIA_GIT_ID"
+
+[[kv_namespaces]]
+binding = "GIT_KV"
+id = "REPLACE_WITH_REAL_GIT_KV_ID"
+
+# ── Ambiente TEST ──────────────────────────────────────────────────────────────
+[env.test]
+name = "enavia-executor-test"
+workers_dev = true
+
+[env.test.vars]
+CF_WORKER_NAME_NV_ENAVIA = "enavia-worker-teste"
+DEPLOY_WORKER_URL = "https://deploy-worker-test.brunovasque.workers.dev"
+ENAVIA_ENV = "test"
+OPENAI_CODE_MODEL = "gpt-5.2"
+TARGET_WORKER_NAME = "enavia-worker-teste"
+
+[[env.test.kv_namespaces]]
+binding = "ENAVIA_BRAIN"
+id = "REPLACE_WITH_REAL_ENAVIA_BRAIN_TEST_ID"
+
+[[env.test.kv_namespaces]]
+binding = "ENAVIA_GIT"
+id = "REPLACE_WITH_REAL_ENAVIA_GIT_TEST_ID"
+
+[[env.test.kv_namespaces]]
+binding = "GIT_KV"
+id = "REPLACE_WITH_REAL_GIT_KV_TEST_ID"

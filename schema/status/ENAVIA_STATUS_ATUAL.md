@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** copilot/fix-audit-response-contract
-**Última tarefa:** PR15 — EXECUTOR-ONLY. Ajuste conservador no contrato de resposta do `POST /audit`: `verdict:"approve"` agora só sai com sucesso explícito (`execResult.ok === true` e `execResult.error !== true`); qualquer outro caso cai em `reject`. `execResult.verdict` só é preservado quando já for exatamente `"approve"` (com sucesso explícito) ou `"reject"`. Regra extraída para `executor/src/audit-response.js` e coberta por testes focados. Nenhuma alteração no Worker `nv-enavia`, no Painel, no Deploy Worker ou em KV. Smoke do contrato do Executor: 33/33 ✅.
+**Branch ativa:** `copilot/create-separate-deploy-executor`
+**Última tarefa:** INFRA-ONLY — Deploy separado para o Executor. Criados `wrangler.executor.toml`, `executor/package.json` e `.github/workflows/deploy-executor.yml`. Nenhuma alteração em código de Worker, Painel ou KV. Smoke tests do contrato Executor: 33/33 ✅.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
@@ -121,4 +121,7 @@
 - `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado para esses cenários → **111 passed, 0 failed** ✅.
 
 ## Próxima etapa segura
-- Aguardar revisão da PR #162 após o ajuste P1.
+- Preencher IDs reais de KV namespace no `wrangler.executor.toml` (PROD e TEST).
+- Rodar o workflow `Deploy enavia-executor` com `target_env=test` no GitHub Actions.
+- Verificar smoke embutido: `POST /audit` em `enavia-executor-test` deve retornar `result.verdict` e `audit.verdict`.
+- Se TEST passar, rodar com `target_env=prod` para atualizar `enavia-executor` (PROD).

@@ -4,6 +4,27 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — INFRA-ONLY — Deploy separado para o Executor (enavia-executor-test / enavia-executor)
+
+- **Branch:** `copilot/create-separate-deploy-executor`
+- **Escopo:** Infra-only. Nenhuma alteração em `nv-enavia.js`, `contract-executor.js`, `executor/src/index.js`, `executor/src/audit-response.js`, `wrangler.toml` (principal), painel ou KV.
+- **Arquivos criados:**
+  1. `wrangler.executor.toml` — config de deploy do Executor: PROD (`enavia-executor`) e TEST (`enavia-executor-test`). `main = "executor/src/index.js"`. KV namespaces como placeholders (requer preenchimento com IDs reais antes do deploy).
+  2. `executor/package.json` — declara dependência `acorn ^8.16.0` (usado em `executor/src/index.js`). Necessário para `npm install --prefix executor` no workflow.
+  3. `.github/workflows/deploy-executor.yml` — workflow manual (`workflow_dispatch`) com input `target_env: test | prod`. Valida secrets, placeholders e roda testes antes do deploy.
+- **Fluxo TEST:** `wrangler deploy --config wrangler.executor.toml --env test` → publica em `enavia-executor-test`.
+- **Fluxo PROD:** `wrangler deploy --config wrangler.executor.toml` → publica em `enavia-executor`.
+- **Smoke TEST embutido no workflow:** `POST /audit` em `enavia-executor-test` valida `result.verdict` e `audit.verdict`.
+- **Testes executados localmente:**
+  - `node --check executor/src/index.js` → OK ✅
+  - `node --check executor/src/audit-response.js` → OK ✅
+  - `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
+  - Validação YAML: `python3 yaml.safe_load(...)` → **YAML válido** ✅
+- **Bloqueios:** nenhum. KV namespace IDs precisam ser preenchidos no `wrangler.executor.toml` antes do primeiro deploy real.
+- **Próxima etapa segura:** preencher IDs reais no `wrangler.executor.toml` e rodar o workflow `Deploy enavia-executor` com `target_env=test`.
+
+---
+
 ## 2026-04-28 — PR14 ajuste P1 — bloquear JSON inválido em bridges do Executor/Deploy
 
 - **Branch:** `claude/pr14-executor-deploy-real-loop`
