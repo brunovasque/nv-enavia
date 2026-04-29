@@ -1,40 +1,52 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — incluir `target.workerId` no payload do Deploy Worker `/apply-test`
-**Para:** Revalidar o loop real em TEST e confirmar que o `/apply-test` não retorna mais HTTP 400 por `target.workerId obrigatório`
+**De:** FIX — incluir `patch.content` no payload do Deploy Worker `/apply-test`
+**Para:** Revalidar o loop real em TEST e confirmar que o `/apply-test` não retorna mais HTTP 400 por `patch.content obrigatório`
 
 ## O que foi feito nesta sessão
 
 ### Patch cirúrgico — `nv-enavia.js` + `tests/pr14-executor-deploy-real-loop.smoke.test.js`
 
-O loop operacional do Worker `nv-enavia` já resolvia o target worker dinâmico para `/audit` e `/propose`, mas o payload enviado ao Deploy Worker `/apply-test` seguia sem `target.workerId`. O patch desta sessão alinha o deploy à mesma fonte de verdade dinâmica:
+Após a PR174 corrigir `target.workerId`, o Deploy Worker `/apply-test` passou a retornar novo HTTP 400: `patch.content obrigatório`. O patch desta sessão fecha esse novo bloqueio.
 
 **Detalhes do patch:**
-- `nv-enavia.js` (`handleExecuteNext` → step de deploy):
-  - `_deployPayload` agora inclui `...buildExecutorTargetPayload(auditTargetResolution.workerId)`;
-  - o `DEPLOY_WORKER /apply-test` passa a receber `workerId` e `target.workerId` coerentes com o mesmo worker já auditado/proposto;
-  - nenhum worker hardcoded novo foi introduzido.
+- `nv-enavia.js` (`handleExecuteNext` → step C do execute_next, `_deployPayload`):
+  - Adicionado `patch: { type: "contract_action", content: JSON.stringify(nextAction) }`;
+  - Reutiliza exatamente o mesmo shape já montado em `_proposePayload` (linha 5688) — sem duplicação de lógica;
+  - Nenhum campo existente foi removido.
 - `tests/pr14-executor-deploy-real-loop.smoke.test.js`:
-  - novo assert de payload confirma que `/apply-test` recebe `workerId`;
-  - novo assert confirma `target.workerId === workerId`.
+  - C5: 3 novos asserts verificam que `/apply-test` recebe `patch` (object), `patch.content` não vazio, `patch.content` consistente com `/propose`;
+  - E1: 1 novo assert verifica `patch.content` não vazio no payload capturado do `/apply-test`.
+
+**Shape final do patch enviado ao /apply-test:**
+```json
+{
+  "patch": {
+    "type": "contract_action",
+    "content": "<JSON.stringify(nextAction)>"
+  }
+}
+```
 
 **Garantias do patch:**
-- Escopo Worker-only. Executor, Panel, Deploy Worker externo e recibo `/__internal__/audit` não foram alterados.
-- O deploy reaproveita a mesma resolução dinâmica já validada em `/audit` e `/propose`.
+- Escopo Worker-only. Executor, Panel, Deploy Worker externo e gates não foram alterados.
+- `/__internal__/audit` continua sendo chamado antes de `/apply-test`.
+- `target.workerId` (PR174) continua presente.
 - Nenhum gate de `risk_level`, `verdict` ou ambiente TEST/PROD foi relaxado.
+- high/critical continuam bloqueados pelo `validateExecutorAuditForReceipt`.
 
 **Validações locais:**
 - `node --check nv-enavia.js` → OK ✅
 - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
-- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **164 passed, 0 failed** ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **168 passed, 0 failed** ✅
 - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima ação segura
 
 1. Rodar o fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real.
-2. Confirmar no payload/log do `DEPLOY_WORKER /apply-test` que agora existem `workerId` e `target.workerId`.
-3. Confirmar que o erro HTTP 400 `target.workerId obrigatório` desapareceu.
+2. Confirmar no payload/log do `DEPLOY_WORKER /apply-test` que agora existe `patch.content`.
+3. Confirmar que o erro HTTP 400 `patch.content obrigatório` desapareceu.
 4. Se ainda surgir novo 400 contratual, diagnosticar só o próximo campo obrigatório faltante, sem tocar Panel/Executor.
 
 ## Bloqueios

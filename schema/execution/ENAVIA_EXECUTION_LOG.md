@@ -4,6 +4,31 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — incluir `patch.content` no payload do Deploy Worker `/apply-test`
+
+- **Branch:** `copilot/fix-nv-enavia-payload`
+- **Escopo:** Worker-only. Sem alteração em Executor, Panel, Deploy Worker externo, gates ou bindings.
+- **Problema:** após a PR174 (que corrigiu `target.workerId`), o loop operacional voltou a falhar em TEST com HTTP 400 `patch.content obrigatório` no `DEPLOY_WORKER /apply-test`. O `_deployPayload` já tinha `workerId`/`target.workerId`, mas não incluía o campo `patch`.
+- **Correção cirúrgica:**
+  1. `nv-enavia.js` (`handleExecuteNext`, step C do execute_next): `_deployPayload` agora inclui `patch: { type: "contract_action", content: JSON.stringify(nextAction) }`, reutilizando exatamente o mesmo shape já montado para `_proposePayload`.
+  2. `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado com 3 novos asserts (C5 e E1) para validar:
+     - `/apply-test` recebe `patch` como objeto;
+     - `patch.content` não vazio;
+     - `patch.content` consistente com o mesmo campo enviado ao `/propose`.
+- **Testes executados:**
+  - `node --check nv-enavia.js` → OK ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **168 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **Shape final do patch enviado ao /apply-test:**
+  ```json
+  { "type": "contract_action", "content": "<JSON.stringify(nextAction)>" }
+  ```
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** revalidar o fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real e confirmar que `/apply-test` deixa de retornar `patch.content obrigatório`.
+
+---
+
 ## 2026-04-29 — FIX — enviar `target.workerId` no payload do Deploy Worker `/apply-test`
 
 - **Branch:** `copilot/nv-enavia-include-target-workerid`
