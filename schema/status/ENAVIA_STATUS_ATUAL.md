@@ -158,7 +158,20 @@
   - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **122 passed, 0 failed** ✅
   - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
-## Próxima etapa segura
-- Rodar novamente o fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real.
-- Confirmar no log/resposta que o `DEPLOY_WORKER /apply-test` deixa de falhar com `target.workerId obrigatório`.
-- Se ainda houver bloqueio, inspecionar apenas o próximo campo obrigatório faltante no contrato real do `/apply-test`, sem alterar Panel ou Executor.
+## Decisões formalizadas em PR16
+
+- `startTask` importado de `contract-executor.js` em `nv-enavia.js`.
+- Step D0 inserido em `handleExecuteNext` (execute_next path): se `nextAction.type === "start_task"` e `nextAction.task_id` existir, chama `startTask(env, contractId, nextAction.task_id)` antes do synthetic request para `handleExecuteContract`. Try/catch cobre falhas de KV/runtime.
+- `handleGetLoopStatus`: `availableActions` de `start_task`/`start_micro_pr` agora aponta para `POST /contracts/execute-next` (era `POST /contracts/execute`, que era o endpoint direto sem gates).
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado com seção F (3 novos cenários: F1 startTask ok, F2 startTask falha, F3 availableActions correto) → **183 passed, 0 failed**.
+- Gates de audit/propose/deploy (high/critical bloqueados) não alterados.
+
+- Rodar o fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real, usando um contrato novo (ex: `ctr_smoke_pr175_20260429`), e confirmar que:
+  1. task transiciona de `queued` para `in_progress` (via startTask);
+  2. `executeCurrentMicroPr` prossegue além do Gate 2;
+  3. `/apply-test` recebe `patch.content` não-vazio (PR175);
+  4. não há mais HTTP 409 `TASK_NOT_IN_PROGRESS`.
+- Se ainda surgir bloqueio, diagnosticar o próximo campo obrigatório faltante sem tocar Panel/Executor.
+
+## Bloqueios
+- nenhum
