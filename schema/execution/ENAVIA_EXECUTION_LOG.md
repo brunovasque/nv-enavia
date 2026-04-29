@@ -4,6 +4,31 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR0 — Docs-only — Loop obrigatório de execução por PR
+
+- **Branch:** `claude/pr0-docs-loop-obrigatorio`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` (criado nesta PR)
+- **Escopo:** Docs-only. Sem alteração em Worker, Panel, Executor, Deploy Worker, workflows, JS/TS/JSX/TSX.
+- **Alterações:**
+  1. `CLAUDE.md` — adicionada seção `## Loop obrigatório de execução por PR` (seção 4, 17 passos + regras de bloqueio); referência fixa ao contrato `PR1–PR7` removida; orientação para localizar contrato ativo em `schema/contracts/active/`; seções renumeradas 4→5, 5→6, 6→7, 7→8, 8→9; `schema/contracts/INDEX.md` adicionado à estrutura obrigatória.
+  2. `schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — criado. Novo contrato ativo PR17–PR30.
+  3. `schema/contracts/INDEX.md` — criado. Índice central de todos os contratos.
+  4. Governança: status, handoff, execution log atualizados.
+- **Histórico de contratos:**
+  - PR1–PR7: `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` — Encerrado ✅
+  - PR8–PR16: `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` (+ fixes PR14–PR16) — Encerrado ✅
+  - Novo: `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — Ativo 🟢
+- **Smoke tests:**
+  - `git diff --name-only` — confirma Docs-only ✅
+  - `CLAUDE.md` contém `Loop obrigatório de execução por PR` ✅
+  - `CLAUDE.md` não fixa mais `PR1–PR7` como contrato ativo exclusivo ✅
+  - Status, handoff, execution log e INDEX.md atualizados ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa autorizada:** PR17 — PR-DIAG — Diagnóstico do estado atual do loop de skills.
+
+---
+
 ## 2026-04-29 — PR16 — Fix: execute-next inicia task queued antes de delegar execução
 
 - **Branch:** `claude/pr16-fix-execute-next-starttask`

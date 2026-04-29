@@ -1,10 +1,32 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/fix-nv-enavia-payload`
-**Última tarefa:** Correção cirúrgica Worker-only — o `_deployPayload` enviado por `callDeployBridge(...)/apply-test` agora inclui `patch: { type: "contract_action", content: JSON.stringify(nextAction) }`, reutilizando o mesmo shape já montado para `_proposePayload`. Isso fecha o novo bloqueio real em TEST onde o Deploy Worker devolvia HTTP 400 com `patch.content obrigatório` (após a PR174 já ter corrigido `target.workerId`).
+**Branch ativa:** `claude/pr0-docs-loop-obrigatorio`
+**Última tarefa:** PR0 — Docs-only — Loop obrigatório de execução por PR. `CLAUDE.md` atualizado com seção `Loop obrigatório de execução por PR` (17 passos + regras de bloqueio); referência fixa ao contrato PR1–PR7 removida; novo contrato ativo `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` criado; `schema/contracts/INDEX.md` criado. Sem alteração em runtime.
 
-## Decisões formalizadas nesta sessão
+## Contrato ativo
+
+`schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` 🟢
+
+## Histórico de contratos
+
+| Contrato | PRs | Estado |
+|----------|-----|--------|
+| `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
+| `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
+| `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+
+## Decisões formalizadas em PR0
+
+- `CLAUDE.md` seção `## 4. Loop obrigatório de execução por PR` adicionada com 17 passos e regras de bloqueio explícitas.
+- Referência fixa ao `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` como contrato ativo exclusivo removida.
+- Agente orientado a identificar contrato ativo via `schema/contracts/INDEX.md`.
+- `schema/contracts/INDEX.md` criado como índice central.
+- `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` criado como novo contrato ativo.
+- Próxima PR autorizada pelo novo contrato: **PR17** (PR-DIAG).
+- Escopo Docs-only: nenhum arquivo de runtime alterado.
+
+## Decisões formalizadas em sessão anterior (PR15/PR16 fixes)
 - `handleExecuteNext` → step C (`_deployPayload`) agora inclui `patch: { type: "contract_action", content: JSON.stringify(nextAction) }`.
 - O patch reutiliza exatamente o mesmo shape e fonte de verdade do `_proposePayload` — sem duplicação de lógica, sem patch inventado.
 - `tests/pr14-executor-deploy-real-loop.smoke.test.js` ampliado com 3 novos asserts em C5 e E1 validando:
