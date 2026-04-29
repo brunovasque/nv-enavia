@@ -12,6 +12,7 @@ import {
   handleCloseFinalContract,
   // PR6 — loop supervisionado
   resolveNextAction,
+  buildExecutionHandoff,
   rehydrateContract,
   readExecEvent,
   // Macro2-F5 — Functional logs
@@ -4838,6 +4839,86 @@ function buildOperationalAction(nextAction, contractId) {
   };
 }
 
+function normalizeTargetWorkers(workers) {
+  if (!Array.isArray(workers)) return [];
+  return [...new Set(
+    workers
+      .filter((worker) => typeof worker === "string" && worker.trim())
+      .map((worker) => worker.trim())
+  )];
+}
+
+function resolveAuditTargetWorker(state, decomposition, nextAction) {
+  const sources = [];
+  const register = (source, workers) => {
+    const normalized = normalizeTargetWorkers(workers);
+    if (normalized.length > 0) {
+      sources.push({ source, workers: normalized });
+    }
+  };
+
+  register(
+    "state.current_execution.handoff_used.scope.workers",
+    state?.current_execution?.handoff_used?.scope?.workers
+  );
+
+  const targetMpr = nextAction?.micro_pr_candidate_id
+    ? (decomposition?.micro_pr_candidates || []).find(
+        (mpr) => mpr && mpr.id === nextAction.micro_pr_candidate_id
+      )
+    : null;
+  register(
+    "nextAction.micro_pr_candidate.target_workers",
+    targetMpr?.target_workers
+  );
+
+  const executionHandoff = buildExecutionHandoff(state, decomposition);
+  register(
+    "buildExecutionHandoff(...).scope.workers",
+    executionHandoff?.scope?.workers
+  );
+
+  register("state.scope.workers", state?.scope?.workers);
+
+  const uniqueWorkers = [...new Set(sources.flatMap((entry) => entry.workers))];
+
+  if (uniqueWorkers.length === 1) {
+    const workerId = uniqueWorkers[0];
+    const source = sources.find((entry) => entry.workers.includes(workerId))?.source || null;
+    return {
+      ok: true,
+      workerId,
+      source,
+      candidates: uniqueWorkers,
+    };
+  }
+
+  if (uniqueWorkers.length === 0) {
+    return {
+      ok: false,
+      workerId: null,
+      source: null,
+      candidates: [],
+      reason: "target worker ausente para auditoria segura",
+    };
+  }
+
+  return {
+    ok: false,
+    workerId: null,
+    source: null,
+    candidates: uniqueWorkers,
+    reason: `target worker ambíguo para auditoria segura: ${uniqueWorkers.join(", ")}`,
+  };
+}
+
+function buildExecutorTargetPayload(workerId) {
+  return {
+    workerId,
+    target: { system: "cloudflare_worker", workerId },
+  };
+}
+
 // ============================================================================
 // PR6 — GET /contracts/loop-status (handler canônico, Worker-only)
 //
@@ -5548,14 +5629,36 @@ async function handleExecuteNext(request, env) {
     });
   }
 
+  const auditTargetResolution =
+    operationalAction.type === "execute_next" || operationalAction.type === "approve"
+      ? resolveAuditTargetWorker(state, decomposition, nextAction)
+      : null;
+
   // 6. execute_next — PR14: Executor audit + propose + Deploy Bridge antes do handler interno.
   // Sem timeout local artificial: o handler pode persistir KV e não há
   // cancelamento real. Timeout local seria inseguro porque a resposta poderia
   // voltar "bloqueada" enquanto a mutação continuaria em background.
   if (operationalAction.type === "execute_next") {
+    if (!auditTargetResolution?.ok) {
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: auditTargetResolution?.reason || "target worker ausente para auditoria segura",
+        executor_audit: null, executor_propose: null,
+        executor_status: "blocked", executor_route: null,
+        executor_block_reason: auditTargetResolution?.reason || "target worker ausente para auditoria segura",
+        deploy_result: null, deploy_status: "not_reached", deploy_route: null,
+        deploy_block_reason: "Audit não foi chamado porque o alvo da auditoria não é confiável.",
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
+      });
+    }
+
     // PR14 — Step A: Executor /audit (obrigatório antes de executar)
     const _auditPayload = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
+      ...buildExecutorTargetPayload(auditTargetResolution.workerId),
+      context: { require_live_read: true },
       contract_id: contractId, nextAction, operationalAction,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
@@ -5581,7 +5684,7 @@ async function handleExecuteNext(request, env) {
     // PR14 — Step B: Executor /propose (apenas execute_next)
     const _proposePayload = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "propose",
-      workerId: "nv-enavia",
+      ...buildExecutorTargetPayload(auditTargetResolution.workerId),
       patch: { type: "contract_action", content: JSON.stringify(nextAction) },
       prompt: `Proposta supervisionada para ação contratual: ${operationalAction.type}`,
       intent: "propose",
@@ -5716,9 +5819,26 @@ async function handleExecuteNext(request, env) {
       }, 400);
     }
 
+    if (!auditTargetResolution?.ok) {
+      return jsonResponse({
+        ok: false, executed: false, status: "blocked",
+        reason: auditTargetResolution?.reason || "target worker ausente para auditoria segura",
+        executor_audit: null, executor_propose: null,
+        executor_status: "blocked", executor_route: null,
+        executor_block_reason: auditTargetResolution?.reason || "target worker ausente para auditoria segura",
+        deploy_result: null, deploy_status: "not_applicable", deploy_route: null,
+        deploy_block_reason: "Approve não usa deploy direto.",
+        nextAction, operationalAction,
+        evidence: evidenceReport, rollback: rollbackBlocked,
+        executor_path: executorPathInfo, audit_id: auditId,
+      });
+    }
+
     // PR14 — Step A: Executor /audit (obrigatório para approve também)
     const _auditPayloadApprove = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
+      ...buildExecutorTargetPayload(auditTargetResolution.workerId),
+      context: { require_live_read: true },
       contract_id: contractId, nextAction, operationalAction,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by,

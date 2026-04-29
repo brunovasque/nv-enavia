@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/nv-enavia-register-audit-receipt`
-**Última tarefa:** Correção cirúrgica — `nv-enavia.js` agora registra um recibo de audit aprovado no `DEPLOY_WORKER` via `POST /audit` antes de chamar `POST /apply-test` no fluxo `POST /contracts/execute-next`. O payload de deploy passou a carregar `execution_id` consistente com `audit_id`; o bridge só segue para `/apply-test` quando o recibo é aceito; e `deploy_route`/`deploy_result.audit_receipt` agora refletem a etapa real atingida. Smoke tests do PR14 ampliados para validar ordem `audit → propose → deploy:/audit → deploy:/apply-test`, bloqueio quando o recibo falha e JSON inválido apenas em `/apply-test`.
+**Branch ativa:** `copilot/investigate-risk-level-audit`
+**Última tarefa:** Correção cirúrgica — `nv-enavia.js` agora resolve o `workerId` do Executor `/audit` a partir do contrato/execução atual, sem hardcode. O fluxo `POST /contracts/execute-next` passou a bloquear com `target worker ausente para auditoria segura` quando não existe alvo confiável, envia `workerId` + `target.workerId` + `context.require_live_read:true` no `/audit`, reutiliza o mesmo alvo dinâmico no `/propose`, e consolidou um helper local para montar o bloco `{ workerId, target }` sem duplicação. Smoke tests PR14 ampliados para cobrir bloqueio sem target, consistência do target dinâmico em `execute_next` e `approve`, e leitura segura dos payloads de teste.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)

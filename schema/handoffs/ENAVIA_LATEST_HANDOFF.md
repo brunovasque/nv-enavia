@@ -1,8 +1,8 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — Registrar recibo de audit aprovado no Deploy Worker antes do `/apply-test`
-**Para:** Validar o loop operacional em TEST com `DEPLOY_WORKER` real após o recibo obrigatório
+**De:** FIX — Resolver target worker dinâmico para o Executor `/audit`
+**Para:** Validar em TEST que o `risk_level` do `/audit` deixa de depender de payload pobre e passa a refletir o alvo real do contrato
 
 ## O que foi feito nesta sessão
 
@@ -14,43 +14,45 @@ O fluxo `POST /contracts/execute-next` mantido em `nv-enavia.js` continua com a 
 AUDIT → PROPOSE → APPLY TEST → DEPLOY TEST → APPROVE → PROMOTE
 ```
 
-Sem trocar essa ordem, o `callDeployBridge(...)` agora registra primeiro um recibo de audit aprovado em:
-
-```txt
-POST https://deploy-worker.internal/audit
-```
-
-E só depois chama:
-
-```txt
-POST https://deploy-worker.internal/apply-test
-```
+Sem trocar essa ordem, o payload do Executor `/audit` agora usa o target real do contrato/execução em vez de assumir `workerId: "nv-enavia"`.
 
 **Detalhes do patch:**
-- `execution_id` do bridge de deploy agora é preenchido a partir do `audit_id` do `execute-next`, para casar o recibo com o gate do Deploy Worker.
-- O recibo envia `audit: { ok: true, verdict: "approve", risk_level }` e preserva `executor_audit` no payload para rastreabilidade.
-- Se `DEPLOY_WORKER /audit` falhar, o fluxo bloqueia antes do `/apply-test`.
-- `deploy_route` passou a refletir a rota real atingida (`/audit` ou `/apply-test`).
-- `deploy_result.audit_receipt` foi adicionado de forma aditiva para depuração/auditoria.
+- `resolveAuditTargetWorker(...)` consolida a fonte canônica do alvo em ordem segura:
+  1. `state.current_execution.handoff_used.scope.workers`
+  2. `nextAction.micro_pr_candidate.target_workers`
+  3. `buildExecutionHandoff(...).scope.workers`
+  4. `state.scope.workers`
+- Se existir exatamente 1 alvo confiável, `handleExecuteNext` envia no `/audit`:
+  - `workerId`
+  - `target: { system: "cloudflare_worker", workerId }`
+  - `context: { require_live_read: true }`
+- O `/propose` reaproveita o mesmo `workerId` resolvido.
+- `buildExecutorTargetPayload(workerId)` centraliza a montagem do bloco `{ workerId, target }` para `/audit`, `/propose` e `approve`.
+- Se não existir alvo confiável, o Worker bloqueia antes de chamar o Executor com:
+  - `status: "blocked"`
+  - `reason: "target worker ausente para auditoria segura"`
+- Se houver múltiplos alvos conflitantes, o Worker também bloqueia sem assumir alvo artificial.
 
 **Garantias do patch:**
 - A ordem canônica **não mudou**.
-- `/apply-test` continua bloqueado quando faltar o recibo de audit.
-- O handler interno KV continua rodando apenas depois de audit, propose e deploy seguro passarem.
+- `validateExecutorAuditForReceipt` continua intocado.
+- O Worker não baixa `risk_level` artificialmente.
+- O Executor só recebe `/audit` quando há alvo contratual confiável.
 - Escopo Worker-only: sem alteração em painel, executor externo, workflow do executor ou `wrangler.toml`.
 
 **Validações locais:**
 - `node --check nv-enavia.js` → OK ✅
+- `node --check contract-executor.js` → OK ✅
 - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
-- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **122 passed, 0 failed** ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **161 passed, 0 failed** ✅
 - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
 
 ## Próxima ação segura
 
-1. Rodar o fluxo real em TEST com `DEPLOY_WORKER`/`EXECUTOR` reais.
-2. Confirmar que o Deploy Worker recebe primeiro `POST /audit`.
-3. Confirmar que o `/apply-test` deixa de bloquear por ausência de `AUDIT:`.
-4. Se TEST passar, seguir sem alterar a ordem operacional.
+1. Rodar o loop real em TEST com contrato/micro-PR que tenha `target_workers` explícito.
+2. Capturar o payload real do `/audit` e confirmar `workerId === target.workerId`.
+3. Comparar o `risk_level` do `/audit` no mesmo Executor TEST antes/depois do enriquecimento do target.
+4. Se ainda vier `high`, analisar os `findings` do próprio Executor no alvo real em vez de relaxar o gate.
 
 ## Bloqueios
 

@@ -76,7 +76,16 @@ const STATE_START_TASK = JSON.stringify({
 const DECOMP_START_TASK = JSON.stringify({
   phases:              [{ id: "phase-alpha", status: "active", tasks: ["task-01"] }],
   tasks:               [{ id: "task-01", phase_id: "phase-alpha", status: "queued", depends_on: [] }],
-  micro_pr_candidates: [],
+  micro_pr_candidates: [
+    {
+      id: "micro-pr-01",
+      task_id: "task-01",
+      status: "queued",
+      environment: "TEST",
+      target_workers: ["nv-enavia"],
+      target_routes: ["/contracts/execute-next"],
+    },
+  ],
 });
 
 const kvExecuteNext = makeKV({
@@ -91,6 +100,13 @@ const STATE_AWAITING = JSON.stringify({
   status_global:  "in_progress",
   current_phase:  "phase-done",
   current_task:   null,
+  current_execution: {
+    handoff_used: {
+      scope: {
+        workers: ["nv-enavia"],
+      },
+    },
+  },
   phases:         [],
   blockers:       [],
   plan_rejection: null,
@@ -559,6 +575,41 @@ async function runTests() {
   console.log("C. Fluxo integrado execute_next\n");
 
   {
+    console.log("  C0. sem target worker confiável → bloqueia antes do Executor /audit");
+    const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
+    const deployMock = makeDeployMock();
+    const env = {
+      ...BASE_ENV,
+      ENAVIA_BRAIN: makeKV({
+        "contract:index": JSON.stringify(["ct-pr14-no-target"]),
+        "contract:ct-pr14-no-target:state": JSON.stringify({
+          contract_id: "ct-pr14-no-target",
+          status_global: "in_progress",
+          current_phase: "phase-alpha",
+          current_task: null,
+          phases: [],
+          blockers: [],
+          plan_rejection: null,
+          updated_at: "2026-04-28T00:00:00.000Z",
+        }),
+        "contract:ct-pr14-no-target:decomposition": JSON.stringify({
+          phases: [{ id: "phase-alpha", status: "active", tasks: ["task-01"] }],
+          tasks: [{ id: "task-01", phase_id: "phase-alpha", status: "queued", depends_on: [] }],
+          micro_pr_candidates: [],
+        }),
+      }),
+      EXECUTOR: execMock.binding,
+      DEPLOY_WORKER: deployMock.binding,
+    };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                         "  status: blocked");
+    ok(r.data?.reason === "target worker ausente para auditoria segura", "  reason explícita");
+    ok(execMock.calls.length === 0,                          "  Executor NÃO chamado");
+    ok(deployMock.calls.length === 0,                        "  Deploy Worker NÃO chamado");
+    console.log("");
+  }
+
+  {
     console.log("  C1. sem executor: executor_block_reason, deploy_status:not_reached");
     const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, envExecuteNextNoExecutor);
     ok(r.data?.status === "blocked",                  "  status: blocked");
@@ -754,6 +805,16 @@ async function runTests() {
     ok(deployMock.calls.some(c => c.pathname === "/__internal__/audit"), "  Deploy Worker recebeu recibo em /__internal__/audit");
     ok(deployMock.calls.some(c => c.pathname === "/apply-test"), "  Deploy Worker recebeu /apply-test");
     ok(r.data?.deploy_result?.audit_receipt?.ok === true,        "  deploy_result.audit_receipt.ok: true");
+    const auditCall = execMock.calls.find(c => c.pathname === "/audit");
+    const proposeCall = execMock.calls.find(c => c.pathname === "/propose");
+    ok(!!auditCall,                                              "  payload de /audit disponível");
+    ok(!!proposeCall,                                            "  payload de /propose disponível");
+    const auditPayload = JSON.parse(auditCall?.body || "{}");
+    const proposePayload = JSON.parse(proposeCall?.body || "{}");
+    ok(auditPayload.workerId === "nv-enavia",                     "  /audit usa workerId dinâmico do contrato");
+    ok(auditPayload.target?.workerId === auditPayload.workerId,   "  /audit envia target.workerId consistente");
+    ok(auditPayload.context?.require_live_read === true,          "  /audit exige live read");
+    ok(proposePayload.workerId === auditPayload.workerId,         "  /propose reutiliza a mesma fonte de verdade");
     console.log("");
   }
 
@@ -768,6 +829,11 @@ async function runTests() {
       { confirm: true, approved_by: "tester", evidence: [] }, env);
     ok(r.data?.executor_audit !== null && r.data?.executor_audit !== undefined, "  executor_audit presente");
     ok(execMock.calls.some(c => c.pathname === "/audit"),  "  /audit chamado");
+    const auditCall = execMock.calls.find(c => c.pathname === "/audit");
+    ok(!!auditCall,                                         "  payload de /audit disponível no approve");
+    const auditPayload = JSON.parse(auditCall?.body || "{}");
+    ok(auditPayload.workerId === "nv-enavia",              "  approve usa workerId dinâmico");
+    ok(auditPayload.target?.workerId === auditPayload.workerId, "  approve envia target.workerId consistente");
     console.log("");
   }
 
