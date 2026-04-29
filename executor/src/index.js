@@ -988,18 +988,43 @@ if (METHOD === "POST" && pathname === "/audit") {
         });
       }
 
+      // ============================================================
+      // PR15 — verdict/risk_level explícitos no envelope /audit
+      // O Worker (nv-enavia.js, callExecutorBridge) exige
+      // data.result.verdict ou data.audit.verdict. Sem isso, classifica
+      // como "Audit sem verdict explícito. Resposta ambígua bloqueada
+      // por segurança." Mantém o restante de execResult intacto.
+      // ============================================================
+      const auditVerdict =
+        execResult && execResult.ok === false ? "reject" : "approve";
+      const auditRiskLevel =
+        (riskReport &&
+          (riskReport.risk_level ||
+            riskReport.level ||
+            riskReport.risk)) ||
+        execResult?.risk_level ||
+        "low";
+
+      const baseResult =
+        execResult && typeof execResult === "object" ? execResult : {};
+      const resultWithVerdict = {
+        ...baseResult,
+        verdict: baseResult.verdict || auditVerdict,
+        risk_level: baseResult.risk_level || auditRiskLevel,
+        ...(canonicalMap ? { map: canonicalMap } : {}),
+      };
+
       return withCORS(
         jsonResponse({
           system: SYSTEM_NAME,
           executor: "core_v2",
           route: "/audit",
           received_action: action,
-          result: canonicalMap
-            ? {
-                ...execResult,
-                map: canonicalMap,
-              }
-            : execResult,
+          result: resultWithVerdict,
+          audit: {
+            verdict: resultWithVerdict.verdict,
+            risk_level: resultWithVerdict.risk_level,
+          },
           evidence,
           ...(pipeline ? { pipeline } : {}),
         }),

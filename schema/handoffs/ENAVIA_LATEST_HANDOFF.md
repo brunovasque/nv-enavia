@@ -1,8 +1,42 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-04-28
-**De:** PR14 — ajuste P1 na PR #162
-**Para:** Novo contrato (se necessário)
+**Data:** 2026-04-29
+**De:** PR15 — EXECUTOR-ONLY: contrato `/audit` com verdict explícito
+**Para:** Próxima rodada de smoke real TEST (Worker chamando Executor)
+
+## O que foi feito nesta sessão
+
+### PR15 — EXECUTOR-ONLY: `/audit` agora emite `verdict` e `risk_level`
+
+**Diagnóstico:**
+- Smoke real em TEST mostrou que `POST /contracts/execute-next` no `nv-enavia` chamava o binding `EXECUTOR`, o `/audit` respondia HTTP 200 com JSON válido, e mesmo assim o Worker bloqueava com:
+  `Audit sem verdict explícito. Resposta ambígua bloqueada por segurança.`
+- Causa: `nv-enavia.js` em `callExecutorBridge` (linha 5179) lê `data?.result?.verdict || data?.audit?.verdict`. O Executor nunca emitia esses campos no envelope `/audit`.
+
+**Patch cirúrgico em `executor/src/index.js` (handler `POST /audit`, único return final):**
+- Calcula `auditVerdict`: `"reject"` quando `execResult.ok === false`, senão `"approve"`.
+- Calcula `auditRiskLevel`: lê `riskReport.risk_level | level | risk`, senão `execResult.risk_level`, fallback `"low"`.
+- Injeta `verdict` e `risk_level` em `result` (preservando valores se já existirem) e espelha em um campo top-level `audit: { verdict, risk_level }` para compatibilidade total com ambos os ramos do contrato do Worker (`data.result.verdict` e `data.audit.verdict`).
+- Restante do envelope (`system`, `executor`, `route`, `received_action`, `evidence`, `pipeline`, `result.map` quando há `canonicalMap`) preservado integralmente.
+
+**Documentação:**
+- `executor/CONTRACT.md` — exemplo do `Response 200` de `/audit` atualizado com `result.verdict`, `result.risk_level` e bloco `audit`. Nota PR15 explicando o mapeamento.
+
+**Não tocado (escopo travado):**
+- `nv-enavia.js` (Worker) — intacto.
+- `panel/` — intacto.
+- `contract-executor.js` / Deploy Worker — intactos.
+- KV / wrangler / bindings — intactos.
+
+**Smoke tests:**
+- `node executor/tests/executor.contract.test.js` → 23/23 ✅
+- `node --check executor/src/index.js` → OK
+- Mocks do Worker em `tests/pr14-executor-deploy-real-loop.smoke.test.js` já assumem `result: { verdict: "approve", risk_level: "low" }`, confirmando o formato esperado.
+
+## Próxima ação segura
+- Deploy do Executor em TEST (`enavia-executor-test`) e re-rodar o smoke real:
+  `POST /contracts → GET /contracts/loop-status → POST /contracts/execute-next`. Esperado: `executor_status: "passed"` ao invés de `"ambiguous"`.
+- Se passar em TEST, considerar promoção do Executor para PROD em PR separada.
 
 ## O que foi feito nesta sessão
 
