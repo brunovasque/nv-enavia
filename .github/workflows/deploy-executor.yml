@@ -100,7 +100,10 @@ jobs:
           GIT_KV_ID: ${{ secrets.GIT_KV_ID }}
           GIT_KV_TEST_ID: ${{ secrets.GIT_KV_TEST_ID }}
         run: |
-          rm -f /tmp/kv_check_failures /tmp/kv_namespaces.json /tmp/wrangler_kv_list.err
+          cleanup() {
+            rm -f /tmp/kv_check_failures /tmp/kv_namespaces.json /tmp/wrangler_kv_list.err
+          }
+          trap cleanup EXIT
 
           set +e
           npx wrangler kv namespace list > /tmp/kv_namespaces.json 2> /tmp/wrangler_kv_list.err
@@ -119,7 +122,7 @@ jobs:
             echo "stderr:"
             cat /tmp/wrangler_kv_list.err
             echo "stdout preview:"
-            head -c 500 /tmp/kv_namespaces.json
+            head -n 20 /tmp/kv_namespaces.json
             exit 1
           fi
 
