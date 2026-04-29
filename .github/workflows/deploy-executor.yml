@@ -126,6 +126,14 @@ jobs:
             exit 1
           fi
 
+          # Diagnóstico: listar somente os títulos/nomes dos KV namespaces visíveis
+          # para o token/conta do GitHub Actions. NUNCA imprimir IDs nem secrets.
+          echo "KV namespaces visíveis nesta conta/token:"
+          jq -r '.[] | (.title // .name // empty)' /tmp/kv_namespaces.json \
+            | sort -u \
+            | sed 's/^/- /'
+          echo ""
+
           check_kv() {
             local secret_name="$1"
             local secret_value="$2"
