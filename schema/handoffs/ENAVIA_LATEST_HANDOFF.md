@@ -1,10 +1,70 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — Validação falso-positivo no deploy-executor
-**Para:** Deploy real em TEST (`enavia-executor-test`)
+**De:** FIX — Validação KV namespace IDs contra Cloudflare
+**Para:** Deploy real em TEST (`enavia-executor-test`) com diagnóstico claro de KV inválidos
 
 ## O que foi feito nesta sessão
+
+### FIX cirúrgico — `deploy-executor.yml` — etapa de validação KV contra Cloudflare
+
+**Problema:** Deploy falhava com:
+```
+KV namespace '***' is not valid. Please verify the namespace_id in your configuration. [code: 10042]
+```
+O GitHub mascarava o valor com `***`, tornando impossível saber qual dos 6 KV secrets/bindings estava inválido.
+
+**Correção aplicada (patch cirúrgico):**
+
+Nova etapa `Validate KV namespace IDs against Cloudflare` inserida **após** `Setup Node` e **antes** de qualquer `wrangler deploy`:
+
+```bash
+KV_LIST_JSON=$(npx wrangler kv namespace list 2>/dev/null)
+# check_kv() verifica se o ID está no JSON sem imprimir o valor
+# Falha com mensagem clara se algum for INVALID
+```
+
+**Output esperado no workflow:**
+```
+KV CHECK:
+  ENAVIA_BRAIN_KV_ID: OK  (binding: ENAVIA_BRAIN)
+  ENAVIA_BRAIN_TEST_KV_ID: OK  (binding: ENAVIA_BRAIN_TEST)
+  ENAVIA_GIT_KV_ID: INVALID  (binding: ENAVIA_GIT)
+  ENAVIA_GIT_TEST_KV_ID: OK  (binding: ENAVIA_GIT_TEST)
+  GIT_KV_ID: OK  (binding: GIT_KV)
+  GIT_KV_TEST_ID: OK  (binding: GIT_KV_TEST)
+
+FALHA: Um ou mais KV namespace IDs são inválidos na conta Cloudflare.
+Corrija os secrets antes de fazer o deploy.
+```
+
+**Arquivo alterado:**
+- `.github/workflows/deploy-executor.yml` — somente nova etapa adicionada
+
+**Não tocado:**
+- `nv-enavia.js` — intacto
+- `executor/src/index.js` — intacto
+- `panel/` — intacto
+- `wrangler.toml` / `wrangler.executor.template.toml` — intactos
+- KV / bindings / secrets — intactos
+
+**Evidência:**
+- Validação YAML → **YAML válido** ✅
+
+## Próxima ação segura
+
+1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
+2. Observar o output da etapa `Validate KV namespace IDs against Cloudflare`.
+3. O binding que aparecer como `INVALID` é o que precisa ter o secret corrigido no GitHub.
+4. Após corrigir o(s) secret(s) inválido(s), re-rodar o workflow.
+
+## Bloqueios
+
+- nenhum
+
+---
+
+## Histórico anterior: FIX — Validação falso-positivo no deploy-executor (comentários)
 
 ### FIX cirúrgico — `deploy-executor.yml` validação de comentários
 
@@ -34,16 +94,6 @@ Filtra linhas comentadas antes de buscar placeholders.
 - Grep antigo → "FALSO POSITIVO detectado" ✅ (confirma o bug)
 - Grep novo → "OK: nenhum placeholder fora de comentários" ✅ (confirma a correção)
 - Validação YAML → **YAML válido** ✅
-
-## Próxima ação segura
-
-1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
-2. Verificar smoke: `POST https://enavia-executor-test.brunovasque.workers.dev/audit` → `result.verdict` + `audit.verdict` presentes.
-3. Se TEST OK, rodar `target_env=prod`.
-
-## Bloqueios
-
-- nenhum
 
 ---
 

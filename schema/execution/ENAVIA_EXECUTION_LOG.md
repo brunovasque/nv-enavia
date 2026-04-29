@@ -4,6 +4,22 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — Validação KV namespace IDs contra Cloudflare (deploy-executor.yml)
+
+- **Branch:** `copilot/fix-kv-secret-validation`
+- **Escopo:** Apenas `.github/workflows/deploy-executor.yml`. Nenhuma alteração em `nv-enavia.js`, `executor/src/index.js`, `panel/`, `wrangler.toml`, KV runtime.
+- **Problema:** Deploy falhava com `KV namespace '***' is not valid [code: 10042]`. O GitHub mascarava o valor com `***`, impossibilitando diagnóstico. Não era possível saber qual dos 6 KV secrets estava inválido.
+- **Correção:** Nova etapa `Validate KV namespace IDs against Cloudflare` adicionada após `Setup Node` e antes de qualquer `wrangler deploy`. A etapa:
+  1. Chama `npx wrangler kv namespace list` (requer `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`).
+  2. Para cada um dos 6 secrets/bindings, verifica se o ID aparece no JSON retornado.
+  3. Imprime `OK` ou `INVALID` sem imprimir o valor do secret.
+  4. Se algum for INVALID, falha antes do deploy com mensagem clara.
+- **Validação YAML:** `python3 yaml.safe_load(...)` → **YAML válido** ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** rodar workflow `Deploy enavia-executor` com `target_env=test`. O output do novo step mostrará exatamente qual(is) KV ID(s) está(ão) inválido(s).
+
+---
+
 ## 2026-04-29 — FIX — Validação falso-positivo no deploy-executor (comentários)
 
 - **Branch:** `copilot/fix-validate-generated-config`

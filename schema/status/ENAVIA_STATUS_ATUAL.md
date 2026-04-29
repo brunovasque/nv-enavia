@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
 **Data:** 2026-04-29
-**Branch ativa:** `copilot/fix-validate-generated-config`
-**Última tarefa:** FIX cirúrgico — validação falso-positivo no `deploy-executor.yml`. O passo "Validate generated config" usava `grep -q "REPLACE_WITH_REAL_"` que disparava em linhas comentadas. Corrigido para ignorar comentários com `grep -v '^[[:space:]]*#'`. YAML validado. Sem alteração em nv-enavia.js, executor, painel ou KV.
+**Branch ativa:** `copilot/fix-kv-secret-validation`
+**Última tarefa:** FIX cirúrgico — validação KV namespace IDs contra Cloudflare no `deploy-executor.yml`. Nova etapa `Validate KV namespace IDs against Cloudflare` adicionada após `Setup Node`. Chama `npx wrangler kv namespace list`, verifica cada um dos 6 KV secrets/bindings, imprime `OK` ou `INVALID` sem expor valores, e falha antes do deploy se algum for inválido. YAML validado. Sem alteração em `nv-enavia.js`, `executor/src/index.js`, painel ou KV runtime.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)
