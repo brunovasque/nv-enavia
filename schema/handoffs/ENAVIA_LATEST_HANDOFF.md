@@ -1,8 +1,70 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — incluir `patch.content` no payload do Deploy Worker `/apply-test`
-**Para:** Revalidar o loop real em TEST e confirmar que o `/apply-test` não retorna mais HTTP 400 por `patch.content obrigatório`
+**De:** PR16 — Fix: execute-next inicia task queued antes de delegar execução
+**Para:** Revalidar o loop real em TEST e confirmar que `/contracts/execute-next` não retorna mais HTTP 409 `TASK_NOT_IN_PROGRESS`
+
+## O que foi feito nesta sessão
+
+### Patch cirúrgico — `nv-enavia.js` + `tests/pr14-executor-deploy-real-loop.smoke.test.js`
+
+**Problema:** `POST /contracts/execute-next` retornava HTTP 409 `TASK_NOT_IN_PROGRESS` porque a task ficava em status `queued` e o handler interno (`executeCurrentMicroPr`) exige `in_progress` no Gate 2.
+
+**Correção (3 pontos cirúrgicos em `nv-enavia.js`):**
+
+1. **Import:** `startTask` adicionado ao import de `contract-executor.js`.
+
+2. **`handleGetLoopStatus`** — `availableActions` para `start_task`/`start_micro_pr`:
+   ```js
+   // Antes:
+   availableActions = ["POST /contracts/execute"];
+   // Depois:
+   availableActions = ["POST /contracts/execute-next"];
+   ```
+
+3. **`handleExecuteNext`** — Step D0 inserido após deploy simulate OK, antes do synthetic request:
+   ```js
+   if (nextAction.type === "start_task" && nextAction.task_id) {
+     let startResult;
+     try {
+       startResult = await startTask(env, contractId, nextAction.task_id);
+     } catch (err) {
+       startResult = { ok: false, error: "START_TASK_ERROR", message: String(err) };
+     }
+     if (!startResult.ok) { return jsonResponse({ status: "blocked", ... }); }
+   }
+   ```
+
+**Garantias do patch:**
+- Ordem canônica preservada: audit → propose → deploy simulate → startTask → handleExecuteContract.
+- Gates de high/critical continuam bloqueando antes do startTask (bloqueia no deploy simulate).
+- Escopo Worker-only. Executor, Panel, Deploy Worker e `contract-executor.js` não alterados.
+- Gates de audit/propose/deploy não relaxados.
+
+**Testes novos (seção F):**
+- F1: task queued + tudo ok → startTask chamado (kv.writes > 0), NÃO retorna TASK_NOT_IN_PROGRESS.
+- F2: KV.put erro → blocked com reason claro.
+- F3: loop-status → `availableActions` contém `POST /contracts/execute-next`, não contém o antigo `POST /contracts/execute`.
+
+**Validações:**
+- `node --check nv-enavia.js` → OK ✅
+- `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **183 passed, 0 failed** ✅
+- `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+
+## Próxima ação segura
+
+1. Rodar fluxo real `POST /contracts/execute-next` em TEST com `DEPLOY_WORKER` real e contrato novo (ex: `ctr_smoke_pr175_20260429`).
+2. Confirmar que task transiciona `queued` → `in_progress` e que não há mais HTTP 409.
+3. Se ainda surgir bloqueio, diagnosticar próximo campo obrigatório faltante sem tocar Panel/Executor.
+
+## Bloqueios
+
+- nenhum
+
+---
+
+
 
 ## O que foi feito nesta sessão
 

@@ -4,6 +4,33 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR16 — Fix: execute-next inicia task queued antes de delegar execução
+
+- **Branch:** `claude/pr16-fix-execute-next-starttask`
+- **Escopo:** Worker-only (`nv-enavia.js` + `tests/pr14-executor-deploy-real-loop.smoke.test.js`). Sem alteração em Executor, Panel, Deploy Worker externo, gates, contract-executor.js ou bindings.
+- **Problema diagnosticado (READ-ONLY):** `POST /contracts/execute-next` retornava HTTP 409 `TASK_NOT_IN_PROGRESS` porque `resolveNextAction` retorna `start_task` para tasks em status `queued`, mas o fluxo não chamava `startTask` antes de delegar ao `handleExecuteContract`. O gate 2 de `executeCurrentMicroPr` exige `task.status === "in_progress"` e bloqueava. Adicionalmente, `handleGetLoopStatus` mostrava `availableActions: ["POST /contracts/execute"]` em vez do endpoint supervisionado canônico.
+- **Correção cirúrgica (3 pontos):**
+  1. `nv-enavia.js` — import de `startTask` de `contract-executor.js` adicionado.
+  2. `nv-enavia.js` (`handleGetLoopStatus`): `availableActions` de `start_task`/`start_micro_pr` atualizado para `["POST /contracts/execute-next"]`.
+  3. `nv-enavia.js` (`handleExecuteNext`, step D0): bloco inserido após `deploy simulate` OK e antes de `syntheticReq`. Se `nextAction.type === "start_task"` e `nextAction.task_id`, chama `startTask(env, contractId, nextAction.task_id)` com try/catch. Falha bloqueia com reason claro; sucesso segue para handler interno.
+- **Testes novos (seção F):**
+  - F1: task queued + tudo ok → startTask chamado, KV tem writes, NÃO retorna TASK_NOT_IN_PROGRESS.
+  - F2: KV.put falha → startTask bloqueado, retorna blocked com reason.
+  - F3: loop-status start_task → availableActions contém POST /contracts/execute-next, não contém POST /contracts/execute.
+- **Testes executados:**
+  - `node --check nv-enavia.js` → OK ✅
+  - `node --check tests/pr14-executor-deploy-real-loop.smoke.test.js` → OK ✅
+  - `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **183 passed, 0 failed** ✅
+  - `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅
+- **Arquivos alterados:**
+  - `nv-enavia.js`
+  - `tests/pr14-executor-deploy-real-loop.smoke.test.js`
+  - `schema/status/ENAVIA_STATUS_ATUAL.md`
+  - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+  - `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+---
+
 ## 2026-04-29 — FIX — incluir `patch.content` no payload do Deploy Worker `/apply-test`
 
 - **Branch:** `copilot/fix-nv-enavia-payload`

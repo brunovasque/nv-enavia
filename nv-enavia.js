@@ -12,6 +12,8 @@ import {
   handleCloseFinalContract,
   // PR6 — loop supervisionado
   resolveNextAction,
+  // PR16 — startTask (transiciona task queued → in_progress antes da execução)
+  startTask,
   buildExecutionHandoff,
   rehydrateContract,
   readExecEvent,
@@ -5025,7 +5027,7 @@ async function handleGetLoopStatus(env) {
 
     if (isReady) {
       if (nextAction.type === "start_task" || nextAction.type === "start_micro_pr") {
-        availableActions = ["POST /contracts/execute"];
+        availableActions = ["POST /contracts/execute-next"];
       } else if (nextAction.type === "phase_complete") {
         // complete-task e execute exigem task in_progress — falhariam aqui deterministicamente.
         // Não há endpoint de avanço de fase disponível; documentar em guidance.
@@ -5738,6 +5740,34 @@ async function handleExecuteNext(request, env) {
         evidence: evidenceReport, rollback: rollbackBlocked,
         executor_path: executorPathInfo, audit_id: auditId,
       });
+    }
+
+    // PR16 — Step D0: Iniciar task queued antes de delegar execução.
+    // resolveNextAction retorna "start_task" quando a task está queued.
+    // handleExecuteContract → executeCurrentMicroPr exige task.status === "in_progress" (Gate 2).
+    // startTask transiciona queued → in_progress e persiste no KV.
+    if (nextAction.type === "start_task" && nextAction.task_id) {
+      let startResult;
+      try {
+        startResult = await startTask(env, contractId, nextAction.task_id);
+      } catch (err) {
+        logNV("🔴 [POST /contracts/execute-next] Falha ao chamar startTask", { error: String(err) });
+        startResult = { ok: false, error: "START_TASK_ERROR", message: String(err) };
+      }
+      if (!startResult.ok) {
+        return jsonResponse({
+          ok: false, executed: false, status: "blocked",
+          reason: `Falha ao iniciar task "${nextAction.task_id}": ${startResult.message || startResult.error}`,
+          executor_audit: executorAuditResult, executor_propose: executorProposeResult,
+          executor_status: "passed", executor_route: "/propose",
+          executor_block_reason: null,
+          deploy_result: deployResult, deploy_status: deployResult.status,
+          deploy_route: deployResult.route || null, deploy_block_reason: null,
+          nextAction, operationalAction,
+          evidence: evidenceReport, rollback: rollbackBlocked,
+          executor_path: executorPathInfo, audit_id: auditId,
+        });
+      }
     }
 
     // PR14 — Step D: Após audit + propose + deploy seguro, delegar ao handler interno

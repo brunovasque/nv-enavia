@@ -964,6 +964,86 @@ async function runTests() {
     console.log("");
   }
 
+  // ── F. PR16 — startTask antes de handleExecuteContract ───────────────────
+  //
+  //   F1. task queued com tudo ok: startTask chamado, handler interno chamado,
+  //       NÃO retorna TASK_NOT_IN_PROGRESS.
+  //   F2. startTask falha (KV.put erro): retorna blocked com reason claro.
+  //   F3. loop-status com start_task → availableActions contém execute-next.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  console.log("F. PR16 — startTask antes de handleExecuteContract\n");
+
+  {
+    console.log("  F1. task queued + tudo ok: startTask chamado, handler interno chamado, sem TASK_NOT_IN_PROGRESS");
+    // Após startTask, a task fica in_progress → executeCurrentMicroPr passa o Gate 2.
+    // O handler interno pode bloquear por NO_VALID_HANDOFF (task sem description),
+    // mas o ponto crítico é que NÃO deve retornar TASK_NOT_IN_PROGRESS.
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.execution_result?.error !== "TASK_NOT_IN_PROGRESS",  "  NÃO retorna TASK_NOT_IN_PROGRESS");
+    // startTask persiste no KV → deve haver writes após a chamada
+    ok(kv.writes.length > 0,                                        "  KV tem writes (startTask persistiu)");
+    // Os bridges continuam sendo chamados
+    ok(execMock.calls.some(c => c.pathname === "/audit"),            "  audit chamado");
+    ok(execMock.calls.some(c => c.pathname === "/propose"),          "  propose chamado");
+    ok(deployMock.calls.some(c => c.pathname === "/apply-test"),     "  /apply-test chamado");
+    console.log("");
+  }
+
+  {
+    console.log("  F2. startTask falha (KV.put erro): retorna blocked com reason claro");
+    // KV que falha no put simula falha de persistência durante startTask.
+    const kvPutFails = {
+      writes: [],
+      get: async (key) => {
+        const db = {
+          "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+          "contract:ct-pr14-001:state":         STATE_START_TASK,
+          "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+        };
+        return db[key] ?? null;
+      },
+      put: async () => { throw new Error("KV put error simulado"); },
+      list: async () => ({ keys: [] }),
+    };
+    const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
+    const deployMock = makeDeployMock();
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kvPutFails, EXECUTOR: execMock.binding, DEPLOY_WORKER: deployMock.binding };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                                 "  status: blocked");
+    ok(r.data?.executed === false,                                   "  executed: false");
+    ok(typeof r.data?.reason === "string" && r.data.reason.length > 0, "  reason presente e não vazio");
+    // Bridges ainda foram chamados antes do startTask
+    ok(execMock.calls.some(c => c.pathname === "/audit"),            "  audit chamado antes do startTask");
+    ok(execMock.calls.some(c => c.pathname === "/propose"),          "  propose chamado antes do startTask");
+    console.log("");
+  }
+
+  {
+    console.log("  F3. loop-status com start_task → availableActions contém POST /contracts/execute-next");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const env = { ...BASE_ENV, ENAVIA_BRAIN: kv };
+    const r = await callWorker("GET", "/contracts/loop-status", undefined, env);
+    ok(r.status === 200,                                                        "  HTTP 200");
+    ok(r.data?.nextAction?.type === "start_task",                               "  nextAction.type: start_task");
+    ok(Array.isArray(r.data?.loop?.availableActions),                           "  availableActions é array");
+    ok(r.data?.loop?.availableActions?.includes("POST /contracts/execute-next"), "  availableActions contém POST /contracts/execute-next");
+    ok(!r.data?.loop?.availableActions?.includes("POST /contracts/execute"),    "  availableActions NÃO contém POST /contracts/execute (deprecated)");
+    console.log("");
+  }
+
   // ── Resultado ─────────────────────────────────────────────────────────────
 
   console.log(`\n=== Resultado: ${passed} passed, ${failed} failed ===\n`);
