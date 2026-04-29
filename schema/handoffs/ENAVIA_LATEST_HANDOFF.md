@@ -1,52 +1,45 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** FIX — Portar resolução canônica de credenciais Cloudflare para o Executor operacional deste repo
-**Para:** Publicar em TEST e validar live-read real no runtime `enavia-executor-test`
+**De:** FIX — bootstrap do snapshot canônico do Executor no KV após deploy TEST
+**Para:** Rodar `Deploy enavia-executor` em TEST e confirmar bootstrap + self-audit sem finding crítico de snapshot ausente
 
 ## O que foi feito nesta sessão
 
-### Patch cirúrgico — `executor/src/index.js` + helper novo + smoke de deploy
+### Patch cirúrgico — `executor/src/index.js` + `.github/workflows/deploy-executor.yml`
 
-O fluxo operacional do Worker `nv-enavia` continua chamando o Executor com live-read, mas o runtime governado por este repo agora resolve credenciais Cloudflare de forma canônica:
+O fluxo operacional do Worker `nv-enavia` continua chamando o Executor com live-read, mas o runtime governado por este repo agora também passa a nascer com snapshot bootstrapado no KV TEST logo após o deploy:
 
 **Detalhes do patch:**
-- Novo helper `executor/src/cloudflare-credentials.mjs`:
-  - `resolveCloudflareCredentials(env)`
-  - `getCloudflareCredentialPresence(env)`
-  - `createCloudflareCredentialsError(env, message)`
-- Aliases aceitos:
-  - account: `CF_ACCOUNT_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT`, `CLOUDFLARE_ACCOUNT`
-  - token: `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_TOKEN`
-- `/audit` e `/propose` agora usam o mesmo resolver canônico antes de qualquer live read.
-- Leituras internas de snapshot/script list (`fetchCurrentWorkerSnapshot` callers e `listCloudflareWorkerScripts`) também foram alinhadas ao mesmo helper.
-- Quando credenciais faltam, o runtime retorna apenas booleans `has_*`; nenhum valor real é exposto.
-- O caminho `engineer` também propaga apenas diagnóstico seguro quando o live read falha por credenciais ausentes.
-- `.github/workflows/deploy-executor.yml` agora:
-  - roda o teste focado do helper;
-  - faz smoke `POST /audit` com `workerId`, `target.workerId` e `context.require_live_read:true`;
-  - falha se não houver `snapshot_fingerprint`;
-  - falha se a resposta mencionar credenciais ausentes.
+- `saveVersion(...)` em `executor/src/index.js` agora também grava `git:code:latest` junto do snapshot canônico (`git:latest` + `git:code:<id>`), preservando compatibilidade com lookup legado do self-audit.
+- `.github/workflows/deploy-executor.yml` agora, em `target_env=test`:
+  - faz o deploy do runtime `enavia-executor-test`;
+  - monta um payload com `executor/src/index.js`;
+  - chama `POST /apply-patch` no runtime recém-publicado com `auto_deploy:false`;
+  - falha se o bootstrap não devolver `meta.id` e `code_length` válidos;
+  - só depois roda o smoke `POST /audit` com `context.require_live_read:true`.
 
 **Garantias do patch:**
 - Escopo Executor-only + workflow do executor. `nv-enavia.js`, painel e Deploy Worker não foram alterados.
 - Nenhum gate de `risk_level` foi relaxado.
-- Nenhum valor de secret é retornado no diagnóstico.
-- O smoke pós-deploy cobre o mesmo ramo de live read que quebrou em produção TEST.
+- Nenhum valor de secret é retornado no workflow.
+- O bootstrap reutiliza o caminho nativo `/apply-patch` do próprio Executor em vez de escrever KV “por fora”.
+- O smoke pós-bootstrap cobre o mesmo ramo de live read que estava bloqueando por snapshot ausente.
 
 **Validações locais:**
 - `node --check executor/src/index.js` → OK ✅
-- `node --check executor/src/cloudflare-credentials.mjs` → OK ✅
-- `node --check executor/tests/cloudflare-credentials.test.js` → OK ✅
-- `node executor/tests/executor.contract.test.js` → **33 passed, 0 failed** ✅
+- `node executor/tests/executor.contract.test.js` → **34 passed, 0 failed** ✅
 - `node --test executor/tests/cloudflare-credentials.test.js` → **4 passed, 0 failed** ✅
 - `python3 -c "yaml.safe_load(...deploy-executor.yml...)"` → **YAML válido** ✅
 
 ## Próxima ação segura
 
 1. Rodar o workflow `Deploy enavia-executor` com `target_env=test`.
-2. Confirmar no smoke que o `/audit` real devolve prova de snapshot live.
-3. Se o smoke falhar por credenciais ausentes, verificar secrets do Worker `enavia-executor-test` sem mudar o contrato de diagnóstico seguro.
+2. Confirmar no job:
+   - `POST /apply-patch → HTTP 200`
+   - `executor snapshot version_id: ...`
+3. Confirmar no smoke que o `/audit` real devolve `snapshot_fingerprint` e não volta a emitir `Snapshot canônico do executor ausente no KV`.
+4. Se o smoke ainda falhar, inspecionar apenas o retorno do bootstrap e o namespace `ENAVIA_GIT_TEST`, sem alterar Worker/Panel.
 
 ## Bloqueios
 

@@ -4,6 +4,28 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — FIX — bootstrap do snapshot canônico do Executor no KV após deploy TEST
+
+- **Branch:** `copilot/bootstrap-snapshot-canonico-executor-kv`
+- **Commit de código:** `b4ba2a2`
+- **Escopo:** Executor-only + workflow do executor. Sem alteração em `nv-enavia.js`, painel, Deploy Worker ou bindings.
+- **Problema:** o self-audit do Executor em TEST já conseguia fazer live-read, mas continuava emitindo finding crítico `Snapshot canônico do executor ausente no KV` logo após deploy porque o namespace `ENAVIA_GIT_TEST` ainda não tinha bootstrap de snapshot para o runtime recém-publicado.
+- **Correção:**
+  1. `saveVersion(...)` em `executor/src/index.js` passou a sincronizar também o alias legado `git:code:latest` junto com o snapshot canônico (`git:latest` + `git:code:<id>`).
+  2. `.github/workflows/deploy-executor.yml` ganhou a etapa `Bootstrap canonical Executor snapshot TEST` logo após `Deploy Executor TEST`.
+  3. Essa etapa monta payload com o `executor/src/index.js` do commit atual e chama `POST /apply-patch` em `https://enavia-executor-test.brunovasque.workers.dev/apply-patch` com `auto_deploy:false`.
+  4. O workflow falha cedo se o bootstrap não devolver `meta.id` canônico e `code_length` válido.
+  5. O smoke `POST /audit` live-read continua rodando depois do bootstrap, validando a prova `snapshot_fingerprint`.
+- **Testes executados:**
+  - `node --check executor/src/index.js` → OK ✅
+  - `node executor/tests/executor.contract.test.js` → **34 passed, 0 failed** ✅
+  - `node --test executor/tests/cloudflare-credentials.test.js` → **4 passed, 0 failed** ✅
+  - `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/deploy-executor.yml')); print('YAML válido')"` → YAML válido ✅
+- **Bloqueios:** nenhum.
+- **Próxima etapa segura:** rodar `Deploy enavia-executor` em `target_env=test` e confirmar no log do workflow o bootstrap via `/apply-patch` seguido do smoke `/audit` sem finding de snapshot ausente.
+
+---
+
 ## 2026-04-29 — FIX — resolução canônica de credenciais Cloudflare no runtime do Executor
 
 - **Branch:** `copilot/port-cloudflare-credentials-fix`
