@@ -3,6 +3,10 @@
 // Bundled by wrangler/esbuild at deploy time.
 // ============================================================
 import { parse as acornParse } from "acorn";
+import {
+  normalizeAuditRiskLevel,
+  normalizeAuditVerdict,
+} from "./audit-response.js";
 
 // ============================================================
 // 📜 CANONICAL BOUNDARY — EXECUTOR × DEPLOY-WORKER
@@ -993,24 +997,18 @@ if (METHOD === "POST" && pathname === "/audit") {
       // O Worker (nv-enavia.js, callExecutorBridge) exige
       // data.result.verdict ou data.audit.verdict. Sem isso, classifica
       // como "Audit sem verdict explícito. Resposta ambígua bloqueada
-      // por segurança." Mantém o restante de execResult intacto.
+      // por segurança." A aprovação só ocorre com sinal explícito
+      // de sucesso (`ok === true` e `error !== true`).
       // ============================================================
-      const auditVerdict =
-        execResult && execResult.ok === false ? "reject" : "approve";
-      const auditRiskLevel =
-        (riskReport &&
-          (riskReport.risk_level ||
-            riskReport.level ||
-            riskReport.risk)) ||
-        execResult?.risk_level ||
-        "low";
+      const auditVerdict = normalizeAuditVerdict(execResult);
+      const auditRiskLevel = normalizeAuditRiskLevel(execResult, riskReport);
 
       const baseResult =
         execResult && typeof execResult === "object" ? execResult : {};
       const resultWithVerdict = {
         ...baseResult,
-        verdict: baseResult.verdict || auditVerdict,
-        risk_level: baseResult.risk_level || auditRiskLevel,
+        verdict: auditVerdict,
+        risk_level: auditRiskLevel,
         ...(canonicalMap ? { map: canonicalMap } : {}),
       };
 

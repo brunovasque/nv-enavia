@@ -2,7 +2,7 @@
 
 **Data:** 2026-04-29
 **Branch ativa:** copilot/fix-audit-response-contract
-**Última tarefa:** PR15 — EXECUTOR-ONLY. Patch cirúrgico em `executor/src/index.js` no handler `POST /audit`: passa a emitir `result.verdict` (`approve`/`reject`) e `result.risk_level` (espelhados em `audit.verdict`/`audit.risk_level`). Resolve o bloqueio observado em smoke real TEST: `Audit sem verdict explícito. Resposta ambígua bloqueada por segurança.` (gerado por `callExecutorBridge` em `nv-enavia.js:5187`). Nenhuma alteração no Worker `nv-enavia`, no Painel, no Deploy Worker ou em KV. Smoke do contrato do Executor: 23/23 ✅.
+**Última tarefa:** PR15 — EXECUTOR-ONLY. Ajuste conservador no contrato de resposta do `POST /audit`: `verdict:"approve"` agora só sai com sucesso explícito (`execResult.ok === true` e `execResult.error !== true`); qualquer outro caso cai em `reject`. `execResult.verdict` só é preservado quando já for exatamente `"approve"` (com sucesso explícito) ou `"reject"`. Regra extraída para `executor/src/audit-response.js` e coberta por testes focados. Nenhuma alteração no Worker `nv-enavia`, no Painel, no Deploy Worker ou em KV. Smoke do contrato do Executor: 33/33 ✅.
 
 ## Estado geral
 - Contrato anterior: `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` ✅ (encerrado)

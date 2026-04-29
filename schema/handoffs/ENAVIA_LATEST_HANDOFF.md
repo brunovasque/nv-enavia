@@ -14,10 +14,17 @@
 - Causa: `nv-enavia.js` em `callExecutorBridge` (linha 5179) lê `data?.result?.verdict || data?.audit?.verdict`. O Executor nunca emitia esses campos no envelope `/audit`.
 
 **Patch cirúrgico em `executor/src/index.js` (handler `POST /audit`, único return final):**
-- Calcula `auditVerdict`: `"reject"` quando `execResult.ok === false`, senão `"approve"`.
-- Calcula `auditRiskLevel`: lê `riskReport.risk_level | level | risk`, senão `execResult.risk_level`, fallback `"low"`.
-- Injeta `verdict` e `risk_level` em `result` (preservando valores se já existirem) e espelha em um campo top-level `audit: { verdict, risk_level }` para compatibilidade total com ambos os ramos do contrato do Worker (`data.result.verdict` e `data.audit.verdict`).
-- Restante do envelope (`system`, `executor`, `route`, `received_action`, `evidence`, `pipeline`, `result.map` quando há `canonicalMap`) preservado integralmente.
+- Regra endurecida: `verdict:"approve"` só ocorre com sucesso explícito (`execResult.ok === true` e `execResult.error !== true`).
+- Em qualquer outro caso (`ok:false`, `ok` ausente, `error:true`, resultado vazio/estrutural), o `verdict` vira `"reject"`.
+- `execResult.verdict` só é preservado quando já for exatamente `"approve"` (com sucesso explícito) ou `"reject"`; qualquer valor inválido (`"passed"`, etc.) é ignorado e recalculado de forma conservadora.
+- `risk_level` foi extraído para helper com fallback seguro `"low"` e só preserva valores string válidos.
+- O restante do envelope (`system`, `executor`, `route`, `received_action`, `evidence`, `pipeline`, `result.map` quando há `canonicalMap`) continua preservado.
+
+**Novo helper puro do Executor:**
+- `executor/src/audit-response.js`
+  - `normalizeAuditVerdict(execResult)`
+  - `normalizeAuditRiskLevel(execResult, riskReport)`
+- Objetivo: isolar a regra do contrato `/audit` e permitir teste focado sem tocar no Worker nem no runtime do Worker.
 
 **Documentação:**
 - `executor/CONTRACT.md` — exemplo do `Response 200` de `/audit` atualizado com `result.verdict`, `result.risk_level` e bloco `audit`. Nota PR15 explicando o mapeamento.
@@ -29,9 +36,18 @@
 - KV / wrangler / bindings — intactos.
 
 **Smoke tests:**
-- `node executor/tests/executor.contract.test.js` → 23/23 ✅
+- `node executor/tests/executor.contract.test.js` → 33/33 ✅
 - `node --check executor/src/index.js` → OK
-- Mocks do Worker em `tests/pr14-executor-deploy-real-loop.smoke.test.js` já assumem `result: { verdict: "approve", risk_level: "low" }`, confirmando o formato esperado.
+- `node --check executor/src/audit-response.js` → OK
+- `node --check executor/tests/executor.contract.test.js` → OK
+- Casos obrigatórios cobertos no teste:
+  - `ok:true` → `approve`
+  - `ok:false` → `reject`
+  - `{}` → `reject`
+  - `{ error:true }` → `reject`
+  - `verdict:"approve"` com `ok:true` → preserva
+  - `verdict:"reject"` → preserva
+  - `verdict:"passed"` → não preserva
 
 ## Próxima ação segura
 - Deploy do Executor em TEST (`enavia-executor-test`) e re-rodar o smoke real:

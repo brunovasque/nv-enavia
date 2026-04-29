@@ -135,9 +135,14 @@ Diagnóstico completo do worker-alvo (snapshot, hash, mapa canônico).
 > O Worker (`nv-enavia.js → callExecutorBridge`) lê `data.result.verdict`
 > ou `data.audit.verdict`. Sem esses campos a resposta era classificada
 > como `"Audit sem verdict explícito. Resposta ambígua bloqueada por segurança."`.
-> Mapeamento padrão: `execResult.ok === false` → `verdict:"reject"`;
-> caso contrário → `verdict:"approve"`. `risk_level` deriva de `riskReport`
-> quando disponível, com fallback `"low"`.
+> Regra conservadora:
+> - `verdict:"approve"` somente quando `execResult.ok === true`
+>   **e** `execResult.error !== true`;
+> - `verdict:"reject"` em qualquer outro caso;
+> - `execResult.verdict` só é preservado quando já for exatamente
+>   `"approve"` (com sucesso explícito) ou `"reject"`.
+> `risk_level` deriva de `riskReport` quando disponível, depois de
+> `execResult.risk_level`, com fallback seguro `"low"`.
 
 ---
 

@@ -514,3 +514,31 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Rollback:** `git revert <commit>` desta PR; arquivos afetados isolados em `executor/src/index.js`, `executor/CONTRACT.md` e governança.
 - **Bloqueios:** nenhum.
 - **Próxima etapa segura:** deploy do Executor em TEST e re-rodar smoke real `execute-next` para confirmar `executor_status: "passed"`.
+
+### 2026-04-29 — follow-up PR15: regra conservadora do `verdict`
+
+- **Origem:** comentário de revisão na PR (`comment_id: 4340101564`).
+- **Risco apontado:** a primeira versão do patch aprovava qualquer caso que não fosse `ok === false`, o que ainda permitia `approve` em payload vazio, `error:true`, `status:"failed"` ou `ok` ausente.
+- **Correção aplicada (Executor-only):**
+  - Novo helper puro `executor/src/audit-response.js`.
+  - `normalizeAuditVerdict(execResult)`:
+    - retorna `"approve"` somente com `execResult.ok === true` **e** `execResult.error !== true`;
+    - retorna `"reject"` em qualquer outro caso;
+    - preserva `execResult.verdict` apenas quando já for `"approve"` (com sucesso explícito) ou `"reject"`;
+    - descarta valores inválidos como `"passed"` e recalcula de forma conservadora.
+  - `normalizeAuditRiskLevel(execResult, riskReport)`:
+    - aceita apenas valores string não-vazios vindos de `riskReport` ou `execResult.risk_level`;
+    - fallback final seguro `"low"`.
+- **Arquivos alterados:**
+  - `executor/src/audit-response.js`
+  - `executor/src/index.js`
+  - `executor/tests/executor.contract.test.js`
+  - `executor/CONTRACT.md`
+  - governança (`schema/status`, `schema/handoffs`, `schema/execution`)
+- **Testes:**
+  - `node executor/tests/executor.contract.test.js` → 33/33 ✅
+  - `node --check executor/src/index.js` → OK ✅
+  - `node --check executor/src/audit-response.js` → OK ✅
+  - `node --check executor/tests/executor.contract.test.js` → OK ✅
+- **Escopo preservado:** sem mudanças em `nv-enavia.js`, `panel/`, Deploy Worker, KV ou `wrangler.toml`.
+- **Próxima etapa segura:** deploy do Executor em TEST e repetir o smoke real do loop para validar o mesmo comportamento no binding `EXECUTOR`.
