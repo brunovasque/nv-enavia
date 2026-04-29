@@ -62,7 +62,9 @@ Corrija os secrets antes de fazer o deploy.
 
 - nenhum
 
-## O que foi feito nesta sessão
+---
+
+## Histórico anterior: FIX — Validação falso-positivo no deploy-executor (comentários)
 
 ### FIX cirúrgico — `deploy-executor.yml` validação de comentários
 
@@ -92,16 +94,6 @@ Filtra linhas comentadas antes de buscar placeholders.
 - Grep antigo → "FALSO POSITIVO detectado" ✅ (confirma o bug)
 - Grep novo → "OK: nenhum placeholder fora de comentários" ✅ (confirma a correção)
 - Validação YAML → **YAML válido** ✅
-
-## Próxima ação segura
-
-1. Rodar workflow `Deploy enavia-executor` com `target_env=test`.
-2. Verificar smoke: `POST https://enavia-executor-test.brunovasque.workers.dev/audit` → `result.verdict` + `audit.verdict` presentes.
-3. Se TEST OK, rodar `target_env=prod`.
-
-## Bloqueios
-
-- nenhum
 
 ---
 
