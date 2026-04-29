@@ -18,13 +18,14 @@
 //      B1. ação de prod (promote) bloqueada imediatamente
 //      B2. target_env:prod bloqueado imediatamente
 //      B3. sem env.DEPLOY_WORKER → deploy_status:blocked
-//      B4. deploy HTTP 200 + body não JSON → deploy_status:ambiguous
+//      B4. /apply-test HTTP 200 + body não JSON → deploy_status:ambiguous
 //
 //   C. Fluxo integrado execute_next
 //      C1. sem executor: response inclui executor_block_reason, deploy_status:not_reached
 //      C2. audit bloqueia: propose não chamado, deploy:not_reached
 //      C3. propose falha: deploy:not_reached, handler interno não chamado
 //      C4. deploy bloqueado (sem binding): deploy_status:blocked, handler interno não chamado
+//      C4a. recibo de audit falha: /apply-test não chamado, handler interno não chamado
 //      C5. tudo ok: response inclui executor_audit, executor_propose, deploy_result
 //
 //   D. Fluxo approve
@@ -127,17 +128,22 @@ function makeExecutorMock(responses = {}) {
 }
 
 // Cria DEPLOY_WORKER mock com resposta configurável
-function makeDeployMock(response = { status: 200, body: { ok: true, action: "simulate", status: "passed" } }) {
+function makeDeployMock(response = {
+  "/audit": { status: 200, body: { ok: true, status: "recorded" } },
+  "/apply-test": { status: 200, body: { ok: true, action: "simulate", status: "passed" } },
+}) {
   const calls = [];
   return {
     calls,
     binding: {
       fetch: async (url, opts) => {
-        calls.push({ url, body: opts?.body });
-        const body = "rawBody" in response
-          ? response.rawBody
-          : JSON.stringify(response.body);
-        return new Response(body, { status: response.status ?? 200 });
+        const pathname = new URL(url).pathname;
+        calls.push({ url, pathname, body: opts?.body });
+        const selected = response?.[pathname] || response;
+        const body = "rawBody" in selected
+          ? selected.rawBody
+          : JSON.stringify(selected.body);
+        return new Response(body, { status: selected.status ?? 200 });
       },
     },
   };
@@ -200,7 +206,7 @@ function makeEnvNoDeployWorker(auditBody = AUDIT_OK_BODY, proposeBody = PROPOSE_
 // execute_next com tudo ok (executor + deploy)
 function makeEnvAllOk() {
   const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
-  const deployMock = makeDeployMock({ status: 200, body: { ok: true, action: "simulate", status: "passed" } });
+  const deployMock = makeDeployMock();
   return {
     env: {
       ...BASE_ENV,
@@ -369,9 +375,9 @@ async function runTests() {
     // Aqui verificamos que o endpoint de execute-next jamais envia "promote" internamente.
     const { env, execMock, deployMock } = makeEnvAllOk();
     const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
-    // deploy foi chamado com action simulate, não promote/approve/prod
-    if (deployMock.calls.length > 0) {
-      const deployBody = JSON.parse(deployMock.calls[0].body || "{}");
+    const applyCall = deployMock.calls.find(c => c.pathname === "/apply-test");
+    if (applyCall) {
+      const deployBody = JSON.parse(applyCall.body || "{}");
       ok(deployBody.deploy_action === "simulate",   "  deploy_action é simulate (não promote/prod)");
       ok(deployBody.target_env === "test",          "  target_env é test (não prod)");
     } else {
@@ -389,8 +395,9 @@ async function runTests() {
     // Verificamos que o worker sempre força target_env:"test" internamente.
     const { env, deployMock } = makeEnvAllOk();
     await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
-    if (deployMock.calls.length > 0) {
-      const deployBody = JSON.parse(deployMock.calls[0].body || "{}");
+    const applyCall = deployMock.calls.find(c => c.pathname === "/apply-test");
+    if (applyCall) {
+      const deployBody = JSON.parse(applyCall.body || "{}");
       ok(deployBody.target_env !== "production" && deployBody.target_env !== "prod",
         "  target_env nunca é prod/production");
     } else {
@@ -533,14 +540,46 @@ async function runTests() {
   }
 
   {
-    console.log("  C4b. deploy com JSON inválido → ambiguous, handler interno não chamado");
+    console.log("  C4a. recibo de audit no Deploy Worker falha → /apply-test não é chamado");
     const kv = makeKV({
       "contract:index":                     JSON.stringify(["ct-pr14-001"]),
       "contract:ct-pr14-001:state":         STATE_START_TASK,
       "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
     });
     const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
-    const deployMock = makeDeployMock({ status: 200, rawBody: "<<deploy-not-json>>" });
+    const deployMock = makeDeployMock({
+      "/audit": { status: 200, body: { ok: false, error: "AUDIT_RECEIPT_REQUIRED" } },
+      "/apply-test": { status: 200, body: { ok: true, action: "simulate", status: "passed" } },
+    });
+    const env = {
+      ...BASE_ENV,
+      ENAVIA_BRAIN: kv,
+      EXECUTOR: execMock.binding,
+      DEPLOY_WORKER: deployMock.binding,
+    };
+    const r = await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
+    ok(r.data?.status === "blocked",                        "  status: blocked");
+    ok(r.data?.deploy_status === "failed",                  "  deploy_status: failed");
+    ok(r.data?.deploy_route === "/audit",                   "  deploy_route: /audit");
+    ok(r.data?.deploy_block_reason?.includes("recibo de audit aprovado"), "  bloqueio menciona recibo de audit");
+    ok(deployMock.calls.filter(c => c.pathname === "/audit").length === 1,      "  /audit chamado uma vez");
+    ok(deployMock.calls.filter(c => c.pathname === "/apply-test").length === 0, "  /apply-test NÃO chamado");
+    ok(kv.writes.length === 0,                              "  handler interno NÃO executado");
+    console.log("");
+  }
+
+  {
+    console.log("  C4b. /apply-test com JSON inválido → ambiguous, handler interno não chamado");
+    const kv = makeKV({
+      "contract:index":                     JSON.stringify(["ct-pr14-001"]),
+      "contract:ct-pr14-001:state":         STATE_START_TASK,
+      "contract:ct-pr14-001:decomposition": DECOMP_START_TASK,
+    });
+    const execMock = makeExecutorMock({ "/audit": { body: AUDIT_OK_BODY }, "/propose": { body: PROPOSE_OK_BODY } });
+    const deployMock = makeDeployMock({
+      "/audit": { status: 200, body: { ok: true, status: "recorded" } },
+      "/apply-test": { status: 200, rawBody: "<<deploy-not-json>>" },
+    });
     const env = {
       ...BASE_ENV,
       ENAVIA_BRAIN: kv,
@@ -554,7 +593,8 @@ async function runTests() {
     ok(r.data?.deploy_result?.ok === false,                 "  deploy_result.ok: false");
     ok(r.data?.deploy_result?.status === "ambiguous",       "  deploy_result.status: ambiguous");
     ok(r.data?.deploy_result?.reason === "Resposta do Deploy Worker não é JSON válido.", "  reason de JSON inválido no Deploy Worker");
-    ok(deployMock.calls.length === 1,                       "  Deploy Worker chamado uma vez");
+    ok(deployMock.calls.filter(c => c.pathname === "/audit").length === 1,      "  /audit chamado uma vez");
+    ok(deployMock.calls.filter(c => c.pathname === "/apply-test").length === 1, "  /apply-test chamado uma vez");
     ok(kv.writes.length === 0,                              "  handler interno NÃO executado");
     console.log("");
   }
@@ -575,7 +615,9 @@ async function runTests() {
     // Executor deve ter sido chamado em /audit e /propose
     ok(execMock.calls.some(c => c.pathname === "/audit"),   "  /audit chamado");
     ok(execMock.calls.some(c => c.pathname === "/propose"), "  /propose chamado");
-    ok(deployMock.calls.length > 0,                         "  Deploy Worker chamado");
+    ok(deployMock.calls.some(c => c.pathname === "/audit"),      "  Deploy Worker recebeu recibo em /audit");
+    ok(deployMock.calls.some(c => c.pathname === "/apply-test"), "  Deploy Worker recebeu /apply-test");
+    ok(r.data?.deploy_result?.audit_receipt?.ok === true,        "  deploy_result.audit_receipt.ok: true");
     console.log("");
   }
 
@@ -657,8 +699,9 @@ async function runTests() {
         },
       },
       DEPLOY_WORKER: {
-        fetch: async () => {
-          callOrder.push("deploy:/apply-test");
+        fetch: async (url) => {
+          const p = new URL(url).pathname;
+          callOrder.push("deploy:" + p);
           return new Response(JSON.stringify({ ok: true, action: "simulate", status: "passed" }), { status: 200 });
         },
       },
@@ -666,12 +709,14 @@ async function runTests() {
     await callWorker("POST", "/contracts/execute-next", EXECUTE_BODY, env);
     const auditIdx   = callOrder.indexOf("executor:/audit");
     const proposeIdx = callOrder.indexOf("executor:/propose");
-    const deployIdx  = callOrder.indexOf("deploy:/apply-test");
+    const deployAuditIdx = callOrder.indexOf("deploy:/audit");
+    const deployApplyIdx = callOrder.indexOf("deploy:/apply-test");
     ok(auditIdx !== -1,                         "  audit foi chamado");
     ok(proposeIdx !== -1,                       "  propose foi chamado");
-    if (deployIdx !== -1) {
+    if (deployAuditIdx !== -1 && deployApplyIdx !== -1) {
       ok(auditIdx < proposeIdx,                 "  audit chamado antes de propose");
-      ok(proposeIdx < deployIdx,                "  propose chamado antes de deploy");
+      ok(proposeIdx < deployAuditIdx,           "  propose chamado antes do recibo no Deploy Worker");
+      ok(deployAuditIdx < deployApplyIdx,       "  recibo no Deploy Worker chamado antes do /apply-test");
     } else {
       // deploy pode não ter sido chamado se handler interno bloqueou — isso é ok
       ok(true, "  deploy não chamado mas ordem audit→propose mantida");
