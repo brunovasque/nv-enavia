@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após feedback PR0)
-**Branch ativa:** `claude/pr0-docs-loop-obrigatorio`
-**Última tarefa:** PR0 — Docs-only — Loop obrigatório de execução por PR. `CLAUDE.md` atualizado com seção `Loop obrigatório de execução por PR` (17 passos + regras de bloqueio); referência fixa ao contrato PR1–PR7 removida; novo contrato ativo `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` criado; `schema/contracts/INDEX.md` criado. Contrato PR17–PR30 reestruturado por feedback: priorizando loop `phase_complete → advance-phase` antes das skills. Sem alteração em runtime.
+**Data:** 2026-04-29 (atualizado após PR17)
+**Branch ativa:** `claude/pr17-diag-phase-complete-advance-phase`
+**Última tarefa:** PR17 — PR-DIAG — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase. Gap confirmado: `advanceContractPhase` existe completa em `contract-executor.js` (linha 1027, exportada linha 5120) mas não está importada nem exposta via HTTP em `nv-enavia.js`. Nenhum endpoint `POST /contracts/advance-phase` existe. Patch mínimo para PR18 documentado. Sem alteração em runtime.
 
 ## Contrato ativo
 
@@ -15,6 +15,17 @@
 | `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
 | `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
 | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+
+## Diagnóstico formalizado em PR17
+
+- `phase_complete` gerado por `resolveNextAction` Rule 4 (`contract-executor.js:1479`) quando todas as tasks da fase ativa têm status done/merged/completed/skipped.
+- `advanceContractPhase` implementada em `contract-executor.js:1027`, exportada em linha 5120. Não importada nem usada em `nv-enavia.js`.
+- Nenhum endpoint `POST /contracts/advance-phase` existe em `nv-enavia.js` (grep confirmado).
+- `loop-status` mapeia `phase_complete` → `block` (linha 4809) com guidance "No phase-advance endpoint exists yet" (linha 5034).
+- Gate de avanço: `checkPhaseGate` (`contract-executor.js:975`) — já implementado, chamado internamente por `advanceContractPhase`.
+- KV keys: `contract:{id}:state` e `contract:{id}:decomposition` (leitura e escrita).
+- Testes de `advanceContractPhase` existem em `contracts-smoke.test.js` (via import direto) — nenhum teste via HTTP.
+- Patch mínimo para PR18: (1) importar `advanceContractPhase`, (2) criar handler, (3) adicionar rota, (4) atualizar `availableActions` em `loop-status`.
 
 ## Decisões formalizadas em PR0 (revisão pós-feedback)
 
