@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR22)
-**Branch ativa:** `claude/pr22-docs-enavia-system-map`
-**Última tarefa:** PR22 — PR-DOCS — Criação de `schema/system/ENAVIA_SYSTEM_MAP.md` com 14 seções documentando todos os componentes do sistema ENAVIA: objetivo, estado atual, componentes (nv-enavia, enavia-executor, deploy-worker, contract-executor.js, panel), arquivos centrais, contratos/governança, loop contratual (fluxo + Rules 1–9), estados operacionais, workers/bindings/KV/secrets (PROD+TEST), endpoints (~40 rotas), testes e provas (451/451 ✅), consolidado, pendências (PR23–PR30), itens opcionais e regras de manutenção. Nenhum runtime alterado. Branch base: `3d29b7d` (PR21 mergeada).
+**Data:** 2026-04-29 (atualizado após PR23)
+**Branch ativa:** `claude/pr23-docs-enavia-route-registry`
+**Última tarefa:** PR23 — PR-DOCS — Criação de `schema/system/ENAVIA_ROUTE_REGISTRY.json` com 68 rotas reais do worker `nv-enavia` verificadas por evidência de código (grep + leitura linha a linha). 14 grupos de rotas. Validação de enums: 0 violações. Campos obrigatórios: 0 ausentes. Rotas obrigatórias do spec: 10/10 ✅. Nenhum runtime alterado. Branch base: `fc7a4ec` (PR22 mergeada).
 
 ## Contrato ativo
 

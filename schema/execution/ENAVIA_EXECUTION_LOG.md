@@ -4,6 +4,46 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR23 — PR-DOCS — Criar schema/system/ENAVIA_ROUTE_REGISTRY.json
+
+- **Branch:** `claude/pr23-docs-enavia-route-registry`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR22 ✅ (commit `0899557`, PR #183 mergeada — commit merge `fc7a4ec`)
+- **Escopo:** Docs-only. Apenas criação de `schema/system/ENAVIA_ROUTE_REGISTRY.json` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar registry machine-readable das 68 rotas HTTP reais do worker `nv-enavia`, baseado exclusivamente em evidência do código (`nv-enavia.js`). Campos por rota: id, method, path, handler, scope, status, auth, cors, input, output, evidence (file/pattern/confidence), notes.
+
+### Arquivo criado
+
+- **`schema/system/ENAVIA_ROUTE_REGISTRY.json`** (NOVO):
+  - 68 rotas em 14 grupos.
+  - Validação de enums: 0 violações (scope, status, auth.type, confidence).
+  - Campos obrigatórios: 0 ausentes.
+  - Rotas obrigatórias do spec: 10/10 ✅.
+  - 3 unknowns documentados.
+  - 5 external routes documentadas (EXECUTOR, DEPLOY_WORKER, BROWSER_EXECUTOR_URL, DIRECTOR_COGNITIVE_URL, VERCEL_EXECUTOR_URL).
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste criado ou modificado.
+
+### Verificações
+
+| Comando | Resultado |
+|---------|-----------|
+| `node -e "JSON.parse(...)"` | `JSON válido` ✅ |
+| Validação de enums (script Node) | `0 violações` ✅ |
+| Campos obrigatórios (script Node) | `0 ausentes` ✅ |
+| Rotas obrigatórias do spec | `10/10` ✅ |
+| `git diff --name-only` | `(vazio)` ✅ |
+
+---
+
 ## 2026-04-29 — PR22 — PR-DOCS — Criar schema/system/ENAVIA_SYSTEM_MAP.md
 
 - **Branch:** `claude/pr22-docs-enavia-system-map`

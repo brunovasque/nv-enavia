@@ -1,0 +1,2894 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-04-29",
+  "source": {
+    "repo": "brunovasque/nv-enavia",
+    "primary_file": "nv-enavia.js",
+    "contract": "CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md",
+    "pr": "PR23"
+  },
+  "rules": {
+    "runtime_changed": false,
+    "routes_must_exist_in_code": true,
+    "no_invented_routes": true,
+    "registry_is_documentation_only": true
+  },
+  "route_groups": [
+    {
+      "group": "system",
+      "description": "Saúde, CORS preflight e raiz do worker."
+    },
+    {
+      "group": "internal",
+      "description": "Rotas internas autenticadas via Bearer INTERNAL_TOKEN. Acesso restrito ao Deploy Worker e automações de CI."
+    },
+    {
+      "group": "cognitive",
+      "description": "Chat LLM-first, Director Cognitive e Enavia Observer."
+    },
+    {
+      "group": "planner",
+      "description": "Pipeline estruturado PM4→PM9: classificação, plano canônico, gate, bridge e memória."
+    },
+    {
+      "group": "execution",
+      "description": "Trilha de execução, decisões humanas e health."
+    },
+    {
+      "group": "contracts",
+      "description": "Contratos contratuais supervisionados: criação, leitura, loop operacional e fechamento."
+    },
+    {
+      "group": "loop_operacional",
+      "description": "Loop contratual supervisionado: execute-next, complete-task, advance-phase. Frente PR17–PR21."
+    },
+    {
+      "group": "github_arm",
+      "description": "GitHub/PR Arm: ações em branches e PRs no repositório (P24)."
+    },
+    {
+      "group": "browser_arm",
+      "description": "Browser Arm: execução de ações de browser externo (P25)."
+    },
+    {
+      "group": "memory",
+      "description": "Memória persistida no KV: memórias manuais, candidatos de aprendizado e auditoria."
+    },
+    {
+      "group": "brain",
+      "description": "Acesso ao brain (KV): módulos, índice, prompt de sistema e queries."
+    },
+    {
+      "group": "audit_propose",
+      "description": "Auditoria e proposta de patch supervisionada via EXECUTOR service binding."
+    },
+    {
+      "group": "bridge",
+      "description": "Bridges para executores externos: Vercel, Browser físico."
+    },
+    {
+      "group": "engineer",
+      "description": "Relay para enavia-executor core via service binding."
+    }
+  ],
+  "routes": [
+    {
+      "id": "system.cors_preflight",
+      "method": "OPTIONS",
+      "path": "*",
+      "handler": "handleCORSPreflight",
+      "group": "system",
+      "scope": "unknown",
+      "status": "active",
+      "priority": "highest",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "OPTIONS é respondido antes de qualquer guard de autenticação."
+      },
+      "cors": {
+        "expected": true,
+        "notes": "Resposta CORS pura — sem body."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "Response com headers CORS",
+        "status_codes": [
+          204
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6505,
+        "pattern": "if (request.method === \"OPTIONS\")",
+        "confidence": "high"
+      },
+      "notes": "Rota de mais alta prioridade. Interceptada antes do bloco principal de roteamento."
+    },
+    {
+      "id": "system.root.get",
+      "method": "GET",
+      "path": "/",
+      "handler": "inline (static text response)",
+      "group": "system",
+      "scope": "health",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "Wrapped com withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "text/plain com lista de rotas disponíveis",
+        "status_codes": [
+          200
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8757,
+        "pattern": "if (method === \"GET\" && path === \"/\")",
+        "confidence": "high"
+      },
+      "notes": "Retorna texto de saúde e lista de rotas públicas documentadas no worker."
+    },
+    {
+      "id": "system.root.post",
+      "method": "POST",
+      "path": "/",
+      "handler": "handleChatRequest",
+      "group": "cognitive",
+      "scope": "cognitive",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "Wrapped com withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "message": "string (obrigatório)",
+          "session_id": "string (opcional)",
+          "context": "object (opcional)"
+        }
+      },
+      "output": {
+        "shape": "chat response",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8095,
+        "pattern": "if (method === \"POST\" && path === \"/\")",
+        "confidence": "high"
+      },
+      "notes": "Chat NV-FIRST — rota raiz. Equivalente a /chat/run mas via POST /."
+    },
+    {
+      "id": "internal.build.get",
+      "method": "GET",
+      "path": "/__internal__/build",
+      "handler": "inline (build info)",
+      "group": "internal",
+      "scope": "admin",
+      "status": "internal",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>",
+        "notes": "isInternalAuthorized(request, env) — compara com env.INTERNAL_TOKEN."
+      },
+      "cors": {
+        "expected": false,
+        "notes": "Retorna Response puro sem withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, worker, env, build, timestamp }",
+        "status_codes": [
+          200,
+          401
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6944,
+        "pattern": "if (method === \"GET\" && path === \"/__internal__/build\")",
+        "confidence": "high"
+      },
+      "notes": "Usado pelo CI (deploy.yml) como smoke de deploy. Smoke valida HTTP 200."
+    },
+    {
+      "id": "internal.describe.get",
+      "method": "GET",
+      "path": "/__internal__/describe",
+      "handler": "inline (system describe)",
+      "group": "internal",
+      "scope": "admin",
+      "status": "internal",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>",
+        "notes": "isInternalAuthorized — 401 sem token."
+      },
+      "cors": {
+        "expected": false
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, system, role, env_hint, internal, version, timestamp, routes }",
+        "status_codes": [
+          200,
+          401
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 7930,
+        "pattern": "if (internalPath === \"/__internal__/describe\" && method === \"GET\")",
+        "confidence": "high"
+      },
+      "notes": "Handshake de identidade. Usado pelo Deploy Worker para verificar conectividade."
+    },
+    {
+      "id": "internal.routes.get",
+      "method": "GET",
+      "path": "/__internal__/routes",
+      "handler": "inline (routes discovery)",
+      "group": "internal",
+      "scope": "admin",
+      "status": "internal",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>"
+      },
+      "cors": {
+        "expected": false
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, worker, role, version, timestamp, routes[] }",
+        "status_codes": [
+          200,
+          401
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 7957,
+        "pattern": "if (internalPath === \"/__internal__/routes\" && method === \"GET\")",
+        "confidence": "high"
+      },
+      "notes": "Autodiscovery canônico de rotas internas. Lista apenas rotas /__internal__/, /audit e /propose."
+    },
+    {
+      "id": "internal.capabilities.get",
+      "method": "GET",
+      "path": "/__internal__/capabilities",
+      "handler": "inline (capabilities discovery)",
+      "group": "internal",
+      "scope": "admin",
+      "status": "internal",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>"
+      },
+      "cors": {
+        "expected": false
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, worker, role, version, timestamp, internal_auth, capabilities }",
+        "status_codes": [
+          200,
+          401
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 7985,
+        "pattern": "if (internalPath === \"/__internal__/capabilities\" && method === \"GET\")",
+        "confidence": "high"
+      },
+      "notes": "Anuncia capacidades: propose, audit, deploy_apply, deploy_rollback."
+    },
+    {
+      "id": "internal.deploy_apply.post",
+      "method": "POST",
+      "path": "/__internal__/deploy-apply",
+      "handler": "inline (passive mode)",
+      "group": "internal",
+      "scope": "deploy",
+      "status": "internal",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>"
+      },
+      "cors": {
+        "expected": false
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "execution_id": "string (opcional)",
+          "patch": "object com .content (opcional)",
+          "mode": "string (opcional)",
+          "probe": "boolean (opcional) — se true, retorna ACK sem processar"
+        }
+      },
+      "output": {
+        "shape": "{ ok, system, internal, mode:passive, received, message, timestamp }",
+        "status_codes": [
+          200,
+          401
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8018,
+        "pattern": "if (internalPath === \"/__internal__/deploy-apply\" && method === \"POST\")",
+        "confidence": "high"
+      },
+      "notes": "PASSIVE MODE — não executa deploy real. Apenas registra recibo. Deploy Worker chama esta rota para handshake."
+    },
+    {
+      "id": "internal.deploy_rollback.post",
+      "method": "POST",
+      "path": "/__internal__/deploy-rollback",
+      "handler": "inline (passive mode)",
+      "group": "internal",
+      "scope": "deploy",
+      "status": "internal",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>"
+      },
+      "cors": {
+        "expected": false
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "execution_id": "string (opcional)",
+          "env": "string (opcional)",
+          "manual": "boolean (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, system, internal, mode:passive, received, message, timestamp }",
+        "status_codes": [
+          200,
+          401
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8062,
+        "pattern": "if (internalPath === \"/__internal__/deploy-rollback\" && method === \"POST\")",
+        "confidence": "high"
+      },
+      "notes": "PASSIVE MODE — não executa rollback real. Apenas confirma recibo."
+    },
+    {
+      "id": "cognitive.director_cognitive.post",
+      "method": "POST",
+      "path": "/director/cognitive",
+      "handler": "handleDirectorCognitiveProxy",
+      "group": "cognitive",
+      "scope": "cognitive",
+      "status": "active",
+      "priority": "high",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Interceptado ANTES do bloco principal (linha 6513) para garantia CSP. Também existe como fallback no bloco principal (linha 8187)."
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS em ambas as ocorrências."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "message": "string",
+          "context": "object (opcional)"
+        }
+      },
+      "output": {
+        "shape": "proxy response do Director Cognitive",
+        "status_codes": [
+          200,
+          502,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6513,
+        "pattern": "if (url.pathname === \"/director/cognitive\")",
+        "confidence": "high"
+      },
+      "notes": "Proxy CSP-safe para DIRECTOR_COGNITIVE_URL. Alta prioridade — roda antes de parser/brain/engineer."
+    },
+    {
+      "id": "cognitive.chat_run.post",
+      "method": "POST",
+      "path": "/chat/run",
+      "handler": "handleChatLLM",
+      "group": "cognitive",
+      "scope": "cognitive",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "message": "string (obrigatório)",
+          "session_id": "string (opcional)",
+          "context": "object (opcional)",
+          "conversation_history": "array (opcional, max 20 msgs / 4000 chars)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, system, mode, reply, planner_used, planner?, timestamp, input, telemetry }",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6526,
+        "pattern": "if (url.pathname === \"/chat/run\")",
+        "confidence": "high"
+      },
+      "notes": "Chat LLM-first. Planner disponível como ferramenta interna via PM4."
+    },
+    {
+      "id": "cognitive.chat_run.get",
+      "method": "GET",
+      "path": "/chat/run",
+      "handler": "inline (schema description)",
+      "group": "cognitive",
+      "scope": "cognitive",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, route, description, schema, timestamp }",
+        "status_codes": [
+          200
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6612,
+        "pattern": "if (request.method === \"GET\") { if (url.pathname === \"/chat/run\")",
+        "confidence": "high"
+      },
+      "notes": "Schema/contrato da rota POST /chat/run. Útil para smoke de conectividade."
+    },
+    {
+      "id": "cognitive.enavia_observe.post",
+      "method": "POST",
+      "path": "/enavia/observe",
+      "handler": "handleEnaviaObserve",
+      "group": "cognitive",
+      "scope": "cognitive",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Sem guard explícito observado."
+      },
+      "cors": {
+        "expected": false,
+        "notes": "Não usa withCORS — retorna response direto."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "event": "string",
+          "data": "object (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok }",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6975,
+        "pattern": "if (method === \"POST\" && path === \"/enavia/observe\")",
+        "confidence": "high"
+      },
+      "notes": "Observer read-only de eventos do sistema ENAVIA."
+    },
+    {
+      "id": "planner.run.post",
+      "method": "POST",
+      "path": "/planner/run",
+      "handler": "handlePlannerRun",
+      "group": "planner",
+      "scope": "planner",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "message": "string (obrigatório)",
+          "session_id": "string (opcional)",
+          "context": "object (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, system, timestamp, input, planner: { classification, canonicalPlan, gate, bridge, memoryConsolidation, outputMode }, telemetry }",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6538,
+        "pattern": "if (url.pathname === \"/planner/run\")",
+        "confidence": "high"
+      },
+      "notes": "Pipeline PM4→PM5→PM6→PM7→PM8→PM9→P15."
+    },
+    {
+      "id": "planner.run.get",
+      "method": "GET",
+      "path": "/planner/run",
+      "handler": "inline (schema description)",
+      "group": "planner",
+      "scope": "planner",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, route, description, schema }",
+        "status_codes": [
+          200
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6669,
+        "pattern": "if (request.method === \"GET\") { if (url.pathname === \"/planner/run\")",
+        "confidence": "high"
+      },
+      "notes": "Schema/contrato da rota POST /planner/run."
+    },
+    {
+      "id": "planner.bridge.post",
+      "method": "POST",
+      "path": "/planner/bridge",
+      "handler": "handlePlannerBridge",
+      "group": "planner",
+      "scope": "planner",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "bridge_payload": "object (resultado do PM8)"
+        }
+      },
+      "output": {
+        "shape": "bridge response com trilha de execução",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6550,
+        "pattern": "if (url.pathname === \"/planner/bridge\")",
+        "confidence": "high"
+      },
+      "notes": "Ponte real: painel envia bridge payload após aprovação do gate (P12)."
+    },
+    {
+      "id": "planner.latest.get",
+      "method": "GET",
+      "path": "/planner/latest",
+      "handler": "handlePlannerLatest",
+      "group": "planner",
+      "scope": "planner",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [
+          {
+            "name": "session_id",
+            "required": false,
+            "type": "string",
+            "notes": "Filtra plano por sessão."
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "último plano gerado para a sessão",
+        "status_codes": [
+          200,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6708,
+        "pattern": "if (url.pathname === \"/planner/latest\")",
+        "confidence": "high"
+      },
+      "notes": "Lê de KV planner:latest:{session_id}."
+    },
+    {
+      "id": "execution.get",
+      "method": "GET",
+      "path": "/execution",
+      "handler": "handleGetExecution",
+      "group": "execution",
+      "scope": "contracts.execution",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "trilha de execução mais recente do KV",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6564,
+        "pattern": "if (url.pathname === \"/execution\")",
+        "confidence": "high"
+      },
+      "notes": "P13 — Retorna última trilha de execução persistida. Usado pelo painel (ExecutionPage)."
+    },
+    {
+      "id": "execution.decision.post",
+      "method": "POST",
+      "path": "/execution/decision",
+      "handler": "handlePostDecision",
+      "group": "execution",
+      "scope": "contracts.execution",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "bridge_id": "string (obrigatório)",
+          "decision": "object"
+        }
+      },
+      "output": {
+        "shape": "{ ok }",
+        "status_codes": [
+          200,
+          422,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6577,
+        "pattern": "if (url.pathname === \"/execution/decision\")",
+        "confidence": "high"
+      },
+      "notes": "P14 — Registra decisão humana vinculada a execução canônica (bridge_id)."
+    },
+    {
+      "id": "execution.decisions.get",
+      "method": "GET",
+      "path": "/execution/decisions",
+      "handler": "handleGetDecisions",
+      "group": "execution",
+      "scope": "contracts.execution",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [
+          {
+            "name": "bridge_id",
+            "required": true,
+            "type": "string",
+            "notes": "Identificador canônico do disparo."
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, bridge_id, decisions[] }",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6590,
+        "pattern": "if (url.pathname === \"/execution/decisions\")",
+        "confidence": "high"
+      },
+      "notes": "P14 — Leitura do histórico de decisões por execução."
+    },
+    {
+      "id": "execution.health.get",
+      "method": "GET",
+      "path": "/health",
+      "handler": "handleGetHealth",
+      "group": "execution",
+      "scope": "health",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, status, summary, blockedExecutions, latestDecision? }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6603,
+        "pattern": "if (url.pathname === \"/health\")",
+        "confidence": "high"
+      },
+      "notes": "PR3 — Dados de saúde reais: exec_event, decisão mais recente, summary.blocked."
+    },
+    {
+      "id": "contracts.create.post",
+      "method": "POST",
+      "path": "/contracts",
+      "handler": "handleCreateContract",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Sem guard explícito observado no roteador."
+      },
+      "cors": {
+        "expected": true,
+        "notes": "jsonResponse usa withCORS internamente."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (opcional — gerado se ausente)",
+          "contract_name": "string (obrigatório)",
+          "scope": "object { workers[] }",
+          "definition_of_done": "array de strings",
+          "phases": "array de fases",
+          "tasks": "array de tasks"
+        }
+      },
+      "output": {
+        "shape": "{ ok, contract_id, state }",
+        "status_codes": [
+          200,
+          201,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8245,
+        "pattern": "if (method === \"POST\" && path === \"/contracts\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "contracts.get",
+      "method": "GET",
+      "path": "/contracts",
+      "handler": "handleGetContract",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [
+          {
+            "name": "id",
+            "required": true,
+            "type": "string",
+            "notes": "ID do contrato."
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, contract: { state, decomposition } }",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8251,
+        "pattern": "if (method === \"GET\" && path === \"/contracts\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "contracts.summary.get",
+      "method": "GET",
+      "path": "/contracts/summary",
+      "handler": "handleGetContractSummary",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [
+          {
+            "name": "id",
+            "required": true,
+            "type": "string",
+            "notes": "ID do contrato."
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "resumo do contrato (shape compacto)",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8258,
+        "pattern": "if (method === \"GET\" && path === \"/contracts/summary\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "contracts.active_surface.get",
+      "method": "GET",
+      "path": "/contracts/active-surface",
+      "handler": "handleGetActiveSurface",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "superfície do contrato ativo mais recente",
+        "status_codes": [
+          200,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8265,
+        "pattern": "if (method === \"GET\" && path === \"/contracts/active-surface\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "loop_operacional.loop_status.get",
+      "method": "GET",
+      "path": "/contracts/loop-status",
+      "handler": "handleGetLoopStatus",
+      "group": "loop_operacional",
+      "scope": "contracts.loop",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "handleGetLoopStatus retorna via withCORS internamente (jsonResponse)."
+      },
+      "input": {
+        "query": [
+          {
+            "name": "id",
+            "required": true,
+            "type": "string",
+            "notes": "ID do contrato."
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, contract, nextAction, operationalAction, loop: { canProceed, blocked, blockReason, availableActions, guidance } }",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8271,
+        "pattern": "if (method === \"GET\" && path === \"/contracts/loop-status\")",
+        "confidence": "high"
+      },
+      "notes": "PR6 + PR18 + PR20. Resolve nextAction via resolveNextAction(state, decomposition). Expõe ação correta para cada estado: start_task→execute-next, in_progress→complete-task, phase_complete→advance-phase."
+    },
+    {
+      "id": "loop_operacional.execute_next.post",
+      "method": "POST",
+      "path": "/contracts/execute-next",
+      "handler": "handleExecuteNext",
+      "group": "loop_operacional",
+      "scope": "contracts.loop",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Gate interno: can_execute !== true bloqueia antes de qualquer ação."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)",
+          "task_id": "string (opcional)",
+          "evidence": "array (obrigatório — gate de evidência)",
+          "confirm": "boolean (obrigatório para approve)",
+          "approved_by": "string (obrigatório para approve)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, executed, status, reason, nextAction, operationalAction, evidence, rollback, executor_audit?, executor_propose?, deploy_result? }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8276,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/execute-next\")",
+        "confidence": "high"
+      },
+      "notes": "PR9 + PR14. Chain completo: startTask(KV) → callExecutorBridge /audit → callExecutorBridge /propose → callDeployBridge /audit → callDeployBridge /apply-test → handler interno KV."
+    },
+    {
+      "id": "contracts.execute.post",
+      "method": "POST",
+      "path": "/contracts/execute",
+      "handler": "handleExecuteContract",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "resultado de execução do contrato",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8281,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/execute\")",
+        "confidence": "high"
+      },
+      "notes": "Endpoint direto de execução (sem gates extras do execute-next). Usado em fluxos internos."
+    },
+    {
+      "id": "contracts.close_test.post",
+      "method": "POST",
+      "path": "/contracts/close-test",
+      "handler": "handleCloseContractInTest",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "resultado de fechamento em TEST",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8287,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/close-test\")",
+        "confidence": "high"
+      },
+      "notes": "C2 — Fechamento automático de contrato em ambiente TEST."
+    },
+    {
+      "id": "contracts.cancel.post",
+      "method": "POST",
+      "path": "/contracts/cancel",
+      "handler": "handleCancelContract",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)",
+          "reason": "string (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, status }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8293,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/cancel\")",
+        "confidence": "high"
+      },
+      "notes": "F1 — Cancelamento formal. Transiciona status_global → cancelled."
+    },
+    {
+      "id": "contracts.reject_plan.post",
+      "method": "POST",
+      "path": "/contracts/reject-plan",
+      "handler": "handleRejectDecompositionPlan",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)",
+          "reason": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, status }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8299,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/reject-plan\")",
+        "confidence": "high"
+      },
+      "notes": "F2 — Rejeição formal do plano de decomposição. Seta plan_rejection.plan_rejected = true."
+    },
+    {
+      "id": "contracts.resolve_plan_revision.post",
+      "method": "POST",
+      "path": "/contracts/resolve-plan-revision",
+      "handler": "handleResolvePlanRevision",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, status }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8305,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/resolve-plan-revision\")",
+        "confidence": "high"
+      },
+      "notes": "F2b — Resolução de revisão do plano (desbloqueio após rejeição corrigida)."
+    },
+    {
+      "id": "loop_operacional.complete_task.post",
+      "method": "POST",
+      "path": "/contracts/complete-task",
+      "handler": "handleCompleteTask",
+      "group": "loop_operacional",
+      "scope": "contracts.loop",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Gate interno de aderência: MicrostepResultado obrigatório com flags is_simulado:false, is_mockado:false, is_local:false, is_parcial:false."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)",
+          "task_id": "string (obrigatório)",
+          "resultado": {
+            "objetivo_atendido": "boolean (obrigatório)",
+            "criterio_aceite_atendido": "boolean (obrigatório)",
+            "escopo_efetivo": "array de strings (obrigatório)",
+            "is_simulado": "false (obrigatório)",
+            "is_mockado": "false (obrigatório)",
+            "is_local": "false (obrigatório)",
+            "is_parcial": "false (obrigatório)"
+          }
+        }
+      },
+      "output": {
+        "shape": "{ ok, status, task_id, adherence }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8311,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/complete-task\")",
+        "confidence": "high"
+      },
+      "notes": "Gate obrigatório de aderência contratual por microetapa. Transiciona task in_progress → done/completed. Requer state.definition_of_done como array."
+    },
+    {
+      "id": "loop_operacional.advance_phase.post",
+      "method": "POST",
+      "path": "/contracts/advance-phase",
+      "handler": "handleAdvancePhase",
+      "group": "loop_operacional",
+      "scope": "contracts.loop",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Gate interno: checkPhaseGate aplicado via advanceContractPhase (contract-executor.js:975)."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório, aceita alias contractId)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, status, contract_id, result }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8318,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/advance-phase\")",
+        "confidence": "high"
+      },
+      "notes": "PR18. Endpoint supervisionado de avanço de fase. Chama advanceContractPhase (contract-executor.js:1027). Gate: todas as tasks da fase devem estar done/merged/completed/skipped."
+    },
+    {
+      "id": "contracts.close_final.post",
+      "method": "POST",
+      "path": "/contracts/close-final",
+      "handler": "handleCloseFinalContract",
+      "group": "contracts",
+      "scope": "contracts",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Gate final pesado — verifica status global, fases e adherence completa."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "contract_id": "string (obrigatório)",
+          "confirm": "boolean (obrigatório)",
+          "approved_by": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, status, contract_id }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8324,
+        "pattern": "if (method === \"POST\" && path === \"/contracts/close-final\")",
+        "confidence": "high"
+      },
+      "notes": "PR 3 — Gate final pesado do contrato inteiro."
+    },
+    {
+      "id": "github_arm.action.post",
+      "method": "POST",
+      "path": "/github-pr/action",
+      "handler": "handleGitHubPrAction",
+      "group": "github_arm",
+      "scope": "unknown",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Guards internos do handleGitHubPrAction podem verificar token."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "action": "string — ex: create_branch, commit, open_pr",
+          "payload": "object"
+        }
+      },
+      "output": {
+        "shape": "resultado da ação no GitHub/PR",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8335,
+        "pattern": "if (method === \"POST\" && path === \"/github-pr/action\")",
+        "confidence": "high"
+      },
+      "notes": "P24 — GitHub/PR Arm. Operações em branches/PRs do repositório."
+    },
+    {
+      "id": "github_arm.request_merge.post",
+      "method": "POST",
+      "path": "/github-pr/request-merge",
+      "handler": "handleRequestMergeApproval",
+      "group": "github_arm",
+      "scope": "unknown",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "pr_number": "number (obrigatório)",
+          "contract_id": "string (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, ready, reason }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8341,
+        "pattern": "if (method === \"POST\" && path === \"/github-pr/request-merge\")",
+        "confidence": "high"
+      },
+      "notes": "Avalia prontidão para merge. Não executa merge."
+    },
+    {
+      "id": "github_arm.approve_merge.post",
+      "method": "POST",
+      "path": "/github-pr/approve-merge",
+      "handler": "handleApproveMerge",
+      "group": "github_arm",
+      "scope": "unknown",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "pr_number": "number (obrigatório)",
+          "approved_by": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, merged }",
+        "status_codes": [
+          200,
+          400,
+          409,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8347,
+        "pattern": "if (method === \"POST\" && path === \"/github-pr/approve-merge\")",
+        "confidence": "high"
+      },
+      "notes": "Aprovação formal de merge. Botão no painel."
+    },
+    {
+      "id": "browser_arm.action.post",
+      "method": "POST",
+      "path": "/browser-arm/action",
+      "handler": "handleBrowserArmAction",
+      "group": "browser_arm",
+      "scope": "browser",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "action": "string",
+          "payload": "object"
+        }
+      },
+      "output": {
+        "shape": "resultado da ação de browser",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8359,
+        "pattern": "if (method === \"POST\" && path === \"/browser-arm/action\")",
+        "confidence": "high"
+      },
+      "notes": "P25 — Browser Arm Runtime. Ações de navegação/busca/visual em browser externo."
+    },
+    {
+      "id": "browser_arm.state.get",
+      "method": "GET",
+      "path": "/browser-arm/state",
+      "handler": "getBrowserArmStateWithKV",
+      "group": "browser_arm",
+      "scope": "browser",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "estado atual do Browser Arm (rehydratado do KV)",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8365,
+        "pattern": "if (method === \"GET\" && path === \"/browser-arm/state\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "memory.manual.get",
+      "method": "GET",
+      "path": "/memory/manual",
+      "handler": "searchMemory (filter: MEMORIA_MANUAL)",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, items[], count }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8374,
+        "pattern": "if (method === \"GET\" && path === \"/memory/manual\")",
+        "confidence": "high"
+      },
+      "notes": "PR4 — Lista todas as memórias manuais incluindo inativas."
+    },
+    {
+      "id": "memory.manual.post",
+      "method": "POST",
+      "path": "/memory/manual",
+      "handler": "buildMemoryObject + writeMemory",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "title": "string",
+          "content": "string ou content_structured: object",
+          "entity_type": "string (opcional)",
+          "priority": "string (opcional)",
+          "confidence": "string (opcional)",
+          "status": "string (opcional)",
+          "is_canonical": "boolean (opcional)",
+          "tags": "array (opcional)",
+          "flags": "array (opcional)",
+          "expires_at": "ISO8601 (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, memory_id, record }",
+        "status_codes": [
+          201,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8391,
+        "pattern": "if (method === \"POST\" && path === \"/memory/manual\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "memory.manual.patch",
+      "method": "PATCH",
+      "path": "/memory/manual",
+      "handler": "readMemoryById + updateMemory",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "memory_id": "string (obrigatório)",
+          "title": "string (opcional)",
+          "content": "string ou content_structured: object (opcional)",
+          "priority": "string (opcional)",
+          "confidence": "string (opcional)",
+          "status": "string (opcional)",
+          "tags": "array (opcional)",
+          "flags": "array (opcional)",
+          "expires_at": "ISO8601 (opcional)",
+          "is_canonical": "boolean (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, memory_id, record }",
+        "status_codes": [
+          200,
+          400,
+          403,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8426,
+        "pattern": "if (method === \"PATCH\" && path === \"/memory/manual\")",
+        "confidence": "high"
+      },
+      "notes": "Apenas memórias do tipo MEMORIA_MANUAL podem ser editadas por esta rota."
+    },
+    {
+      "id": "memory.manual.block.post",
+      "method": "POST",
+      "path": "/memory/manual/block",
+      "handler": "readMemoryById + blockMemory",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "memory_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, memory_id, record }",
+        "status_codes": [
+          200,
+          400,
+          403,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8465,
+        "pattern": "if (method === \"POST\" && path === \"/memory/manual/block\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "memory.manual.invalidate.post",
+      "method": "POST",
+      "path": "/memory/manual/invalidate",
+      "handler": "readMemoryById + invalidateMemory",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "memory_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, memory_id, record }",
+        "status_codes": [
+          200,
+          400,
+          403,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8491,
+        "pattern": "if (method === \"POST\" && path === \"/memory/manual/invalidate\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "memory.learning.get",
+      "method": "GET",
+      "path": "/memory/learning",
+      "handler": "listLearningCandidates",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [
+          {
+            "name": "status",
+            "required": false,
+            "type": "string",
+            "notes": "Filtra candidatos por status."
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, items[], count }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8521,
+        "pattern": "if (method === \"GET\" && path === \"/memory/learning\")",
+        "confidence": "high"
+      },
+      "notes": "PR5 — Lista candidatos a aprendizado controlado."
+    },
+    {
+      "id": "memory.learning.post",
+      "method": "POST",
+      "path": "/memory/learning",
+      "handler": "registerLearningCandidate",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "title": "string (obrigatório)",
+          "content_structured": "object (opcional)",
+          "content": "string (alternativa)",
+          "source": "string (opcional)",
+          "confidence": "string (opcional)",
+          "priority": "string (opcional)",
+          "tags": "array (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, candidate_id, record }",
+        "status_codes": [
+          201,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8538,
+        "pattern": "if (method === \"POST\" && path === \"/memory/learning\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "memory.learning.approve.post",
+      "method": "POST",
+      "path": "/memory/learning/approve",
+      "handler": "approveLearningCandidate",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "candidate_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, candidate_id, promoted_memory_id, candidate }",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8561,
+        "pattern": "if (method === \"POST\" && path === \"/memory/learning/approve\")",
+        "confidence": "high"
+      },
+      "notes": "Aprovação humana — promove candidato para memória ativa."
+    },
+    {
+      "id": "memory.learning.reject.post",
+      "method": "POST",
+      "path": "/memory/learning/reject",
+      "handler": "rejectLearningCandidate",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "candidate_id": "string (obrigatório)",
+          "reason": "string (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, candidate_id, candidate }",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8585,
+        "pattern": "if (method === \"POST\" && path === \"/memory/learning/reject\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "memory.audit.get",
+      "method": "GET",
+      "path": "/memory/audit",
+      "handler": "listAuditEvents",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [
+          {
+            "name": "event_type",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "target_type",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "target_id",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "type": "integer"
+          }
+        ],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, items[], count }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8612,
+        "pattern": "if (method === \"GET\" && path === \"/memory/audit\")",
+        "confidence": "high"
+      },
+      "notes": "PR6 — Telemetria de auditoria de memória. Filtros: event_type, target_type, target_id, limit."
+    },
+    {
+      "id": "memory.get",
+      "method": "GET",
+      "path": "/memory",
+      "handler": "searchRelevantMemory",
+      "group": "memory",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ state, summary, canonicalEntries[], operationalEntries[], liveContext, consolidation, memoryReadBeforePlan, auditSnapshots[] }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8639,
+        "pattern": "if (method === \"GET\" && path === \"/memory\")",
+        "confidence": "high"
+      },
+      "notes": "Estado completo da memória persistida no KV. Painel: aba Memória."
+    },
+    {
+      "id": "brain.director_query.post",
+      "method": "POST",
+      "path": "/brain/director-query",
+      "handler": "loadDirectorBrain",
+      "group": "brain",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": true,
+        "type": "admin_key",
+        "header": "Authorization: Bearer <INTERNAL_TOKEN>",
+        "notes": "isInternalAuthorized. Além disso: body.role === 'director' obrigatório (403 se diferente)."
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "role": "\"director\" (obrigatório literal)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, brain: { role, version, modules, content } }",
+        "status_codes": [
+          200,
+          401,
+          403,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8137,
+        "pattern": "if (method === \"POST\" && path === \"/brain/director-query\")",
+        "confidence": "high"
+      },
+      "notes": "Cérebro canônico do Director — carregado do KV. Acesso restrito a role:director com INTERNAL_TOKEN."
+    },
+    {
+      "id": "brain.get_module.post",
+      "method": "POST",
+      "path": "/brain/get-module",
+      "handler": "handleBrainGetModule",
+      "group": "brain",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "module_id": "string (obrigatório)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, module_id, content }",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8130,
+        "pattern": "if (method === \"POST\" && path === \"/brain/get-module\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "brain.query.post",
+      "method": "POST",
+      "path": "/brain-query",
+      "handler": "handleBrainQuery",
+      "group": "brain",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "query": "string (tema de busca)"
+        }
+      },
+      "output": {
+        "shape": "módulos relevantes do brain",
+        "status_codes": [
+          200,
+          400,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8123,
+        "pattern": "if (method === \"POST\" && path === \"/brain-query\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "brain.read.get",
+      "method": "GET",
+      "path": "/brain/read",
+      "handler": "inline (KV read SYSTEM_PROMPT)",
+      "group": "brain",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, route, systemPrompt, index, modulesLoaded[] }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8218,
+        "pattern": "if (method === \"GET\" && path === \"/brain/read\")",
+        "confidence": "high"
+      },
+      "notes": "Lê SYSTEM_PROMPT do KV (ENAVIA_BRAIN). Retorna index e módulos em cache."
+    },
+    {
+      "id": "brain.index.get",
+      "method": "GET",
+      "path": "/brain/index",
+      "handler": "handleBrainIndex",
+      "group": "brain",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "INDEX completo + meta de cache",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8236,
+        "pattern": "if (method === \"GET\" && path === \"/brain/index\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "brain.debug.get",
+      "method": "GET",
+      "path": "/debug-brain",
+      "handler": "handleDebugBrain",
+      "group": "brain",
+      "scope": "debug",
+      "status": "debug",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "status interno real do NV-FIRST",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8197,
+        "pattern": "if (method === \"GET\" && path === \"/debug-brain\")",
+        "confidence": "high"
+      }
+    },
+    {
+      "id": "audit_propose.audit.get",
+      "method": "GET",
+      "path": "/audit",
+      "handler": "inline (schema description)",
+      "group": "audit_propose",
+      "scope": "executor",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": false,
+        "notes": "Retorna jsonResponse sem withCORS explícito nesta rota."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, route, description, schema, smoke_example, timestamp }",
+        "status_codes": [
+          200
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 7100,
+        "pattern": "if (method === \"GET\" && path === \"/audit\")",
+        "confidence": "high"
+      },
+      "notes": "Schema/contrato do POST /audit. Usado como smoke de conectividade pelo CI (deploy.yml)."
+    },
+    {
+      "id": "audit_propose.audit.post",
+      "method": "POST",
+      "path": "/audit",
+      "handler": "inline (calls EXECUTOR + DEPLOY_WORKER)",
+      "group": "audit_propose",
+      "scope": "executor",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Sem guard de auth explícito. Requer campos obrigatórios no body."
+      },
+      "cors": {
+        "expected": false,
+        "notes": "Não usa withCORS nesta rota específica."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "execution_id": "string (obrigatório)",
+          "mode": "\"enavia_audit\" (obrigatório literal)",
+          "source": "string (obrigatório)",
+          "target": {
+            "system": "string",
+            "workerId": "string"
+          },
+          "patch": {
+            "type": "\"patch_text\"",
+            "content": "string"
+          },
+          "constraints": {
+            "read_only": true,
+            "no_auto_apply": true
+          }
+        }
+      },
+      "output": {
+        "shape": "{ ok, execution_id, duration_ms, executor, audit_result, deploy_receipt }",
+        "status_codes": [
+          200,
+          400,
+          502,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 7138,
+        "pattern": "if (method === \"POST\" && path === \"/audit\")",
+        "confidence": "high"
+      },
+      "notes": "Audit endpoint canônico (read-only). Chama EXECUTOR via service binding e carimba no DEPLOY_WORKER."
+    },
+    {
+      "id": "audit_propose.propose.post",
+      "method": "POST",
+      "path": "/propose",
+      "handler": "inline (calls EXECUTOR.fetch /audit)",
+      "group": "audit_propose",
+      "scope": "executor",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "execution_id": "string (opcional — gerado se ausente)",
+          "target": {
+            "workerId": "string (opcional)"
+          },
+          "patch": {
+            "content": "string (opcional)"
+          },
+          "prompt": "string (opcional)",
+          "intent": "string (opcional)",
+          "constraints": "object (opcional)",
+          "context": "object (opcional)",
+          "ask_suggestions": "boolean (opcional, default true)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, execution_id, duration_ms, executor, propose, next_actions[] }",
+        "status_codes": [
+          200,
+          400,
+          502
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6984,
+        "pattern": "if (method === \"POST\" && path === \"/propose\")",
+        "confidence": "high"
+      },
+      "notes": "Proposta supervisionada. NÃO carimba no Deploy Worker. Apenas consulta EXECUTOR. Não requer AUDIT prévio."
+    },
+    {
+      "id": "engineer.post",
+      "method": "POST",
+      "path": "/engineer",
+      "handler": "handleEngineerRequest",
+      "group": "engineer",
+      "scope": "executor",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Guard interno pode verificar INTERNAL_TOKEN para certas ações."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "action": "string",
+          "payload": "object"
+        }
+      },
+      "output": {
+        "shape": "resposta do executor core",
+        "status_codes": [
+          200,
+          400,
+          502,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8102,
+        "pattern": "if (method === \"POST\" && path === \"/engineer\")",
+        "confidence": "high"
+      },
+      "notes": "Relay para enavia-executor core. env.EXECUTOR.fetch é usado APENAS nesta rota (PR11 confirmado)."
+    },
+    {
+      "id": "engineer.get",
+      "method": "GET",
+      "path": "/engineer",
+      "handler": "inline (static JSON)",
+      "group": "engineer",
+      "scope": "executor",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, route, message }",
+        "status_codes": [
+          200
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8204,
+        "pattern": "if (method === \"GET\" && path === \"/engineer\")",
+        "confidence": "high"
+      },
+      "notes": "Teste rápido de ativação da rota POST /engineer."
+    },
+    {
+      "id": "bridge.vercel_patch.post",
+      "method": "POST",
+      "path": "/vercel/patch",
+      "handler": "inline (fetch VERCEL_EXECUTOR_URL)",
+      "group": "bridge",
+      "scope": "deploy",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "patch": "object (enviado ao executor Vercel)"
+        }
+      },
+      "output": {
+        "shape": "resposta do VERCEL_EXECUTOR_URL",
+        "status_codes": [
+          200,
+          500,
+          502
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 1510,
+        "pattern": "if (method === \"POST\" && path === \"/vercel/patch\")",
+        "confidence": "high"
+      },
+      "notes": "Simulação de patch no Executor Vercel. Encaminha body.patch para VERCEL_EXECUTOR_URL."
+    },
+    {
+      "id": "bridge.browser_run.post",
+      "method": "POST",
+      "path": "/browser/run",
+      "handler": "inline (fetch BROWSER_EXECUTOR_URL)",
+      "group": "bridge",
+      "scope": "browser",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Guard anti-reentrada: X-NV-Browser-Source: enavia-worker → 508."
+      },
+      "cors": {
+        "expected": true,
+        "notes": "withCORS."
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "plan": {
+            "version": "\"plan.v1\"",
+            "steps": "array de steps"
+          },
+          "execution_id": "string (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, execution_id, result }",
+        "status_codes": [
+          200,
+          400,
+          500,
+          508
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6720,
+        "pattern": "if (url.pathname === \"/browser/run\" || url.pathname === \"/browser/execute\")",
+        "confidence": "high"
+      },
+      "notes": "Executor lógico de browser — encaminha plan.v1 para BROWSER_EXECUTOR_URL (DigitalOcean). Alias: /browser/execute."
+    },
+    {
+      "id": "bridge.browser_execute.post",
+      "method": "POST",
+      "path": "/browser/execute",
+      "handler": "inline (fetch BROWSER_EXECUTOR_URL) — alias de /browser/run",
+      "group": "bridge",
+      "scope": "browser",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Mesmo handler de /browser/run."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "plan": "object com .steps[]"
+        }
+      },
+      "output": {
+        "shape": "{ ok, execution_id, result }",
+        "status_codes": [
+          200,
+          400,
+          500,
+          508
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6720,
+        "pattern": "url.pathname === \"/browser/execute\"",
+        "confidence": "high"
+      },
+      "notes": "Alias de /browser/run. Ambos tratados no mesmo bloco condicional."
+    },
+    {
+      "id": "bridge.browser_test.post",
+      "method": "POST",
+      "path": "/browser-test",
+      "handler": "inline (gera plan.v1 smoke + fetch BROWSER_EXECUTOR_URL)",
+      "group": "bridge",
+      "scope": "browser",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none",
+        "notes": "Guard anti-reentrada: X-NV-Browser-Source: enavia-worker → 508."
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": {
+          "url": "string (opcional, default: https://google.com)",
+          "ms": "number (opcional, wait ms, default: 5000)",
+          "execution_id": "string (opcional)"
+        }
+      },
+      "output": {
+        "shape": "{ ok, execution_id, result }",
+        "status_codes": [
+          200,
+          500,
+          508
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 6842,
+        "pattern": "if (urlObj.pathname === \"/browser-test\")",
+        "confidence": "high"
+      },
+      "notes": "Gera automaticamente um plan.v1 smoke (open + wait) e envia ao BROWSER_EXECUTOR_URL."
+    },
+    {
+      "id": "brain.reload.post",
+      "method": "POST",
+      "path": "/reload",
+      "handler": "handleReloadRequest",
+      "group": "brain",
+      "scope": "memory",
+      "status": "active",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, modules_loaded }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8109,
+        "pattern": "if (method === \"POST\" && path === \"/reload\")",
+        "confidence": "high"
+      },
+      "notes": "Recarrega INDEX do brain (NV_INDEX_CACHE)."
+    },
+    {
+      "id": "brain.debug_load.post",
+      "method": "POST",
+      "path": "/debug-load",
+      "handler": "handleDebugLoad",
+      "group": "brain",
+      "scope": "memory",
+      "status": "debug",
+      "auth": {
+        "required": false,
+        "type": "none"
+      },
+      "cors": {
+        "expected": true
+      },
+      "input": {
+        "query": [],
+        "body": null
+      },
+      "output": {
+        "shape": "{ ok, modules }",
+        "status_codes": [
+          200,
+          500
+        ]
+      },
+      "evidence": {
+        "file": "nv-enavia.js",
+        "line": 8116,
+        "pattern": "if (method === \"POST\" && path === \"/debug-load\")",
+        "confidence": "high"
+      },
+      "notes": "Carrega módulos via fila (3 simultâneos) para cache local."
+    }
+  ],
+  "known_external_routes": [
+    {
+      "name": "enavia-executor (EXECUTOR service binding)",
+      "type": "service_binding",
+      "binding": "env.EXECUTOR",
+      "routes": [
+        {
+          "path": "/audit",
+          "method": "POST",
+          "used_by": [
+            "POST /propose",
+            "POST /audit (via callExecutorBridge)",
+            "POST /contracts/execute-next (via callExecutorBridge)"
+          ]
+        },
+        {
+          "path": "/audit",
+          "method": "POST",
+          "used_by": [
+            "POST /propose — chama EXECUTOR.fetch('https://enavia-executor.internal/audit')"
+          ],
+          "notes": "propose usa /audit do executor (não /propose)"
+        }
+      ],
+      "confidence": "high"
+    },
+    {
+      "name": "deploy-worker (DEPLOY_WORKER service binding)",
+      "type": "service_binding",
+      "binding": "env.DEPLOY_WORKER",
+      "routes": [
+        {
+          "path": "/audit",
+          "method": "POST",
+          "used_by": [
+            "callDeployBridge — recibo de audit aprovado"
+          ]
+        },
+        {
+          "path": "/apply-test",
+          "method": "POST",
+          "used_by": [
+            "callDeployBridge — aplicação de patch em TEST"
+          ]
+        }
+      ],
+      "confidence": "high"
+    },
+    {
+      "name": "BROWSER_EXECUTOR_URL (external fetch)",
+      "type": "external_url",
+      "env_var": "BROWSER_EXECUTOR_URL",
+      "default_url": "https://run.nv-imoveis.com/browser/run",
+      "routes": [
+        {
+          "path": "(configurado por env)",
+          "method": "POST",
+          "used_by": [
+            "POST /browser/run",
+            "POST /browser/execute",
+            "POST /browser-test"
+          ]
+        }
+      ],
+      "confidence": "high"
+    },
+    {
+      "name": "DIRECTOR_COGNITIVE_URL (external fetch)",
+      "type": "external_url",
+      "env_var": "DIRECTOR_COGNITIVE_URL",
+      "default_url": "https://nv-director-cognitive.brunovasque.workers.dev/director/cognitive",
+      "routes": [
+        {
+          "path": "/director/cognitive",
+          "method": "POST",
+          "used_by": [
+            "handleDirectorCognitiveProxy"
+          ]
+        }
+      ],
+      "confidence": "high"
+    },
+    {
+      "name": "VERCEL_EXECUTOR_URL (external fetch)",
+      "type": "external_url",
+      "env_var": "VERCEL_EXECUTOR_URL",
+      "default_url": "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch",
+      "routes": [
+        {
+          "path": "(configurado por env)",
+          "method": "POST",
+          "used_by": [
+            "POST /vercel/patch"
+          ]
+        }
+      ],
+      "confidence": "high"
+    }
+  ],
+  "unknowns": [
+    {
+      "item": "auth.required para rotas de contratos",
+      "reason": "Nenhum guard explícito de autenticação foi observado nas rotas /contracts/* no roteador de nv-enavia.js. Handlers importados de contract-executor.js podem ter guards internos não visíveis no roteador.",
+      "action": "Confirmar presença ou ausência de auth em handleCreateContract, handleCompleteTask, etc. em contract-executor.js."
+    },
+    {
+      "item": "CORS em POST /audit e GET /audit",
+      "reason": "Essas rotas usam jsonResponse mas sem withCORS explícito verificado nas linhas lidas. Pode estar embutido em jsonResponse ou ausente.",
+      "action": "Verificar implementação de jsonResponse para confirmar se inclui withCORS por padrão."
+    },
+    {
+      "item": "Rotas adicionais em contract-executor.js",
+      "reason": "contract-executor.js pode expor rotas internas chamadas por handleExecuteContract ou outros handlers que não aparecem no roteador de nv-enavia.js.",
+      "action": "Confirmar em PR-DOCS futura ou via leitura de contract-executor.js se houver endpoints HTTP próprios (improvável, mas não confirmado)."
+    }
+  ],
+  "route_count": {
+    "total": 67,
+    "by_group": {
+      "system": 2,
+      "internal": 5,
+      "cognitive": 5,
+      "planner": 4,
+      "execution": 4,
+      "contracts": 9,
+      "loop_operacional": 4,
+      "github_arm": 3,
+      "browser_arm": 2,
+      "memory": 10,
+      "brain": 8,
+      "audit_propose": 3,
+      "bridge": 4,
+      "engineer": 2
+    },
+    "by_method": {
+      "GET": 22,
+      "POST": 43,
+      "PATCH": 1,
+      "OPTIONS": 1
+    },
+    "by_confidence": {
+      "high": 67,
+      "medium": 0,
+      "low": 0
+    }
+  },
+  "maintenance": {
+    "update_when": [
+      "nova rota criada em nv-enavia.js",
+      "handler alterado ou renomeado",
+      "rota removida ou deprecada",
+      "autenticação alterada",
+      "escopo operacional alterado",
+      "novo service binding adicionado"
+    ],
+    "companion_documents": [
+      "schema/system/ENAVIA_SYSTEM_MAP.md — visão macro do sistema",
+      "schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md — como operar o loop (PR24)",
+      "PR25 — registry de workers, bindings, KV e secrets"
+    ],
+    "next_registry": "PR24 — ENAVIA_OPERATIONAL_PLAYBOOK.md"
+  }
+}
