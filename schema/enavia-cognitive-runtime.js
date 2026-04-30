@@ -237,7 +237,10 @@ export function buildChatSystemPrompt(opts = {}) {
       sections.push("• O alvo operacional acima é real e está ativo. Use-o como referência nesta resposta — não pergunte dados que já estão no alvo.");
     }
     if (target?.mode === "read_only") {
-      sections.push("• MODO READ-ONLY CONFIRMADO: não sugira deploy, patch, merge, escrita ou qualquer operação de escrita. Foque exclusivamente em validação e leitura.");
+      // PR36: read_only é nota factual de capacidade (gate de execução), não regra de tom.
+      // A Enavia continua livre para conversar, raciocinar, discordar, explicar, diagnosticar
+      // e planejar. O bloqueio é apenas sobre execução real com efeito colateral.
+      sections.push("• Modo atual: read_only. Ações com efeito colateral (deploy, patch, merge, escrita) estão bloqueadas sem aprovação/contrato. Conversar, raciocinar, explicar, diagnosticar e planejar continuam livres.");
     }
     sections.push(
       "• NUNCA pergunte 'qual sistema?', 'qual worker?' ou 'qual ambiente?' se esses dados já existirem no alvo operacional.",

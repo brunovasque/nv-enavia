@@ -1,12 +1,100 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR35 — PR-DOCS — Mode Policy + ajuste do contrato para execução real na PR36
-**Para:** PR36 — PR-IMPL — Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos
+**De:** PR36 — PR-IMPL — Correção inicial do chat runtime (read_only como gate, target sem tom forçado, sanitizers não destrutivos, telemetria)
+**Para:** PR37 — PR-PROVA — Smoke anti-bot real do chat runtime
 
 ## O que foi feito nesta sessão
 
-### PR35 — PR-DOCS — Mode Policy (esta PR)
+### PR36 — PR-IMPL — Chat runtime anti-bot inicial
+
+**Tipo:** `PR-IMPL` (worker-only, patch cirúrgico)
+**Branch:** `copilot/claudepr36-impl-chat-runtime-readonly-target-sanit`
+
+**Arquivos alterados (runtime):**
+
+1. **`nv-enavia.js`**:
+   - `_sanitizeChatReply`: patterns mais estritos (forma de campo `chave:` ou `chave=`), threshold elevado (3 → 4), sinal estrutural complementar JSON-like que dispara independente do threshold.
+   - `_isManualPlanReply`: threshold elevado (2 → 5) + bypass `_looksLikeNaturalProse` para preservar prosa estratégica útil ao operador.
+   - Helper novo `isOperationalMessage(message, context)` com lista expandida (deploy, executor, contrato, worker, health, diagnóstico, logs, erro, branch, merge, rollback, patch, revisar pr, endpoint, prod, staging, kv, binding, etc.).
+   - `isOperationalContext` agora depende de intenção operacional real, não de `hasTarget` sozinho.
+   - `_operationalContextBlock` ativado por `(hasTarget && isOperationalContext)` em vez de `hasTarget` puro.
+   - `readOnlyNote` reescrito como nota factual de gate de execução.
+   - Telemetria `sanitization: {applied, layer, reason}` adicionada à resposta `/chat/run` (campo aditivo).
+   - Named exports aditivos para testabilidade (`_sanitizeChatReply`, `_isManualPlanReply`, `_looksLikeNaturalProse`, `_MANUAL_PLAN_FALLBACK`, `isOperationalMessage`).
+
+2. **`schema/enavia-cognitive-runtime.js`**:
+   - Seção 5c: `read_only` virou nota factual ("Modo atual: read_only. Ações com efeito colateral estão bloqueadas sem aprovação/contrato. Conversar, raciocinar, explicar, diagnosticar e planejar continuam livres.") — não mais regra de tom defensiva.
+
+**Arquivos criados (testes + governança):**
+
+3. **`tests/pr36-chat-runtime-anti-bot.smoke.test.js`** (NOVO): 5 cenários, 25 asserts, todos verdes.
+4. **`schema/reports/PR36_IMPL_CHAT_RUNTIME_REPORT.md`** (NOVO): 11 seções com objetivo, diagnósticos usados, arquivos alterados, mudanças, telemetria, testes, riscos, o que NÃO foi feito e próxima PR.
+
+**Arquivos atualizados (governança):**
+
+5. **`schema/contracts/INDEX.md`**: PR36 ✅ adicionada. Próxima PR autorizada → PR37 PR-PROVA.
+6. **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR36 registrada. Próxima PR: PR37.
+7. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo): handoff atualizado para PR37.
+8. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**: bloco PR36 adicionado.
+
+**Arquivos NÃO alterados (proibidos pelo escopo):**
+
+- `panel/` (nenhum arquivo tocado)
+- `contract-executor.js`, `executor/`
+- `.github/workflows/`
+- `wrangler.toml`, `wrangler.executor.template.toml`
+- secrets, bindings, KV config
+- contratos encerrados
+- Nenhum endpoint criado, nenhum brain/intent engine/skill router criado, nenhum deploy.
+- Nenhum gate real de execução / aprovação / Bridge perigoso relaxado.
+
+## Smoke tests executados
+
+```bash
+node --check nv-enavia.js                                         # OK
+node --check schema/enavia-cognitive-runtime.js                   # OK
+node --check tests/pr36-chat-runtime-anti-bot.smoke.test.js       # OK
+node tests/pr36-chat-runtime-anti-bot.smoke.test.js               # 25/25  ✅
+node tests/pr21-loop-status-states.smoke.test.js                  # 53/53  ✅
+node tests/pr20-loop-status-in-progress.smoke.test.js             # 27/27  ✅
+node tests/pr19-advance-phase-e2e.smoke.test.js                   # 52/52  ✅
+node tests/pr14-executor-deploy-real-loop.smoke.test.js           # 183/183 ✅
+node tests/pr13-hardening-operacional.smoke.test.js               # 91/91  ✅
+node tests/cognitive-runtime.smoke.test.js                        # 44/44  ✅
+node tests/pr3-tool-arbitration.smoke.test.js                     # 84/84  ✅
+node tests/chat-run.http.test.js                                  # 24/24  ✅
+```
+
+Nenhuma regressão.
+
+## Próxima ação autorizada
+
+**PR37 — PR-PROVA — Smoke anti-bot real do chat runtime**
+
+A PR36 foi PR-IMPL real, então a próxima é PROVA (não volta para PR-DOCS).
+
+### Escopo técnico esperado para PR37
+
+- Subir Worker em staging/test e exercitar `/chat/run` com cenários reais.
+- Confirmar comportamento end-to-end:
+  - Conversa simples + `target.mode = "read_only"` → `operational_context_applied: false`, reply natural, sem fallback.
+  - Mensagem operacional real → `operational_context_applied: true`, reply útil estruturado.
+  - Snapshot de planner injetado (controlado) → `sanitization.layer = "planner_terms"`.
+  - Resposta longa estratégica → preservada, sem `manual_plan` fallback.
+- Capturar request/response como evidência.
+- Não alterar runtime nem painel.
+
+Após PR37, a Frente 2 corretiva (PR33-PR37) fica fechada e a Frente 3 (Brain/Intent Engine/Skill Router) pode iniciar.
+
+---
+
+## Histórico: PR35
+
+**De:** PR34 — PR-DIAG — Diagnóstico técnico profundo
+**Para:** PR36 (esta PR)
+
+### PR35 — PR-DOCS — Mode Policy + ajuste do contrato para execução real na PR36
 
 **Tipo:** `PR-DOCS` (sem alteração de runtime)  
 **Branch:** `copilot/claudepr35-docs-mode-policy-e-ajuste-para-execucao`
