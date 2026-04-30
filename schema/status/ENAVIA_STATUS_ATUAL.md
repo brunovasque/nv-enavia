@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR27)
-**Branch ativa:** `claude/pr27-docs-deploy-governance-operator-skill`
-**Última tarefa:** PR27 — PR-DOCS — Criação de `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` com 23 seções + atualização de `schema/skills/INDEX.md`. Segunda skill oficial supervisionada da ENAVIA. Cobre: identidade, objetivo, princípio de deploy seguro, matriz TEST vs PROD (8 tipos), 12 gates obrigatórios, relação com Contract Loop Operator/Worker Registry/Route Registry/Playbook, procedimento deploy TEST e promoção PROD (com aprovação humana obrigatória), rollback por tipo (DOCS/PROVA/IMPL/workflow/KV/PROD), diagnóstico de falhas (12 cenários), 7 exemplos de uso, segurança/limites, checklist final. Nenhum runtime alterado. Branch base: `2954fef` (PR26 mergeada).
+**Data:** 2026-04-30 (atualizado após PR28)
+**Branch ativa:** `claude/pr28-docs-system-mapper-skill`
+**Última tarefa:** PR28 — PR-DOCS — Criação de `schema/skills/SYSTEM_MAPPER.md` com 23 seções + atualização de `schema/skills/INDEX.md`. Terceira skill oficial supervisionada da ENAVIA. Cobre: identidade, objetivo, princípio de mapeamento fiel ("Mapa bom não é mapa bonito; é mapa fiel ao sistema real."), triggers de ativação (runtime, documental, operação), quando NÃO ativar, pré-condições obrigatórias (10 itens), tabela de documentos sob responsabilidade (9 documentos com função/quando/fonte), regras específicas para System Map, Route Registry, Worker Registry, Operational Playbook e Skills Index, matriz de impacto documental (11 cenários), procedimento supervisionado de mapeamento (10 passos), tabela de divergências (9 cenários com ação segura), relação com Contract Loop Operator (PR26), Deploy Governance Operator (PR27) e futura Contract Auditor (PR29), critérios para sugerir nova skill (6 gatilhos + template), 6 exemplos de uso concretos, segurança/limites, "Isso é opcional. Não mexa agora." (9 itens), checklist final (11 itens). Nenhum runtime alterado. Branch base: `0f43c29` (PR27 mergeada via PR #188).
 
 ## Contrato ativo
 

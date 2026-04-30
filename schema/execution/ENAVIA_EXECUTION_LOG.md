@@ -4,6 +4,75 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR28 — PR-DOCS — Criar schema/skills/SYSTEM_MAPPER.md
+
+- **Branch:** `claude/pr28-docs-system-mapper-skill`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR27 ✅ (PR #188 mergeada — commit merge `0f43c29`)
+- **Escopo:** Docs-only. Criação de `schema/skills/SYSTEM_MAPPER.md` + atualização de `schema/skills/INDEX.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar a terceira skill oficial supervisionada da ENAVIA — System Mapper — que governa a manutenção dos documentos de sistema (System Map, Route Registry, Worker Registry, Operational Playbook, Skills Index). Skill supervisionada e documental: não atualiza documentos automaticamente, não inventa rota/worker/binding, não altera runtime.
+
+### Arquivos criados/alterados
+
+- **`schema/skills/SYSTEM_MAPPER.md`** (NOVO):
+  - 23 seções obrigatórias.
+  - Frase obrigatória: "Mapa bom não é mapa bonito; é mapa fiel ao sistema real." (Seção 3).
+  - Seção 7: Tabela de 9 documentos sob responsabilidade da skill com função, quando atualizar e fonte primária.
+  - Seções 8–12: Regras específicas para System Map, Route Registry, Worker Registry, Operational Playbook e Skills Index.
+  - Seção 13: Matriz de impacto documental (11 cenários).
+  - Seção 14: Procedimento supervisionado de mapeamento (10 passos).
+  - Seção 15: Tabela de divergências (9 cenários).
+  - Seções 16–18: Relação com Contract Loop Operator (PR26), Deploy Governance Operator (PR27) e futura Contract Auditor (PR29).
+  - Seção 19: Critérios para sugerir nova skill + template.
+  - Seção 20: 6 exemplos de uso concretos.
+  - Seção 22: "Isso é opcional. Não mexa agora." (9 itens).
+  - Seção 23: Checklist final (11 itens).
+
+- **`schema/skills/INDEX.md`** (ATUALIZADO):
+  - System Mapper movida de "previstas" para "ativas".
+  - Total: 3 skills ativas (PR26, PR27, PR28), 1 prevista (PR29).
+
+- **Governança:**
+  - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+  - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — recriado para PR28→PR29.
+  - `schema/contracts/INDEX.md` — próxima PR autorizada = PR29 (Contract Auditor).
+  - `schema/execution/ENAVIA_EXECUTION_LOG.md` — esta entrada.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, Panel, Executor, Deploy Worker.
+- `wrangler.toml`, `wrangler.executor.template.toml`.
+- `.github/workflows/`.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding, KV ou env var alterado.
+
+### Verificações smoke
+
+- `git diff --name-only`: apenas `schema/skills/SYSTEM_MAPPER.md` (novo), `schema/skills/INDEX.md`, `schema/contracts/INDEX.md`, `schema/status/ENAVIA_STATUS_ATUAL.md`, `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`, `schema/execution/ENAVIA_EXECUTION_LOG.md`.
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Frase "Mapa bom não é mapa bonito; é mapa fiel ao sistema real." presente.
+- Frase "Isso é opcional. Não mexa agora." presente.
+- Referências a `CONTRACT_LOOP_OPERATOR.md`, `DEPLOY_GOVERNANCE_OPERATOR.md` e futura `CONTRACT_AUDITOR.md` presentes.
+
+### Rollback
+
+- `git revert <commit>` reverte a criação da skill e retorna `schema/skills/INDEX.md`, `schema/contracts/INDEX.md` e governança ao estado pós-PR27.
+- Não há impacto em runtime.
+
+### Próxima ação autorizada
+
+**PR29** — PR-DOCS — Criar skill: Contract Auditor (`schema/skills/CONTRACT_AUDITOR.md`).
+
+### Bloqueios
+
+- nenhum.
+
+---
+
 ## 2026-04-30 — PR27 — PR-DOCS — Criar schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md
 
 - **Branch:** `claude/pr27-docs-deploy-governance-operator-skill`

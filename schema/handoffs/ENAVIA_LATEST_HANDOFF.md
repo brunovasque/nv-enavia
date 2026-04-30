@@ -1,73 +1,74 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR27 — PR-DOCS — Criar `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md`
-**Para:** PR28 — PR-DOCS — Criar skill: System Mapper
+**De:** PR28 — PR-DOCS — Criar `schema/skills/SYSTEM_MAPPER.md`
+**Para:** PR29 — PR-DOCS — Criar skill: Contract Auditor
 
 ## O que foi feito nesta sessão
 
-### PR27 — PR-DOCS — Deploy Governance Operator (segunda skill oficial)
+### PR28 — PR-DOCS — System Mapper (terceira skill oficial)
 
 **Tipo:** `PR-DOCS`
-**Branch:** `claude/pr27-docs-deploy-governance-operator-skill` (criada a partir de `origin/main` atualizada — commit base `2954fef`, contendo PR26 mergeada — PR #187)
+**Branch:** `claude/pr28-docs-system-mapper-skill` (atualizada contra `origin/main` — commit base `0f43c29`, contendo PR27 mergeada — PR #188)
 
 **Arquivos criados/alterados:**
 
-1. **`schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md`** (NOVO):
+1. **`schema/skills/SYSTEM_MAPPER.md`** (NOVO):
    - 23 seções obrigatórias.
-   - Segunda skill oficial supervisionada da ENAVIA.
-   - Frase obrigatória 1: "Deploy seguro não é deploy travado; é deploy com prova, rollback e aprovação clara."
-   - Frase obrigatória 2: "Sem aprovação humana explícita, PROD é bloqueado."
-   - Seção 3: Princípio de deploy seguro sem travamento — governa sem impedir evolução.
-   - Seção 9: Matriz de decisão TEST vs PROD — 8 tipos de PR/ação mapeados (DOCS, PROVA, IMPL, workflow, binding, hotfix, rollback, promoção).
-   - Seção 10: 12 gates obrigatórios antes de qualquer deploy (branch limpa, PR aprovada, CI verde, smoke suite, sem conflito, wrangler válido, secrets verificados, worker registrado, rollback documentado, aprovação humana para PROD, KV backup, deploy log).
-   - Seção 11: Relação com Contract Loop Operator — ponto de integração `execute-next → DEPLOY_WORKER:/apply-test`.
-   - Seção 12: Relação com Worker Registry (PR25) — fonte de verdade para workers, bindings, secrets, workflows.
-   - Seção 13: Relação com Route Registry (PR23) — `known_external_routes` para deploy.
-   - Seção 14: Relação com Operational Playbook (PR24) — rollback e smoke suite.
-   - Seções 15–16: Procedimento passo a passo deploy TEST (8 passos) e promoção PROD (10 passos).
-   - Seção 17: Rollback por tipo (DOCS, PROVA, IMPL Worker, workflow/config, KV/data, PROD) + quando NÃO fazer rollback + formato de log.
-   - Seção 18: Tabela de diagnóstico de falhas (12 linhas: GitHub Actions, wrangler, secrets, bindings, KV, worker 500, smoke fail, rollback fail, etc.).
-   - Seção 19: Critérios para sugerir nova skill (8 gatilhos + template).
-   - Seção 20: 7 exemplos de uso concretos (PR-DOCS sem deploy, PR-IMPL para TEST, TEST→PROD, smoke fail, secret faltando, rollback, sugestão de skill).
-   - Seção 21: Segurança e limites (nunca expor secrets, nunca alterar bindings/KV, nunca auto-promover PROD).
-   - Seção 22: "Isso é opcional. Não mexa agora." (11 itens: executor automático de deploy, endpoint /deploy/trigger, webhook de CI, auto-rollback, etc.).
-   - Seção 23: Checklist final (12 itens).
+   - Terceira skill oficial supervisionada da ENAVIA.
+   - Frase obrigatória: "Mapa bom não é mapa bonito; é mapa fiel ao sistema real."
+   - Seção 3: Princípio de mapeamento fiel (mapa não é imaginação; registry não é desejo; documentação não pode inventar runtime; `A VERIFICAR` para incertezas).
+   - Seção 4: Triggers de ativação (runtime, documental, operação).
+   - Seção 5: Quando NÃO ativar — encaminha para Contract Loop Operator (loop), Deploy Governance Operator (deploy), Contract Auditor (aderência futura).
+   - Seção 6: Pré-condições obrigatórias (10 itens).
+   - Seção 7: Tabela de documentos sob responsabilidade (9 documentos).
+   - Seções 8–12: Regras específicas para System Map, Route Registry, Worker Registry, Operational Playbook e Skills Index.
+   - Seção 13: Matriz de impacto documental (11 cenários: nova rota, rota removida, novo worker, novo binding, novo secret, novo workflow, novo endpoint do loop, nova skill, novo contrato, mudança de fase, PR mergeada).
+   - Seção 14: Procedimento supervisionado de mapeamento (10 passos).
+   - Seção 15: Tabela de divergências (9 cenários com ação segura).
+   - Seção 16: Relação com Contract Loop Operator (PR26).
+   - Seção 17: Relação com Deploy Governance Operator (PR27).
+   - Seção 18: Relação com futura Contract Auditor (PR29).
+   - Seção 19: Critérios para sugerir nova skill (6 gatilhos + template).
+   - Seção 20: 6 exemplos de uso (nova rota, novo binding, skill nova, playbook desatualizado, registry diverge, "o que existe hoje").
+   - Seção 21: Segurança e limites.
+   - Seção 22: "Isso é opcional. Não mexa agora." (9 itens: gerador automático de registry, scanner de workers, endpoint /system/map, UI de mapas, validação automática, auto-sync docs/runtime, bot de atualização, graph database, documentação visual interativa).
+   - Seção 23: Checklist final (11 itens).
 
 2. **`schema/skills/INDEX.md`** (ATUALIZADO):
-   - Deploy Governance Operator movida de "previstas" para "ativas".
-   - Agora 2 skills ativas (PR26, PR27), 2 previstas (PR28, PR29).
+   - System Mapper movida de "previstas" para "ativas".
+   - Agora 3 skills ativas (PR26, PR27, PR28), 1 prevista (PR29).
 
 3. **Governança:**
-   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR27 no topo.
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR28 no topo.
    - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo.
    - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
-   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR28.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR29.
 
 **Arquivos NÃO alterados:**
-- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
 - Nenhum teste criado ou modificado.
+- Nenhum secret, binding ou KV alterado.
 
 ## Critérios de aceite — atendidos
 
 | Critério | Status |
 |----------|--------|
-| `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado | ✅ |
+| `schema/skills/SYSTEM_MAPPER.md` criado | ✅ |
 | `schema/skills/INDEX.md` atualizado com a nova skill ativa | ✅ |
-| 23 seções obrigatórias presentes | ✅ |
-| "Deploy seguro não é deploy travado..." presente | ✅ (2 ocorrências) |
-| "Sem aprovação humana explícita, PROD é bloqueado." presente | ✅ |
-| CONTRACT_LOOP_OPERATOR referenciado | ✅ |
-| ENAVIA_WORKER_REGISTRY referenciado | ✅ (10 ocorrências) |
-| ENAVIA_ROUTE_REGISTRY referenciado | ✅ (5 ocorrências) |
-| ENAVIA_OPERATIONAL_PLAYBOOK referenciado | ✅ (3 ocorrências) |
-| Rollback documentado por tipo | ✅ (seção 17) |
-| Gates de deploy documentados | ✅ (seção 10, 12 gates) |
-| Promoção PROD supervisionada documentada | ✅ (seção 16) |
-| "Isso é opcional. Não mexa agora." presente | ✅ (seção 22) |
+| Skill governa System Map, Route Registry, Worker Registry, Playbook e Skills Index | ✅ (Seções 7–12) |
+| Frase "Mapa bom não é mapa bonito; é mapa fiel ao sistema real." presente | ✅ (Seção 3) |
+| Skill não autoriza atualização automática sem PR | ✅ (Seções 3, 21, 22) |
+| Skill não autoriza inventar rota/worker/binding | ✅ (Seções 3, 9, 10, 21) |
+| Referencia `CONTRACT_LOOP_OPERATOR.md` | ✅ (header + Seção 16) |
+| Referencia `DEPLOY_GOVERNANCE_OPERATOR.md` | ✅ (header + Seção 17) |
+| Referencia futura `CONTRACT_AUDITOR.md` | ✅ (Seção 18) |
+| "Isso é opcional. Não mexa agora." presente | ✅ (Seção 22) |
 | Nenhum runtime alterado | ✅ |
+| Nenhum endpoint criado | ✅ |
+| Nenhum teste criado | ✅ |
 | Governança atualizada | ✅ |
-| `schema/contracts/INDEX.md` aponta PR28 como próxima | ✅ |
+| `schema/contracts/INDEX.md` aponta PR29 como próxima | ✅ |
 
 ## Contrato ativo
 
@@ -75,18 +76,18 @@
 
 ## Próxima ação autorizada
 
-**PR28** — `PR-DOCS` — Criar skill: System Mapper
+**PR29** — `PR-DOCS` — Criar skill: Contract Auditor
 
-Criar `schema/skills/SYSTEM_MAPPER.md` — skill supervisionada que governa manutenção e atualização dos documentos de sistema (System Map, Route Registry, Worker Registry). Deve cobrir:
-- Quando atualizar cada documento de sistema
-- Triggers de atualização (nova rota, novo worker, novo binding, novo contrato)
-- Procedimento de atualização supervisionada
-- Relação com Deploy Governance Operator (PR27) — informação de infraestrutura
-- Relação com Contract Loop Operator (PR26) — quando loop aciona mudança de sistema
-- Relação com Contract Auditor (PR29) — validação de aderência
-- Atualizar `schema/skills/INDEX.md` com a nova skill ativa
+Criar `schema/skills/CONTRACT_AUDITOR.md` — skill supervisionada que valida aderência ao contrato ativo. Deve cobrir:
+- Validação de PR vs contrato (escopo declarado vs mudanças reais).
+- Detecção de divergência entre contrato e implementação.
+- Relação com Contract Loop Operator (PR26) — auditor não executa loop.
+- Relação com Deploy Governance Operator (PR27) — auditor não promove deploy.
+- Relação com System Mapper (PR28) — auditor pode pedir correção documental via PR-DOCS sob System Mapper.
+- Critérios de bloqueio quando PR violar contrato.
+- Atualizar `schema/skills/INDEX.md` movendo Contract Auditor para "ativas".
 
-**Pré-requisito:** PR27 concluída (esta PR) ✅
+**Pré-requisito:** PR28 concluída (esta PR) ✅
 
 ## Bloqueios
 

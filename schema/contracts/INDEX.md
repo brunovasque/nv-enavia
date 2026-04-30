@@ -38,11 +38,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR28** — PR-DOCS — Criar skill: System Mapper.
+**PR29** — PR-DOCS — Criar skill: Contract Auditor.
 
-Criar `schema/skills/SYSTEM_MAPPER.md` — skill supervisionada que governa manutenção e atualização dos documentos de sistema (System Map, Route Registry, Worker Registry). Documentar: quando atualizar cada documento, triggers de atualização, procedimento supervisionado, relação com Deploy Governance Operator (PR27), Contract Loop Operator (PR26) e Contract Auditor (PR29).
+Criar `schema/skills/CONTRACT_AUDITOR.md` — skill supervisionada que valida aderência ao contrato ativo. Deve cobrir: validação de PR vs contrato, detecção de divergência entre escopo declarado e mudanças reais, relação com Contract Loop Operator (PR26), Deploy Governance Operator (PR27) e System Mapper (PR28). Auditor pode pedir correção documental via PR-DOCS sob System Mapper, mas não atualiza mapas diretamente.
 
-Contexto: PR27 concluída — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado (23 seções, segunda skill oficial). Continua a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Contexto: PR28 concluída — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial supervisionada). Continua a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
@@ -51,4 +51,5 @@ Contexto: PR27 concluída — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` cria
 - **PR24** ✅ (PR-DOCS, mergeada — PR #185, commit merge `b54e74c`) — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado (18 seções + Apêndice A).
 - **PR25** ✅ (PR-DOCS, mergeada — PR #186, commit merge `fb8e640`) — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado (18 seções, inventário de infraestrutura).
 - **PR26** ✅ (PR-DOCS, mergeada — PR #187, commit merge `2954fef`) — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial) + `schema/skills/INDEX.md`.
-- **PR27** ✅ (PR-DOCS, em revisão) — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado (23 seções, segunda skill oficial) + `schema/skills/INDEX.md` atualizado.
+- **PR27** ✅ (PR-DOCS, mergeada — PR #188, commit merge `0f43c29`) — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado (23 seções, segunda skill oficial) + `schema/skills/INDEX.md` atualizado.
+- **PR28** ✅ (PR-DOCS, em revisão) — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial) + `schema/skills/INDEX.md` atualizado.
