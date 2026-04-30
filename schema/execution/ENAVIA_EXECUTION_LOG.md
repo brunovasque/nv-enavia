@@ -4,6 +4,48 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR31 — PR-DOCS — Ativação do contrato ENAVIA JARVIS BRAIN v1
+
+- **Branch:** `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`
+- **Tipo:** `PR-DOCS`
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` → **Criado e Ativo 🟢**
+- **PR anterior validada:** PR30 ✅ (contrato PR17–PR30 encerrado formalmente)
+- **Escopo:** Docs-only. Ativação do novo contrato macro. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar e ativar o novo contrato macro da ENAVIA: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`. Religar o loop contratual após encerramento do contrato PR17–PR30. PR-DOCS pura — sem alteração de runtime.
+
+### Arquivos criados
+
+- **`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`** (NOVO):
+  - 11 seções: status, objetivo macro, filosofia (LLM-first), arquitetura alvo (7 camadas), regras de segurança, escopo PR31–PR60 (12 frentes, 30 PRs), detalhamento completo de PR31–PR60, Obsidian Brain estrutura alvo, critérios de sucesso, riscos, regras de bloqueio, estado inicial.
+
+- **`schema/reports/PR31_ATIVACAO_CONTRATO_JARVIS_BRAIN.md`** (NOVO):
+  - Relatório de ativação.
+
+### Arquivos atualizados
+
+- **`schema/contracts/INDEX.md`**: contrato ativo → `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`. Próxima PR → PR32.
+- **`schema/status/ENAVIA_STATUS_ATUAL.md`**: novo contrato ativo. Próxima PR: PR32.
+- **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`**: de PR31 para PR32.
+- **`schema/execution/ENAVIA_EXECUTION_LOG.md`**: esta entrada.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, Panel, Executor, Deploy Worker.
+- `wrangler.toml`, `wrangler.executor.template.toml`.
+- `.github/workflows/`.
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding, KV ou env var alterado.
+
+### Próxima PR autorizada
+
+**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada**
+
+---
+
 ## 2026-04-30 — PR30 — PR-DOCS/PR-PROVA — Fechamento formal do contrato PR17–PR30
 
 - **Branch:** `copilot/claude-pr30-fechamento-contrato-loop-skills-system`

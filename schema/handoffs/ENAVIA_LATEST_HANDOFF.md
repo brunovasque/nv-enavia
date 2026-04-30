@@ -1,8 +1,77 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR30 — PR-DOCS/PR-PROVA — Fechamento, hardening e handoff final do contrato
-**Para:** Próximo contrato — a definir pelo operador humano
+**De:** PR31 — PR-DOCS — Ativação do contrato ENAVIA JARVIS BRAIN v1
+**Para:** PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada
+
+## O que foi feito nesta sessão
+
+### PR31 — PR-DOCS — Ativar contrato Jarvis Brain v1
+
+**Tipo:** `PR-DOCS`
+**Branch:** `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`
+
+**Arquivos criados:**
+
+1. **`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`** (NOVO):
+   - Contrato macro da nova fase ENAVIA JARVIS BRAIN v1.
+   - 11 seções: status, objetivo macro, filosofia, arquitetura alvo (7 camadas), regras de segurança, escopo PR31–PR60 (12 frentes, 30 PRs), detalhamento completo de cada PR, Obsidian Brain estrutura alvo, critérios de sucesso, riscos, regras de bloqueio, estado inicial.
+   - Frase central: "A Enavia pensa livremente, lembra com estrutura, sugere com inteligência e executa somente com governança."
+   - Princípio: "A Enavia é LLM-first. Contratos, skills, mapas, workers e executores são ferramentas da inteligência, não a personalidade dela."
+
+2. **`schema/reports/PR31_ATIVACAO_CONTRATO_JARVIS_BRAIN.md`** (NOVO):
+   - Relatório curto de ativação do contrato.
+
+**Arquivos atualizados:**
+
+3. **`schema/contracts/INDEX.md`**:
+   - Seção "Contrato ativo" atualizada para `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`.
+   - "Próxima PR autorizada" → PR32.
+
+4. **`schema/status/ENAVIA_STATUS_ATUAL.md`**:
+   - Novo contrato ativo registrado.
+   - Próxima PR: PR32.
+
+5. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo):
+   - Handoff atualizado de PR31 para PR32.
+
+6. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**:
+   - Bloco PR31 adicionado no topo.
+
+**Arquivos NÃO alterados:**
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding ou KV alterado.
+
+## Contrato ativo
+
+`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — **Ativo 🟢**
+
+## Próxima ação autorizada
+
+**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada**
+
+### O que a PR32 deve investigar
+
+- Prompts do chat: system prompt, prompt de segurança, prompt de memória, prompt de planner
+- Parâmetros `read_only`, `target`, `env`, `mode` e como afetam a resposta
+- Origem da resposta: qual função gera o texto final ao usuário
+- Memória aplicada: o que é injetado no contexto da conversa
+- Skills não usadas: por que as 4 skills documentais não são consultadas no chat
+- Fallback genérico: de onde vem a resposta padrão
+- Response formatter: como o texto é formatado antes de retornar
+- System prompt: conteúdo atual e limitações
+- Separação entre conversar / diagnosticar / planejar / executar
+
+### Entrega esperada da PR32
+
+`schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`
+
+## Bloqueios
+
+- nenhum
+
 
 ## O que foi feito nesta sessão
 

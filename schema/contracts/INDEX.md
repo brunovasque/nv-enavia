@@ -7,9 +7,13 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-Nenhum contrato ativo no momento.
-
-**Próxima etapa:** Aguardar definição do próximo contrato pelo operador humano.
+| Campo | Valor |
+|-------|-------|
+| **Arquivo** | `active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` |
+| **Estado** | Ativo 🟢 |
+| **PRs** | PR31–PR60 |
+| **Data de início** | 2026-04-30 |
+| **Objetivo** | Transformar a Enavia em IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit |
 
 ---
 
@@ -39,9 +43,9 @@ Nenhum contrato ativo no momento.
 
 ## Próxima PR autorizada
 
-**Nenhuma.** O contrato `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` foi encerrado na PR30.
+**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada**
 
-Aguardar definição do próximo contrato pelo operador humano antes de qualquer nova PR contratual.
+Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
 ### Histórico do contrato encerrado (PR17–PR30)
 
