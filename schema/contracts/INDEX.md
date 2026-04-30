@@ -43,12 +43,12 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR40 — PR-DOCS — Self Model da Enavia**
+**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
-> ✅ PR39 criou a estrutura documental completa do Obsidian Brain (`schema/brain/`). Docs-only, nenhum runtime alterado.
-> PR40 irá criar os arquivos de self-model em `schema/brain/self-model/`.
+> ✅ PR40 criou o self-model documental completo em `schema/brain/self-model/`: 5 arquivos (identity, capabilities, limitations, current-state, how-to-answer). Docs-only, nenhum runtime alterado.
+> PR41 irá migrar o conhecimento operacional consolidado para dentro do Obsidian Brain.
 
 ### PRs do contrato Jarvis Brain já concluídas
 
@@ -60,6 +60,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR36** ✅ (PR-IMPL) — Correção inicial do chat runtime. Worker-only, patch cirúrgico. `read_only` virou nota factual de gate de execução (não tom). Helper `isOperationalMessage` introduzido — `target` default sozinho NÃO ativa mais contexto operacional. Sanitizers menos destrutivos: prosa natural útil é preservada, snapshot JSON-like do planner continua bloqueado. Telemetria `sanitization: {applied, layer, reason}` adicionada (campo aditivo na resposta `/chat/run`). Smoke test novo `tests/pr36-chat-runtime-anti-bot.smoke.test.js` (26/26 ✅). Regressões PR13/PR14/PR19/PR20/PR21 todas verdes. Nenhum painel/contrato/endpoint/policy/brain alterado ou criado. Relatório: `schema/reports/PR36_IMPL_CHAT_RUNTIME_REPORT.md`.
 - **PR37** ✅ (PR-PROVA) — Prova anti-bot real do chat runtime. 51/56 passaram (5 achados reais). Cenários E (sanitizer preserva prosa útil) e F (bloqueio de vazamento interno) passaram completamente. Achados: (A2/B2) system prompt ainda injeta "MODO OPERACIONAL ATIVO" quando `hasActiveTarget=true` no cognitive runtime; (C1/G5) falsos positivos em `isOperationalMessage` com "sistema" e "contrato"; (D1) falso negativo para forma imperativa "Revise". Nenhum runtime alterado. Relatório: `schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md`.
 - **PR38** ✅ (PR-IMPL) — Correção cirúrgica dos 5 achados da PR37. Worker-only, patch cirúrgico. `buildChatSystemPrompt` corrigido: target informativo separado do bloco comportamental operacional pesado — `MODO OPERACIONAL ATIVO` só injetado quando `is_operational_context=true`. `_CHAT_OPERATIONAL_INTENT_TERMS` refinado: `"sistema"` e `"contrato"` isolados removidos (falsos positivos), termos compostos `"estado do contrato"`/`"contrato ativo"` adicionados, verbos imperativos (`"revise"`, `"verifique"`, `"cheque"`, `"inspecione"`) e termos técnicos (`"runtime"`, `"gate"`, `"gates"`) adicionados. PR37 agora passa 56/56 ✅. Regressões PR36/PR13/PR14/PR19/PR20/PR21 verdes. Relatório: `schema/reports/PR38_IMPL_CORRECAO_ACHADOS_PR37.md`.
+- **PR40** ✅ (PR-DOCS) — Self Model da Enavia criado. 5 arquivos em `schema/brain/self-model/`: identity, capabilities, limitations, current-state, how-to-answer. `INDEX.md` atualizado. Relatório: `schema/reports/PR40_SELF_MODEL_ENAVIA_REPORT.md`. Nenhum runtime alterado.
 - **PR39** ✅ (PR-DOCS) — Arquitetura do Obsidian Brain criada. Estrutura documental completa em `schema/brain/`: 7 arquivos principais (INDEX, ARCHITECTURE, GRAPH, MEMORY_RULES, RETRIEVAL_POLICY, UPDATE_POLICY, SYSTEM_AWARENESS), 8 pastas com INDEX, incidente `chat-engessado-readonly.md` documentado. Nenhum runtime alterado. Relatório: `schema/reports/PR39_OBSIDIAN_BRAIN_ARCHITECTURE_REPORT.md`.
 
 ### Histórico do contrato encerrado (PR17–PR30)

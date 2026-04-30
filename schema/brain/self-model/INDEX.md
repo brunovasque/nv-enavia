@@ -65,15 +65,15 @@ O self-model é crucial para evitar dois problemas opostos:
 
 ---
 
-## Arquivos planejados para PRs futuras
+## Arquivos do self-model (criados na PR40)
 
-| Arquivo | Conteúdo | PR planejada |
-|---------|----------|--------------|
-| `identity.md` | Quem é a Enavia, propósito, valores | PR40 |
-| `capabilities.md` | O que a Enavia pode fazer agora vs. futuro | PR40 |
-| `limits.md` | O que a Enavia não pode ou não deve fazer | PR40 |
-| `how-to-answer.md` | Forma de resposta, tom, nível de confiança | PR40 |
-| `modes.md` | Como se comportar em cada modo (conversation/diagnosis/execution) | PR40 |
+| Arquivo | Conteúdo | Quando consultar |
+|---------|----------|-----------------|
+| `identity.md` | Quem é a Enavia, propósito, valores, frase canônica | Ao responder "o que você é?", ao ajustar tom |
+| `capabilities.md` | Capacidades atuais vs. capacidades futuras | Ao responder "o que você pode fazer?", ao verificar se capacidade existe |
+| `limitations.md` | Limites reais — o que não deve ou não pode fazer | Ao decidir se pode executar algo, ao sinalizar restrição |
+| `current-state.md` | Estado real pós-PR39: o que existe, o que não existe | Ao responder sobre estado do sistema, ao planejar próximas PRs |
+| `how-to-answer.md` | 10 regras + 4 exemplos de como responder | Sempre que a qualidade da resposta importar |
 
 ---
 
@@ -106,7 +106,49 @@ quando existe é sub-representação. O self-model deve ser preciso e atualizado
 
 ---
 
-## Estado desta pasta na PR39
+## Relação com Mode Policy
 
-Pasta criada como esqueleto. Os arquivos de self-model serão criados na PR40
-(próxima PR autorizada: PR40 — PR-DOCS — Self Model da Enavia).
+O `how-to-answer.md` e o `limitations.md` se relacionam diretamente com `schema/policies/MODE_POLICY.md`:
+
+- A Mode Policy define os 3 modos canônicos: `conversation`, `diagnosis`, `execution`.
+- O `how-to-answer.md` define como se comportar em cada modo (Regra 4 e Regra 5).
+- O `limitations.md` define que `read_only` é gate de execução, não regra de tom — alinhado com a Mode Policy.
+
+---
+
+## Relação com Obsidian Brain
+
+O self-model faz parte do Obsidian Brain como a camada de **self-model** (camada 6 da arquitetura):
+
+- `schema/brain/ARCHITECTURE.md` — descreve as 7 camadas, incluindo self-model.
+- `schema/brain/SYSTEM_AWARENESS.md` — descreve o estado real do sistema, base para `current-state.md`.
+- `schema/brain/MEMORY_RULES.md` — descreve o que conta como memória válida.
+- `schema/brain/RETRIEVAL_POLICY.md` — mapeia quais arquivos consultar por intenção.
+
+---
+
+## O que este self-model ainda NÃO é (runtime)
+
+Esta pasta é **documental**. O self-model:
+
+- **Não está conectado ao runtime do chat** — o LLM não lê esses arquivos automaticamente.
+- **Não é carregado pelo Brain Loader** — esse componente ainda não existe.
+- **Não é consumido automaticamente** em nenhuma conversa.
+
+O self-model será consumido automaticamente quando o Brain Loader for implementado
+(frente futura do contrato Jarvis Brain, após PR41).
+
+Por enquanto, é usado como referência por contrato/agente — lido manualmente no início de sessão.
+
+---
+
+## Estado desta pasta na PR40
+
+Todos os 5 arquivos do self-model foram criados nesta PR:
+- `identity.md` ✅
+- `capabilities.md` ✅
+- `limitations.md` ✅
+- `current-state.md` ✅
+- `how-to-answer.md` ✅
+
+Próxima PR autorizada: **PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**.
