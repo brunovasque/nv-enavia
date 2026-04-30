@@ -4,6 +4,72 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR22 — PR-DOCS — Criar schema/system/ENAVIA_SYSTEM_MAP.md
+
+- **Branch:** `claude/pr22-docs-enavia-system-map`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR21 ✅ (commit `6a0595e`, PR #182 mergeada — commit merge `3d29b7d`)
+- **Escopo:** Docs-only. Apenas criação de `schema/system/ENAVIA_SYSTEM_MAP.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar o mapeamento técnico completo do sistema ENAVIA com 14 seções cobrindo: objetivo, estado atual, componentes principais, arquivos centrais, contratos/governança, loop contratual, estados operacionais, workers/bindings/KV/secrets, endpoints, testes/provas, consolidado, pendências, itens opcionais e regras de manutenção.
+
+### Arquivos alterados
+
+1. **`schema/system/ENAVIA_SYSTEM_MAP.md`** (NOVO — criado):
+   - Seção 1: Objetivo do sistema
+   - Seção 2: Estado atual resumido
+   - Seção 3: Componentes principais (worker, executor, deploy-worker, contract-executor, panel)
+   - Seção 4: Arquivos centrais (nv-enavia.js, contract-executor.js, wrangler.toml, workflows, módulos de schema)
+   - Seção 5: Contratos e governança (estrutura, histórico, taxonomia)
+   - Seção 6: Loop contratual supervisionado (fluxo, funções, Rules 1–9)
+   - Seção 7: Estados operacionais (status_global, task, phase, ações por estado)
+   - Seção 8: Workers, bindings, KV namespaces e secrets (PROD + TEST, KV keys canônicas, shapes)
+   - Seção 9: Endpoints conhecidos (contratos, outras rotas, executor, deploy)
+   - Seção 10: Testes e provas (smoke tests formais + outros)
+   - Seção 11: O que está consolidado
+   - Seção 12: O que ainda falta (PR23–PR30)
+   - Seção 13: Itens opcionais / fora do escopo
+   - Seção 14: Regras de manutenção
+2. **Governança:**
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR22 no topo.
+   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — atualizado para PR23.
+   - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR23.
+
+### Arquivos NÃO alterados (proibido pelo escopo)
+
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, deploy worker, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste pré-existente modificado.
+
+### Fontes consultadas para construção do mapa
+
+- `wrangler.toml` (bindings PROD e TEST, vars, services)
+- `nv-enavia.js` (rotas via grep, imports, funções)
+- `contract-executor.js` (funções, Rules, estados, linhas de referência)
+- `.github/workflows/deploy.yml` e `deploy-executor.yml`
+- `executor/wrangler.toml` e `executor/src/index.js`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`, `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (histórico de decisões)
+- `schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- `tests/` (smoke tests PR13–PR21)
+
+### Smoke tests
+
+| Verificação | Resultado |
+|-------------|-----------|
+| Arquivo criado em `schema/system/ENAVIA_SYSTEM_MAP.md` | ✅ |
+| Nenhum arquivo `.js`, `.toml`, `.yml` alterado | ✅ |
+| 14 seções presentes no documento | ✅ |
+| Bindings consistentes com `wrangler.toml` | ✅ |
+| Rotas consistentes com grep de `nv-enavia.js` | ✅ |
+| Testes consistentes com smoke tests PR13–PR21 (totais confirmados) | ✅ |
+
+---
+
 ## 2026-04-29 — PR21 — PR-PROVA — Smoke do loop-status com task in_progress e phase_complete
 
 - **Branch:** `claude/pr21-prova-loop-status-states`
