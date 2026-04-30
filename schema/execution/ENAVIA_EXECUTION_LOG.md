@@ -4,6 +4,70 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR18 — PR-IMPL — Worker-only — Endpoint supervisionado de avanço de fase
+
+- **Branch:** `claude/pr18-impl-advance-phase-endpoint`
+- **Tipo:** `PR-IMPL`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR17 ✅ (commit `f0c1d29`, PR #178 mergeada — commit merge `38582b4`)
+- **Escopo:** Worker-only. Apenas `nv-enavia.js`, novo smoke test e governança.
+
+### Objetivo
+
+Fechar o gap diagnosticado em PR17: criar endpoint HTTP supervisionado `POST /contracts/advance-phase` reutilizando integralmente `advanceContractPhase` de `contract-executor.js`. Sem duplicar lógica nem gate.
+
+### Alterações em `nv-enavia.js`
+
+1. **Imports** (linha ~14): adicionado `advanceContractPhase` ao import de `contract-executor.js`.
+2. **`buildOperationalAction`** (linha ~4809):
+   - `phase_complete` mapeia agora para `advance_phase` (não mais `block`).
+   - Comentário do mapeamento atualizado.
+   - `EVIDENCE_MAP` ganhou `advance_phase: ["contract_id"]`.
+3. **`handleGetLoopStatus`** (linha ~5031):
+   - `availableActions = ["POST /contracts/advance-phase"]` quando `nextAction.type === "phase_complete"`.
+   - `guidance` reescrita para instruir o uso do endpoint (não diz mais "no phase-advance endpoint exists yet").
+4. **Novo handler `handleAdvancePhase`** (antes de `handleExecuteNext`):
+   - Lê body JSON; valida `contract_id` (aceita `contract_id` ou `contractId`).
+   - Delega para `advanceContractPhase(env, contractId)`.
+   - 200 → `{ ok: true, status: "advanced", contract_id, result }`.
+   - 400 → JSON inválido ou `contract_id` ausente.
+   - 409 → gate falhou ou contrato não encontrado, com `reason` derivada de `result.error/reason/gate.reason`.
+   - 500 → exceção não esperada.
+5. **Routing** (próximo a `/contracts/complete-task`): `POST /contracts/advance-phase` → `handleAdvancePhase`.
+6. **Help text** atualizado com a nova rota.
+
+### Não alterado (proibido pelo escopo)
+
+- `contract-executor.js` (não foi necessário modificar — função já estava completa)
+- `panel/`, `executor/`, deploy worker, workflows, `wrangler.toml`
+- Nenhum gate paralelo criado, nenhuma lógica de avanço duplicada.
+
+### Smoke tests
+
+- `node --check nv-enavia.js` ✅
+- `node --check tests/pr18-advance-phase-endpoint.smoke.test.js` ✅
+- `node tests/pr18-advance-phase-endpoint.smoke.test.js` → **45 passed, 0 failed** ✅
+- `node tests/pr13-hardening-operacional.smoke.test.js` → **91 passed, 0 failed** ✅ (regressão)
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → **183 passed, 0 failed** ✅ (regressão)
+
+### Cobertura do novo smoke test PR18 (5 seções, 45 asserts)
+
+- **A. Validação de input:** JSON inválido → 400, body sem `contract_id` → 400, alias `contractId` aceito.
+- **B. Avanço happy path:** `phase_complete` com gate ok → 200 + KV `state` e `decomposition` atualizados; única fase done → `current_phase = "all_phases_complete"`.
+- **C. Gate de segurança:** task incompleta → 409, blockers persistidos no state; contract inexistente → 409 `CONTRACT_NOT_FOUND`.
+- **D. `loop-status`:** expõe `availableActions = ["POST /contracts/advance-phase"]` e `operationalAction.type === "advance_phase"` com `can_execute: true`.
+- **E. Isolamento:** `execute-next` em `phase_complete` NÃO avança fase implicitamente — avanço só via endpoint explícito.
+
+### Bloqueios
+
+Nenhum.
+
+### Próxima etapa autorizada
+
+**PR19** — `PR-PROVA` — Smoke real: `execute-next → complete-task → phase_complete → advance-phase → próxima task/fase` (ciclo completo de ponta a ponta).
+
+---
+
 ## 2026-04-29 — PR17 — PR-DIAG — Diagnóstico READ-ONLY de phase_complete e avanço de fase
 
 - **Branch:** `claude/pr17-diag-phase-complete-advance-phase`
