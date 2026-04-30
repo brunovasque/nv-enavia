@@ -1,62 +1,78 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** PR20 — PR-IMPL — Worker-only — `loop-status` expõe `complete-task` em task `in_progress`
-**Para:** PR21 — PR-PROVA — Smoke do `loop-status` com task `in_progress` e `phase_complete`
+**De:** PR21 — PR-PROVA — Smoke do `loop-status` com task `in_progress` e `phase_complete`
+**Para:** PR22 — PR-DOCS — Criar `schema/system/ENAVIA_SYSTEM_MAP.md`
 
 ## O que foi feito nesta sessão
 
-### PR20 — PR-IMPL — `loop-status` operacional em task in_progress
+### PR21 — PR-PROVA — Matriz de estados do loop-status
 
-**Tipo:** `PR-IMPL`
-**Branch:** `claude/pr20-impl-loop-status-in-progress` (criada a partir de `origin/main` atualizada — commit base `fbf8813`, contendo PR19 mergeada)
-
-**Diagnóstico:** `resolveNextAction` Rule 9 (`contract-executor.js:1594-1605`) já retornava `{ type: "no_action", status: "in_progress", task_id }` quando havia task em progresso, mas `handleGetLoopStatus` em `nv-enavia.js:5024-5047` não tinha ramo para esse estado — `availableActions` ficava vazia, deixando o operador "cego".
-
-**Patch cirúrgico em `nv-enavia.js`:**
-- Novo `else if (nextAction.status === "in_progress")` no `handleGetLoopStatus`:
-  - `availableActions = ["POST /contracts/complete-task"]`
-  - `guidance = "Task in_progress. Use POST /contracts/complete-task com { contract_id, task_id, resultado } para concluir com gate de aderência."`
-- `canProceed` atualizado para incluir `nextAction.status === "in_progress"`.
-- Nada mais alterado no handler (sem refatoração).
+**Tipo:** `PR-PROVA`
+**Branch:** `claude/pr21-prova-loop-status-states` (criada a partir de `origin/main` atualizada — commit base `028862d`, contendo PR20 mergeada)
 
 **Arquivos alterados:**
 
-1. **`nv-enavia.js`** (Worker-only) — patch de ~7 linhas em `handleGetLoopStatus`.
-2. **`tests/pr20-loop-status-in-progress.smoke.test.js`** (NOVO) — 27 asserts em 4 seções A/B/C/D.
-3. **Governança:** `schema/execution/ENAVIA_EXECUTION_LOG.md`, `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`, `schema/status/ENAVIA_STATUS_ATUAL.md`, `schema/contracts/INDEX.md`.
+1. **`tests/pr21-loop-status-states.smoke.test.js`** (NOVO):
+   - 53 asserts em 5 cenários cobrindo a matriz cruzada de estados.
+   - Cenários: queued, in_progress, phase_complete, plan_rejected, cancelled, contract_complete, consistência cruzada.
+   - Validação por unicidade: cada estado expõe **apenas** a ação correta.
+
+2. **Governança:**
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR21 no topo.
+   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo.
+   - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR22.
 
 **Arquivos NÃO alterados (proibido pelo escopo):**
-- `contract-executor.js` — Rule 9 já tinha o shape certo, nenhuma mudança necessária.
-- Endpoints `complete-task`/`execute-next`/`advance-phase` — comportamento intocado.
-- `panel/`, `executor/`, deploy worker, `.github/workflows/`, `wrangler.toml`.
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, deploy worker, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste pré-existente modificado.
 
 ## Critérios de aceite — atendidos
 
 | Critério | Status |
 |----------|--------|
-| `loop-status` mostra `POST /contracts/complete-task` em `in_progress` | ✅ (Teste A1) |
-| `loop-status` NÃO mostra `complete-task` em `queued`/`phase_complete`/`blocked` | ✅ (Testes B1/B2/B3) |
-| `phase_complete` continua mostrando `POST /contracts/advance-phase` | ✅ (Teste B2) |
-| `start_task` continua mostrando `POST /contracts/execute-next` | ✅ (Teste B1) |
-| `operationalAction` não libera execução errada em `in_progress` | ✅ (Teste C1: type=block, can_execute=false) |
-| `canProceed` reflete estados corretamente | ✅ (Testes D1/D2/D3) |
-| Nenhuma regressão | ✅ (398/398 total) |
+| Novo teste PR21 criado | ✅ |
+| Matriz de estados validada | ✅ (5 cenários, 53 asserts) |
+| `complete-task` só aparece em `in_progress` | ✅ (Cenário 5) |
+| `advance-phase` só aparece em `phase_complete` | ✅ (Cenário 5) |
+| `execute-next` só aparece em `start_task` | ✅ (Cenário 5) |
+| Estados bloqueados/concluídos não expõem ações indevidas | ✅ (4a/4b/4c) |
+| Nenhum runtime alterado | ✅ |
+| Nenhum comportamento corrigido | ✅ |
 | Governança atualizada | ✅ |
 
 ## Smoke tests executados
 
 | Teste | Comando | Resultado |
 |-------|---------|-----------|
-| Sintaxe Worker | `node --check nv-enavia.js` | ✅ |
-| Sintaxe novo teste | `node --check tests/pr20-loop-status-in-progress.smoke.test.js` | ✅ |
-| PR20 (novo) | `node tests/pr20-loop-status-in-progress.smoke.test.js` | **27 passed, 0 failed** ✅ |
+| Sintaxe novo teste | `node --check tests/pr21-loop-status-states.smoke.test.js` | ✅ |
+| PR21 (novo) | `node tests/pr21-loop-status-states.smoke.test.js` | **53 passed, 0 failed** ✅ |
+| PR20 (regressão) | `node tests/pr20-loop-status-in-progress.smoke.test.js` | **27 passed, 0 failed** ✅ |
 | PR19 (regressão) | `node tests/pr19-advance-phase-e2e.smoke.test.js` | **52 passed, 0 failed** ✅ |
 | PR18 (regressão) | `node tests/pr18-advance-phase-endpoint.smoke.test.js` | **45 passed, 0 failed** ✅ |
 | PR13 (regressão) | `node tests/pr13-hardening-operacional.smoke.test.js` | **91 passed, 0 failed** ✅ |
 | PR14 (regressão) | `node tests/pr14-executor-deploy-real-loop.smoke.test.js` | **183 passed, 0 failed** ✅ |
 
-**Total: 398/398 sem regressão.**
+**Total: 451/451 sem regressão.**
+
+## Observação documentada (sem corrigir nesta PR)
+
+`status_global: "blocked"` sozinho **não** faz `resolveNextAction` esconder ações operacionais. O sistema só bloqueia via:
+- `state.plan_rejection.plan_rejected === true` (`isPlanRejected` em `contract-executor.js:516`)
+- `state.status_global === "cancelled"` (`isCancelledContract` em `contract-executor.js:500`)
+
+PR21 usou `plan_rejection` no shape correto no cenário 4a. Comportamento existente preservado integralmente.
+
+## Estado consolidado da frente do loop
+
+Com a sequência PR17 → PR18 → PR19 → PR20 → PR21 concluída, o loop contratual supervisionado está formalmente provado:
+
+- **execute-next** → `start_task` (PR ≤16, validado por PR13/PR14)
+- **complete-task** → `in_progress → completed` (gate aderência, PR-anteriores)
+- **advance-phase** → `phase_complete → próxima fase` (PR18, provado por PR19)
+- **loop-status** → expõe ação correta para cada estado (PR20, provado por PR21)
 
 ## Contrato ativo
 
@@ -64,9 +80,9 @@
 
 ## Próxima ação autorizada
 
-**PR21** — `PR-PROVA` — Smoke do `loop-status` com task `in_progress` e `phase_complete` (cobertura cruzada formal dos dois estados operacionais).
+**PR22** — `PR-DOCS` — Criar `schema/system/ENAVIA_SYSTEM_MAP.md` (mapeamento de componentes, workers, bindings, KV namespaces, rotas e estados operacionais).
 
-**Pré-requisito:** PR20 concluída (esta PR) ✅
+**Pré-requisito:** PR21 concluída (esta PR) ✅
 
 ## Bloqueios
 

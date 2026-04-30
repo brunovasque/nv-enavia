@@ -4,6 +4,77 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR21 — PR-PROVA — Smoke do loop-status com task in_progress e phase_complete
+
+- **Branch:** `claude/pr21-prova-loop-status-states`
+- **Tipo:** `PR-PROVA`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR20 ✅ (commit `a563a97`, PR #181 mergeada — commit merge `028862d`)
+- **Escopo:** PR-PROVA. Apenas teste novo + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Provar formalmente, em uma matriz cruzada e focada, que o `GET /contracts/loop-status` está coerente em todos os estados operacionais relevantes:
+
+1. `queued` / `start_task` → `POST /contracts/execute-next`
+2. `in_progress` → `POST /contracts/complete-task` (PR20)
+3. `phase_complete` → `POST /contracts/advance-phase` (PR18)
+4. `plan_rejected` / `cancelled` / `contract_complete` → vazio ou seguro
+
+### Arquivos alterados
+
+1. **`tests/pr21-loop-status-states.smoke.test.js`** (novo, 53 asserts em 5 cenários):
+   - 1. queued → execute-next exclusivo (10 asserts)
+   - 2. in_progress → complete-task exclusivo + guidance c/ contract_id/task_id/resultado (12 asserts)
+   - 3. phase_complete → advance-phase exclusivo + operationalAction.advance_phase (10 asserts)
+   - 4a. plan_rejected → ações vazias (4 asserts)
+   - 4b. cancelled → ações vazias (4 asserts)
+   - 4c. contract_complete (todas fases done) → ações vazias (4 asserts)
+   - 5. Consistência cruzada — matriz de unicidade (9 asserts)
+2. **Governança:**
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR21 no topo.
+   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — atualizado para PR22.
+   - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR22.
+
+### Arquivos NÃO alterados (proibido pelo escopo)
+
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, deploy worker, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste pré-existente modificado.
+
+### Observação documentada (sem corrigir comportamento)
+
+Durante a construção do teste 4a foi confirmado que `status_global: "blocked"` sozinho **não** faz `resolveNextAction` esconder ações operacionais — o sistema só bloqueia via:
+- `state.plan_rejection.plan_rejected === true` (`isPlanRejected` em `contract-executor.js:516`)
+- `state.status_global === "cancelled"` (`isCancelledContract` em `contract-executor.js:500`)
+
+Esse é o comportamento existente. PR21 ajustou o cenário 4a para usar `plan_rejection` no shape correto, sem alterar runtime. Se for desejado bloquear via `status_global` no futuro, isso seria uma PR-IMPL separada (não nesta).
+
+### Smoke tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `node --check tests/pr21-loop-status-states.smoke.test.js` | ✅ |
+| `node tests/pr21-loop-status-states.smoke.test.js` | **53 passed, 0 failed** ✅ |
+| `node tests/pr20-loop-status-in-progress.smoke.test.js` (regressão) | **27 passed, 0 failed** ✅ |
+| `node tests/pr19-advance-phase-e2e.smoke.test.js` (regressão) | **52 passed, 0 failed** ✅ |
+| `node tests/pr18-advance-phase-endpoint.smoke.test.js` (regressão) | **45 passed, 0 failed** ✅ |
+| `node tests/pr13-hardening-operacional.smoke.test.js` (regressão) | **91 passed, 0 failed** ✅ |
+| `node tests/pr14-executor-deploy-real-loop.smoke.test.js` (regressão) | **183 passed, 0 failed** ✅ |
+
+**Total: 451/451 sem regressão.**
+
+### Bloqueios
+
+Nenhum.
+
+### Próxima etapa autorizada
+
+**PR22** — `PR-DOCS` — Criar `schema/system/ENAVIA_SYSTEM_MAP.md` (mapeamento de componentes, workers, bindings, KV namespaces, rotas e estados do sistema ENAVIA).
+
+---
+
 ## 2026-04-29 — PR20 — PR-IMPL — Worker-only — loop-status expõe complete-task em task in_progress
 
 - **Branch:** `claude/pr20-impl-loop-status-in-progress`
