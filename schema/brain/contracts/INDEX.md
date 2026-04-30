@@ -81,7 +81,17 @@ operacional-pr8-pr13-legado.md
 
 ---
 
-## Estado desta pasta na PR39
+## Arquivos populados (PR41)
 
-Pasta criada como esqueleto. Nenhum resumo foi populado nesta PR.
-Os resumos serão adicionados em PRs futuras conforme o brain for populado.
+| Arquivo | Conteúdo | Quando consultar |
+|---------|----------|------------------|
+| `active.md` | Resumo do contrato ativo Jarvis Brain (PR31–PR64): objetivo macro, frase-síntese, estado atual pós-PR40, próximas PRs (PR41/PR42), regras centrais, frentes | Para verificar próxima PR autorizada; para entender escopo atual sem abrir o contrato completo |
+| `closed.md` | Resumo dos 3 contratos encerrados (PR1–PR7, PR8–PR16, PR17–PR30) com entregas e lições aprendidas | Para entender legado; para evitar repetir erros |
+| `next-candidates.md` | 7 candidatos a contrato futuro (Runtime de Skills, Skill Executor, UI de Skills, Auditoria automática de PR, Infra Health, Self-Audit, Memory Update Supervision) — todos marcados "opcional, não mexa agora" | Para responder "o que vem depois?"; para evitar escopo creep |
+
+## Estado desta pasta na PR41
+
+Pasta populada com 3 resumos navegáveis. Fonte de verdade continua em
+`schema/contracts/INDEX.md` e nos contratos completos em
+`schema/contracts/active/`. Em conflito, o original prevalece e o resumo
+deve ser corrigido em nova PR.

@@ -166,3 +166,90 @@ O grafo cresce a cada PR que:
 - Adiciona mapa
 
 Nenhuma conexão de runtime existe ainda. As conexões são todas textuais e navegáveis por operadores.
+
+---
+
+## 8. Atualização do Grafo na PR41 — Brain Populado
+
+A PR41 popula o brain com conteúdo real. Os novos nós e arestas:
+
+```
+brain/maps/INDEX.md
+├── brain/maps/system-map.md
+│   └── → schema/system/ENAVIA_SYSTEM_MAP.md
+│   └── → schema/system/ENAVIA_ROUTE_REGISTRY.json
+│   └── → schema/system/ENAVIA_WORKER_REGISTRY.md
+│   └── → schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md
+│   └── → schema/skills/INDEX.md
+│   └── → schema/contracts/INDEX.md
+├── brain/maps/route-map.md
+│   └── → schema/system/ENAVIA_ROUTE_REGISTRY.json
+│   └── → schema/skills/SYSTEM_MAPPER.md
+│   └── → brain/incidents/chat-engessado-readonly.md
+├── brain/maps/worker-map.md
+│   └── → schema/system/ENAVIA_WORKER_REGISTRY.md
+│   └── → schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md
+│   └── → brain/memories/hard-rules.md
+└── brain/maps/skill-map.md
+    └── → schema/skills/INDEX.md (+ 4 skills)
+    └── → brain/contracts/next-candidates.md
+
+brain/contracts/INDEX.md
+├── brain/contracts/active.md
+│   └── → schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md
+│   └── → schema/reports/PR32-PR40 (+ todos os reports da frente)
+├── brain/contracts/closed.md
+│   └── → schema/contracts/active/ (3 contratos encerrados)
+│   └── → brain/learnings/what-worked.md
+└── brain/contracts/next-candidates.md
+    └── → brain/open-questions/strategic-questions.md
+    └── → brain/memories/hard-rules.md
+
+brain/memories/INDEX.md
+├── brain/memories/operator-preferences.md
+├── brain/memories/operating-style.md
+├── brain/memories/project-principles.md
+├── brain/memories/hard-rules.md
+└── brain/memories/recurring-patterns.md
+    (todos com → CLAUDE.md, → schema/policies/MODE_POLICY.md,
+     → reports relevantes, e cross-links entre si)
+
+brain/decisions/INDEX.md
+├── brain/decisions/2026-04-30-read-only-gate-nao-tom.md
+│   └── → schema/policies/MODE_POLICY.md
+│   └── → schema/brain/incidents/chat-engessado-readonly.md
+├── brain/decisions/2026-04-30-jarvis-brain-llm-first.md
+│   └── → schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md
+│   └── → schema/brain/self-model/identity.md
+├── brain/decisions/2026-04-30-skills-documentais-antes-de-runtime.md
+│   └── → schema/skills/INDEX.md
+│   └── → brain/contracts/next-candidates.md
+└── brain/decisions/2026-04-30-pr36-pr38-anti-bot-before-brain.md
+    └── → schema/brain/incidents/chat-engessado-readonly.md
+    └── → reports PR32-PR38
+
+brain/learnings/INDEX.md
+├── brain/learnings/what-worked.md
+│   └── → reports PR32-PR38
+│   └── → brain/decisions/* (todas as 4)
+├── brain/learnings/what-failed.md
+│   └── → schema/reports/PR35, PR37, PR38
+│   └── → brain/incidents/chat-engessado-readonly.md
+└── brain/learnings/future-risks.md
+    └── → schema/brain/RETRIEVAL_POLICY.md
+    └── → schema/brain/UPDATE_POLICY.md
+    └── → brain/contracts/next-candidates.md
+    └── → brain/open-questions/* (ambos)
+
+brain/open-questions/INDEX.md
+├── brain/open-questions/unresolved-technical-gaps.md
+│   └── → schema/brain/RETRIEVAL_POLICY.md
+│   └── → schema/brain/UPDATE_POLICY.md
+│   └── → brain/contracts/next-candidates.md
+└── brain/open-questions/strategic-questions.md
+    └── → brain/decisions/2026-04-30-jarvis-brain-llm-first.md
+    └── → brain/memories/project-principles.md
+```
+
+> Após PR41, **cada pasta do brain tem conteúdo real** com fonte e backlinks.
+> Nenhuma pasta segue como esqueleto.

@@ -88,8 +88,13 @@ quando for conectado ao Intent Engine, ao LLM Core e ao Skill Router.
 
 ## Estado desta PR
 
-Esta PR (PR39) cria o esqueleto documental do brain. Nenhuma memória de runtime existe ainda.
-As PRs seguintes (PR40+) irão popular o brain com dados reais e, eventualmente, conectá-lo
-ao runtime conforme contrato Jarvis Brain.
+A arquitetura inicial do brain foi criada na PR39, o self-model na PR40, e a
+PR41 populou as pastas `maps/`, `contracts/`, `memories/`, `decisions/`,
+`learnings/` e `open-questions/` com conteúdo real consolidado a partir de
+contratos, relatórios PR17–PR40, status, handoff, execution log, system map,
+route registry, worker registry, playbook, skills, mode policy, self-model e
+incidentes.
 
-**Próxima PR autorizada:** PR40 — PR-DOCS — Self Model da Enavia.
+O brain segue **documental** — não há runtime, loader, endpoint nem conexão
+ao chat. A próxima PR autorizada é **PR42 — PR-DIAG — Diagnóstico da memória
+atual no runtime**.
