@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR21)
-**Branch ativa:** `claude/pr21-prova-loop-status-states`
-**Última tarefa:** PR21 — PR-PROVA — Smoke da matriz de estados do `GET /contracts/loop-status`. Novo teste `tests/pr21-loop-status-states.smoke.test.js` (53 asserts, 5 cenários: queued, in_progress, phase_complete, plan_rejected, cancelled, contract_complete + consistência cruzada por unicidade). Confirmou que o loop contratual supervisionado (PR17→PR21) está coerente em todos os estados. Nenhum runtime alterado. Regressões: PR20 27/27 ✅, PR19 52/52 ✅, PR18 45/45 ✅, PR13 91/91 ✅, PR14 183/183 ✅. Total **451/451 sem regressão**.
+**Data:** 2026-04-29 (atualizado após PR22)
+**Branch ativa:** `claude/pr22-docs-enavia-system-map`
+**Última tarefa:** PR22 — PR-DOCS — Criação de `schema/system/ENAVIA_SYSTEM_MAP.md` com 14 seções documentando todos os componentes do sistema ENAVIA: objetivo, estado atual, componentes (nv-enavia, enavia-executor, deploy-worker, contract-executor.js, panel), arquivos centrais, contratos/governança, loop contratual (fluxo + Rules 1–9), estados operacionais, workers/bindings/KV/secrets (PROD+TEST), endpoints (~40 rotas), testes e provas (451/451 ✅), consolidado, pendências (PR23–PR30), itens opcionais e regras de manutenção. Nenhum runtime alterado. Branch base: `3d29b7d` (PR21 mergeada).
 
 ## Contrato ativo
 

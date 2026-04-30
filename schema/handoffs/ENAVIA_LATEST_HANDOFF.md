@@ -1,28 +1,41 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** PR21 — PR-PROVA — Smoke do `loop-status` com task `in_progress` e `phase_complete`
-**Para:** PR22 — PR-DOCS — Criar `schema/system/ENAVIA_SYSTEM_MAP.md`
+**De:** PR22 — PR-DOCS — Criar `schema/system/ENAVIA_SYSTEM_MAP.md`
+**Para:** PR23 — PR-DOCS — Criar `schema/system/ENAVIA_ROUTE_REGISTRY.json`
 
 ## O que foi feito nesta sessão
 
-### PR21 — PR-PROVA — Matriz de estados do loop-status
+### PR22 — PR-DOCS — System Map
 
-**Tipo:** `PR-PROVA`
-**Branch:** `claude/pr21-prova-loop-status-states` (criada a partir de `origin/main` atualizada — commit base `028862d`, contendo PR20 mergeada)
+**Tipo:** `PR-DOCS`
+**Branch:** `claude/pr22-docs-enavia-system-map` (criada a partir de `origin/main` atualizada — commit base `3d29b7d`, contendo PR21 mergeada — PR #182)
 
-**Arquivos alterados:**
+**Arquivo criado:**
 
-1. **`tests/pr21-loop-status-states.smoke.test.js`** (NOVO):
-   - 53 asserts em 5 cenários cobrindo a matriz cruzada de estados.
-   - Cenários: queued, in_progress, phase_complete, plan_rejected, cancelled, contract_complete, consistência cruzada.
-   - Validação por unicidade: cada estado expõe **apenas** a ação correta.
+1. **`schema/system/ENAVIA_SYSTEM_MAP.md`** (NOVO):
+   - 14 seções documentando todos os componentes do sistema ENAVIA.
+   - Nenhum componente inventado — todas as informações extraídas do repo.
+   - Seção 1: Objetivo do sistema.
+   - Seção 2: Estado atual resumido (PR21 mergeada, 451/451 testes ✅).
+   - Seção 3: Componentes principais (5 componentes: nv-enavia, enavia-executor, deploy-worker, contract-executor.js, panel).
+   - Seção 4: Arquivos centrais (workers, módulos de schema, workflows).
+   - Seção 5: Contratos e governança (estrutura schema/, histórico, taxonomia PR-DIAG/IMPL/PROVA/DOCS).
+   - Seção 6: Loop contratual supervisionado (fluxo completo, funções, Rules 1–9 de resolveNextAction).
+   - Seção 7: Estados operacionais (status_global, task, phase, ações por estado).
+   - Seção 8: Workers, bindings, KV, secrets (PROD e TEST, shapes canônicos de state e decomposition).
+   - Seção 9: Endpoints conhecidos (rotas de contratos, outras rotas do worker, executor, deploy worker).
+   - Seção 10: Testes e provas (PR13–PR21 com contagens; outros testes por categoria).
+   - Seção 11: O que está consolidado.
+   - Seção 12: O que ainda falta (PR23–PR30).
+   - Seção 13: Itens opcionais / fora do escopo.
+   - Seção 14: Regras de manutenção.
 
 2. **Governança:**
-   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR21 no topo.
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR22 no topo.
    - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo.
    - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
-   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR22.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR23.
 
 **Arquivos NÃO alterados (proibido pelo escopo):**
 - `nv-enavia.js`, `contract-executor.js`
@@ -33,46 +46,22 @@
 
 | Critério | Status |
 |----------|--------|
-| Novo teste PR21 criado | ✅ |
-| Matriz de estados validada | ✅ (5 cenários, 53 asserts) |
-| `complete-task` só aparece em `in_progress` | ✅ (Cenário 5) |
-| `advance-phase` só aparece em `phase_complete` | ✅ (Cenário 5) |
-| `execute-next` só aparece em `start_task` | ✅ (Cenário 5) |
-| Estados bloqueados/concluídos não expõem ações indevidas | ✅ (4a/4b/4c) |
+| `schema/system/ENAVIA_SYSTEM_MAP.md` criado | ✅ |
+| 14 seções obrigatórias presentes | ✅ |
+| Nenhum componente inventado | ✅ |
+| Bindings consistentes com wrangler.toml | ✅ |
+| Rotas consistentes com nv-enavia.js | ✅ |
 | Nenhum runtime alterado | ✅ |
-| Nenhum comportamento corrigido | ✅ |
 | Governança atualizada | ✅ |
 
-## Smoke tests executados
+## Estado consolidado da frente System Map
 
-| Teste | Comando | Resultado |
-|-------|---------|-----------|
-| Sintaxe novo teste | `node --check tests/pr21-loop-status-states.smoke.test.js` | ✅ |
-| PR21 (novo) | `node tests/pr21-loop-status-states.smoke.test.js` | **53 passed, 0 failed** ✅ |
-| PR20 (regressão) | `node tests/pr20-loop-status-in-progress.smoke.test.js` | **27 passed, 0 failed** ✅ |
-| PR19 (regressão) | `node tests/pr19-advance-phase-e2e.smoke.test.js` | **52 passed, 0 failed** ✅ |
-| PR18 (regressão) | `node tests/pr18-advance-phase-endpoint.smoke.test.js` | **45 passed, 0 failed** ✅ |
-| PR13 (regressão) | `node tests/pr13-hardening-operacional.smoke.test.js` | **91 passed, 0 failed** ✅ |
-| PR14 (regressão) | `node tests/pr14-executor-deploy-real-loop.smoke.test.js` | **183 passed, 0 failed** ✅ |
+Com PR22 concluída, inicia a documentação estruturada do sistema:
 
-**Total: 451/451 sem regressão.**
-
-## Observação documentada (sem corrigir nesta PR)
-
-`status_global: "blocked"` sozinho **não** faz `resolveNextAction` esconder ações operacionais. O sistema só bloqueia via:
-- `state.plan_rejection.plan_rejected === true` (`isPlanRejected` em `contract-executor.js:516`)
-- `state.status_global === "cancelled"` (`isCancelledContract` em `contract-executor.js:500`)
-
-PR21 usou `plan_rejection` no shape correto no cenário 4a. Comportamento existente preservado integralmente.
-
-## Estado consolidado da frente do loop
-
-Com a sequência PR17 → PR18 → PR19 → PR20 → PR21 concluída, o loop contratual supervisionado está formalmente provado:
-
-- **execute-next** → `start_task` (PR ≤16, validado por PR13/PR14)
-- **complete-task** → `in_progress → completed` (gate aderência, PR-anteriores)
-- **advance-phase** → `phase_complete → próxima fase` (PR18, provado por PR19)
-- **loop-status** → expõe ação correta para cada estado (PR20, provado por PR21)
+- **ENAVIA_SYSTEM_MAP.md** (PR22) ✅ — visão geral de componentes, estados, bindings, endpoints
+- **ENAVIA_ROUTE_REGISTRY.json** (PR23) ⏳ — registry machine-readable de todas as rotas
+- **ENAVIA_OPERATIONAL_PLAYBOOK.md** (PR24) ⏳ — playbook operacional
+- **Registry workers/bindings/secrets** (PR25) ⏳ — inventário de deploy
 
 ## Contrato ativo
 
@@ -80,9 +69,17 @@ Com a sequência PR17 → PR18 → PR19 → PR20 → PR21 concluída, o loop con
 
 ## Próxima ação autorizada
 
-**PR22** — `PR-DOCS` — Criar `schema/system/ENAVIA_SYSTEM_MAP.md` (mapeamento de componentes, workers, bindings, KV namespaces, rotas e estados operacionais).
+**PR23** — `PR-DOCS` — Criar `schema/system/ENAVIA_ROUTE_REGISTRY.json`
 
-**Pré-requisito:** PR21 concluída (esta PR) ✅
+Registry JSON de todas as rotas do worker `nv-enavia` com:
+- método HTTP
+- path
+- handler
+- autenticação obrigatória
+- escopo (contratos / memória / planner / cognitivo / etc.)
+- status (ativo / legado / interno)
+
+**Pré-requisito:** PR22 concluída (esta PR) ✅
 
 ## Bloqueios
 

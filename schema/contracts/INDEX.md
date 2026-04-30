@@ -38,9 +38,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR22** — PR-DOCS — Criar `schema/system/ENAVIA_SYSTEM_MAP.md` (mapeamento de componentes, workers, bindings, KV namespaces, rotas e estados operacionais do sistema ENAVIA).
+**PR23** — PR-DOCS — Criar `schema/system/ENAVIA_ROUTE_REGISTRY.json` (registry machine-readable de todas as rotas do worker `nv-enavia` com método, path, handler, autenticação, escopo e status).
 
-Contexto: Loop contratual supervisionado consolidado (PR17→PR21). Inicia agora a frente de System Map + Tool Registry (PR22–PR25) prevista no contrato ativo. Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Contexto: PR22 concluída — `schema/system/ENAVIA_SYSTEM_MAP.md` criado com 14 seções. Continua a frente de System Map + Tool Registry (PR22–PR25) prevista no contrato ativo. Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
@@ -48,4 +48,5 @@ Contexto: Loop contratual supervisionado consolidado (PR17→PR21). Inicia agora
 - **PR18** ✅ (PR-IMPL, mergeada — PR #179, commit merge `9b45395`) — endpoint `POST /contracts/advance-phase` criado em `nv-enavia.js`.
 - **PR19** ✅ (PR-PROVA, mergeada — PR #180, commit merge `fbf8813`) — smoke E2E do ciclo completo (52/52 ✅).
 - **PR20** ✅ (PR-IMPL, mergeada — PR #181, commit merge `028862d`) — `loop-status` expõe `complete-task` em `in_progress` (27/27 ✅).
-- **PR21** (PR-PROVA, em revisão) — matriz de estados do `loop-status` (53/53 ✅).
+- **PR21** ✅ (PR-PROVA, mergeada — PR #182, commit merge `3d29b7d`) — matriz de estados do `loop-status` (53/53 ✅).
+- **PR22** ✅ (PR-DOCS, em revisão) — `schema/system/ENAVIA_SYSTEM_MAP.md` criado (14 seções).
