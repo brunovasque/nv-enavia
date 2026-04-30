@@ -209,38 +209,45 @@ export function buildChatSystemPrompt(opts = {}) {
   }
 
   // === 5c. Alvo Operacional Ativo + Instruções Operacionais ===
-  // Injetado quando context.target existe com campos relevantes OU modo operacional ativo.
-  // Garante que o LLM trate o alvo como referência real, não pergunte dados já presentes
-  // no target e siga defaults seguros para validação.
+  // PR38: separação cirúrgica entre target informativo e bloco comportamental operacional.
+  //
+  // O target informativo ([ALVO OPERACIONAL ATIVO] + campos + nota read_only) é exibido
+  // sempre que há target ativo — é contexto técnico factual, não instrução de tom.
+  //
+  // O bloco comportamental pesado (MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO)
+  // só é injetado quando is_operational_context === true. hasActiveTarget sozinho NÃO
+  // ativa as instruções operacionais — isso previne que conversas simples ("oi",
+  // mensagens de frustração) recebam tom operacional pesado só por ter target.
   const target = context.target && typeof context.target === "object" ? context.target : null;
   const hasActiveTarget = !!(target && (target.worker || target.repo || target.environment || target.mode));
 
-  if (hasActiveTarget || is_operational_context) {
-    // Bloco de target em formato legível para o LLM
-    if (hasActiveTarget) {
-      const targetLines = ["[ALVO OPERACIONAL ATIVO]"];
-      if (target.worker)      targetLines.push(`worker: ${target.worker}`);
-      if (target.repo)        targetLines.push(`repo: ${target.repo}`);
-      if (target.branch)      targetLines.push(`branch: ${target.branch}`);
-      if (target.environment) targetLines.push(`environment: ${target.environment}`);
-      if (target.mode)        targetLines.push(`mode: ${target.mode}`);
-      if (target.target_type) targetLines.push(`tipo: ${target.target_type}`);
-      sections.push("", targetLines.join("\n"));
-    }
+  // Target informativo: sempre exibido quando há target ativo (contexto técnico factual).
+  if (hasActiveTarget) {
+    const targetLines = ["[ALVO OPERACIONAL ATIVO]"];
+    if (target.worker)      targetLines.push(`worker: ${target.worker}`);
+    if (target.repo)        targetLines.push(`repo: ${target.repo}`);
+    if (target.branch)      targetLines.push(`branch: ${target.branch}`);
+    if (target.environment) targetLines.push(`environment: ${target.environment}`);
+    if (target.mode)        targetLines.push(`mode: ${target.mode}`);
+    if (target.target_type) targetLines.push(`tipo: ${target.target_type}`);
+    sections.push("", targetLines.join("\n"));
 
-    // Instruções operacionais fortes
+    // PR36/PR38: read_only é nota factual de gate de execução, não regra de tom.
+    // Aparece sempre que há target com mode=read_only, independente do contexto operacional.
+    if (target.mode === "read_only") {
+      sections.push("• Modo atual: read_only. Ações com efeito colateral (deploy, patch, merge, escrita) estão bloqueadas sem aprovação/contrato. Conversar, raciocinar, explicar, diagnosticar e planejar continuam livres.");
+    }
+  }
+
+  // Bloco comportamental operacional pesado: SOMENTE quando is_operational_context === true.
+  // hasActiveTarget sozinho não é suficiente — exige intenção operacional real detectada.
+  if (is_operational_context) {
     sections.push(
       "",
       "MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:",
     );
     if (hasActiveTarget) {
       sections.push("• O alvo operacional acima é real e está ativo. Use-o como referência nesta resposta — não pergunte dados que já estão no alvo.");
-    }
-    if (target?.mode === "read_only") {
-      // PR36: read_only é nota factual de capacidade (gate de execução), não regra de tom.
-      // A Enavia continua livre para conversar, raciocinar, discordar, explicar, diagnosticar
-      // e planejar. O bloqueio é apenas sobre execução real com efeito colateral.
-      sections.push("• Modo atual: read_only. Ações com efeito colateral (deploy, patch, merge, escrita) estão bloqueadas sem aprovação/contrato. Conversar, raciocinar, explicar, diagnosticar e planejar continuam livres.");
     }
     sections.push(
       "• NUNCA pergunte 'qual sistema?', 'qual worker?' ou 'qual ambiente?' se esses dados já existirem no alvo operacional.",

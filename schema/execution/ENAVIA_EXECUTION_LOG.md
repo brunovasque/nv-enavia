@@ -4,6 +4,84 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR38 — PR-IMPL — Correção cirúrgica dos achados PR37 anti-bot
+
+- **Branch:** `copilot/claudepr38-impl-corrigir-achados-pr37-anti-bot`
+- **Tipo:** `PR-IMPL` (worker-only, patch cirúrgico, runtime alterado)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR37 ✅ (PR-PROVA — 51/56, falha parcial documentada)
+- **Escopo:** Worker-only. Patch cirúrgico em 2 arquivos de runtime + relatório + governança.
+
+### Objetivo
+
+Corrigir exclusivamente os 5 achados reais da PR37 (prova anti-bot parcialmente falha).
+
+### Resultado
+
+**56/56 — PASSOU** ✅ (era 51/56 na PR37)
+
+Achados corrigidos:
+
+1. **A2/B2**: `buildChatSystemPrompt` em `schema/enavia-cognitive-runtime.js` — separação
+   cirúrgica entre target informativo e bloco comportamental operacional. `MODO OPERACIONAL
+   ATIVO` só injetado quando `is_operational_context=true`. `hasActiveTarget` sozinho não
+   ativa mais o bloco pesado.
+
+2. **C1**: `"sistema"` removido de `_CHAT_OPERATIONAL_INTENT_TERMS` em `nv-enavia.js` —
+   `isOperationalMessage("Você sabe operar seu sistema?")` agora retorna `false`.
+
+3. **D1**: `"revise"`, `"verifique"`, `"cheque"`, `"inspecione"`, `"runtime"`, `"gate"`,
+   `"gates"` adicionados — `isOperationalMessage("Revise a PR 197 e veja se o runtime
+   quebrou algum gate")` agora retorna `true`.
+
+4. **G5**: `"contrato"` isolado removido, substituído por `"estado do contrato"` e
+   `"contrato ativo"` — `isOperationalMessage("explique o que é o contrato Jarvis Brain")`
+   agora retorna `false`. Teste PR36 (`"estado do contrato"`) continua passando.
+
+### Arquivos alterados (runtime)
+
+- `schema/enavia-cognitive-runtime.js` (MODIFICADO — seção 5c)
+- `nv-enavia.js` (MODIFICADO — `_CHAT_OPERATIONAL_INTENT_TERMS`)
+
+### Arquivos criados/atualizados (relatório + governança)
+
+- `schema/reports/PR38_IMPL_CORRECAO_ACHADOS_PR37.md` (NOVO)
+- `schema/contracts/INDEX.md` (atualizado — PR37 ✅, PR38 ✅, próxima PR39)
+- `schema/status/ENAVIA_STATUS_ATUAL.md` (atualizado)
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (atualizado)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| `node --check nv-enavia.js` | ✅ OK |
+| `node --check schema/enavia-cognitive-runtime.js` | ✅ OK |
+| `node --check tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` | ✅ OK |
+| `node tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` | ✅ **56/56** |
+| `node tests/pr36-chat-runtime-anti-bot.smoke.test.js` | ✅ 26/26 |
+| `node tests/pr21-loop-status-states.smoke.test.js` | ✅ 53/53 |
+| `node tests/pr20-loop-status-in-progress.smoke.test.js` | ✅ 27/27 |
+| `node tests/pr19-advance-phase-e2e.smoke.test.js` | ✅ 52/52 |
+| `node tests/pr14-executor-deploy-real-loop.smoke.test.js` | ✅ 183/183 |
+| `node tests/pr13-hardening-operacional.smoke.test.js` | ✅ 91/91 |
+
+### Rollback
+
+```bash
+git revert HEAD  # reverte patch do cognitive runtime + nv-enavia.js
+```
+
+Os dois arquivos de runtime alterados são independentes — podem ser revertidos
+separadamente se necessário.
+
+### Próxima etapa segura
+
+**PR39 — PR-DOCS — Arquitetura do Obsidian Brain**
+Frente 2 corretiva encerrada. Retorno ao fluxo principal do contrato Jarvis Brain.
+
+---
+
 ## 2026-04-30 — PR37 — PR-PROVA — Prova anti-bot real do chat runtime
 
 - **Branch:** `copilot/claude-pr37-prova-chat-runtime-anti-bot-real`

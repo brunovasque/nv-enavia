@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR37 — Prova anti-bot real do chat runtime)
-**Branch ativa:** `copilot/claude-pr37-prova-chat-runtime-anti-bot-real`
-**Última tarefa:** PR37 — PR-PROVA — Worker-only, prova. 51/56 asserts passaram. Cenários E (sanitizer preserva prosa útil) e F (bloqueio de vazamento interno) passaram completamente. 5 achados reais: (A2/B2) system prompt ainda injeta "MODO OPERACIONAL ATIVO" quando `hasActiveTarget=true` no cognitive runtime; (C1/G5) falsos positivos em `isOperationalMessage` com "sistema" e "contrato"; (D1) falso negativo para imperativo "Revise". Nenhum runtime alterado. Regressões PR13/PR14/PR19/PR20/PR21 verdes.
+**Data:** 2026-04-30 (atualizado após PR38 — Correção cirúrgica dos achados PR37 anti-bot)
+**Branch ativa:** `copilot/claudepr38-impl-corrigir-achados-pr37-anti-bot`
+**Última tarefa:** PR38 — PR-IMPL — Worker-only, patch cirúrgico. Todos os 5 achados da PR37 corrigidos. `buildChatSystemPrompt` em `schema/enavia-cognitive-runtime.js` separado: target informativo exibido com `hasActiveTarget`, bloco operacional pesado (`MODO OPERACIONAL ATIVO`) apenas com `is_operational_context=true`. `_CHAT_OPERATIONAL_INTENT_TERMS` em `nv-enavia.js` refinado: removidos `"sistema"` e `"contrato"` isolados (falsos positivos), adicionados termos compostos, imperativos operacionais e termos técnicos. PR37 agora passa 56/56 ✅. Regressões verdes.
 
 ## Estado atual do sistema
 
@@ -33,12 +33,10 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR38 — PR-IMPL — Correção cirúrgica dos pontos anti-bot que falharam na PR37.**
+**PR39 — PR-DOCS — Arquitetura do Obsidian Brain**
 
-> ⚠️ PR37 falhou parcialmente (51/56). Conforme contrato, PR38 deve ser PR-IMPL (correção cirúrgica):
-> 1. `schema/enavia-cognitive-runtime.js`: separar injeção de target informativo vs. bloco operacional pesado.
-> 2. `nv-enavia.js`: refinar `_CHAT_OPERATIONAL_INTENT_TERMS` (remover termos genéricos, adicionar formas imperativas).
-> Após PR38 passar nos 5 achados, PR39 pode ser PR-DOCS (Obsidian Brain).
+> ✅ PR38 corrigiu todos os 5 achados da PR37. Smoke test 56/56. Frente 2 corretiva encerrada.
+> PR39 retoma o fluxo principal do contrato Jarvis Brain: documentação da arquitetura do Obsidian Brain.
 
 ## Histórico de contratos
 

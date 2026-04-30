@@ -43,12 +43,12 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR38 — PR-IMPL — Correção cirúrgica dos pontos anti-bot que falharam na PR37**
+**PR39 — PR-DOCS — Arquitetura do Obsidian Brain**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
-> ⚠️ PR37 falhou parcialmente (51/56). Conforme contrato, PR38 deve ser PR-IMPL (correção),
-> não PR-DOCS. Ver `schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md` para detalhes.
+> ✅ PR38 corrigiu todos os 5 achados da PR37. Teste anti-bot: 56/56. Frente 2 corretiva encerrada.
+> PR39 retoma o fluxo principal do contrato Jarvis Brain: documentação da arquitetura do Obsidian Brain.
 
 ### PRs do contrato Jarvis Brain já concluídas
 
@@ -58,7 +58,8 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR34** ✅ (PR-DIAG) — Diagnóstico profundo de `read_only`, `target` default e sanitizers/fallbacks. Causa técnica refinada em 7 camadas. Recomendações conceituais para PR35 (Mode Policy) e PR36 (Response Policy). Relatório: `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`. Nenhum runtime alterado.
 - **PR35** ✅ (PR-DOCS) — Mode Policy criada. 3 modos canônicos definidos (conversation/diagnosis/execution). `read_only` definido como gate de execução, não regra de tom. Contrato ajustado para PR36 ser PR-IMPL real. Risco de excesso documental reconhecido — objetivo agora é produto funcionando. Relatório: `schema/reports/PR35_MODE_POLICY_E_PLANO_EXECUCAO.md`. Nenhum runtime alterado.
 - **PR36** ✅ (PR-IMPL) — Correção inicial do chat runtime. Worker-only, patch cirúrgico. `read_only` virou nota factual de gate de execução (não tom). Helper `isOperationalMessage` introduzido — `target` default sozinho NÃO ativa mais contexto operacional. Sanitizers menos destrutivos: prosa natural útil é preservada, snapshot JSON-like do planner continua bloqueado. Telemetria `sanitization: {applied, layer, reason}` adicionada (campo aditivo na resposta `/chat/run`). Smoke test novo `tests/pr36-chat-runtime-anti-bot.smoke.test.js` (26/26 ✅). Regressões PR13/PR14/PR19/PR20/PR21 todas verdes. Nenhum painel/contrato/endpoint/policy/brain alterado ou criado. Relatório: `schema/reports/PR36_IMPL_CHAT_RUNTIME_REPORT.md`.
-- **PR37** ⚠️ (PR-PROVA) — Prova anti-bot real do chat runtime. 51/56 passaram (5 achados reais). Cenários E (sanitizer preserva prosa útil) e F (bloqueio de vazamento interno) passaram completamente. Achados: (A2/B2) system prompt ainda injeta "MODO OPERACIONAL ATIVO" quando `hasActiveTarget=true` no cognitive runtime; (C1/G5) falsos positivos em `isOperationalMessage` com "sistema" e "contrato"; (D1) falso negativo para forma imperativa "Revise". Nenhum runtime alterado. Relatório: `schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md`.
+- **PR37** ✅ (PR-PROVA) — Prova anti-bot real do chat runtime. 51/56 passaram (5 achados reais). Cenários E (sanitizer preserva prosa útil) e F (bloqueio de vazamento interno) passaram completamente. Achados: (A2/B2) system prompt ainda injeta "MODO OPERACIONAL ATIVO" quando `hasActiveTarget=true` no cognitive runtime; (C1/G5) falsos positivos em `isOperationalMessage` com "sistema" e "contrato"; (D1) falso negativo para forma imperativa "Revise". Nenhum runtime alterado. Relatório: `schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md`.
+- **PR38** ✅ (PR-IMPL) — Correção cirúrgica dos 5 achados da PR37. Worker-only, patch cirúrgico. `buildChatSystemPrompt` corrigido: target informativo separado do bloco comportamental operacional pesado — `MODO OPERACIONAL ATIVO` só injetado quando `is_operational_context=true`. `_CHAT_OPERATIONAL_INTENT_TERMS` refinado: `"sistema"` e `"contrato"` isolados removidos (falsos positivos), termos compostos `"estado do contrato"`/`"contrato ativo"` adicionados, verbos imperativos (`"revise"`, `"verifique"`, `"cheque"`, `"inspecione"`) e termos técnicos (`"runtime"`, `"gate"`, `"gates"`) adicionados. PR37 agora passa 56/56 ✅. Regressões PR36/PR13/PR14/PR19/PR20/PR21 verdes. Relatório: `schema/reports/PR38_IMPL_CORRECAO_ACHADOS_PR37.md`.
 
 ### Histórico do contrato encerrado (PR17–PR30)
 
