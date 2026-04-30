@@ -1,5 +1,15 @@
 # CONTRATO — ENAVIA LOOP SKILLS + SYSTEM MAP — PR17 a PR30
 
+> **Status:** Encerrado ✅ — Data de encerramento: 2026-04-30
+> **PRs concluídas:** PR0, PR17, PR18, PR19, PR20, PR21, PR22, PR23, PR24, PR25, PR26, PR27, PR28, PR29, PR30
+> **Relatório final:** `schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md`
+> **Handoff final:** `schema/handoffs/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_FINAL_HANDOFF.md`
+> **Próxima etapa:** Aguardar novo contrato autorizado pelo operador humano.
+>
+> Este contrato está encerrado. Não deve ser editado — apenas lido como referência histórica.
+
+---
+
 ## 0. Instrução obrigatória
 
 Antes de qualquer ação, leia obrigatoriamente `CLAUDE.md` na raiz do repo e siga todas as regras dele, incluindo o **Loop obrigatório de execução por PR** (seção 4).
@@ -339,3 +349,46 @@ Rollback:
 Bloqueios:
 - nenhum
 ```
+
+---
+
+## 17. Encerramento formal — PR30
+
+**Data de encerramento:** 2026-04-30
+**Status:** Encerrado ✅
+
+### Checklist de encerramento
+
+- [x] PR0 — PR-DOCS — Loop obrigatório de execução por PR (`CLAUDE.md` + `schema/contracts/INDEX.md`) — Concluída
+- [x] PR17 — PR-DIAG — Diagnóstico de `phase_complete` e `advance-phase` — Concluída
+- [x] PR18 — PR-IMPL — Endpoint `POST /contracts/advance-phase` — Concluída
+- [x] PR19 — PR-PROVA — Smoke E2E do ciclo completo (52/52 ✅) — Concluída
+- [x] PR20 — PR-IMPL — `loop-status` expõe `complete-task` em `in_progress` — Concluída
+- [x] PR21 — PR-PROVA — Matriz de estados do `loop-status` (53/53 ✅) — Concluída
+- [x] PR22 — PR-DOCS — `schema/system/ENAVIA_SYSTEM_MAP.md` (PR #183) — Concluída
+- [x] PR23 — PR-DOCS — `schema/system/ENAVIA_ROUTE_REGISTRY.json` (PR #184) — Concluída
+- [x] PR24 — PR-DOCS — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` (PR #185) — Concluída
+- [x] PR25 — PR-DOCS — `schema/system/ENAVIA_WORKER_REGISTRY.md` (PR #186) — Concluída
+- [x] PR26 — PR-DOCS — `schema/skills/CONTRACT_LOOP_OPERATOR.md` (PR #187) — Concluída
+- [x] PR27 — PR-DOCS — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` (PR #188) — Concluída
+- [x] PR28 — PR-DOCS — `schema/skills/SYSTEM_MAPPER.md` (PR #189) — Concluída
+- [x] PR29 — PR-DOCS — `schema/skills/CONTRACT_AUDITOR.md` — Concluída
+- [x] PR30 — PR-DOCS/PR-PROVA — Fechamento, hardening e handoff final — **Esta PR**
+
+### Resultado final
+
+| Item | Estado |
+|------|--------|
+| Loop contratual supervisionado | ✅ Consolidado e provado (PR17–PR21) |
+| System Map + Route Registry + Playbook + Worker Registry | ✅ Criados (PR22–PR25) |
+| 4 skills documentais ativas | ✅ Criadas (PR26–PR29) |
+| Relatório final | ✅ `schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md` |
+| Handoff final | ✅ `schema/handoffs/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_FINAL_HANDOFF.md` |
+| Governança atualizada | ✅ INDEX.md, status, handoff, execution log |
+| Runtime alterado nas frentes de docs/skills | ✅ Não — zero alterações de runtime em PR22–PR30 |
+
+### Próxima etapa
+
+Aguardar definição do próximo contrato pelo operador humano.
+
+Não iniciar novo contrato sem aprovação explícita e sem criar novo arquivo em `schema/contracts/active/`.

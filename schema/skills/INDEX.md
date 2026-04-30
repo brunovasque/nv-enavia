@@ -18,7 +18,9 @@ Atualizar sempre que uma skill for criada, encerrada ou substituída.
 
 ## Skills previstas (contrato PR17–PR30)
 
-Nenhuma skill prevista pendente neste contrato.
+Nenhuma skill prevista pendente neste contrato. ✅ Frente de Skills concluída na PR29.
+
+**Próxima evolução de skills** depende de contrato futuro aprovado pelo operador humano. Ver recomendações em `schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md` (Seção 10).
 
 ---
 
