@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR40 — Self Model da Enavia)
-**Branch ativa:** `copilot/claude-pr40-docs-self-model-enavia`
-**Última tarefa:** PR40 — PR-DOCS — Docs-only. Self-model documental completo criado em `schema/brain/self-model/`. 5 arquivos: identity, capabilities, limitations, current-state, how-to-answer. INDEX.md atualizado. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR41 — Popular Obsidian Brain)
+**Branch ativa:** `copilot/claudepr41-docs-popular-obsidian-brain`
+**Última tarefa:** PR41 — PR-DOCS — Docs-only. Obsidian Brain populado com conhecimento real consolidado: 4 mapas (`brain/maps/`), 3 resumos de contratos (`brain/contracts/`), 5 memórias operacionais (`brain/memories/`), 4 decisões arquiteturais datadas (`brain/decisions/`), 3 aprendizados (`brain/learnings/`), 2 arquivos de questões abertas (`brain/open-questions/`). INDEX de cada subpasta + `GRAPH.md` + `SYSTEM_AWARENESS.md` atualizados. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
@@ -33,10 +33,16 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
+**PR42 — PR-DIAG — Diagnóstico da memória atual no runtime**
 
-> ✅ PR40 criou o self-model documental completo em `schema/brain/self-model/`. Nenhum runtime alterado.
-> PR41 irá migrar conhecimento operacional existente (skills, playbooks, mapas) para dentro do Obsidian Brain.
+> ✅ PR41 populou o Obsidian Brain com conhecimento real consolidado a
+> partir de contratos, relatórios PR17–PR40, status, handoff, execution log,
+> system map, route registry, worker registry, playbook, skills, mode policy,
+> self-model e incidentes. Brain segue documental — não há runtime, loader,
+> endpoint nem conexão ao chat.
+> PR42 será PR-DIAG: diagnosticar como a memória existe hoje no runtime
+> (KV `ENAVIA_BRAIN`, key shapes, leituras/escritas) e comparar com o
+> brain documentado. Sem alteração de runtime.
 
 ## Histórico de contratos
 

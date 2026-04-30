@@ -43,14 +43,23 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
+**PR42 — PR-DIAG — Diagnóstico da memória atual no runtime**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
-> ✅ PR40 criou o self-model documental completo em `schema/brain/self-model/`: 5 arquivos (identity, capabilities, limitations, current-state, how-to-answer). Docs-only, nenhum runtime alterado.
-> PR41 irá migrar o conhecimento operacional consolidado para dentro do Obsidian Brain.
+> ✅ PR41 populou o Obsidian Brain com conhecimento real consolidado: 4 mapas
+> (`maps/`), 3 resumos de contratos (`contracts/`), 5 memórias operacionais
+> (`memories/`), 4 decisões arquiteturais datadas (`decisions/`), 3
+> aprendizados (`learnings/`) e 2 arquivos de questões abertas
+> (`open-questions/`). Todos os INDEX atualizados, GRAPH e SYSTEM_AWARENESS
+> atualizados. Docs-only, nenhum runtime alterado.
+> PR42 será PR-DIAG: levantar como a memória existe hoje no runtime
+> (KV ENAVIA_BRAIN, key shapes, leituras/escritas em `nv-enavia.js`/
+> `contract-executor.js`) e comparar com o brain documentado.
 
 ### PRs do contrato Jarvis Brain já concluídas
+
+- **PR41** ✅ (PR-DOCS) — Obsidian Brain populado com conhecimento consolidado: 4 mapas em `brain/maps/` (system-map, route-map, worker-map, skill-map), 3 resumos em `brain/contracts/` (active, closed, next-candidates), 5 memórias em `brain/memories/` (operator-preferences, operating-style, project-principles, hard-rules, recurring-patterns), 4 decisões datadas em `brain/decisions/`, 3 aprendizados em `brain/learnings/` (what-worked, what-failed, future-risks), 2 questões em `brain/open-questions/` (unresolved-technical-gaps, strategic-questions). INDEX de cada subpasta atualizado. `GRAPH.md` e `SYSTEM_AWARENESS.md` atualizados. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`. Nenhum runtime alterado.
 
 - **PR31** ✅ (PR-DOCS) — Ativação do contrato Jarvis Brain v1. Governança religada. Nenhum runtime alterado.
 - **PR32** ✅ (PR-DIAG) — Diagnóstico do chat engessado. Causa raiz identificada (target default + read_only como tom + ausência de LLM Core/Intent/Skill Router/Brain + sanitizers pós-LLM + envelope JSON). Relatório: `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`. Nenhum runtime alterado.

@@ -76,7 +76,18 @@ skill-domain-map.md
 
 ---
 
-## Estado desta pasta na PR39
+## Arquivos populados (PR41)
 
-Pasta criada como esqueleto. Nenhum mapa foi populado nesta PR.
-Os mapas serão adicionados em PRs futuras conforme o brain for populado.
+| Arquivo | Conteúdo | Quando consultar |
+|---------|----------|------------------|
+| `system-map.md` | Resumo navegável do sistema (workers, rotas, contratos, skills, playbooks, registries, relação `nv-enavia.js` ↔ executor ↔ deploy worker ↔ browser ↔ painel ↔ schema) | Antes de afirmar capacidade do sistema; antes de sugerir PR técnica |
+| `route-map.md` | Resumo navegável das 68 rotas agrupadas por finalidade (chat, loop, contratos, memória, executor, deploy, externo, admin) | Para revisar endpoint; para responder se uma rota existe; antes de propor rota nova |
+| `worker-map.md` | Workers confirmados (PROD/TEST), bindings, KVs, diferenças PROD↔TEST, workers centrais | Antes de afirmar capacidade de worker; antes de tocar deploy/binding/KV |
+| `skill-map.md` | 4 skills documentais; quando usar cada uma; o que cada uma **não** faz; status documental vs. ausência de runtime de skills | Para escolher skill; para responder "essa skill executa X?" |
+
+## Estado desta pasta na PR41
+
+Pasta populada com 4 mapas reais derivados de fontes verificadas em
+`schema/system/`, `schema/skills/`, `schema/contracts/` e `schema/playbooks/`.
+Os mapas são resumos navegáveis — fonte de verdade continua nos arquivos
+originais.

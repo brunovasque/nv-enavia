@@ -76,7 +76,21 @@ revertidas silenciosamente — qualquer reversão exige nova PR e novo registro.
 
 ---
 
-## Estado desta pasta na PR39
+## Decisões registradas (PR41)
 
-Pasta criada como esqueleto. Nenhuma decisão foi populada nesta PR.
-As decisões serão adicionadas em PRs futuras conforme o brain for populado.
+| Arquivo | Decisão | PR de origem |
+|---------|---------|-------------|
+| `2026-04-30-read-only-gate-nao-tom.md` | `read_only` é gate de execução, **não** regra de tom | PR35 (definição) + PR36/PR38 (implementação) |
+| `2026-04-30-jarvis-brain-llm-first.md` | A Enavia é LLM-first: inteligência primeiro, ferramentas depois | PR31 + PR33 + PR40/PR41 |
+| `2026-04-30-skills-documentais-antes-de-runtime.md` | Skills nascem documentais; runtime de skills é candidato futuro | PR26–PR29 |
+| `2026-04-30-pr36-pr38-anti-bot-before-brain.md` | Frente Brain só após corrigir e provar runtime do chat (anti-bot 56/56) | PR33 + PR36/PR37/PR38 |
+
+> Cada decisão segue a estrutura: contexto, problema, decisão, alternativas,
+> consequência, fonte, como usar futuramente, backlinks.
+
+## Estado desta pasta na PR41
+
+Pasta populada com 4 decisões arquiteturais reais derivadas das PRs
+PR26–PR40. Toda decisão tem PR de origem identificada e fontes verificáveis
+em `schema/reports/`, `schema/contracts/`, `schema/policies/` e
+`schema/brain/`.

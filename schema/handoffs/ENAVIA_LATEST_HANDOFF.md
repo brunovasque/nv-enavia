@@ -1,82 +1,84 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR40 — PR-DOCS — Self Model da Enavia
-**Para:** PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain
+**De:** PR41 — PR-DOCS — Popular Obsidian Brain
+**Para:** PR42 — PR-DIAG — Diagnóstico da memória atual no runtime
+
+---
 
 ## O que foi feito nesta sessão
 
-### PR40 — PR-DOCS — Self Model da Enavia
+### PR41 — PR-DOCS — Popular Obsidian Brain
 
 **Tipo:** `PR-DOCS` (Docs-only, nenhum runtime alterado)
-**Branch:** `copilot/claude-pr40-docs-self-model-enavia`
+**Branch:** `copilot/claudepr41-docs-popular-obsidian-brain`
 
 **Objetivo:**
-Criar o self-model documental da Enavia dentro do Obsidian Brain. O self-model define
-quem a Enavia é, qual é o papel dela no projeto, quais capacidades ela tem hoje, quais
-ainda não existem, quais limites deve respeitar, qual é o estado atual, como deve
-responder ao operador, e como evitar voltar a parecer bot/checklist. Docs-only, não
-implementa runtime, não conecta self-model ao chat.
+Popular o Obsidian Brain da Enavia com conhecimento real consolidado do
+projeto, a partir das fontes existentes (contratos, relatórios PR17–PR40,
+status/handoff/execution log, system map, route registry, worker registry,
+playbook, skills, mode policy, self-model, incidentes). PR39 criou a
+arquitetura; PR40 criou o self-model; PR41 preenche o cérebro com decisões,
+contratos navegáveis, memórias operacionais, regras duras, aprendizados,
+mapas, questões abertas e como a Enavia deve usar o próprio sistema.
 
-**Arquivos criados:**
+**Arquivos criados (17):**
 
-1. **`schema/brain/self-model/identity.md`**: Identidade da Enavia — LLM-first, propósito,
-   5 modos (pensar/diagnosticar/planejar/sugerir/executar), sinceridade técnica, frase
-   canônica obrigatória: "A Enavia é uma inteligência estratégica com ferramentas; não
-   uma ferramenta com frases automáticas."
+- **maps/** (4): `system-map.md`, `route-map.md`, `worker-map.md`, `skill-map.md`
+- **contracts/** (3): `active.md`, `closed.md`, `next-candidates.md`
+- **memories/** (5): `operator-preferences.md`, `operating-style.md`,
+  `project-principles.md`, `hard-rules.md`, `recurring-patterns.md`
+- **decisions/** (4 datadas): `2026-04-30-read-only-gate-nao-tom.md`,
+  `2026-04-30-jarvis-brain-llm-first.md`,
+  `2026-04-30-skills-documentais-antes-de-runtime.md`,
+  `2026-04-30-pr36-pr38-anti-bot-before-brain.md`
+- **learnings/** (3): `what-worked.md`, `what-failed.md`, `future-risks.md`
+- **open-questions/** (2): `unresolved-technical-gaps.md`, `strategic-questions.md`
+- **Relatório:** `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`
 
-2. **`schema/brain/self-model/capabilities.md`**: Capacidades atuais confirmadas vs.
-   capacidades ainda não existentes. Explicitamente marcadas: Brain Loader (futuro),
-   LLM Core vivo (futuro), Intent Engine completo (futuro), Skill Router runtime (futuro),
-   memória automática supervisionada (futura).
+**Arquivos atualizados:**
 
-3. **`schema/brain/self-model/limitations.md`**: Limites reais. Inclui seção obrigatória
-   "Limite não é personalidade" — explica que limites operacionais não devem tornar a
-   Enavia fria, travada ou robótica.
-
-4. **`schema/brain/self-model/current-state.md`**: Estado atual pós-PR39. Documenta:
-   frente 2 (PR32–PR38) encerrada com PR38 56/56 ✅, PR39 criou brain architecture,
-   PR40 cria self-model. Inclui frase obrigatória sobre estado documental vs. runtime.
-
-5. **`schema/brain/self-model/how-to-answer.md`**: 10 regras de resposta + 4 exemplos
-   canônicos. O arquivo mais importante do self-model para comportamento observável.
-
-**Arquivo atualizado:**
-
-6. **`schema/brain/self-model/INDEX.md`**: Tabela de arquivos planejados substituída por
-   tabela de arquivos criados. Seções adicionadas: relação com Mode Policy, relação com
-   Obsidian Brain, nota de runtime (documental, não conectado ao chat), estado pós-PR40.
-
-**Relatório criado:**
-
-7. **`schema/reports/PR40_SELF_MODEL_ENAVIA_REPORT.md`**: Relatório completo da PR40
-   com 9 seções + tabela de verificações.
-
-**Governança atualizada:**
-
-8. **`schema/contracts/INDEX.md`**: PR40 ✅ adicionada, próxima PR → PR41.
-9. **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR40 registrada. Próxima PR: PR41.
-10. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo): handoff atualizado para PR41.
-11. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**: bloco PR40 adicionado.
+- INDEX de cada subpasta do brain (`maps/`, `contracts/`, `memories/`,
+  `decisions/`, `learnings/`, `open-questions/`)
+- `schema/brain/INDEX.md` — seção "Estado desta PR" reescrita para PR41
+- `schema/brain/SYSTEM_AWARENESS.md` — Dimensão 1, Dimensão 2 e Seção 6
+- `schema/brain/GRAPH.md` — nova Seção 8 com grafo dos arquivos populados
+- `schema/contracts/INDEX.md` — PR41 ✅, próxima PR → PR42
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR41 registrada
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR41 adicionado
 
 ## Arquivos NÃO alterados
 
-- `nv-enavia.js` (não tocado)
-- `schema/enavia-cognitive-runtime.js` (não tocado)
+- `nv-enavia.js`
+- `schema/enavia-cognitive-runtime.js`
 - `panel/` (nenhum arquivo tocado)
 - `contract-executor.js`, `executor/`
-- `.github/workflows/`, `wrangler.toml`
+- `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
 - secrets, bindings, KV config
 - contratos encerrados
+- `schema/brain/self-model/` (criado em PR40, não tocado em PR41)
+- `schema/brain/incidents/chat-engessado-readonly.md` (criado em PR39)
+- arquivos `.policies/MODE_POLICY.md`, `system/*`, `playbooks/*`, `skills/*`
+  (apenas lidos como fonte, não alterados)
 
 ## Próxima PR autorizada
 
-**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
+**PR42 — PR-DIAG — Diagnóstico da memória atual no runtime**
 
-Objetivo: Consolidar o conhecimento operacional existente (skills, playbooks, mapas,
-system map, route registry) dentro do Obsidian Brain, nos formatos e convenções
-definidos em `schema/brain/` pela PR39.
+Objetivo: Levantar como a memória existe hoje no runtime — KV `ENAVIA_BRAIN`,
+key shapes, leituras e escritas em `nv-enavia.js` e `contract-executor.js` —
+e comparar com o que está documentado no Obsidian Brain populado pela PR41.
+Apenas diagnóstico; nenhuma alteração de runtime, nenhum endpoint novo,
+nenhum loader, nenhuma conexão.
 
-Referências obrigatórias: `schema/brain/MEMORY_RULES.md`, `schema/brain/UPDATE_POLICY.md`,
-`schema/brain/GRAPH.md` (para backlinks), `schema/brain/self-model/` (para contexto de
-identidade e capacidades).
+Referências obrigatórias para PR42:
+
+- `schema/brain/INDEX.md`, `MEMORY_RULES.md`, `RETRIEVAL_POLICY.md`,
+  `UPDATE_POLICY.md`, `SYSTEM_AWARENESS.md`
+- `schema/brain/self-model/capabilities.md` (capacidades atuais vs. futuras)
+- `schema/brain/maps/system-map.md`, `worker-map.md` (KVs e bindings)
+- `schema/brain/open-questions/unresolved-technical-gaps.md` (lacunas
+  técnicas a investigar)
+- `schema/system/ENAVIA_WORKER_REGISTRY.md` §6 (key shapes ENAVIA_BRAIN)
+- `nv-enavia.js`, `contract-executor.js` (somente leitura)

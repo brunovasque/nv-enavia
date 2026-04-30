@@ -92,7 +92,22 @@ aberta deve ter uma PR futura que a resolva ou a arquive.
 
 ---
 
-## Estado desta pasta na PR39
+## Arquivos populados (PR41)
 
-Pasta criada como esqueleto. As questões identificadas acima serão formalizadas
-em arquivos individuais em PRs futuras conforme o brain for populado.
+| Arquivo | Tipo | Conteúdo |
+|---------|------|----------|
+| `unresolved-technical-gaps.md` | Lacunas técnicas | 8 lacunas (Brain Loader, limite de contexto, ranking de memórias, atualização de Brain após PR, validação docs↔runtime, segurança do LLM Core, custo, logging de retrieval) |
+| `strategic-questions.md` | Questões estratégicas | 6 questões (quando Runtime de Skills, UI de Skills, automatizar memória, integrar Self-Audit, balancear Jarvis vs governança, evitar virar só documentação) |
+
+## Quando consultar
+
+- Ao planejar próxima frente do contrato Jarvis Brain
+- Ao desenhar PR de runtime que toca brain / LLM / skills
+- Antes de propor novo contrato (verificar se uma questão aberta deve ser
+  resolvida antes)
+
+## Estado desta pasta na PR41
+
+Pasta populada com 2 arquivos consolidando lacunas técnicas e questões
+estratégicas reais identificadas até PR40. Cada questão tem estado,
+impacto e próxima ação sugerida — nenhuma é "to-do" cosmético.

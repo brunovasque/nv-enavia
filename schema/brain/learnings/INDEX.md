@@ -86,7 +86,25 @@ e como aplicar o aprendizado em próximas PRs.
 
 ---
 
-## Estado desta pasta na PR39
+## Aprendizados registrados (PR41)
 
-Pasta criada como esqueleto. Nenhum aprendizado foi populado nesta PR.
-Os aprendizados serão adicionados em PRs futuras conforme o brain for populado.
+| Arquivo | Tipo | Conteúdo |
+|---------|------|----------|
+| `what-worked.md` | Sucesso | 7 padrões de sucesso (diagnóstico antes de impl, PR-PROVA revelando falhas, PR38 voltando ao contrato, separar `read_only` de tom, sanitizers cirúrgicos, governança+teste, skills documentais primeiro) |
+| `what-failed.md` | Falha | 5 padrões de falha (excesso documental, chat robótico por target/read_only, falsos positivos com palavras genéricas, confundir skills documentais com runtime, Latest Handoff inflado) |
+| `future-risks.md` | Risco | 9 riscos futuros (Brain só docs, LLM Core fraco, retrieval errado, contexto caro, self-model desatualizado, skills sem governança, excesso documental volta, alucinação, divergência docs↔runtime) |
+
+## Quando consultar
+
+| Intenção | Arquivo prioritário |
+|----------|--------------------|
+| Planejar próxima PR | `what-worked.md` + `future-risks.md` |
+| Diagnosticar problema com precedente | `what-failed.md` |
+| Revisar nova frente / contrato | os três |
+| Antecipar risco antes de PR-IMPL | `future-risks.md` |
+
+## Estado desta pasta na PR41
+
+Pasta populada com 3 aprendizados consolidados derivados de PRs reais
+(PR26–PR40). Todos com fonte e backlinks. Nenhuma opinião sem evidência
+foi registrada.

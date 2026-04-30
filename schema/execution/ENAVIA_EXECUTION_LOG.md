@@ -4,6 +4,112 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR41 — PR-DOCS — Popular Obsidian Brain
+
+- **Branch:** `copilot/claudepr41-docs-popular-obsidian-brain`
+- **Tipo:** `PR-DOCS` (Docs-only, nenhum runtime alterado)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR40 ✅ (PR-DOCS — Self Model da Enavia)
+- **Escopo:** Docs-only. População do Obsidian Brain em `schema/brain/maps/`,
+  `contracts/`, `memories/`, `decisions/`, `learnings/`, `open-questions/` +
+  atualização de INDEX, GRAPH, SYSTEM_AWARENESS + relatório + governança.
+
+### Objetivo
+
+Popular o Obsidian Brain da Enavia com conhecimento real consolidado do projeto,
+a partir das fontes existentes (contratos, relatórios PR17–PR40, status, handoff,
+execution log, system map, route registry, worker registry, playbook, skills,
+mode policy, self-model, incidentes). PR39 criou a arquitetura; PR40 criou o
+self-model; PR41 preenche o cérebro com conteúdo navegável: decisões, contratos,
+memórias operacionais, regras duras, aprendizados, mapas, questões abertas e
+como a Enavia deve usar o próprio sistema.
+
+### Resultado
+
+✅ Brain populado — 17 arquivos novos de conteúdo + 6 INDEX atualizados +
+GRAPH + SYSTEM_AWARENESS + relatório + governança.
+
+### Arquivos criados
+
+- `schema/brain/maps/system-map.md`
+- `schema/brain/maps/route-map.md`
+- `schema/brain/maps/worker-map.md`
+- `schema/brain/maps/skill-map.md`
+- `schema/brain/contracts/active.md`
+- `schema/brain/contracts/closed.md`
+- `schema/brain/contracts/next-candidates.md`
+- `schema/brain/memories/operator-preferences.md`
+- `schema/brain/memories/operating-style.md`
+- `schema/brain/memories/project-principles.md`
+- `schema/brain/memories/hard-rules.md`
+- `schema/brain/memories/recurring-patterns.md`
+- `schema/brain/decisions/2026-04-30-read-only-gate-nao-tom.md`
+- `schema/brain/decisions/2026-04-30-jarvis-brain-llm-first.md`
+- `schema/brain/decisions/2026-04-30-skills-documentais-antes-de-runtime.md`
+- `schema/brain/decisions/2026-04-30-pr36-pr38-anti-bot-before-brain.md`
+- `schema/brain/learnings/what-worked.md`
+- `schema/brain/learnings/what-failed.md`
+- `schema/brain/learnings/future-risks.md`
+- `schema/brain/open-questions/unresolved-technical-gaps.md`
+- `schema/brain/open-questions/strategic-questions.md`
+- `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`
+
+### Arquivos atualizados
+
+- `schema/brain/INDEX.md`
+- `schema/brain/GRAPH.md`
+- `schema/brain/SYSTEM_AWARENESS.md`
+- `schema/brain/maps/INDEX.md`
+- `schema/brain/contracts/INDEX.md`
+- `schema/brain/memories/INDEX.md`
+- `schema/brain/decisions/INDEX.md`
+- `schema/brain/learnings/INDEX.md`
+- `schema/brain/open-questions/INDEX.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`
+- `schema/enavia-cognitive-runtime.js`
+- `panel/`, `executor/`, `contract-executor.js`
+- `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+- secrets, bindings, KV configs
+- contratos encerrados em `schema/contracts/active/`
+- `schema/brain/self-model/`, `schema/brain/incidents/`,
+  `schema/brain/MEMORY_RULES.md`, `RETRIEVAL_POLICY.md`, `UPDATE_POLICY.md`,
+  `ARCHITECTURE.md`
+- `schema/policies/MODE_POLICY.md`
+- `schema/system/*`, `schema/playbooks/*`, `schema/skills/*`
+  (apenas lidos como fonte)
+
+### Verificações
+
+- `git diff --name-only` retorna apenas arquivos `.md` ✅
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado ✅
+- `operator-preferences.md` existe ✅
+- `operating-style.md` contém seção "Como usar o sistema" (Seção 3) ✅
+- `project-principles.md` menciona LLM-first (§1.1) ✅
+- `hard-rules.md` contém "`read_only` é gate de execução, não tom" (§3) ✅
+- `decisions/` possui os 4 arquivos datados ✅
+- `learnings/` possui `what-worked.md`, `what-failed.md`, `future-risks.md` ✅
+- `open-questions/` possui `unresolved-technical-gaps.md` e `strategic-questions.md` ✅
+- Relatório PR41 existe ✅
+- Status, handoff, execution log e `schema/contracts/INDEX.md` atualizados ✅
+
+### Próxima PR
+
+**PR42 — PR-DIAG — Diagnóstico da memória atual no runtime**
+
+PR-DIAG (read-only): levantar como a memória existe hoje em runtime
+(KV `ENAVIA_BRAIN`, key shapes, leituras/escritas em `nv-enavia.js` e
+`contract-executor.js`) e comparar com o brain documentado pela PR41.
+Sem alteração de runtime, sem endpoint novo, sem loader, sem conexão.
+
+---
+
 ## 2026-04-30 — PR40 — PR-DOCS — Self Model da Enavia
 
 - **Branch:** `copilot/claude-pr40-docs-self-model-enavia`

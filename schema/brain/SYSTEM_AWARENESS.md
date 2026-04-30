@@ -31,9 +31,10 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 
 - **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — Ativo 🟢 (ampliado para PR31-PR64)
 - **Objetivo do contrato:** Transformar a Enavia em IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit
-- **Próxima PR autorizada:** PR40 — PR-DOCS — Self Model da Enavia
-- **Última PR concluída:** PR39 — PR-DOCS — Arquitetura do Obsidian Brain
-- **PRs concluídas do contrato:** PR31–PR39
+- **Próxima PR autorizada:** PR42 — PR-DIAG — Diagnóstico da memória atual no runtime
+- **Última PR concluída:** PR40 — PR-DOCS — Self Model da Enavia
+- **PR em andamento:** PR41 — PR-DOCS — Popular Obsidian Brain
+- **PRs concluídas do contrato:** PR31–PR40
 
 ### O que deve marcar como incerto
 
@@ -61,13 +62,15 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — o que foi feito na última PR
 - `schema/execution/ENAVIA_EXECUTION_LOG.md` — histórico cronológico
 
-### O que a Enavia pode afirmar (baseado em fonte — atualizado após PR39)
+### O que a Enavia pode afirmar (baseado em fonte — atualizado após PR41)
 
-- **Última PR mergeada:** PR38 — PR-IMPL — Correção achados PR37 anti-bot (56/56 ✅)
+- **Última PR mergeada:** PR40 — PR-DOCS — Self Model da Enavia
+- **PR em andamento:** PR41 — PR-DOCS — Popular Obsidian Brain
+- **Próxima PR autorizada:** PR42 — PR-DIAG — Diagnóstico da memória atual no runtime
 - **Frente 2 corretiva (PR32-PR38):** Encerrada ✅. Teste anti-bot: 56/56.
 - **Frente anti-bot (PR36-PR38):** `read_only` é gate de execução, não tom. Sanitizers preservam prosa útil. `isOperationalMessage` usa termos compostos.
-- **Runtime:** Estável. Nenhum runtime alterado em PR39.
-- **PR em andamento:** PR39 — PR-DOCS — Arquitetura do Obsidian Brain (esta PR)
+- **Frente Obsidian Brain (PR39-PR41):** PR39 criou arquitetura, PR40 criou self-model, PR41 populou o brain com conteúdo real.
+- **Runtime:** Estável. Nenhum runtime alterado em PR39, PR40 ou PR41.
 
 ### O que deve marcar como incerto
 
@@ -157,14 +160,17 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 | Componente | Estado |
 |-----------|--------|
 | Estrutura documental (`schema/brain/`) | ✅ Criada (PR39) |
+| Self-model documental (`schema/brain/self-model/`) | ✅ Criado (PR40) |
+| Brain populado com conteúdo real (`maps/`, `contracts/`, `memories/`, `decisions/`, `learnings/`, `open-questions/`) | ✅ Populado (PR41) |
 | Runtime de memory retrieval | ❌ Não existe ainda |
 | Runtime de memory update | ❌ Não existe ainda |
 | Conexão ao LLM Core | ❌ Não existe ainda |
 | Intent Engine | ❌ Não existe ainda |
 | Skill Router | ❌ Não existe ainda |
 
-> O Obsidian Brain é documental nesta PR39. Não é runtime. Não executa nada.
-> As PRs futuras (PR40+) irão popular e depois conectar o brain ao runtime.
+> O Obsidian Brain é documental até PR41. Não é runtime. Não executa nada.
+> A próxima PR (PR42 — PR-DIAG) diagnosticará a memória atual no runtime
+> antes de qualquer conexão.
 
 ---
 
