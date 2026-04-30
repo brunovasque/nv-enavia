@@ -38,11 +38,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR25** — PR-DOCS — Registry de workers, bindings, KV e secrets esperados.
+**PR26** — PR-DOCS — Criar skill: Contract Loop Operator.
 
-Criar `schema/system/ENAVIA_WORKER_REGISTRY.md` documentando: workers do sistema, bindings de serviço (EXECUTOR/DEPLOY_WORKER PROD+TEST), KV namespaces (ENAVIA_BRAIN PROD+TEST, key shapes), secrets esperados (INTERNAL_TOKEN, OPENAI_API_KEY, SUPABASE_*, BROWSER_EXECUTOR_URL, etc.), environment vars. Fontes: `wrangler.toml`, `executor/wrangler.toml`, `.github/workflows/deploy.yml` e `deploy-executor.yml`.
+Criar `schema/skills/CONTRACT_LOOP_OPERATOR.md` — skill operacional supervisionada que encapsula o loop contratual completo (`execute-next → complete-task → advance-phase`). Documentar: objetivo/escopo, triggers, pré-condições, passos supervisionados, outputs, critérios de parada, referências a PR22–PR25.
 
-Contexto: PR24 concluída — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado com 18 seções. Continua a frente de System Map + Tool Registry (PR22–PR25). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Contexto: PR25 concluída — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado com 18 seções (inventário de infraestrutura). A frente System Map + Tool Registry (PR22–PR25) está fechada. Inicia-se a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
@@ -53,4 +53,5 @@ Contexto: PR24 concluída — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` 
 - **PR21** ✅ (PR-PROVA, mergeada — PR #182, commit merge `3d29b7d`) — matriz de estados do `loop-status` (53/53 ✅).
 - **PR22** ✅ (PR-DOCS, mergeada — PR #183, commit merge `fc7a4ec`) — `schema/system/ENAVIA_SYSTEM_MAP.md` criado (14 seções).
 - **PR23** ✅ (PR-DOCS, mergeada — PR #184, commit merge `beb3dfa`) — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado (68 rotas, 0 violações).
-- **PR24** ✅ (PR-DOCS, em revisão) — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado (18 seções + Apêndice A).
+- **PR24** ✅ (PR-DOCS, mergeada — PR #185, commit merge `b54e74c`) — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado (18 seções + Apêndice A).
+- **PR25** ✅ (PR-DOCS, em revisão) — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado (18 seções, inventário de infraestrutura).

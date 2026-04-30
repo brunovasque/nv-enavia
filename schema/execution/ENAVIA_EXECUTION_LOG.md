@@ -4,6 +4,59 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR25 — PR-DOCS — Criar schema/system/ENAVIA_WORKER_REGISTRY.md
+
+- **Branch:** `claude/pr25-docs-enavia-worker-registry`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR24 ✅ (commit `8c5670f`, PR #185 mergeada — commit merge `b54e74c`)
+- **Escopo:** Docs-only. Apenas criação de `schema/system/ENAVIA_WORKER_REGISTRY.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar o inventário oficial de infraestrutura da ENAVIA documentando workers, service bindings, KV namespaces, secrets esperados, env vars, workflows e dependências externas. Todas as informações baseadas em evidência real das fontes: `wrangler.toml`, `wrangler.executor.template.toml`, `executor/wrangler.toml`, `.github/workflows/deploy.yml`, `.github/workflows/deploy-executor.yml`, `nv-enavia.js`, `contract-executor.js`.
+
+### Arquivo criado
+
+- **`schema/system/ENAVIA_WORKER_REGISTRY.md`** (NOVO):
+  - 18 seções obrigatórias.
+  - 6 workers Cloudflare confirmados (3 PROD + 3 TEST via bindings).
+  - 5 workers externos por URL (Browser, Director Cognitive, Vercel, Deploy Worker URL, ENAVIA Executor URL).
+  - Service bindings EXECUTOR e DEPLOY_WORKER — PROD e TEST separados.
+  - KV ENAVIA_BRAIN com 2 IDs visíveis (PROD/TEST); executor com 3 bindings KV adicionais.
+  - 14 key shapes do ENAVIA_BRAIN confirmados por evidência direta de código.
+  - Secrets esperados: `INTERNAL_TOKEN`, `OPENAI_API_KEY` (confirmados); `SUPABASE_KEY` [A VERIFICAR]; executor: `CF_ACCOUNT_ID`, `CF_API_TOKEN`, `OPENAI_API_KEY`/`CODEX_API_KEY`.
+  - GitHub Secrets confirmados: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `INTERNAL_TOKEN`.
+  - Env vars PROD vs TEST documentadas (11 vars nv-enavia + 5 vars executor por ambiente).
+  - 2 workflows documentados: `deploy.yml` e `deploy-executor.yml`.
+  - Checklist de saúde com 18 itens.
+  - Diagnóstico de 10 falhas comuns.
+  - Seção 16: 8 incertezas marcadas como [A VERIFICAR].
+  - Seção 17: "Isso é opcional. Não mexa agora." com 9 itens.
+  - Referências: 3× ENAVIA_SYSTEM_MAP, 13× ENAVIA_ROUTE_REGISTRY, 4× ENAVIA_OPERATIONAL_PLAYBOOK.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+- Nenhum teste criado ou modificado.
+
+### Verificações
+
+| Verificação | Resultado |
+|-------------|-----------|
+| 18 seções numeradas presentes | ✅ |
+| Referências a ENAVIA_SYSTEM_MAP.md | `3 ocorrências` ✅ |
+| Referências a ENAVIA_ROUTE_REGISTRY.json | `13 ocorrências` ✅ |
+| Referências a ENAVIA_OPERATIONAL_PLAYBOOK.md | `4 ocorrências` ✅ |
+| "NUNCA DOCUMENTAR" na coluna de valores de secrets | ✅ |
+| Nenhum valor de secret exposto | ✅ |
+| "Isso é opcional. Não mexa agora." presente | ✅ |
+| `git diff --name-only` (runtime) | `(vazio)` ✅ |
+| Nenhum .js/.ts/.toml/.yml alterado | `0 arquivos` ✅ |
+
+---
+
 ## 2026-04-29 — PR24 — PR-DOCS — Criar schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md
 
 - **Branch:** `claude/pr24-docs-enavia-operational-playbook`
