@@ -9,7 +9,7 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 - **Branch:** `copilot/claudepr42-diag-memoria-runtime-brain`
 - **Tipo:** `PR-DIAG` (read-only, nenhum runtime alterado)
 - **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
-- **PR anterior validada:** PR41 ✅ (declarada mergeada pelo operador — ver Seção 12.1 do relatório)
+- **PR anterior validada:** PR41 ✅ (PR-DOCS — mergeada como PR #202 — relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`)
 - **Escopo:** Docs-only. Diagnóstico de memória runtime + relatório + governança.
 
 ### Objetivo
@@ -33,7 +33,7 @@ e preparar recomendação técnica para PR43 Brain Loader.
 7. Painel envia context.target — sem botão "Salvar na memória" no chat
 8. Brain documental NÃO está conectado ao runtime
 9. Brain Loader via bundle estático é viável para PR43
-10. PR41 discrepância registrada (não encontrado relatório no repo)
+10. Brain Loader via bundle estático é viável para PR43
 
 ### Arquivos criados
 

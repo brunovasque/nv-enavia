@@ -35,10 +35,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 **PR43 — PR-IMPL — Brain Loader read-only Worker-only**
 
-> ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Self-model existe (PR40). Brain não está conectado ao runtime. Implementação do Brain Loader é viável.
+> ✅ PR41 mergeada (PR #202): Brain populado com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
+> ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não está conectado ao runtime. Implementação do Brain Loader é viável.
 > PR43 irá implementar o Brain Loader bundled estático com allowlist de 6 arquivos do self-model, injetado em buildChatSystemPrompt, read-only, sem endpoint, sem painel.
-
-> **Nota:** PR41 (Migrar conhecimento para Brain) foi declarada mergeada pelo operador no problem statement da PR42. Não foi encontrado relatório PR41 no repo. Ver `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md` Seção 12.1 para registro desta discrepância.
 
 ## Histórico de contratos
 

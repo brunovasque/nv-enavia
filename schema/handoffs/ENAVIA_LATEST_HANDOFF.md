@@ -48,8 +48,7 @@ Obsidian Brain documental. Preparar base técnica para PR43.
 9. **Brain Loader via bundle estático é viável** para PR43. Allowlist de 6 arquivos
    do self-model + SYSTEM_AWARENESS, injetados em `buildChatSystemPrompt`.
 
-10. **Discrepância PR41**: problem statement declarou PR41 mergeada, mas não há
-    relatório PR41 no repo. Registrado na Seção 12.1 do relatório PR42.
+10. **PR41 mergeada e validada** (PR #202 — relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`)
 
 **Arquivos criados:**
 

@@ -47,10 +47,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
+> ✅ PR41 foi mergeada (PR #202) e populou o Obsidian Brain com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
 > ✅ PR42 diagnosticou a memória runtime. `ENAVIA_BRAIN` existe com IDs reais. Brain documental não está conectado. Brain Loader via bundle estático é viável.
 > PR43 irá implementar Brain Loader com allowlist de 6 arquivos (self-model + SYSTEM_AWARENESS), bundled estático, injetado em `buildChatSystemPrompt`, read-only, sem endpoint, sem painel.
-
-> **Nota sobre PR41**: PR41 (Migrar conhecimento para Brain) foi declarada mergeada pelo operador no problem statement da PR42, mas não foi encontrado relatório PR41 no repo. Ver `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md` Seção 12.1.
 
 ### PRs do contrato Jarvis Brain já concluídas
 
@@ -62,7 +61,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR36** ✅ (PR-IMPL) — Correção inicial do chat runtime. Worker-only, patch cirúrgico. `read_only` virou nota factual de gate de execução (não tom). Helper `isOperationalMessage` introduzido — `target` default sozinho NÃO ativa mais contexto operacional. Sanitizers menos destrutivos: prosa natural útil é preservada, snapshot JSON-like do planner continua bloqueado. Telemetria `sanitization: {applied, layer, reason}` adicionada (campo aditivo na resposta `/chat/run`). Smoke test novo `tests/pr36-chat-runtime-anti-bot.smoke.test.js` (26/26 ✅). Regressões PR13/PR14/PR19/PR20/PR21 todas verdes. Nenhum painel/contrato/endpoint/policy/brain alterado ou criado. Relatório: `schema/reports/PR36_IMPL_CHAT_RUNTIME_REPORT.md`.
 - **PR37** ✅ (PR-PROVA) — Prova anti-bot real do chat runtime. 51/56 passaram (5 achados reais). Cenários E (sanitizer preserva prosa útil) e F (bloqueio de vazamento interno) passaram completamente. Achados: (A2/B2) system prompt ainda injeta "MODO OPERACIONAL ATIVO" quando `hasActiveTarget=true` no cognitive runtime; (C1/G5) falsos positivos em `isOperationalMessage` com "sistema" e "contrato"; (D1) falso negativo para forma imperativa "Revise". Nenhum runtime alterado. Relatório: `schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md`.
 - **PR38** ✅ (PR-IMPL) — Correção cirúrgica dos 5 achados da PR37. Worker-only, patch cirúrgico. `buildChatSystemPrompt` corrigido: target informativo separado do bloco comportamental operacional pesado — `MODO OPERACIONAL ATIVO` só injetado quando `is_operational_context=true`. `_CHAT_OPERATIONAL_INTENT_TERMS` refinado: `"sistema"` e `"contrato"` isolados removidos (falsos positivos), termos compostos `"estado do contrato"`/`"contrato ativo"` adicionados, verbos imperativos (`"revise"`, `"verifique"`, `"cheque"`, `"inspecione"`) e termos técnicos (`"runtime"`, `"gate"`, `"gates"`) adicionados. PR37 agora passa 56/56 ✅. Regressões PR36/PR13/PR14/PR19/PR20/PR21 verdes. Relatório: `schema/reports/PR38_IMPL_CORRECAO_ACHADOS_PR37.md`.
-- **PR41** ✅ (PR-DOCS) — Migrar conhecimento consolidado para Brain. Declarado mergeado pelo operador (sem relatório encontrado no repo — ver PR42 Seção 12.1).
+- **PR41** ✅ (PR-DOCS) — Popular Obsidian Brain com conhecimento consolidado. Mergeada como PR #202. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`. Nenhum runtime alterado.
 - **PR42** ✅ (PR-DIAG) — Diagnóstico da Memória Atual no Runtime. `ENAVIA_BRAIN` confirmado. KVs mapeados. Fluxo de chat diagnosticado. Painel mapeado. Brain Loader via bundle estático recomendado para PR43. Relatório: `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md`. Nenhum runtime alterado.
 
 ### Histórico do contrato encerrado (PR17–PR30)

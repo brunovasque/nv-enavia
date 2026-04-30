@@ -4,7 +4,7 @@
 **Tipo:** PR-DIAG (read-only, nenhum runtime alterado)
 **Branch:** `copilot/claudepr42-diag-memoria-runtime-brain`
 **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
-**PR anterior:** PR41 — PR-DOCS — conforme problem statement (não há relatório PR41 no repo — ver Seção 12)
+**PR anterior:** PR41 — PR-DOCS — mergeada (PR #202). Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`
 
 ---
 
@@ -646,22 +646,11 @@ Esta PR é diagnóstico puro. Os itens abaixo NÃO foram feitos:
 - ❌ Nenhuma secret alterada
 - ❌ Nenhum contrato novo criado
 
-### 12.1 Discrepância com problem statement
+### 12.1 Estado pós-PR41
 
-O problem statement declara "PR anterior obrigatória: PR41 — PR-DOCS — mergeada."
-Porém, o repositório não contém:
-- Relatório `schema/reports/PR41_*.md`
-- Arquivos populados em `schema/brain/memories/`, `schema/brain/maps/` ou `schema/brain/contracts/`
-- Entrada PR41 no `ENAVIA_EXECUTION_LOG.md`
-
-**Evidência**: `git log --oneline` mostra último merge como PR40.
-
-O operador declarou PR41 como mergeada. Essa PR42 foi executada com base
-nessa autorização explícita, sem bloquear. A discrepância é registrada aqui
-como transparência — não como bloqueio.
-
-A governança foi atualizada para refletir PR42 como atual, com PR41 listada
-como pré-requisito declarado pelo operador.
+PR41 foi mergeada como PR #202 e validada. Relatório disponível em
+`schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`. Esta PR42 parte
+do estado pós-PR41.
 
 ---
 
