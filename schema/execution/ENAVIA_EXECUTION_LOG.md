@@ -4,7 +4,81 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-04-30 — PR29 — PR-DOCS — Criar schema/skills/CONTRACT_AUDITOR.md
+## 2026-04-30 — PR30 — PR-DOCS/PR-PROVA — Fechamento formal do contrato PR17–PR30
+
+- **Branch:** `copilot/claude-pr30-fechamento-contrato-loop-skills-system`
+- **Tipo:** `PR-DOCS/PR-PROVA`
+- **Contrato:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` → **Encerrado ✅**
+- **PR anterior validada:** PR29 ✅ (schema/skills/CONTRACT_AUDITOR.md criado)
+- **Escopo:** Docs-only. Fechamento formal, hardening documental, relatório final, handoff final. Nenhum runtime alterado.
+
+### Objetivo
+
+Encerrar formalmente o contrato PR17–PR30. Revisar completude das três frentes (loop, system map, skills), criar relatório final, atualizar governança, marcar contrato como encerrado, preparar handoff para próximo contrato.
+
+### Arquivos criados
+
+- **`schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md`** (NOVO):
+  - Relatório final completo — 11 seções.
+  - Objetivo do contrato, resultado executivo, tabela de 15 PRs, loop consolidado, mapas, skills, o que está consolidado, o que é documental (não runtime), riscos restantes, recomendações para próximo contrato, handoff final.
+
+- **`schema/handoffs/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_FINAL_HANDOFF.md`** (NOVO):
+  - Handoff final de fechamento — 8 seções.
+  - Contrato encerrado, resumo das três frentes, o que NÃO foi alterado, skills são documentais, relatório final, próximos contratos possíveis, estado final do sistema, próxima ação esperada do operador humano.
+
+### Arquivos atualizados
+
+- **`schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`**:
+  - Banner de encerramento no topo.
+  - Seção 17 adicionada ao final (checklist completo + resultado final + próxima etapa).
+  - Histórico preservado.
+
+- **`schema/contracts/INDEX.md`**:
+  - Seção "Contrato ativo" → "Nenhum contrato ativo".
+  - Contrato PR17–PR30 movido para "Contratos encerrados" com data 2026-04-30.
+  - "Próxima PR autorizada" → "Nenhuma. Aguardar operador humano."
+
+- **`schema/status/ENAVIA_STATUS_ATUAL.md`**:
+  - Contrato encerrado registrado.
+  - Entregas por frente listadas.
+  - Skills explicitadas como documentais.
+  - Estado: aguardando próximo contrato.
+
+- **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`**:
+  - Handoff final transformado — De: PR30, Para: próximo contrato.
+
+- **`schema/execution/ENAVIA_EXECUTION_LOG.md`**:
+  - Esta entrada.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, Panel, Executor, Deploy Worker.
+- `wrangler.toml`, `wrangler.executor.template.toml`.
+- `.github/workflows/`.
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding, KV ou env var alterado.
+- Nenhum endpoint criado.
+
+### Verificações smoke
+
+- `git diff --name-only`: apenas arquivos de `schema/` (relatório, handoffs, contrato, INDEX, status, execution log).
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado ✅.
+- Relatório final existe ✅.
+- Contrato PR17–PR30 marcado como encerrado ✅.
+- `schema/contracts/INDEX.md` não aponta próxima PR do contrato encerrado ✅.
+- `schema/status/ENAVIA_STATUS_ATUAL.md` registra "aguardando próximo contrato" ✅.
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` é handoff final ✅.
+- `schema/skills/INDEX.md` lista 4 skills ativas ✅.
+- Nenhum documento sugere que `/skills/run` já existe ✅.
+
+### Rollback
+
+Esta PR é docs-only. Se necessário reverter: `git revert` dos commits de fechamento. O sistema operacional (Worker, Executor) não foi alterado — nenhum rollback de runtime necessário.
+
+---
+
+
 
 - **Branch:** `copilot/claudepr29-docs-contract-auditor-skill`
 - **Tipo:** `PR-DOCS`

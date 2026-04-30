@@ -1,20 +1,61 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR29)
-**Branch ativa:** `copilot/claudepr29-docs-contract-auditor-skill`
-**Última tarefa:** PR29 — PR-DOCS — Criação de `schema/skills/CONTRACT_AUDITOR.md` com 24 seções + atualização de `schema/skills/INDEX.md`. Quarta skill oficial supervisionada da ENAVIA. Cobre: identidade, objetivo, princípio de auditoria justa e firme ("Auditoria boa não é a que bloqueia tudo; é a que separa risco real de ruído."), triggers de ativação, quando NÃO ativar (encaminha para Contract Loop Operator, Deploy Governance Operator, System Mapper), pré-condições obrigatórias (12 itens), entradas/saídas esperadas, matriz de auditoria por tipo de PR (4 tipos), checklist de aderência contratual (13 itens), auditoria de arquivos alterados, auditoria de governança, auditoria de testes/provas, auditoria de rollback, auditoria de segurança, critérios de severidade (5 níveis + exemplos), relação com Contract Loop Operator (PR26), Deploy Governance Operator (PR27) e System Mapper (PR28), critérios para sugerir nova skill + template, 7 exemplos de uso concretos, segurança/limites, "Isso é opcional. Não mexa agora." (9 itens), checklist final (11 itens). Nenhum runtime alterado. Branch base: `daefe36` (PR28 mergeada via PR #189).
+**Data:** 2026-04-30 (atualizado após PR30 — fechamento formal do contrato PR17–PR30)
+**Branch ativa:** `copilot/claude-pr30-fechamento-contrato-loop-skills-system`
+**Última tarefa:** PR30 — PR-DOCS/PR-PROVA — Fechamento, hardening documental e handoff final do contrato `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`. Relatório final criado (`schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md`). Handoff final criado (`schema/handoffs/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_FINAL_HANDOFF.md`). Contrato marcado como Encerrado ✅. Governança atualizada. Nenhum runtime alterado. Aguardando próximo contrato pelo operador humano.
 
-## Contrato ativo
+## Estado atual do sistema
 
-`schema/contracts/active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` 🟢
+**Contrato ativo:** Nenhum — aguardando definição do próximo contrato pelo operador humano.
+
+**Sistema operacional:** Estável. Loop contratual supervisionado funcional. Runtime não alterado nas frentes de documentação e skills (PR22–PR30).
 
 ## Histórico de contratos
 
-| Contrato | PRs | Estado |
-|----------|-----|--------|
-| `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
-| `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
-| `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+| Contrato | PRs | Estado | Encerrado em |
+|----------|-----|--------|--------------|
+| `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ | 2026-04-27 |
+| `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ | 2026-04-29 |
+| `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | **Encerrado ✅** | 2026-04-30 |
+
+## O que foi entregue no contrato PR17–PR30
+
+### Loop contratual supervisionado (PR17–PR21) — Consolidado ✅
+
+- Loop funcional: `queued → execute-next → in_progress → complete-task → phase_complete → advance-phase → próxima fase`
+- Smoke tests: PR19 (52/52 ✅), PR21 (53/53 ✅)
+
+### System Map + Tool Registry (PR22–PR25) — Concluído ✅
+
+- `schema/system/ENAVIA_SYSTEM_MAP.md` — 14 seções
+- `schema/system/ENAVIA_ROUTE_REGISTRY.json` — 68 rotas, 0 violações
+- `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` — 18 seções + Apêndice A
+- `schema/system/ENAVIA_WORKER_REGISTRY.md` — 18 seções
+
+### Skills documentais (PR26–PR29) — Concluídas ✅
+
+- `schema/skills/CONTRACT_LOOP_OPERATOR.md` — 20 seções (PR26)
+- `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` — 23 seções (PR27)
+- `schema/skills/SYSTEM_MAPPER.md` — 23 seções (PR28)
+- `schema/skills/CONTRACT_AUDITOR.md` — 24 seções (PR29)
+- **Skills são documentais — não há executor automático, não há `/skills/run`, não há UI de skills**
+
+### Fechamento (PR30) — Concluído ✅
+
+- Relatório final: `schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md`
+- Handoff final: `schema/handoffs/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_FINAL_HANDOFF.md`
+- Contrato encerrado e governança atualizada
+
+## Próxima etapa
+
+**Aguardando definição do próximo contrato pelo operador humano.**
+
+Nenhuma PR seguinte está autorizada dentro do contrato encerrado. Qualquer nova frente técnica requer:
+1. Criação de novo contrato em `schema/contracts/active/`.
+2. Atualização de `schema/contracts/INDEX.md`.
+3. Início do ciclo PR-DIAG → PR-IMPL → PR-PROVA conforme CLAUDE.md.
+
+
 
 ## Prova formalizada em PR21
 
