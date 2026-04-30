@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR25)
-**Branch ativa:** `claude/pr25-docs-enavia-worker-registry`
-**Última tarefa:** PR25 — PR-DOCS — Criação de `schema/system/ENAVIA_WORKER_REGISTRY.md` com 18 seções. Inventário oficial de infraestrutura ENAVIA cobrindo: 6 workers Cloudflare (nv-enavia, enavia-worker-teste, enavia-executor, enavia-executor-test, deploy-worker, deploy-worker-test) + 5 workers externos por URL; service bindings EXECUTOR/DEPLOY_WORKER (PROD e TEST); KV namespaces ENAVIA_BRAIN (2 IDs) + ENAVIA_GIT/GIT_KV no executor; 14 key shapes confirmados; secrets esperados por worker; env vars PROD vs TEST; 2 workflows documentados; relação Worker→Binding→Endpoint; checklist de saúde; diagnóstico de 10 falhas comuns. Nenhum runtime alterado. Branch base: `b54e74c` (PR24 mergeada).
+**Data:** 2026-04-30 (atualizado após PR26)
+**Branch ativa:** `claude/pr26-docs-contract-loop-operator-skill`
+**Última tarefa:** PR26 — PR-DOCS — Criação de `schema/skills/CONTRACT_LOOP_OPERATOR.md` com 20 seções + `schema/skills/INDEX.md`. Primeira skill oficial supervisionada da ENAVIA. Cobre: identidade, objetivo, princípio de segurança sem engessamento, triggers, pré-condições, entradas/saídas, matriz operacional (7 estados), procedimento passo a passo (12 passos), bodies mínimos dos 5 endpoints de loop, critérios de parada (12 itens), critérios para sugerir nova skill, template de sugestão, relação com skills futuras (PR27–PR29), segurança/limites, 5 exemplos de uso, checklist final. Nenhum runtime alterado. Branch base: `fb8e640` (PR25 mergeada).
 
 ## Contrato ativo
 

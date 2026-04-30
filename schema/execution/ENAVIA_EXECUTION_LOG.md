@@ -4,6 +4,57 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR26 — PR-DOCS — Criar schema/skills/CONTRACT_LOOP_OPERATOR.md
+
+- **Branch:** `claude/pr26-docs-contract-loop-operator-skill`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR25 ✅ (commit `599a499`, PR #186 mergeada — commit merge `fb8e640`)
+- **Escopo:** Docs-only. Criação de `schema/skills/CONTRACT_LOOP_OPERATOR.md` + `schema/skills/INDEX.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar a primeira skill oficial supervisionada da ENAVIA — Contract Loop Operator — que encapsula o loop contratual completo (`loop-status → execute-next → complete-task → advance-phase`). Skill segura mas não engessada: permite sugestão de novas skills sob governança, sem autonomia cega.
+
+### Arquivos criados
+
+- **`schema/skills/CONTRACT_LOOP_OPERATOR.md`** (NOVO):
+  - 20 seções obrigatórias.
+  - Frase obrigatória: "Segurança não significa engessamento."
+  - Seção 3: Princípio de segurança sem engessamento — equilibra proteção e evolução.
+  - Seção 9: Matriz operacional com 7 estados + observação PR21.
+  - Seção 11: Bodies mínimos dos 5 endpoints de loop com shapes completos do Route Registry.
+  - Seção 13: Critérios para sugerir nova skill (8 gatilhos).
+  - Seção 14: Template padrão de sugestão de nova skill.
+  - Seção 15: Relação com PR27 (Deploy Governance), PR28 (System Mapper), PR29 (Contract Auditor).
+  - Seção 18: 5 exemplos de uso concretos (queued, in_progress, phase_complete, plan_rejected, sugestão de skill).
+  - Seção 20: "Isso é opcional. Não mexa agora." (9 itens).
+  - Referências: 21× documentos oficiais (System Map, Route Registry, Playbook, Worker Registry).
+
+- **`schema/skills/INDEX.md`** (NOVO):
+  - Índice de skills ativas (1), previstas (3: PR27–PR29) e sugeridas.
+  - Regras de uso e relação com documentos oficiais.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste criado ou modificado.
+
+### Verificações
+
+| Verificação | Resultado |
+|-------------|-----------|
+| 20 seções numeradas presentes | ✅ |
+| Frase "Segurança não significa engessamento" presente | ✅ |
+| Seção de sugestão de nova skill presente | ✅ (seções 13, 14, Exemplo 5) |
+| "Isso é opcional. Não mexa agora." presente | ✅ |
+| Refs a documentos oficiais | `21 ocorrências` ✅ |
+| PR21 observação sobre `status_global:"blocked"` presente | ✅ |
+| `git diff --name-only` (runtime) | `(vazio)` ✅ |
+| Nenhum .js/.ts/.toml/.yml alterado | `0 arquivos` ✅ |
+
+---
+
 ## 2026-04-29 — PR25 — PR-DOCS — Criar schema/system/ENAVIA_WORKER_REGISTRY.md
 
 - **Branch:** `claude/pr25-docs-enavia-worker-registry`
