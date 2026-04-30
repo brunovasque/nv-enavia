@@ -38,9 +38,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR24** — PR-DOCS — Criar `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` (playbook operacional: como executar o loop, como diagnosticar, como fazer rollback, como avançar fase).
+**PR25** — PR-DOCS — Registry de workers, bindings, KV e secrets esperados.
 
-Contexto: PR23 concluída — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado com 68 rotas verificadas em evidência real de `nv-enavia.js`. Continua a frente de System Map + Tool Registry (PR22–PR25). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Criar `schema/system/ENAVIA_WORKER_REGISTRY.md` documentando: workers do sistema, bindings de serviço (EXECUTOR/DEPLOY_WORKER PROD+TEST), KV namespaces (ENAVIA_BRAIN PROD+TEST, key shapes), secrets esperados (INTERNAL_TOKEN, OPENAI_API_KEY, SUPABASE_*, BROWSER_EXECUTOR_URL, etc.), environment vars. Fontes: `wrangler.toml`, `executor/wrangler.toml`, `.github/workflows/deploy.yml` e `deploy-executor.yml`.
+
+Contexto: PR24 concluída — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado com 18 seções. Continua a frente de System Map + Tool Registry (PR22–PR25). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
@@ -50,4 +52,5 @@ Contexto: PR23 concluída — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado 
 - **PR20** ✅ (PR-IMPL, mergeada — PR #181, commit merge `028862d`) — `loop-status` expõe `complete-task` em `in_progress` (27/27 ✅).
 - **PR21** ✅ (PR-PROVA, mergeada — PR #182, commit merge `3d29b7d`) — matriz de estados do `loop-status` (53/53 ✅).
 - **PR22** ✅ (PR-DOCS, mergeada — PR #183, commit merge `fc7a4ec`) — `schema/system/ENAVIA_SYSTEM_MAP.md` criado (14 seções).
-- **PR23** ✅ (PR-DOCS, em revisão) — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado (68 rotas, 0 violações).
+- **PR23** ✅ (PR-DOCS, mergeada — PR #184, commit merge `beb3dfa`) — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado (68 rotas, 0 violações).
+- **PR24** ✅ (PR-DOCS, em revisão) — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado (18 seções + Apêndice A).

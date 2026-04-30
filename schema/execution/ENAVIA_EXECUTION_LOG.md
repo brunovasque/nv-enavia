@@ -4,6 +4,46 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR24 — PR-DOCS — Criar schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md
+
+- **Branch:** `claude/pr24-docs-enavia-operational-playbook`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR23 ✅ (commit `a799fd2`, PR #184 mergeada — commit merge `beb3dfa`)
+- **Escopo:** Docs-only. Apenas criação de `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar o playbook operacional completo do projeto ENAVIA com 18 seções obrigatórias cobrindo: como executar o loop contratual supervisionado passo a passo, como diagnosticar estados bloqueados, como fazer rollback, como avançar de fase, referências cruzadas ao System Map (PR22) e Route Registry (PR23), procedimento de handoff, regras de segurança e checklist final.
+
+### Arquivo criado
+
+- **`schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md`** (NOVO):
+  - 18 seções obrigatórias + Apêndice A (referências rápidas).
+  - Seção 6: Matriz de ações por estado com observação PR21 (`status_global:"blocked"` sozinho não bloqueia via `resolveNextAction`).
+  - Seção 17: "Isso é opcional. Não mexa agora." com 9 itens.
+  - Apêndice A: quick reference de governança, endpoints de loop, padrão de branch, formato de resposta.
+  - Fontes: `ENAVIA_SYSTEM_MAP.md` (PR22), `ENAVIA_ROUTE_REGISTRY.json` (PR23), contrato ativo, testes PR13–PR21.
+  - Referências verificadas: 5× ENAVIA_SYSTEM_MAP, 10× ENAVIA_ROUTE_REGISTRY.
+  - Total smoke tests documentados: 451 (PR13: 91, PR14: 183, PR18: 45, PR19: 52, PR20: 27, PR21: 53).
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste criado ou modificado.
+
+### Verificações
+
+| Verificação | Resultado |
+|-------------|-----------|
+| 18 seções numeradas presentes | ✅ |
+| Referências a ENAVIA_SYSTEM_MAP.md | `5 ocorrências` ✅ |
+| Referências a ENAVIA_ROUTE_REGISTRY.json | `10 ocorrências` ✅ |
+| `git diff --name-only HEAD` | `(vazio)` ✅ |
+
+---
+
 ## 2026-04-29 — PR23 — PR-DOCS — Criar schema/system/ENAVIA_ROUTE_REGISTRY.json
 
 - **Branch:** `claude/pr23-docs-enavia-route-registry`
