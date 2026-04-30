@@ -4,6 +4,62 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR29 — PR-DOCS — Criar schema/skills/CONTRACT_AUDITOR.md
+
+- **Branch:** `copilot/claudepr29-docs-contract-auditor-skill`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR28 ✅ (PR #189 mergeada — commit merge `daefe36`)
+- **Escopo:** Docs-only. Criação de `schema/skills/CONTRACT_AUDITOR.md` + atualização de `schema/skills/INDEX.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar a quarta skill oficial supervisionada da ENAVIA — Contract Auditor — que audita aderência contratual de PRs, tarefas e execuções. Skill supervisionada e documental: não corrige automaticamente, não faz deploy, não atualiza mapas diretamente, não aprova merge sem intervenção humana.
+
+### Arquivos criados/alterados
+
+- **`schema/skills/CONTRACT_AUDITOR.md`** (NOVO):
+  - 24 seções obrigatórias.
+  - Frase obrigatória: "Auditoria boa não é a que bloqueia tudo; é a que separa risco real de ruído." (Seção 3).
+  - Seção 9: Matriz de auditoria por tipo de PR (PR-DIAG, PR-IMPL, PR-PROVA, PR-DOCS).
+  - Seção 10: Checklist de aderência contratual (13 itens).
+  - Seções 11–15: Auditorias específicas (arquivos, governança, testes, rollback, segurança).
+  - Seção 16: Critérios de severidade (BLOCKER, HIGH, MEDIUM, LOW, INFO + exemplos).
+  - Seções 17–19: Relação com Contract Loop Operator (PR26), Deploy Governance Operator (PR27) e System Mapper (PR28).
+  - Seção 20: Critérios para sugerir nova skill + template.
+  - Seção 21: 7 exemplos de uso concretos.
+  - Seção 23: "Isso é opcional. Não mexa agora." (9 itens).
+  - Seção 24: Checklist final (11 itens).
+
+- **`schema/skills/INDEX.md`** (ATUALIZADO):
+  - Contract Auditor movida de "previstas" para "ativas".
+  - Total: 4 skills ativas (PR26, PR27, PR28, PR29), 0 previstas.
+
+- **Governança:**
+  - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+  - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — recriado para PR29→PR30.
+  - `schema/contracts/INDEX.md` — próxima PR autorizada = PR30 (fechamento do contrato).
+  - `schema/execution/ENAVIA_EXECUTION_LOG.md` — esta entrada.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, Panel, Executor, Deploy Worker.
+- `wrangler.toml`, `wrangler.executor.template.toml`.
+- `.github/workflows/`.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding, KV ou env var alterado.
+
+### Verificações smoke
+
+- `git diff --name-only`: apenas `schema/skills/CONTRACT_AUDITOR.md` (novo), `schema/skills/INDEX.md`, `schema/contracts/INDEX.md`, `schema/status/ENAVIA_STATUS_ATUAL.md`, `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`, `schema/execution/ENAVIA_EXECUTION_LOG.md`.
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Frase "Auditoria boa não é a que bloqueia tudo; é a que separa risco real de ruído." presente (Seção 3).
+- Frase "Isso é opcional. Não mexa agora." presente (Seção 23).
+- Referências a `CONTRACT_LOOP_OPERATOR.md`, `DEPLOY_GOVERNANCE_OPERATOR.md` e `SYSTEM_MAPPER.md` presentes.
+- `schema/contracts/INDEX.md` aponta PR30 como próxima PR autorizada.
+
+---
+
 ## 2026-04-30 — PR28 — PR-DOCS — Criar schema/skills/SYSTEM_MAPPER.md
 
 - **Branch:** `claude/pr28-docs-system-mapper-skill`

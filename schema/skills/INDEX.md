@@ -12,14 +12,13 @@ Atualizar sempre que uma skill for criada, encerrada ou substituída.
 | `CONTRACT_LOOP_OPERATOR.md` | Contract Loop Operator | PR26 | **Ativa — documental** 🟢 | Operação do loop contratual supervisionado |
 | `DEPLOY_GOVERNANCE_OPERATOR.md` | Deploy Governance Operator | PR27 | **Ativa — documental** 🟢 | Governança de deploy, rollback e promoção PROD/TEST |
 | `SYSTEM_MAPPER.md` | System Mapper | PR28 | **Ativa — documental** 🟢 | Manutenção de System Map, Route Registry, Worker Registry, Playbook e Skills Index |
+| `CONTRACT_AUDITOR.md` | Contract Auditor | PR29 | **Ativa — documental** 🟢 | Auditoria de aderência contratual de PRs, tarefas e execuções |
 
 ---
 
 ## Skills previstas (contrato PR17–PR30)
 
-| Nome | PR prevista | Status | Escopo |
-|------|------------|--------|--------|
-| Contract Auditor | PR29 | Pendente ⏳ | Validação de aderência contratual |
+Nenhuma skill prevista pendente neste contrato.
 
 ---
 
