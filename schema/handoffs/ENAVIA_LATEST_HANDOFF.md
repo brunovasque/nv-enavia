@@ -1,8 +1,114 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR36 — PR-IMPL — Correção inicial do chat runtime (read_only como gate, target sem tom forçado, sanitizers não destrutivos, telemetria)
-**Para:** PR37 — PR-PROVA — Smoke anti-bot real do chat runtime
+**De:** PR37 — PR-PROVA — Prova anti-bot real do chat runtime (51/56 — falhou parcialmente)
+**Para:** PR38 — PR-IMPL — Correção cirúrgica dos pontos anti-bot que falharam na PR37
+
+## O que foi feito nesta sessão
+
+### PR37 — PR-PROVA — Prova anti-bot real do chat runtime
+
+**Tipo:** `PR-PROVA` (worker-only, prova real, nenhum runtime alterado)
+**Branch:** `copilot/claude-pr37-prova-chat-runtime-anti-bot-real`
+
+**Arquivos criados (testes + governança):**
+
+1. **`tests/pr37-chat-runtime-anti-bot-real.smoke.test.js`** (NOVO): 7 cenários,
+   56 asserts. 51 passaram, 5 falharam com achados reais.
+
+2. **`schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md`** (NOVO): 9 seções com
+   objetivo, PR36 validada, cenários, resultado por cenário, o que melhorou, o que
+   ainda não é Jarvis, regressões, riscos restantes e próxima PR.
+
+**Arquivos atualizados (governança):**
+
+3. **`schema/contracts/INDEX.md`**: PR37 ⚠️ adicionada. Próxima PR → PR38 PR-IMPL.
+4. **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR37 registrada. Próxima PR: PR38.
+5. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo): handoff atualizado para PR38.
+6. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**: bloco PR37 adicionado.
+
+**Arquivos NÃO alterados (proibidos pelo escopo):**
+
+- `nv-enavia.js` (nenhuma alteração)
+- `schema/enavia-cognitive-runtime.js` (nenhuma alteração)
+- `panel/` (nenhum arquivo tocado)
+- `contract-executor.js`, `executor/`
+- `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+- secrets, bindings, KV config
+- contratos encerrados
+
+## Resultado da prova
+
+**51/56 passaram. 5 achados reais.**
+
+### O que passou completamente
+
+- **Cenário E** (sanitizer preserva prosa útil): 4/4 ✅
+- **Cenário F** (bloqueio de vazamento interno): 11/11 ✅
+
+### Os 5 achados
+
+1. **A2 / B2** — System prompt em `buildChatSystemPrompt` ainda injeta
+   `MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:` quando `hasActiveTarget=true`,
+   mesmo com `is_operational_context=false`. Arquivo: `schema/enavia-cognitive-runtime.js:218`.
+   A PR36 corrigiu o nível de mensagens mas não o system prompt.
+
+2. **C1** — `isOperationalMessage("Você sabe operar seu sistema?")` retorna `true`
+   (falso positivo). Palavra `"sistema"` em `_CHAT_OPERATIONAL_INTENT_TERMS` é muito
+   genérica. Arquivo: `nv-enavia.js:~3800`.
+
+3. **D1** — `isOperationalMessage("Revise a PR 197 e veja se o runtime quebrou algum gate")`
+   retorna `false` (falso negativo). Forma imperativa `"Revise"` e `"runtime"` não
+   estão cobertos. Arquivo: `nv-enavia.js:~3800`.
+
+4. **G5** — `isOperationalMessage("explique o que é o contrato Jarvis Brain")` retorna
+   `true` (falso positivo). Palavra `"contrato"` é muito genérica. Arquivo: `nv-enavia.js:~3800`.
+
+## Smoke tests executados
+
+```bash
+node --check nv-enavia.js                                                    # OK
+node --check schema/enavia-cognitive-runtime.js                              # OK
+node --check tests/pr37-chat-runtime-anti-bot-real.smoke.test.js             # OK
+node tests/pr37-chat-runtime-anti-bot-real.smoke.test.js                     # 51/56 ⚠️ (5 achados)
+node tests/pr36-chat-runtime-anti-bot.smoke.test.js                          # 26/26  ✅
+node tests/pr21-loop-status-states.smoke.test.js                             # 53/53  ✅
+node tests/pr20-loop-status-in-progress.smoke.test.js                        # 27/27  ✅
+node tests/pr19-advance-phase-e2e.smoke.test.js                              # 52/52  ✅
+node tests/pr14-executor-deploy-real-loop.smoke.test.js                      # 183/183 ✅
+node tests/pr13-hardening-operacional.smoke.test.js                          # 91/91  ✅
+```
+
+Nenhuma regressão nos testes existentes.
+
+## Próxima ação autorizada
+
+**PR38 — PR-IMPL — Correção cirúrgica dos pontos anti-bot que falharam na PR37**
+
+### Escopo técnico esperado para PR38
+
+**Worker-only.** Patch cirúrgico em dois arquivos:
+
+1. **`schema/enavia-cognitive-runtime.js`** (seção 5c, ~linha 218):
+   - Separar injeção do target informativo (worker/repo/mode — pode aparecer sempre
+     que `hasActiveTarget=true`) da injeção do bloco comportamental pesado
+     (`MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:`) que deve exigir
+     `is_operational_context=true`.
+   - O target como contexto informativo pode continuar sendo injetado com `hasActiveTarget`.
+   - O bloco com `MODO OPERACIONAL ATIVO` e as regras de comportamento operacional
+     devem ser injetados apenas quando `is_operational_context=true`.
+
+2. **`nv-enavia.js`** (helper `isOperationalMessage`, `_CHAT_OPERATIONAL_INTENT_TERMS`):
+   - Remover `"sistema"` e `"contrato"` como termos isolados — são muito genéricos.
+   - Substituir por termos compostos: `"sistema em prod"`, `"estado do contrato"`,
+     `"contrato ativo"`, `"sistema de prod"`.
+   - Adicionar `"revise"`, `"verifique"`, `"cheque"`, `"inspecione"` como formas
+     verbais imperativas operacionais.
+   - Adicionar `"runtime"` e `"gate"` à lista.
+
+A PR38 deve repassar nos asserts A2, B2, C1, D1 e G5 de
+`tests/pr37-chat-runtime-anti-bot-real.smoke.test.js`.
+
 
 ## O que foi feito nesta sessão
 

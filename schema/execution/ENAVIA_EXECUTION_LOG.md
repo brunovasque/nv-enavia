@@ -4,6 +4,73 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR37 — PR-PROVA — Prova anti-bot real do chat runtime
+
+- **Branch:** `copilot/claude-pr37-prova-chat-runtime-anti-bot-real`
+- **Tipo:** `PR-PROVA` (worker-only, prova real, nenhum runtime alterado)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR36 ✅ (PR-IMPL — correção inicial do chat runtime anti-bot)
+- **Escopo:** Worker-only. Criação de smoke test real (7 cenários, 56 asserts) + relatório + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Provar que a PR36 realmente reduziu o comportamento robótico da Enavia no runtime
+do chat, sem quebrar segurança, planner, contrato, loop ou gates.
+
+### Resultado
+
+**51/56 — FALHOU PARCIALMENTE** (5 achados reais documentados).
+
+O que passou completamente:
+- **Cenário E** (sanitizer preserva prosa útil): 4/4 ✅
+- **Cenário F** (bloqueio de vazamento interno): 11/11 ✅
+- Regressões: todas verdes (PR36 26/26, PR13/14/19/20/21)
+
+Os 5 achados:
+1. **A2/B2**: `buildChatSystemPrompt` ainda injeta `MODO OPERACIONAL ATIVO` com `hasActiveTarget=true`, mesmo com `is_operational_context=false`. Arquivo: `schema/enavia-cognitive-runtime.js:218`.
+2. **C1**: `isOperationalMessage("Você sabe operar seu sistema?")` → falso positivo pela palavra `"sistema"`.
+3. **D1**: `isOperationalMessage("Revise a PR 197...")` → falso negativo, forma imperativa `"Revise"` não coberta.
+4. **G5**: `isOperationalMessage("explique o que é o contrato Jarvis Brain")` → falso positivo pela palavra `"contrato"`.
+
+### Arquivos criados
+
+- `tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` (NOVO — 56 asserts, 51 passaram)
+- `schema/reports/PR37_PROVA_CHAT_RUNTIME_ANTI_BOT.md` (NOVO — 9 seções)
+
+### Arquivos atualizados (governança)
+
+- `schema/contracts/INDEX.md`: PR37 ⚠️ + próxima PR = PR38 PR-IMPL
+- `schema/status/ENAVIA_STATUS_ATUAL.md`: PR37 registrada
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`: handoff PR37 → PR38
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`: este bloco
+
+### Arquivos NÃO alterados (proibidos pelo escopo)
+
+- `nv-enavia.js` (nenhuma alteração)
+- `schema/enavia-cognitive-runtime.js` (nenhuma alteração)
+- `panel/` (nenhum arquivo tocado)
+- `contract-executor.js`, `executor/`, `.github/workflows/`, `wrangler.toml`
+- secrets, bindings, KV config, contratos encerrados
+
+### Smoke tests executados
+
+- `node --check nv-enavia.js` → OK
+- `node --check schema/enavia-cognitive-runtime.js` → OK
+- `node --check tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` → OK
+- `node tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` → 51/56 ⚠️ (5 achados)
+- `node tests/pr36-chat-runtime-anti-bot.smoke.test.js` → 26/26 ✅
+- `node tests/pr21-loop-status-states.smoke.test.js` → 53/53 ✅
+- `node tests/pr20-loop-status-in-progress.smoke.test.js` → 27/27 ✅
+- `node tests/pr19-advance-phase-e2e.smoke.test.js` → 52/52 ✅
+- `node tests/pr14-executor-deploy-real-loop.smoke.test.js` → 183/183 ✅
+- `node tests/pr13-hardening-operacional.smoke.test.js` → 91/91 ✅
+
+### Próxima PR
+
+**PR38 — PR-IMPL — Correção cirúrgica dos pontos anti-bot que falharam na PR37**
+
+---
+
 ## 2026-04-30 — PR36 — PR-IMPL — Correção inicial do chat runtime anti-bot
 
 - **Branch:** `copilot/claudepr36-impl-chat-runtime-readonly-target-sanit`
