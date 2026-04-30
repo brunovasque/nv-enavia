@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR19)
-**Branch ativa:** `claude/pr19-prova-advance-phase-e2e`
-**Última tarefa:** PR19 — PR-PROVA — Smoke real ponta a ponta do ciclo `execute-next → complete-task → phase_complete → advance-phase → próxima fase/task`. Novo teste `tests/pr19-advance-phase-e2e.smoke.test.js` (52 asserts, 9 steps cobrindo happy path, bloqueio, isolamento e guard). Nenhum runtime alterado. Regressões: PR18 45/45 ✅, PR13 91/91 ✅, PR14 183/183 ✅. Total **371/371 sem regressão**.
+**Data:** 2026-04-29 (atualizado após PR20)
+**Branch ativa:** `claude/pr20-impl-loop-status-in-progress`
+**Última tarefa:** PR20 — PR-IMPL — Worker-only — `handleGetLoopStatus` em `nv-enavia.js` agora expõe `POST /contracts/complete-task` em `availableActions` quando `nextAction.status === "in_progress"` (Rule 9 do `resolveNextAction`). `canProceed` atualizado para incluir esse estado. Patch cirúrgico (~7 linhas), sem refatoração. Novo teste `tests/pr20-loop-status-in-progress.smoke.test.js` (27 asserts, 4 seções A–D). Regressões: PR19 52/52 ✅, PR18 45/45 ✅, PR13 91/91 ✅, PR14 183/183 ✅. Total **398/398 sem regressão**.
 
 ## Contrato ativo
 
@@ -15,6 +15,14 @@
 | `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
 | `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
 | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+
+## Implementação formalizada em PR20
+
+- `handleGetLoopStatus` (`nv-enavia.js:5024-5050`): novo `else if (nextAction.status === "in_progress")` adicionado. `availableActions = ["POST /contracts/complete-task"]` + guidance instruindo `{ contract_id, task_id, resultado }`.
+- `canProceed` agora inclui `nextAction.status === "in_progress"`.
+- `contract-executor.js` NÃO alterado — Rule 9 (`resolveNextAction`) já produzia o shape correto `{ type: "no_action", status: "in_progress", task_id }`.
+- `buildOperationalAction` NÃO alterada — em `in_progress` permanece `type:block`/`can_execute:false`, evitando liberação errada de execute-next.
+- Cobertura PR20: 4 seções (A: in_progress expõe complete-task; B: estados indevidos NÃO mostram complete-task; C: operationalAction não libera execução errada; D: canProceed correto em todos os estados).
 
 ## Prova formalizada em PR19
 

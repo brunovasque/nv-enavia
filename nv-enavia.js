@@ -5044,9 +5044,16 @@ async function handleGetLoopStatus(env) {
       // awaiting_human_approval retorna status "awaiting_approval" (não "ready").
       // Tratar fora do guard isReady para expor a ação humana disponível.
       availableActions = ["POST /contracts/close-final"];
+    } else if (nextAction.status === "in_progress") {
+      // PR20 — task em progresso pode ser concluída supervisionadamente via complete-task.
+      // Sem essa exposição, o operador/Enavia ficaria "cego" no loop e o ciclo
+      // execute-next → complete-task → phase_complete → advance-phase quebraria autonomia.
+      availableActions = ["POST /contracts/complete-task"];
+      guidance = "Task in_progress. Use POST /contracts/complete-task com { contract_id, task_id, resultado } para concluir com gate de aderência.";
     }
 
-    const canProceed = isReady || isAwaitingApproval;
+    // PR20 — task in_progress permite que o operador prossiga via complete-task.
+    const canProceed = isReady || isAwaitingApproval || (nextAction.status === "in_progress");
 
     return jsonResponse({
       ok: true,
