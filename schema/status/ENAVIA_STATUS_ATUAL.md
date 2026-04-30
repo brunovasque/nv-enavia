@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR40 — Self Model da Enavia)
-**Branch ativa:** `copilot/claude-pr40-docs-self-model-enavia`
-**Última tarefa:** PR40 — PR-DOCS — Docs-only. Self-model documental completo criado em `schema/brain/self-model/`. 5 arquivos: identity, capabilities, limitations, current-state, how-to-answer. INDEX.md atualizado. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR42 — Diagnóstico da Memória Runtime)
+**Branch ativa:** `copilot/claudepr42-diag-memoria-runtime-brain`
+**Última tarefa:** PR42 — PR-DIAG — Read-only. Diagnóstico completo da memória runtime: bindings/KVs mapeados, chaves/shapes inventariados, fluxo de chat diagnosticado, painel mapeado sem alteração, opções de Brain Loader comparadas, recomendação para PR43 entregue. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
@@ -33,10 +33,11 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
+**PR43 — PR-IMPL — Brain Loader read-only Worker-only**
 
-> ✅ PR40 criou o self-model documental completo em `schema/brain/self-model/`. Nenhum runtime alterado.
-> PR41 irá migrar conhecimento operacional existente (skills, playbooks, mapas) para dentro do Obsidian Brain.
+> ✅ PR41 mergeada (PR #202): Brain populado com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
+> ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não está conectado ao runtime. Implementação do Brain Loader é viável.
+> PR43 irá implementar o Brain Loader bundled estático com allowlist de 6 arquivos do self-model, injetado em buildChatSystemPrompt, read-only, sem endpoint, sem painel.
 
 ## Histórico de contratos
 

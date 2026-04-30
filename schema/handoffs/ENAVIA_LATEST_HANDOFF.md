@@ -1,6 +1,96 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
+**De:** PR42 — PR-DIAG — Diagnóstico da Memória Atual no Runtime
+**Para:** PR43 — PR-IMPL — Brain Loader read-only Worker-only
+
+## O que foi feito nesta sessão
+
+### PR42 — PR-DIAG — Diagnóstico da Memória Atual no Runtime
+
+**Tipo:** `PR-DIAG` (read-only, nenhum runtime alterado)
+**Branch:** `copilot/claudepr42-diag-memoria-runtime-brain`
+
+**Objetivo:**
+Diagnosticar como a memória atual da Enavia funciona no runtime. Mapear bindings,
+chaves KV, fluxo de memória no chat, participação do painel e relação com o
+Obsidian Brain documental. Preparar base técnica para PR43.
+
+**Principais descobertas:**
+
+1. **`ENAVIA_BRAIN` EXISTE** — KV binding real em `wrangler.toml` com IDs
+   `722835b730dd44c79f6ff1f0cdc314a9` (PROD) e `235fd25ad3b44217975f6ce0d77615d0` (TEST).
+
+2. **`DEPLOY_KV` e `PROOF_KV` não existem** no repo.
+
+3. **`ENAVIA_GIT` e `GIT_KV` existem apenas no executor template** — não usados
+   pelo worker principal.
+
+4. **KV é único e multipropósito**: o `ENAVIA_BRAIN` concentra todos os namespaces
+   (memória estruturada PM2, memória de treinamento, contratos, execução, planner,
+   decisões, browser-arm).
+
+5. **Fluxo legado (POST /)**: `buildBrain` carrega `brain:index` e `brain:train:*`
+   do KV no boot. Injeção via `buildSystemPrompt` com score de relevância por tokens.
+   Director memory injetada como mensagem system adicional.
+
+6. **Fluxo LLM-first (POST /chat/run)**: pipeline PM2-PM9. Retrieval por PM3.
+   Plano salvo em `planner:latest:<session_id>`. Pending plan salvo em
+   `chat:pending_plan:<session_id>` com TTL de 600s.
+
+7. **Painel**: envia `context.target` com toda mensagem. Sem botão "Salvar na
+   memória" no chat. Memória manual via `MemoryPage`. Anexos locais (max 32KB),
+   não persistidos no KV.
+
+8. **Brain documental NÃO está conectado ao runtime**. `schema/brain/` é puramente
+   documental. Nenhum arquivo é carregado automaticamente.
+
+9. **Brain Loader via bundle estático é viável** para PR43. Allowlist de 6 arquivos
+   do self-model + SYSTEM_AWARENESS, injetados em `buildChatSystemPrompt`.
+
+10. **PR41 mergeada e validada** (PR #202 — relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`)
+
+**Arquivos criados:**
+
+1. `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md` — relatório completo
+   de 13 seções
+
+**Arquivos atualizados (governança):**
+
+2. `schema/contracts/INDEX.md`
+3. `schema/status/ENAVIA_STATUS_ATUAL.md`
+4. `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+5. `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+## Arquivos NÃO alterados
+
+- `nv-enavia.js` (não tocado)
+- `schema/enavia-cognitive-runtime.js` (não tocado)
+- `contract-executor.js` (não tocado)
+- `panel/` (nenhum arquivo tocado)
+- `executor/` (não tocado)
+- `.github/workflows/` (não tocado)
+- `wrangler.toml` (não tocado)
+- `wrangler.executor.template.toml` (não tocado)
+- secrets, bindings, KV config (não tocados)
+- contratos encerrados (não tocados)
+
+## Próxima PR autorizada
+
+**PR43 — PR-IMPL — Brain Loader read-only Worker-only**
+
+Objetivo: implementar o Brain Loader no worker principal.
+- Allowlist: 6 arquivos do self-model + SYSTEM_AWARENESS
+- Bundle estático (Opção 1) — sem nova infra
+- Ponto de injeção: `buildChatSystemPrompt` em `schema/enavia-cognitive-runtime.js`
+- Limite: 4.000 chars total, 1.500 por arquivo
+- Sem escrita, sem endpoint novo, sem painel, sem wrangler, sem workflows
+- Smoke test: verificar que `/chat/run` retorna resposta com identidade da Enavia
+  quando perguntado "quem você é?"
+
+Todos os pré-requisitos confirmados por esta PR42. Implementação viável.
+
+**Data:** 2026-04-30
 **De:** PR40 — PR-DOCS — Self Model da Enavia
 **Para:** PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain
 
