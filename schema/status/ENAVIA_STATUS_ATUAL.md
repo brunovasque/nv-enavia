@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR18)
-**Branch ativa:** `claude/pr18-impl-advance-phase-endpoint`
-**Última tarefa:** PR18 — PR-IMPL — Worker-only — Endpoint supervisionado `POST /contracts/advance-phase` criado em `nv-enavia.js`. Reutiliza integralmente `advanceContractPhase` de `contract-executor.js` (sem duplicar lógica). `phase_complete` agora mapeia para `advance_phase` em `buildOperationalAction`; `loop-status` expõe `availableActions = ["POST /contracts/advance-phase"]`. Novo smoke test `tests/pr18-advance-phase-endpoint.smoke.test.js` (45 asserts, 5 seções A–E). Regressões: PR13 91/91 ✅, PR14 183/183 ✅. Total 319/319 sem regressão.
+**Data:** 2026-04-29 (atualizado após PR19)
+**Branch ativa:** `claude/pr19-prova-advance-phase-e2e`
+**Última tarefa:** PR19 — PR-PROVA — Smoke real ponta a ponta do ciclo `execute-next → complete-task → phase_complete → advance-phase → próxima fase/task`. Novo teste `tests/pr19-advance-phase-e2e.smoke.test.js` (52 asserts, 9 steps cobrindo happy path, bloqueio, isolamento e guard). Nenhum runtime alterado. Regressões: PR18 45/45 ✅, PR13 91/91 ✅, PR14 183/183 ✅. Total **371/371 sem regressão**.
 
 ## Contrato ativo
 
@@ -15,6 +15,15 @@
 | `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
 | `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
 | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+
+## Prova formalizada em PR19
+
+- Novo smoke test E2E `tests/pr19-advance-phase-e2e.smoke.test.js` (52/52 ✅, 9 steps).
+- Cobertura do ciclo completo: `loop-status (start_task) → execute-next → complete-task → loop-status (phase_complete) → advance-phase → loop-status (start_task na phase_02)`.
+- Cenários adicionais: bloqueio do `advance-phase` antes de tasks completas (Step 7), isolamento — `execute-next` não avança fase (Step 8), guard — `advance-phase` só aparece em `phase_complete` (Step 9).
+- Fixture com 2 fases reais e 2 tasks reais; `state.definition_of_done` exigido por `auditExecution` em `complete-task`.
+- Mocks de `EXECUTOR` e `DEPLOY_WORKER` reaproveitam padrão estabelecido em PR14.
+- Nenhum runtime alterado.
 
 ## Implementação formalizada em PR18
 
