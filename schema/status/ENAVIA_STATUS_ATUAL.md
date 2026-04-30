@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR36 — Implementação inicial do chat runtime anti-bot)
-**Branch ativa:** `copilot/claudepr36-impl-chat-runtime-readonly-target-sanit`
-**Última tarefa:** PR36 — PR-IMPL — Worker-only. `read_only` virou nota factual (não tom). `target` default sozinho não ativa contexto operacional (helper `isOperationalMessage`). Sanitizers menos destrutivos (prosa estratégica preservada, snapshot JSON-like do planner ainda bloqueado). Telemetria `sanitization` aditiva. Smoke test novo (25/25 ✅), regressões PR13/PR14/PR19/PR20/PR21 verdes. Nenhum painel/contrato/policy/brain/endpoint alterado ou criado.
+**Data:** 2026-04-30 (atualizado após PR37 — Prova anti-bot real do chat runtime)
+**Branch ativa:** `copilot/claude-pr37-prova-chat-runtime-anti-bot-real`
+**Última tarefa:** PR37 — PR-PROVA — Worker-only, prova. 51/56 asserts passaram. Cenários E (sanitizer preserva prosa útil) e F (bloqueio de vazamento interno) passaram completamente. 5 achados reais: (A2/B2) system prompt ainda injeta "MODO OPERACIONAL ATIVO" quando `hasActiveTarget=true` no cognitive runtime; (C1/G5) falsos positivos em `isOperationalMessage` com "sistema" e "contrato"; (D1) falso negativo para imperativo "Revise". Nenhum runtime alterado. Regressões PR13/PR14/PR19/PR20/PR21 verdes.
 
 ## Estado atual do sistema
 
@@ -33,7 +33,12 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR37 — PR-PROVA — Smoke anti-bot real do chat runtime.**
+**PR38 — PR-IMPL — Correção cirúrgica dos pontos anti-bot que falharam na PR37.**
+
+> ⚠️ PR37 falhou parcialmente (51/56). Conforme contrato, PR38 deve ser PR-IMPL (correção cirúrgica):
+> 1. `schema/enavia-cognitive-runtime.js`: separar injeção de target informativo vs. bloco operacional pesado.
+> 2. `nv-enavia.js`: refinar `_CHAT_OPERATIONAL_INTENT_TERMS` (remover termos genéricos, adicionar formas imperativas).
+> Após PR38 passar nos 5 achados, PR39 pode ser PR-DOCS (Obsidian Brain).
 
 ## Histórico de contratos
 
