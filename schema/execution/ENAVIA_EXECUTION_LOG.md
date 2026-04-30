@@ -4,6 +4,70 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR39 — PR-DOCS — Arquitetura do Obsidian Brain
+
+- **Branch:** `copilot/claude-pr39-docs-arquitetura-obsidian-brain`
+- **Tipo:** `PR-DOCS` (Docs-only, nenhum runtime alterado)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR38 ✅ (PR-IMPL — 56/56 anti-bot, frente 2 corretiva encerrada)
+- **Escopo:** Docs-only. Criação da estrutura `schema/brain/` + relatório + governança.
+
+### Objetivo
+
+Criar a estrutura documental completa do Obsidian Brain da Enavia, conforme contrato
+Jarvis Brain. Esqueleto do brain com regras, políticas, grafos e incidente documentado.
+
+### Resultado
+
+✅ Brain criado — estrutura documental completa.
+
+### Arquivos criados
+
+- `schema/brain/INDEX.md`
+- `schema/brain/ARCHITECTURE.md`
+- `schema/brain/GRAPH.md`
+- `schema/brain/MEMORY_RULES.md`
+- `schema/brain/RETRIEVAL_POLICY.md`
+- `schema/brain/UPDATE_POLICY.md`
+- `schema/brain/SYSTEM_AWARENESS.md`
+- `schema/brain/maps/INDEX.md`
+- `schema/brain/decisions/INDEX.md`
+- `schema/brain/contracts/INDEX.md`
+- `schema/brain/memories/INDEX.md`
+- `schema/brain/incidents/INDEX.md`
+- `schema/brain/learnings/INDEX.md`
+- `schema/brain/open-questions/INDEX.md`
+- `schema/brain/self-model/INDEX.md`
+- `schema/brain/incidents/chat-engessado-readonly.md`
+- `schema/reports/PR39_OBSIDIAN_BRAIN_ARCHITECTURE_REPORT.md`
+
+### Testes
+
+| Verificação | Resultado |
+|-------------|-----------|
+| `git diff --name-only` — nenhum `.js/.ts/.toml/.yml` alterado | ✅ |
+| `schema/brain/INDEX.md` existe | ✅ |
+| `schema/brain/ARCHITECTURE.md` existe | ✅ |
+| `schema/brain/GRAPH.md` existe | ✅ |
+| `schema/brain/MEMORY_RULES.md` existe | ✅ |
+| `schema/brain/RETRIEVAL_POLICY.md` existe | ✅ |
+| `schema/brain/UPDATE_POLICY.md` existe | ✅ |
+| `schema/brain/SYSTEM_AWARENESS.md` existe | ✅ |
+| Todos os INDEX de subpastas existem | ✅ |
+| `schema/brain/incidents/chat-engessado-readonly.md` existe | ✅ |
+
+### Rollback
+
+```bash
+git revert HEAD  # remove pasta schema/brain/ e atualizações de governança
+```
+
+### Próxima etapa segura
+
+**PR40 — PR-DOCS — Self Model da Enavia**
+
+---
+
 ## 2026-04-30 — PR38 — PR-IMPL — Correção cirúrgica dos achados PR37 anti-bot
 
 - **Branch:** `copilot/claudepr38-impl-corrigir-achados-pr37-anti-bot`

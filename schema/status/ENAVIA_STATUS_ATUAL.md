@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR38 — Correção cirúrgica dos achados PR37 anti-bot)
-**Branch ativa:** `copilot/claudepr38-impl-corrigir-achados-pr37-anti-bot`
-**Última tarefa:** PR38 — PR-IMPL — Worker-only, patch cirúrgico. Todos os 5 achados da PR37 corrigidos. `buildChatSystemPrompt` em `schema/enavia-cognitive-runtime.js` separado: target informativo exibido com `hasActiveTarget`, bloco operacional pesado (`MODO OPERACIONAL ATIVO`) apenas com `is_operational_context=true`. `_CHAT_OPERATIONAL_INTENT_TERMS` em `nv-enavia.js` refinado: removidos `"sistema"` e `"contrato"` isolados (falsos positivos), adicionados termos compostos, imperativos operacionais e termos técnicos. PR37 agora passa 56/56 ✅. Regressões verdes.
+**Data:** 2026-04-30 (atualizado após PR39 — Arquitetura do Obsidian Brain)
+**Branch ativa:** `copilot/claude-pr39-docs-arquitetura-obsidian-brain`
+**Última tarefa:** PR39 — PR-DOCS — Docs-only. Estrutura documental completa do Obsidian Brain criada em `schema/brain/`. 7 arquivos principais, 8 pastas com INDEX, incidente `chat-engessado-readonly.md` documentado. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
@@ -33,10 +33,10 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR39 — PR-DOCS — Arquitetura do Obsidian Brain**
+**PR40 — PR-DOCS — Self Model da Enavia**
 
-> ✅ PR38 corrigiu todos os 5 achados da PR37. Smoke test 56/56. Frente 2 corretiva encerrada.
-> PR39 retoma o fluxo principal do contrato Jarvis Brain: documentação da arquitetura do Obsidian Brain.
+> ✅ PR39 criou a estrutura documental completa do Obsidian Brain. Nenhum runtime alterado.
+> PR40 irá criar os arquivos de self-model em `schema/brain/self-model/`.
 
 ## Histórico de contratos
 
