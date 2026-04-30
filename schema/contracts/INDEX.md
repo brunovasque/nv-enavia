@@ -38,11 +38,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR29** — PR-DOCS — Criar skill: Contract Auditor.
+**PR30** — PR-DOCS/PR-PROVA — Fechamento, hardening e handoff final do contrato.
 
-Criar `schema/skills/CONTRACT_AUDITOR.md` — skill supervisionada que valida aderência ao contrato ativo. Deve cobrir: validação de PR vs contrato, detecção de divergência entre escopo declarado e mudanças reais, relação com Contract Loop Operator (PR26), Deploy Governance Operator (PR27) e System Mapper (PR28). Auditor pode pedir correção documental via PR-DOCS sob System Mapper, mas não atualiza mapas diretamente.
+Encerramento formal do contrato `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`. Deve incluir: revisão da completude das frentes (System Map, Skills), hardening documental, atualização do handoff final, transição de estado do contrato para "Encerrado ✅" e, se aplicável, preparação para contrato seguinte.
 
-Contexto: PR28 concluída — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial supervisionada). Continua a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Contexto: PR29 concluída — `schema/skills/CONTRACT_AUDITOR.md` criado (24 seções, quarta skill oficial supervisionada). Todas as skills previstas no contrato (PR26, PR27, PR28, PR29) estão ativas e documentais. Frente de Skills completa.
 
 ### Histórico recente
 
@@ -52,4 +52,5 @@ Contexto: PR28 concluída — `schema/skills/SYSTEM_MAPPER.md` criado (23 seçõ
 - **PR25** ✅ (PR-DOCS, mergeada — PR #186, commit merge `fb8e640`) — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado (18 seções, inventário de infraestrutura).
 - **PR26** ✅ (PR-DOCS, mergeada — PR #187, commit merge `2954fef`) — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial) + `schema/skills/INDEX.md`.
 - **PR27** ✅ (PR-DOCS, mergeada — PR #188, commit merge `0f43c29`) — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado (23 seções, segunda skill oficial) + `schema/skills/INDEX.md` atualizado.
-- **PR28** ✅ (PR-DOCS, em revisão) — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial) + `schema/skills/INDEX.md` atualizado.
+- **PR28** ✅ (PR-DOCS, mergeada — PR #189, commit merge `daefe36`) — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial) + `schema/skills/INDEX.md` atualizado.
+- **PR29** ✅ (PR-DOCS, em revisão) — `schema/skills/CONTRACT_AUDITOR.md` criado (24 seções, quarta skill oficial supervisionada) + `schema/skills/INDEX.md` atualizado.
