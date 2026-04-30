@@ -4,6 +4,82 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR19 — PR-PROVA — Smoke real ponta a ponta do ciclo execute → complete → advance-phase
+
+- **Branch:** `claude/pr19-prova-advance-phase-e2e`
+- **Tipo:** `PR-PROVA`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR18 ✅ (commit `0a1d771`, PR #179 mergeada — commit merge `9b45395`)
+- **Escopo:** PR-PROVA. Apenas teste novo + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Provar via smoke test E2E que o ciclo completo funciona ponta a ponta:
+
+```
+loop-status (start_task)
+  → execute-next (queued → in_progress)
+    → complete-task (in_progress → completed)
+      → loop-status (phase_complete)
+        → advance-phase (phase_01 → phase_02)
+          → loop-status (start_task na phase_02)
+```
+
+### Arquivos alterados
+
+1. **`tests/pr19-advance-phase-e2e.smoke.test.js`** (novo, ~330 linhas, 52 asserts):
+   - Fixture: contrato com 2 fases reais (`phase_01`, `phase_02`), 2 tasks reais (`task_001`, `task_002`), ambas iniciando como `queued`.
+   - Mocks: `EXECUTOR.fetch` (audit + propose ok) e `DEPLOY_WORKER.fetch` (apply-test ok) — padrão idêntico ao PR14.
+   - State da fixture inclui `definition_of_done: [...]` (exigido por `auditExecution` em `complete-task`).
+   - 4 cenários: HAPPY PATH (Steps 1–6), BLOQUEIO (Step 7), ISOLAMENTO (Step 8), GUARD (Step 9).
+2. **Governança:**
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR19 no topo.
+   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — atualizado para PR20.
+   - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR20.
+
+### Arquivos NÃO alterados (proibido pelo escopo)
+
+- `nv-enavia.js`, `contract-executor.js`
+- `panel/`, `executor/`, deploy worker, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste existente foi modificado.
+
+### Cobertura (9 steps, 52 asserts)
+
+| Step | Cenário | Asserts |
+|------|---------|---------|
+| 1 | `loop-status` inicial → `start_task` para `task_001` | 7 |
+| 2 | `execute-next` → `task_001` queued → in_progress | 4 |
+| 3 | `complete-task` aderente → `task_001` completed | 6 |
+| 4 | `loop-status` → `phase_complete` + `advance-phase` disponível | 8 |
+| 5 | `advance-phase` → `phase_01` done, `current_phase` = `phase_02` | 9 |
+| 6 | `loop-status` → próxima ação `start_task` para `task_002` | 7 |
+| 7 | `advance-phase` antes de completar tasks → 409 + blockers persistidos | 7 |
+| 8 | `execute-next` em `phase_complete` NÃO avança fase implicitamente | 2 |
+| 9 | `loop-status` em `start_task` NÃO mostra `advance-phase` | 3 |
+
+### Smoke tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `node --check tests/pr19-advance-phase-e2e.smoke.test.js` | ✅ |
+| `node tests/pr19-advance-phase-e2e.smoke.test.js` | **52 passed, 0 failed** ✅ |
+| `node tests/pr18-advance-phase-endpoint.smoke.test.js` (regressão) | **45 passed, 0 failed** ✅ |
+| `node tests/pr13-hardening-operacional.smoke.test.js` (regressão) | **91 passed, 0 failed** ✅ |
+| `node tests/pr14-executor-deploy-real-loop.smoke.test.js` (regressão) | **183 passed, 0 failed** ✅ |
+
+**Total: 371/371 sem regressão.**
+
+### Bloqueios
+
+Nenhum.
+
+### Próxima etapa autorizada
+
+**PR20** — `PR-IMPL` — Worker-only — `loop-status` expõe ação correta quando task está `in_progress` (deve incluir `POST /contracts/complete-task` em `availableActions`).
+
+---
+
 ## 2026-04-29 — PR18 — PR-IMPL — Worker-only — Endpoint supervisionado de avanço de fase
 
 - **Branch:** `claude/pr18-impl-advance-phase-endpoint`
