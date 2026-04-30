@@ -4,6 +4,64 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR27 — PR-DOCS — Criar schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md
+
+- **Branch:** `claude/pr27-docs-deploy-governance-operator-skill`
+- **Tipo:** `PR-DOCS`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR26 ✅ (commit `0b3b7db`, PR #187 mergeada — commit merge `2954fef`)
+- **Escopo:** Docs-only. Criação de `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` + atualização de `schema/skills/INDEX.md` + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Criar a segunda skill oficial supervisionada da ENAVIA — Deploy Governance Operator — que governa deploy, rollback e promoção PROD/TEST. Skill supervisionada, sem autonomia sobre PROD: promoção exige aprovação humana explícita.
+
+### Arquivos criados/alterados
+
+- **`schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md`** (NOVO):
+  - 23 seções obrigatórias.
+  - Frase obrigatória 1: "Deploy seguro não é deploy travado; é deploy com prova, rollback e aprovação clara."
+  - Frase obrigatória 2: "Sem aprovação humana explícita, PROD é bloqueado."
+  - Seção 9: Matriz de decisão TEST vs PROD (8 tipos de PR/ação mapeados).
+  - Seção 10: 12 gates obrigatórios antes de qualquer deploy.
+  - Seção 11: Relação com Contract Loop Operator — ponto de integração `execute-next → /apply-test`.
+  - Seção 12: Relação com Worker Registry — fonte de verdade para workers, bindings, secrets, workflows.
+  - Seção 13: Relação com Route Registry — `known_external_routes` para deploy.
+  - Seção 14: Relação com Operational Playbook — rollback e smoke suite.
+  - Seções 15–16: Procedimento passo a passo para deploy TEST e promoção PROD.
+  - Seção 17: Rollback por tipo (DOCS, PROVA, IMPL Worker, workflow/config, KV/data, PROD) + log format.
+  - Seção 18: Tabela de diagnóstico de falhas (12 linhas).
+  - Seção 19: Critérios para sugerir nova skill (8 gatilhos + template).
+  - Seção 20: 7 exemplos de uso concretos.
+  - Seção 21: Segurança e limites (nunca expor secrets, nunca alterar bindings/KV, nunca auto-promover PROD).
+  - Seção 22: "Isso é opcional. Não mexa agora." (11 itens).
+  - Seção 23: Checklist final (12 itens).
+
+- **`schema/skills/INDEX.md`** (ATUALIZADO):
+  - Deploy Governance Operator movida de "previstas" para "ativas".
+  - Agora 2 skills ativas, 2 previstas (PR28–PR29).
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`
+- Nenhum teste criado ou modificado.
+
+### Verificações
+
+| Verificação | Resultado |
+|-------------|-----------|
+| 23 seções numeradas presentes | ✅ |
+| "Deploy seguro não é deploy travado..." presente | ✅ (2 ocorrências) |
+| "Sem aprovação humana explícita, PROD é bloqueado." presente | ✅ |
+| CONTRACT_LOOP_OPERATOR referenciado | ✅ (1 ocorrência) |
+| ENAVIA_WORKER_REGISTRY referenciado | ✅ (10 ocorrências) |
+| ENAVIA_ROUTE_REGISTRY referenciado | ✅ (5 ocorrências) |
+| ENAVIA_OPERATIONAL_PLAYBOOK referenciado | ✅ (3 ocorrências) |
+| "Isso é opcional. Não mexa agora." presente | ✅ |
+| Nenhum .js/.ts/.toml/.yml alterado | `0 arquivos` ✅ |
+
+---
+
 ## 2026-04-30 — PR26 — PR-DOCS — Criar schema/skills/CONTRACT_LOOP_OPERATOR.md
 
 - **Branch:** `claude/pr26-docs-contract-loop-operator-skill`

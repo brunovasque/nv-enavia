@@ -38,11 +38,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR27** — PR-DOCS — Criar skill: Deploy Governance Operator.
+**PR28** — PR-DOCS — Criar skill: System Mapper.
 
-Criar `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` — skill supervisionada que governa deploy, rollback e promoção PROD/TEST. Documentar: quando deplorar TEST vs PROD, gates de deploy, rollback seguro por tipo, promoção supervisionada, relação com Contract Loop Operator (PR26), Worker Registry (PR25) e Playbook (PR24).
+Criar `schema/skills/SYSTEM_MAPPER.md` — skill supervisionada que governa manutenção e atualização dos documentos de sistema (System Map, Route Registry, Worker Registry). Documentar: quando atualizar cada documento, triggers de atualização, procedimento supervisionado, relação com Deploy Governance Operator (PR27), Contract Loop Operator (PR26) e Contract Auditor (PR29).
 
-Contexto: PR26 concluída — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial). Continua a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Contexto: PR27 concluída — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado (23 seções, segunda skill oficial). Continua a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
@@ -50,4 +50,5 @@ Contexto: PR26 concluída — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (
 - **PR23** ✅ (PR-DOCS, mergeada — PR #184, commit merge `beb3dfa`) — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado (68 rotas, 0 violações).
 - **PR24** ✅ (PR-DOCS, mergeada — PR #185, commit merge `b54e74c`) — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado (18 seções + Apêndice A).
 - **PR25** ✅ (PR-DOCS, mergeada — PR #186, commit merge `fb8e640`) — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado (18 seções, inventário de infraestrutura).
-- **PR26** ✅ (PR-DOCS, em revisão) — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial) + `schema/skills/INDEX.md`.
+- **PR26** ✅ (PR-DOCS, mergeada — PR #187, commit merge `2954fef`) — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial) + `schema/skills/INDEX.md`.
+- **PR27** ✅ (PR-DOCS, em revisão) — `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` criado (23 seções, segunda skill oficial) + `schema/skills/INDEX.md` atualizado.
