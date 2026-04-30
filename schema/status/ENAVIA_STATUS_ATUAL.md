@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR24)
-**Branch ativa:** `claude/pr24-docs-enavia-operational-playbook`
-**Última tarefa:** PR24 — PR-DOCS — Criação de `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` com 18 seções obrigatórias + Apêndice A. Playbook operacional cobrindo: regras absolutas, tipos de PR, loop contratual supervisionado, diagnóstico de bloqueios, rollback, smoke tests, uso do System Map e Route Registry, procedimento de handoff, regras de segurança e checklist final. Fontes: ENAVIA_SYSTEM_MAP.md (PR22), ENAVIA_ROUTE_REGISTRY.json (PR23), contrato ativo, testes PR13–PR21 (451 total). Nenhum runtime alterado. Branch base: `beb3dfa` (PR23 mergeada).
+**Data:** 2026-04-29 (atualizado após PR25)
+**Branch ativa:** `claude/pr25-docs-enavia-worker-registry`
+**Última tarefa:** PR25 — PR-DOCS — Criação de `schema/system/ENAVIA_WORKER_REGISTRY.md` com 18 seções. Inventário oficial de infraestrutura ENAVIA cobrindo: 6 workers Cloudflare (nv-enavia, enavia-worker-teste, enavia-executor, enavia-executor-test, deploy-worker, deploy-worker-test) + 5 workers externos por URL; service bindings EXECUTOR/DEPLOY_WORKER (PROD e TEST); KV namespaces ENAVIA_BRAIN (2 IDs) + ENAVIA_GIT/GIT_KV no executor; 14 key shapes confirmados; secrets esperados por worker; env vars PROD vs TEST; 2 workflows documentados; relação Worker→Binding→Endpoint; checklist de saúde; diagnóstico de 10 falhas comuns. Nenhum runtime alterado. Branch base: `b54e74c` (PR24 mergeada).
 
 ## Contrato ativo
 
