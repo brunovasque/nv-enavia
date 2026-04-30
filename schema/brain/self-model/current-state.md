@@ -3,7 +3,7 @@
 **Versão:** 1.0
 **Data:** 2026-04-30
 **PR de referência:** PR40
-**Última atualização:** pós-PR39 (Obsidian Brain Architecture)
+**Última atualização:** pós-PR40 — Self Model documental criado
 
 ---
 
@@ -41,7 +41,7 @@
 
 ---
 
-## Estado atual do sistema (pós-PR39, pré-PR40)
+## Estado atual do sistema (pós-PR40)
 
 ### O que existe em runtime
 
