@@ -3760,11 +3760,24 @@ async function _dispatchFromChat(env, pendingPlan) {
 // Mensagem realmente operacional (deploy, executor, contrato, worker, health, diagnóstico técnico, logs, erro,
 // branch, merge, rollback, revisar PR, rota) ainda pode ativar contexto operacional.
 // Esta NÃO é o Intent Engine completo — é desacoplamento inicial seguro.
+// PR38: refinamento cirúrgico da heurística de intenção operacional.
+// Removidos: "sistema" e "contrato" — genéricos demais, causavam falso positivo em
+//   perguntas conceituais como "Você sabe operar seu sistema?" e
+//   "explique o que é o contrato Jarvis Brain".
+// Substituídos por termos compostos que indicam intenção operacional real:
+//   "estado do contrato", "contrato ativo" — verificação de estado, não explicação conceitual.
+// Adicionados (verbos imperativos operacionais):
+//   "revise", "verifique", "cheque", "inspecione" — cobrem forma imperativa de inspeção.
+// Adicionados (termos técnicos operacionais):
+//   "runtime", "gate", "gates" — termos de infraestrutura usados em contexto técnico real.
 const _CHAT_OPERATIONAL_INTENT_TERMS = [
-  "validar", "validação", "sistema", "worker", "plano", "executor", "execução", "executar",
+  "validar", "validação", "worker", "plano", "executor", "execução", "executar",
   "auditoria", "auditar", "deploy-worker", "deploy", "healthcheck", "health",
-  "contrato", "rota", "endpoint", "diagnóstico", "diagnosticar", "logs", "erro",
+  "estado do contrato", "contrato ativo",
+  "rota", "endpoint", "diagnóstico", "diagnosticar", "logs", "erro",
   "branch", "merge", "rollback", "patch", "revisar pr", "revisar a pr", "review pr",
+  "revise", "verifique", "cheque", "inspecione",
+  "runtime", "gate", "gates",
   "produção", "prod", "staging", "kv", "binding",
 ];
 function isOperationalMessage(message, _context) {
