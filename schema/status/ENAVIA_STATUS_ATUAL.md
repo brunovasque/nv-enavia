@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR39 — Arquitetura do Obsidian Brain)
-**Branch ativa:** `copilot/claude-pr39-docs-arquitetura-obsidian-brain`
-**Última tarefa:** PR39 — PR-DOCS — Docs-only. Estrutura documental completa do Obsidian Brain criada em `schema/brain/`. 7 arquivos principais, 8 pastas com INDEX, incidente `chat-engessado-readonly.md` documentado. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR40 — Self Model da Enavia)
+**Branch ativa:** `copilot/claude-pr40-docs-self-model-enavia`
+**Última tarefa:** PR40 — PR-DOCS — Docs-only. Self-model documental completo criado em `schema/brain/self-model/`. 5 arquivos: identity, capabilities, limitations, current-state, how-to-answer. INDEX.md atualizado. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
@@ -33,10 +33,10 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR40 — PR-DOCS — Self Model da Enavia**
+**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
 
-> ✅ PR39 criou a estrutura documental completa do Obsidian Brain. Nenhum runtime alterado.
-> PR40 irá criar os arquivos de self-model em `schema/brain/self-model/`.
+> ✅ PR40 criou o self-model documental completo em `schema/brain/self-model/`. Nenhum runtime alterado.
+> PR41 irá migrar conhecimento operacional existente (skills, playbooks, mapas) para dentro do Obsidian Brain.
 
 ## Histórico de contratos
 

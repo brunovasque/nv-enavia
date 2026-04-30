@@ -4,6 +4,59 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR40 — PR-DOCS — Self Model da Enavia
+
+- **Branch:** `copilot/claude-pr40-docs-self-model-enavia`
+- **Tipo:** `PR-DOCS` (Docs-only, nenhum runtime alterado)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR39 ✅ (PR-DOCS — Obsidian Brain Architecture)
+- **Escopo:** Docs-only. Criação do self-model em `schema/brain/self-model/` + relatório + governança.
+
+### Objetivo
+
+Criar o self-model documental da Enavia. Definir identidade, capacidades (atuais vs. futuras),
+limitações, estado atual e forma de resposta. Base de identidade para Brain Loader, LLM Core,
+Intent Engine e Skill Router (frentes futuras).
+
+### Resultado
+
+✅ Self-model criado — 5 arquivos obrigatórios + INDEX.md atualizado.
+
+### Arquivos criados
+
+- `schema/brain/self-model/identity.md`
+- `schema/brain/self-model/capabilities.md`
+- `schema/brain/self-model/limitations.md`
+- `schema/brain/self-model/current-state.md`
+- `schema/brain/self-model/how-to-answer.md`
+- `schema/reports/PR40_SELF_MODEL_ENAVIA_REPORT.md`
+
+### Arquivos atualizados
+
+- `schema/brain/self-model/INDEX.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Verificações
+
+| Verificação | Resultado |
+|-------------|-----------|
+| `git diff --name-only` — nenhum `.js/.ts/.toml/.yml` alterado | ✅ |
+| 5 arquivos obrigatórios criados | ✅ |
+| `identity.md` contém frase canônica | ✅ |
+| `current-state.md` menciona PR38 56/56 e PR39 Brain Architecture | ✅ |
+| `how-to-answer.md` contém regra sobre excesso documental | ✅ |
+| `INDEX.md` lista os 5 arquivos | ✅ |
+| Governança atualizada | ✅ |
+
+### Próxima PR
+
+**PR41 — PR-DOCS — Migrar conhecimento consolidado para Brain**
+
+---
+
 ## 2026-04-30 — PR39 — PR-DOCS — Arquitetura do Obsidian Brain
 
 - **Branch:** `copilot/claude-pr39-docs-arquitetura-obsidian-brain`
