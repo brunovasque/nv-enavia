@@ -4,6 +4,176 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR17 — PR-DIAG — Diagnóstico READ-ONLY de phase_complete e avanço de fase
+
+- **Branch:** `claude/pr17-diag-phase-complete-advance-phase`
+- **Tipo:** `PR-DIAG`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR0 ✅ (commit `3629698`, PR #177 mergeada)
+- **Escopo:** READ-ONLY. Nenhum arquivo de runtime alterado.
+
+### Objetivo
+
+Mapear o gap `phase_complete → advance-phase`: o sistema chega em `phase_complete` mas não possui mecanismo HTTP supervisionado de avanço de fase.
+
+### Diagnóstico — 10 questões
+
+#### 1. Como phase_complete é gerado?
+
+`resolveNextAction(state, decomposition)` em `contract-executor.js` linha 1479 (Rule 4):
+
+```js
+// Rule 4: Check if ALL phase tasks are complete → phase_complete
+const incompleteInPhase = phaseTasks.filter((t) => !TASK_DONE_STATUSES.includes(t.status));
+if (incompleteInPhase.length === 0 && phaseTasks.length > 0) {
+  return {
+    type: "phase_complete",
+    phase_id: activePhase.id,
+    task_id: null,
+    reason: `All tasks in phase "${activePhase.id}" are complete. Ready to advance.`,
+    status: "ready",
+  };
+}
+```
+
+Condição: todas as tasks da fase ativa com status em `["done", "merged", "completed", "skipped"]` e fase tem ao menos 1 task.
+
+#### 2. O que o sistema faz atualmente quando chega em phase_complete?
+
+`buildOperationalAction` em `nv-enavia.js` linha 4809:
+
+```js
+phase_complete: "block",
+```
+
+E no handler de `loop-status` (linha 5031–5034):
+
+```js
+} else if (nextAction.type === "phase_complete") {
+  // Não há endpoint de avanço de fase disponível; documentar em guidance.
+  guidance = "Phase complete. No phase-advance endpoint exists yet; manual phase transition required.";
+}
+```
+
+**Resultado:** `availableActions = []` (vazia), `can_execute: false`, `guidance` informativo. O operador fica sem ação automática disponível — exige intervenção manual.
+
+#### 3. advanceContractPhase existe?
+
+**Sim.** `contract-executor.js` linha 1027–1117. Implementação completa. Exportada na linha 5120.
+
+Fluxo interno:
+1. `rehydrateContract(env, contractId)` — lê KV (INVARIANT 1+3)
+2. `checkPhaseGate(state, decomposition)` — valida que todas as tasks da fase ativa estão done (INVARIANT 2)
+3. Marca fase ativa como `"done"` na decomposição
+4. Determina próxima fase (`current_phase = next_phase.id` ou `"all_phases_complete"`)
+5. Persiste `contract:{id}:state` e `contract:{id}:decomposition` no KV
+
+Retorna: `{ ok: true, state, decomposition, gate }` ou `{ ok: false, error, gate }`.
+
+#### 4. advanceContractPhase está disponível via HTTP?
+
+**Não.** Grep em `nv-enavia.js` por `advance-phase` e `advance_phase` → zero resultados. Não há rota `POST /contracts/advance-phase`.
+
+#### 5. advanceContractPhase está importada em nv-enavia.js?
+
+**Não.** Imports de `contract-executor.js` (linhas 1–30) listam: `handleCreateContract`, `handleGetContract`, `handleGetContractSummary`, `handleGetActiveSurface`, `handleExecuteContract`, `handleCloseContractInTest`, `handleCancelContract`, `handleRejectDecompositionPlan`, `handleResolvePlanRevision`, `handleCompleteTask`, `handleCloseFinalContract`, `resolveNextAction`, `startTask`, `buildExecutionHandoff`, `rehydrateContract`, `readExecEvent`, `readFunctionalLogs`, `handleGitHubPrAction`, `handleRequestMergeApproval`, `handleApproveMerge`, `handleBrowserArmAction`, `getBrowserArmState`, `getBrowserArmStateWithKV`. **`advanceContractPhase` ausente.**
+
+#### 6. Qual estado precisa mudar para sair de phase_complete?
+
+Em `advanceContractPhase`:
+- `state.current_phase` → atualizado para o ID da próxima fase ou `"all_phases_complete"`
+- `decomposition.phases[activeIndex].status` → marcado como `"done"`
+- Ambos persistidos no KV: `contract:{id}:state` e `contract:{id}:decomposition`
+
+#### 7. Quais KV keys/estado são lidos/escritos?
+
+| Operação | KV Key |
+|----------|--------|
+| Leitura | `contract:{id}:state` |
+| Leitura | `contract:{id}:decomposition` |
+| Escrita | `contract:{id}:state` (current_phase atualizado) |
+| Escrita | `contract:{id}:decomposition` (phase.status = "done") |
+
+Via `rehydrateContract` (leitura) e puts diretos (escrita).
+
+#### 8. Quais gates precisam existir antes de permitir avanço de fase?
+
+`checkPhaseGate(state, decomposition)` — `contract-executor.js` linha 975:
+- Encontra a primeira fase com `status !== "done"` (fase ativa)
+- Filtra tasks da fase ativa
+- Filtra tasks incompletas (`status NOT in ["done", "merged", "completed", "skipped"]`)
+- Se `incompleteTasks.length > 0` → `{ canAdvance: false, reason: "Phase X has N incomplete task(s): ..." }`
+- Se tudo completo → `{ canAdvance: true, reason: "Phase X acceptance criteria met." }`
+- Se todas as fases já done → `{ canAdvance: true, activePhaseId: null, reason: "All phases are complete." }`
+
+O gate já está implementado e já é chamado internamente por `advanceContractPhase`. Nenhum gate adicional precisa ser criado.
+
+#### 9. Quais testes já cobrem ou não cobrem esse cenário?
+
+**Cobrem via função direta (`advanceContractPhase` importada nos testes):**
+- `tests/contracts-smoke.test.js`: Tests 18, 19, 20, 23, 24, 25 e dezenas de outros testes usam `advanceContractPhase` como setup ou como subject direto
+- `tests/exec-event.smoke.test.js`: linha 90
+- `tests/get-health-exec-event.smoke.test.js`: linha 98
+- `tests/macro2-f5-enrichment.smoke.test.js`: linhas 101, 251
+- `tests/get-execution-exec-event.smoke.test.js`: linha 94
+
+**NÃO cobrem:**
+- Nenhum teste de `POST /contracts/advance-phase` via HTTP endpoint (endpoint não existe)
+- `tests/pr13-hardening-operacional.smoke.test.js` — zero ocorrências de `phase_complete`
+- `tests/pr14-executor-deploy-real-loop.smoke.test.js` — não testa phase_complete nem advance-phase
+
+#### 10. Recomendação objetiva e patch mínimo para PR18
+
+**Diagnóstico:** A função `advanceContractPhase` está **completa, testada e exportada** em `contract-executor.js`. O único gap é a **exposição HTTP supervisionada** via `POST /contracts/advance-phase` em `nv-enavia.js`. Não é necessário criar nenhuma lógica nova — apenas conectar o que já existe.
+
+**Patch mínimo para PR18 (não implementado aqui):**
+
+1. **`nv-enavia.js` — imports** (linha ~11): adicionar `advanceContractPhase` à lista de imports de `contract-executor.js`
+
+2. **`nv-enavia.js` — novo handler** `handleAdvancePhase(request, env)`:
+   - Ler `contractId` do body JSON
+   - Chamar `await advanceContractPhase(env, contractId)`
+   - Retornar JSON com resultado
+
+3. **`nv-enavia.js` — routing** (após `complete-task`, linha ~8210):
+   ```js
+   if (method === "POST" && path === "/contracts/advance-phase") {
+     const result = await handleAdvancePhase(request, env);
+     return jsonResponse(result.body, result.status);
+   }
+   ```
+
+4. **`nv-enavia.js` — `buildOperationalAction`** e handler de `loop-status` (linha ~5031): atualizar `phase_complete` para expor `availableActions = ["POST /contracts/advance-phase"]` em vez de guidance morto.
+
+**Não criar:** nenhuma lógica nova de gate, nenhuma nova função de advance — reutilizar `advanceContractPhase` integralmente.
+
+### Endpoints mapeados
+
+| Endpoint | Existe? | Observação |
+|----------|---------|------------|
+| `POST /contracts/complete-task` | ✅ | Linha 8207 em nv-enavia.js |
+| `GET /contracts/loop-status` | ✅ | Expõe phase_complete mas sem ação disponível |
+| `POST /contracts/advance-phase` | ❌ AUSENTE | Gap confirmado |
+
+### Smoke tests desta PR
+
+- `git diff --name-only` na branch → apenas arquivos de governança (nenhum runtime) ✅
+- `advanceContractPhase` exportada em `contract-executor.js` linha 5120 ✅ (confirmado via Read)
+- Nenhum endpoint `/contracts/advance-phase` em `nv-enavia.js` ✅ (confirmado via Grep — zero resultados)
+- `advanceContractPhase` ausente dos imports em `nv-enavia.js` ✅ (confirmado via Read linhas 1–30)
+- `phase_complete` mapeia para `block` em `buildOperationalAction` ✅ (linha 4809)
+- Guidance na linha 5034 documenta o gap explicitamente ✅
+
+### Bloqueios
+
+Nenhum. Diagnóstico completo. PR18 pode iniciar.
+
+### Próxima etapa autorizada
+
+**PR18** — PR-IMPL — Worker-only — Endpoint supervisionado de avanço de fase (`POST /contracts/advance-phase`).
+
+---
+
 ## 2026-04-29 — PR0 (revisão) — Reestruturação do contrato PR17–PR30 por feedback
 
 - **Branch:** `claude/pr0-docs-loop-obrigatorio`
