@@ -1,14 +1,22 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR30 — fechamento formal do contrato PR17–PR30)
-**Branch ativa:** `copilot/claude-pr30-fechamento-contrato-loop-skills-system`
-**Última tarefa:** PR30 — PR-DOCS/PR-PROVA — Fechamento, hardening documental e handoff final do contrato `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`. Relatório final criado (`schema/reports/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30_FINAL_REPORT.md`). Handoff final criado (`schema/handoffs/CONTRATO_LOOP_SKILLS_SYSTEM_MAP_FINAL_HANDOFF.md`). Contrato marcado como Encerrado ✅. Governança atualizada. Nenhum runtime alterado. Aguardando próximo contrato pelo operador humano.
+**Data:** 2026-04-30 (atualizado após PR31 — ativação do contrato ENAVIA JARVIS BRAIN v1)
+**Branch ativa:** `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`
+**Última tarefa:** PR31 — PR-DOCS — Ativação do contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`. Novo contrato ativo criado. Governança atualizada. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
-**Contrato ativo:** Nenhum — aguardando definição do próximo contrato pelo operador humano.
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — Ativo 🟢
 
-**Sistema operacional:** Estável. Loop contratual supervisionado funcional. Runtime não alterado nas frentes de documentação e skills (PR22–PR30).
+**Objetivo do novo contrato:** Transformar a Enavia de sistema governado/documental em uma IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first.
+
+**Frase central:** "A Enavia pensa livremente, lembra com estrutura, sugere com inteligência e executa somente com governança."
+
+**Sistema operacional:** Estável. Runtime não alterado. Loop contratual supervisionado funcional.
+
+## Próxima PR autorizada
+
+**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada.**
 
 ## Histórico de contratos
 
@@ -48,12 +56,9 @@
 
 ## Próxima etapa
 
-**Aguardando definição do próximo contrato pelo operador humano.**
+**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada.**
 
-Nenhuma PR seguinte está autorizada dentro do contrato encerrado. Qualquer nova frente técnica requer:
-1. Criação de novo contrato em `schema/contracts/active/`.
-2. Atualização de `schema/contracts/INDEX.md`.
-3. Início do ciclo PR-DIAG → PR-IMPL → PR-PROVA conforme CLAUDE.md.
+Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 concluída. Loop contratual reativado.
 
 
 
