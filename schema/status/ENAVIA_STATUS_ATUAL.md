@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR20)
-**Branch ativa:** `claude/pr20-impl-loop-status-in-progress`
-**Última tarefa:** PR20 — PR-IMPL — Worker-only — `handleGetLoopStatus` em `nv-enavia.js` agora expõe `POST /contracts/complete-task` em `availableActions` quando `nextAction.status === "in_progress"` (Rule 9 do `resolveNextAction`). `canProceed` atualizado para incluir esse estado. Patch cirúrgico (~7 linhas), sem refatoração. Novo teste `tests/pr20-loop-status-in-progress.smoke.test.js` (27 asserts, 4 seções A–D). Regressões: PR19 52/52 ✅, PR18 45/45 ✅, PR13 91/91 ✅, PR14 183/183 ✅. Total **398/398 sem regressão**.
+**Data:** 2026-04-29 (atualizado após PR21)
+**Branch ativa:** `claude/pr21-prova-loop-status-states`
+**Última tarefa:** PR21 — PR-PROVA — Smoke da matriz de estados do `GET /contracts/loop-status`. Novo teste `tests/pr21-loop-status-states.smoke.test.js` (53 asserts, 5 cenários: queued, in_progress, phase_complete, plan_rejected, cancelled, contract_complete + consistência cruzada por unicidade). Confirmou que o loop contratual supervisionado (PR17→PR21) está coerente em todos os estados. Nenhum runtime alterado. Regressões: PR20 27/27 ✅, PR19 52/52 ✅, PR18 45/45 ✅, PR13 91/91 ✅, PR14 183/183 ✅. Total **451/451 sem regressão**.
 
 ## Contrato ativo
 
@@ -15,6 +15,18 @@
 | `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
 | `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
 | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+
+## Prova formalizada em PR21
+
+- Novo smoke test focado `tests/pr21-loop-status-states.smoke.test.js` (53/53 ✅, 5 cenários).
+- Matriz cruzada validando que o `loop-status` expõe **apenas** a ação correta em cada estado:
+  - `queued` → `execute-next` exclusivo
+  - `in_progress` → `complete-task` exclusivo (PR20)
+  - `phase_complete` → `advance-phase` exclusivo (PR18)
+  - `plan_rejected` / `cancelled` / `contract_complete` → ações vazias/seguras
+- Cenário 5 (consistência cruzada): nenhum estado expõe duas ações conflitantes.
+- Observação documentada (sem corrigir nesta PR): `status_global: "blocked"` sozinho não esconde ações via `resolveNextAction` — o sistema só bloqueia via `plan_rejection.plan_rejected` ou `status_global === "cancelled"`. Comportamento existente preservado.
+- Loop contratual supervisionado (PR17→PR18→PR19→PR20→PR21) consolidado e formalmente provado.
 
 ## Implementação formalizada em PR20
 

@@ -38,13 +38,14 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR21** — PR-PROVA — Smoke do `loop-status` com task `in_progress` e `phase_complete` (cobertura cruzada formal dos dois estados operacionais).
+**PR22** — PR-DOCS — Criar `schema/system/ENAVIA_SYSTEM_MAP.md` (mapeamento de componentes, workers, bindings, KV namespaces, rotas e estados operacionais do sistema ENAVIA).
 
-Contexto: PR17 (diagnóstico) + PR18 (endpoint advance-phase) + PR19 (prova E2E) + PR20 (loop-status em in_progress) concluídas. PR21 valida em smoke focado o comportamento conjunto desses dois estados.
+Contexto: Loop contratual supervisionado consolidado (PR17→PR21). Inicia agora a frente de System Map + Tool Registry (PR22–PR25) prevista no contrato ativo. Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
 - **PR17** ✅ (PR-DIAG, mergeada — PR #178, commit merge `38582b4`) — diagnóstico do gap `phase_complete → advance-phase`.
 - **PR18** ✅ (PR-IMPL, mergeada — PR #179, commit merge `9b45395`) — endpoint `POST /contracts/advance-phase` criado em `nv-enavia.js`.
 - **PR19** ✅ (PR-PROVA, mergeada — PR #180, commit merge `fbf8813`) — smoke E2E do ciclo completo (52/52 ✅).
-- **PR20** (PR-IMPL, em revisão) — `loop-status` expõe `complete-task` em `in_progress` (27/27 ✅).
+- **PR20** ✅ (PR-IMPL, mergeada — PR #181, commit merge `028862d`) — `loop-status` expõe `complete-task` em `in_progress` (27/27 ✅).
+- **PR21** (PR-PROVA, em revisão) — matriz de estados do `loop-status` (53/53 ✅).
