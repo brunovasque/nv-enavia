@@ -1,8 +1,133 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR34 — PR-DIAG — Diagnóstico profundo de `read_only`, `target` default e sanitizers/fallbacks
-**Para:** PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução
+**De:** PR35 — PR-DOCS — Mode Policy + ajuste do contrato para execução real na PR36
+**Para:** PR36 — PR-IMPL — Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos
+
+## O que foi feito nesta sessão
+
+### PR35 — PR-DOCS — Mode Policy (esta PR)
+
+**Tipo:** `PR-DOCS` (sem alteração de runtime)  
+**Branch:** `copilot/claudepr35-docs-mode-policy-e-ajuste-para-execucao`
+
+**Arquivos criados:**
+
+1. **`schema/policies/MODE_POLICY.md`** (NOVO):
+   - 9 seções obrigatórias.
+   - Separação explícita: intenção da mensagem ↔ permissão de execução ↔ tom da resposta.
+   - `read_only` = gate de execução, não regra de tom.
+   - 3 modos canônicos: `conversation`, `diagnosis`, `execution`.
+   - Regra de target: painel não decide tom.
+   - Regra de tom: IA estratégica primeiro.
+   - Regra de planner: ferramenta interna, não personalidade.
+   - Regra de sanitizers: bloqueiam vazamento, não destroem resposta útil.
+   - 4 exemplos concretos de comportamento esperado.
+   - Seção 9: roadmap da PR36 com 5 frentes de patch cirúrgico.
+
+2. **`schema/reports/PR35_MODE_POLICY_E_PLANO_EXECUCAO.md`** (NOVO):
+   - Relatório completo da PR35.
+   - Diagnóstico que fundamenta a policy (resumido).
+   - Riscos reconhecidos (excesso documental, regressão em sanitizers, acoplamento Worker/Panel).
+   - Critérios de aceite verificados.
+
+**Arquivos atualizados:**
+
+3. **`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`**:
+   - `Próxima PR autorizada` atualizado: PR36 → PR-IMPL.
+   - Frente 2: PR36 mudou de PR-DOCS para PR-IMPL.
+   - Seção de PR35 no detalhamento: atualizada com escopo real.
+   - Seção de PR36 no detalhamento: reescrita como PR-IMPL com escopo técnico detalhado, arquivos esperados, critérios de aceite e smoke tests.
+
+4. **`schema/contracts/INDEX.md`**:
+   - Próxima PR autorizada → PR36 PR-IMPL.
+   - PR35 ✅ adicionada ao histórico.
+
+5. **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR35 registrada. Próxima PR: PR36 PR-IMPL.
+6. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo): handoff atualizado de PR35 para PR36.
+7. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**: bloco PR35 adicionado.
+
+**Arquivos NÃO alterados (proibidos pelo escopo):**
+
+- `nv-enavia.js` ✅ (não tocado)
+- `schema/enavia-cognitive-runtime.js` ✅ (não tocado)
+- `schema/enavia-identity.js`, `schema/enavia-capabilities.js`, `schema/enavia-constitution.js` ✅
+- `schema/operational-awareness.js`, `schema/planner-classifier.js`, `schema/planner-output-modes.js`, `schema/memory-retrieval.js` ✅
+- `panel/src/chat/useTargetState.js` ✅ (não tocado)
+- `panel/src/pages/ChatPage.jsx` ✅ (não tocado)
+- `panel/src/api/endpoints/chat.js` ✅ (não tocado)
+- `panel/src/chat/useChatState.js` ✅ (não tocado)
+- Nenhum sanitizer alterado. Nenhum prompt real alterado.
+- Nenhum endpoint criado. Nenhum teste criado.
+- Nenhum Brain/LLM Core/Intent Engine/Skill Router criado.
+- Nenhum deploy. Nenhuma alteração em produção.
+
+## Próxima ação autorizada
+
+**PR36 — PR-IMPL — Correção inicial do chat runtime**
+
+### Escopo técnico da PR36
+
+Patch cirúrgico mínimo com 5 frentes (conforme `schema/policies/MODE_POLICY.md`, seção 9):
+
+1. **Separar `read_only` como gate de execução** — remover instruções de tom nos prompts, manter gate determinístico.
+   - Referências: `nv-enavia.js:4097-4099`, `schema/enavia-cognitive-runtime.js:239-241`.
+
+2. **Desacoplar `isOperationalContext` de `target` default** — `isOperationalContext` não deve ser `true` apenas porque `hasTarget = true`.
+   - Referência: `schema/enavia-cognitive-runtime.js:buildContext()`, seção 5c do prompt.
+
+3. **Reduzir sanitizers destrutivos** — aumentar threshold ou adicionar verificação de contexto em `_sanitizeChatReply` e `_isManualPlanReply`.
+   - Referências: `nv-enavia.js:3530-3583, 4177, 4397-4401`.
+
+4. **Adicionar telemetria de fallback** — log visível no Worker quando qualquer sanitizer substituir resposta.
+
+5. **Preservar segurança** — nenhuma mudança deve expor JSON interno ou remover gates de deploy.
+
+### Prioridade de escopo
+
+- **Worker-only** (preferencial).
+- Panel apenas se inevitável — nesse caso, avaliar PR separada.
+- Não implementar Intent Engine completo.
+- Não implementar LLM Core completo.
+- Não tocar Obsidian Brain.
+
+### Pré-requisitos da PR36
+
+- PR35 ✅ (Mode Policy criada, contrato ajustado).
+- PR34 ✅ (diagnóstico técnico com evidência de arquivo:linha disponível).
+- PR33 ✅ (Regras R1-R4 no contrato).
+- Diagnóstico suficiente — nenhuma PR-DIAG adicional necessária antes de PR36.
+
+### Por que PR36 é PR-IMPL e não mais PR-DOCS
+
+O diagnóstico está completo:
+- PR32: causa raiz identificada.
+- PR34: causa técnica refinada em 7 camadas com evidência de arquivo:linha.
+- PR35: policy definindo o comportamento correto.
+
+Mais documentação seria excesso documental. O contrato agora força produto.
+
+---
+
+## Histórico: PR34
+
+**De:** PR33 — PR-DOCS — Ajuste do contrato pós-diagnóstico  
+**Para:** PR35 (esta PR)
+
+### PR34 — PR-DIAG — Diagnóstico profundo (READ-ONLY)
+
+**Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
+**Branch:** `copilot/claude-pr34-diag-readonly-target-sanitizers`
+
+**Arquivo criado:** `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`
+- 20 seções + causa técnica refinada em 7 camadas.
+- Mapeamento ponta-a-ponta de `read_only`, `target` default e 5 sanitizers/fallbacks.
+- Análise do envelope `{reply, use_planner}` e planner vs conversa.
+
+**Arquivos atualizados:** `schema/contracts/INDEX.md`, `schema/status/ENAVIA_STATUS_ATUAL.md`, `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`, `schema/execution/ENAVIA_EXECUTION_LOG.md`.
+
+Detalhes completos em `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`.
+
 
 ## O que foi feito nesta sessão
 

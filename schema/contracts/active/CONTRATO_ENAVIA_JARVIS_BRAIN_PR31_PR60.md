@@ -10,7 +10,7 @@
 | **Data de início** | 2026-04-30 |
 | **Contrato anterior** | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — Encerrado ✅ |
 | **Objetivo** | Criar cérebro vivo da Enavia com LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first |
-| **Próxima PR autorizada** | PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers |
+| **Próxima PR autorizada** | PR36 — PR-IMPL — Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos |
 
 ---
 
@@ -133,8 +133,8 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
 |----|------|----------|
 | PR33 | PR-DOCS | Ajuste do contrato após diagnóstico PR32 (esta PR) |
 | PR34 | PR-DIAG | Diagnóstico específico de read_only, target default e sanitizers |
-| PR35 | PR-DOCS | Política correta de modos: conversa vs diagnóstico vs execução |
-| PR36 | PR-DOCS | Especificação da Response Policy viva e anti-bot |
+| PR35 | PR-DOCS | Mode Policy: separar intenção, permissão de execução e tom (esta PR) |
+| PR36 | PR-IMPL | Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos |
 
 ### Frente 3 — Obsidian Brain completo
 
@@ -326,26 +326,71 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
 
 ---
 
-### PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução
+### PR35 — PR-DOCS — Mode Policy: separar intenção, permissão de execução e tom
 
-- **Objetivo:** Criar documento de política que define como a Enavia deve se comportar em cada modo de operação. Separar claramente: (a) modo conversa, (b) modo diagnóstico, (c) modo planejamento, (d) modo execução. Definir que `read_only` afeta apenas (d).
+- **Objetivo:** Criar documento de política que define como a Enavia deve se comportar em cada modo de operação. Separar claramente: (a) intenção da mensagem (conversa, diagnóstico, execução); (b) permissão de execução (`read_only` como gate); (c) tom da resposta (estratégico, livre, nunca forçado por `target` default). Preparar o contrato para PR36 ser implementação real.
 - **Tipo:** PR-DOCS
-- **Escopo permitido:** Apenas criação de documentação em `schema/`.
+- **Escopo permitido:** Apenas criação de documentação em `schema/policies/`. Atualização do contrato para refletir PR36 como PR-IMPL. Nenhum runtime alterado.
 - **Arquivos esperados:**
   - `schema/policies/MODE_POLICY.md` (NOVO)
-- **Critérios de aceite:** Política clara por modo. read_only explicitamente limitado ao contexto de execução. Tom vivo garantido para conversa, diagnóstico e planejamento.
-- **Próxima PR autorizada:** PR36 — PR-DOCS (Response Policy)
+  - `schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (atualizado — PR36 → PR-IMPL)
+  - `schema/contracts/INDEX.md` (atualizado — próxima PR → PR36 PR-IMPL)
+  - `schema/status/ENAVIA_STATUS_ATUAL.md` (atualizado)
+  - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (atualizado)
+  - `schema/execution/ENAVIA_EXECUTION_LOG.md` (atualizado)
+  - `schema/reports/PR35_MODE_POLICY_E_PLANO_EXECUCAO.md` (NOVO)
+- **Critérios de aceite:**
+  - `schema/policies/MODE_POLICY.md` criado com 9 seções.
+  - `read_only` definido como gate de execução, não regra de tom.
+  - Target default não decide tom.
+  - 3 modos canônicos definidos (`conversation`, `diagnosis`, `execution`).
+  - Planner não substitui conversa.
+  - Sanitizers não devem destruir resposta viva legítima.
+  - Contrato ajustado: PR36 = PR-IMPL.
+  - INDEX aponta PR36 como PR-IMPL.
+  - Status, handoff e execution log atualizados.
+  - Nenhum runtime alterado. Nenhum `.js`/`.ts`/`.jsx`/`.tsx`/`.toml`/`.yml` alterado.
+- **Smoke tests:** `git diff --name-only` — nenhum arquivo de runtime alterado.
+- **Próxima PR autorizada:** PR36 — PR-IMPL
 
 ---
 
-### PR36 — PR-DOCS — Especificação da Response Policy viva e anti-bot
+### PR36 — PR-IMPL — Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos
 
-- **Objetivo:** Criar documento de especificação da Response Policy que a Enavia deve seguir antes de qualquer implementação de PR41 (Brain Loader) ou PR44 (LLM Core). Definir como a Enavia deve responder como IA estratégica — não como bot de checklist.
-- **Tipo:** PR-DOCS
-- **Escopo permitido:** Apenas criação de documentação em `schema/`.
+- **Objetivo:** Implementar patch cirúrgico mínimo no runtime para corrigir os 3 fatores técnicos identificados no diagnóstico PR34 e formalizados na Mode Policy PR35: (1) `read_only` sendo tratado como regra de tom; (2) `target` default forçando tom operacional em toda conversa; (3) sanitizers pós-LLM destruindo respostas vivas legítimas.
+- **Tipo:** PR-IMPL
+- **Escopo obrigatório:** Worker-only preferencialmente. Se Panel for necessário, documentar risco e avaliar PR separada.
+- **O que implementar:**
+  - Remover instruções de tom associadas a `read_only` nos prompts (`nv-enavia.js:4097-4099`, `schema/enavia-cognitive-runtime.js:239-241`).
+  - Adicionar gate determinístico de execução amarrado a `read_only`: só bloqueia quando intenção = `execution`.
+  - Desacoplar `isOperationalContext` de `hasTarget`: contexto operacional não deve ser ativado apenas porque `target` está presente.
+  - Reduzir sanitizers destrutivos: `_sanitizeChatReply`, `_isManualPlanReply`/`_MANUAL_PLAN_FALLBACK` — aumentar threshold ou adicionar verificação de contexto.
+  - Adicionar telemetria mínima de fallback: log visível no Worker quando qualquer sanitizer substituir uma resposta.
+- **Proibido nesta PR:**
+  - Não implementar Intent Engine completo.
+  - Não implementar LLM Core completo.
+  - Não tocar Obsidian Brain.
+  - Não criar novos endpoints.
+  - Não criar testes E2E completos (smoke teste simples aceito).
+  - Não alterar schema do contrato ou executor.
+- **Pré-requisito:** PR35 ✅ (Mode Policy criada, diagnóstico suficiente disponível, PR34 ✅).
 - **Arquivos esperados:**
-  - `schema/policies/RESPONSE_POLICY.md` (NOVO)
-- **Critérios de aceite:** Política viva especificada. Anti-bot explícito. Integra Regras R1-R3 do contrato. Serve como guia para PR44 (LLM Core) e PR55 (Response Policy runtime).
+  - `nv-enavia.js` (alterado — patch cirúrgico)
+  - `schema/enavia-cognitive-runtime.js` (alterado — patch cirúrgico)
+  - Opcionalmente: `panel/src/chat/useTargetState.js` (se necessário — documentar risco)
+  - Governança atualizada (status, handoff, execution log)
+  - `schema/reports/PR36_IMPL_CHAT_RUNTIME_REPORT.md` (NOVO)
+- **Critérios de aceite:**
+  - `read_only` no prompt como nota factual, sem instrução de tom defensivo.
+  - `isOperationalContext` não ativado apenas por `hasTarget`.
+  - Sanitizer de planner não destrói resposta estruturada legítima.
+  - Log visível de fallback/sanitização.
+  - Nenhuma regressão em deploy governance.
+  - Nenhuma exposição de JSON interno ao usuário.
+- **Smoke tests:**
+  - Enviar mensagem de conversa simples → confirmar que não ativa tom operacional.
+  - Enviar mensagem com `read_only` → confirmar que não adiciona instrução de tom defensivo no prompt.
+  - Enviar resposta estruturada do LLM → confirmar que sanitizer não substitui por fallback.
 - **Próxima PR autorizada:** PR37 — PR-DOCS (Arquitetura do Obsidian Brain)
 
 ---

@@ -43,7 +43,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução**
+**PR36 — PR-IMPL — Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
@@ -53,6 +53,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR32** ✅ (PR-DIAG) — Diagnóstico do chat engessado. Causa raiz identificada (target default + read_only como tom + ausência de LLM Core/Intent/Skill Router/Brain + sanitizers pós-LLM + envelope JSON). Relatório: `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`. Nenhum runtime alterado.
 - **PR33** ✅ (PR-DOCS) — Ajuste do contrato após diagnóstico PR32. Nova Frente 2 corretiva inserida (PR33-PR36). Regras R1-R4 adicionadas. Obsidian Brain deslocado para PR37+. Contrato ampliado para PR31-PR64. Nenhum runtime alterado.
 - **PR34** ✅ (PR-DIAG) — Diagnóstico profundo de `read_only`, `target` default e sanitizers/fallbacks. Causa técnica refinada em 7 camadas. Recomendações conceituais para PR35 (Mode Policy) e PR36 (Response Policy). Relatório: `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`. Nenhum runtime alterado.
+- **PR35** ✅ (PR-DOCS) — Mode Policy criada. 3 modos canônicos definidos (conversation/diagnosis/execution). `read_only` definido como gate de execução, não regra de tom. Contrato ajustado para PR36 ser PR-IMPL real. Risco de excesso documental reconhecido — objetivo agora é produto funcionando. Relatório: `schema/reports/PR35_MODE_POLICY_E_PLANO_EXECUCAO.md`. Nenhum runtime alterado.
 
 ### Histórico do contrato encerrado (PR17–PR30)
 

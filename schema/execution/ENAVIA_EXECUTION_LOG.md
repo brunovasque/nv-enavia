@@ -4,7 +4,50 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR35 — PR-DOCS — Mode Policy + ajuste do contrato para execução real
+
+- **Branch:** `copilot/claudepr35-docs-mode-policy-e-ajuste-para-execucao`
+- **Tipo:** `PR-DOCS` (sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR34 ✅ (PR-DIAG — diagnóstico técnico profundo de read_only, target e sanitizers, mergeada)
+- **Escopo:** Docs/Policies-only. Mode Policy criada. Contrato ajustado para PR36 ser PR-IMPL. Governança atualizada. Nenhum runtime, endpoint, teste, prompt, brain, skill ou intent engine alterado/criado.
+
+### Objetivo
+
+Criar a política de modos da Enavia (`schema/policies/MODE_POLICY.md`) e ajustar o contrato para que a próxima PR seja implementação real, não mais documentação. Esta é a última PR-DOCS antes da execução na Frente 2. Risco de excesso documental reconhecido — o objetivo agora é produto funcionando, não apenas contrato bonito.
+
+### Arquivos criados
+
+- **`schema/policies/MODE_POLICY.md`** (NOVO): 9 seções. `read_only` como gate de execução. 3 modos canônicos (conversation/diagnosis/execution). Regra de target, tom, planner, sanitizers e comportamento esperado. Roadmap da PR36.
+- **`schema/reports/PR35_MODE_POLICY_E_PLANO_EXECUCAO.md`** (NOVO): Relatório completo da PR35, diagnóstico resumido, riscos reconhecidos e critérios de aceite verificados.
+
+### Arquivos atualizados (governança e contrato)
+
+- **`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`**: PR36 mudou de PR-DOCS para PR-IMPL. Seção PR36 reescrita com escopo técnico real. Próxima PR autorizada atualizada.
+- **`schema/contracts/INDEX.md`**: PR35 ✅ adicionada. Próxima PR autorizada → PR36 PR-IMPL.
+- **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR35 registrada. Próxima PR: PR36 PR-IMPL.
+- **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`**: handoff atualizado de PR35 para PR36. Escopo técnico da PR36 detalhado.
+
+### Arquivos NÃO alterados (proibidos pelo escopo)
+
+- `nv-enavia.js`, `schema/enavia-cognitive-runtime.js` e todos os arquivos `.js`/`.ts`/`.jsx`/`.tsx`/`.toml`/`.yml` — nenhum alterado.
+- Nenhum sanitizer, prompt, endpoint, teste, brain, LLM Core, Intent Engine ou Skill Router alterado/criado.
+
+### Regras R1-R4 confirmadas
+
+- **R1:** `read_only` = bloqueio de execução, NÃO regra de tom — formalizado em `MODE_POLICY.md §2`.
+- **R2:** Sanitizadores pós-LLM destroem resposta viva legítima — política de correção em `MODE_POLICY.md §7` e roadmap PR36 em `§9`.
+- **R3:** Target operacional ativa contexto operacional para qualquer conversa — política de correção em `MODE_POLICY.md §4` e roadmap PR36 `§9.2`.
+- **R4:** Brain (PR37+) nasce ciente do incidente — registrado em contrato e relatório.
+
+### Decisão registrada
+
+> Diagnóstico suficiente já existe. A PR36 é implementação real. Não haverá mais PR-DOCS antes da execução nesta frente. Objetivo: produto funcionando, não contrato bonito.
+
+---
+
 ## 2026-04-30 — PR34 — PR-DIAG — Diagnóstico de read_only, target default e sanitizers
+
 
 - **Branch:** `copilot/claude-pr34-diag-readonly-target-sanitizers`
 - **Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
