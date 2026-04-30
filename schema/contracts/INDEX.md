@@ -38,12 +38,13 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR20** — PR-IMPL — Worker-only — `loop-status` expõe ação correta quando task está `in_progress` (deve incluir `POST /contracts/complete-task` em `availableActions`).
+**PR21** — PR-PROVA — Smoke do `loop-status` com task `in_progress` e `phase_complete` (cobertura cruzada formal dos dois estados operacionais).
 
-Contexto: PR17 (diagnóstico) + PR18 (endpoint advance-phase) + PR19 (prova E2E) concluídas. PR20 fecha o gap operacional remanescente identificado no contrato: quando `nextAction.status === "in_progress"`, o `loop-status` deve expor `POST /contracts/complete-task` como ação disponível.
+Contexto: PR17 (diagnóstico) + PR18 (endpoint advance-phase) + PR19 (prova E2E) + PR20 (loop-status em in_progress) concluídas. PR21 valida em smoke focado o comportamento conjunto desses dois estados.
 
 ### Histórico recente
 
 - **PR17** ✅ (PR-DIAG, mergeada — PR #178, commit merge `38582b4`) — diagnóstico do gap `phase_complete → advance-phase`.
 - **PR18** ✅ (PR-IMPL, mergeada — PR #179, commit merge `9b45395`) — endpoint `POST /contracts/advance-phase` criado em `nv-enavia.js`.
-- **PR19** (PR-PROVA, em revisão) — smoke E2E do ciclo completo (52/52 ✅).
+- **PR19** ✅ (PR-PROVA, mergeada — PR #180, commit merge `fbf8813`) — smoke E2E do ciclo completo (52/52 ✅).
+- **PR20** (PR-IMPL, em revisão) — `loop-status` expõe `complete-task` em `in_progress` (27/27 ✅).

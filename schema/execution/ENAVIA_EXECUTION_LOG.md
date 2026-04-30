@@ -4,6 +4,80 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-29 — PR20 — PR-IMPL — Worker-only — loop-status expõe complete-task em task in_progress
+
+- **Branch:** `claude/pr20-impl-loop-status-in-progress`
+- **Tipo:** `PR-IMPL`
+- **Contrato ativo:** `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md`
+- **PR anterior validada:** PR19 ✅ (commit `3662891`, PR #180 mergeada — commit merge `fbf8813`)
+- **Escopo:** Worker-only, ajuste cirúrgico em `nv-enavia.js`. Nenhum outro arquivo de runtime alterado.
+
+### Diagnóstico (read-only, antes do patch)
+
+1. `handleGetLoopStatus` em `nv-enavia.js:5024-5047`.
+2. `nextAction` montado via `resolveNextAction(state, decomposition)` (linha 5018).
+3. Quando task está `in_progress`: `resolveNextAction` Rule 9 (`contract-executor.js:1594-1605`) retorna:
+   ```js
+   { type: "no_action", phase_id, task_id, reason, status: "in_progress" }
+   ```
+4. `availableActions` é montado dentro de `if (isReady) { ... } else if (isAwaitingApproval) { ... }` — sem ramo para `isIdle`/`status === "in_progress"`.
+5. Confirmado: `start_task` → `execute-next`; `phase_complete` → `advance-phase`; `in_progress` → vazio (gap).
+
+### Patch aplicado em `nv-enavia.js` (cirúrgico)
+
+Adicionado novo `else if` ao `handleGetLoopStatus`, sem refatorar o resto:
+
+```js
+} else if (nextAction.status === "in_progress") {
+  // PR20 — task em progresso pode ser concluída supervisionadamente via complete-task.
+  availableActions = ["POST /contracts/complete-task"];
+  guidance = "Task in_progress. Use POST /contracts/complete-task com { contract_id, task_id, resultado } para concluir com gate de aderência.";
+}
+```
+
+E `canProceed` atualizado para incluir o novo estado válido:
+```js
+const canProceed = isReady || isAwaitingApproval || (nextAction.status === "in_progress");
+```
+
+### Não alterado (proibido pelo escopo)
+
+- `contract-executor.js` — Rule 9 já produz o shape correto, nenhuma mudança necessária ✅
+- Endpoints `complete-task`, `execute-next`, `advance-phase` — comportamento intocado
+- `panel/`, `executor/`, deploy worker, workflows, `wrangler.toml`
+- `buildOperationalAction` — não alterada (`no_action` continua mapeando para `block`, o que é correto: não libera execução errada em `in_progress`)
+
+### Smoke tests
+
+| Comando | Resultado |
+|---------|-----------|
+| `node --check nv-enavia.js` | ✅ |
+| `node --check tests/pr20-loop-status-in-progress.smoke.test.js` | ✅ |
+| `node tests/pr20-loop-status-in-progress.smoke.test.js` | **27 passed, 0 failed** ✅ |
+| `node tests/pr19-advance-phase-e2e.smoke.test.js` (regressão) | **52 passed, 0 failed** ✅ |
+| `node tests/pr18-advance-phase-endpoint.smoke.test.js` (regressão) | **45 passed, 0 failed** ✅ |
+| `node tests/pr13-hardening-operacional.smoke.test.js` (regressão) | **91 passed, 0 failed** ✅ |
+| `node tests/pr14-executor-deploy-real-loop.smoke.test.js` (regressão) | **183 passed, 0 failed** ✅ |
+
+**Total: 398/398 sem regressão.**
+
+### Cobertura PR20 (4 seções, 27 asserts)
+
+- **A. Task in_progress** — `loop-status` expõe `POST /contracts/complete-task`, `canProceed:true`, NÃO mostra `execute-next`/`advance-phase`/`close-final`.
+- **B. Estados indevidos** — `queued` → execute-next sem complete-task; `phase_complete` → advance-phase sem complete-task; contrato `blocked` → sem complete-task.
+- **C. operationalAction** — em `in_progress` permanece `type:block`, `can_execute:false` (não libera execução errada).
+- **D. canProceed** — verdadeiro em `start_task`, `phase_complete` e `in_progress`.
+
+### Bloqueios
+
+Nenhum.
+
+### Próxima etapa autorizada
+
+**PR21** — `PR-PROVA` — Smoke do `loop-status` com task `in_progress` e `phase_complete` (cobertura cruzada complementar dos estados operacionais).
+
+---
+
 ## 2026-04-29 — PR19 — PR-PROVA — Smoke real ponta a ponta do ciclo execute → complete → advance-phase
 
 - **Branch:** `claude/pr19-prova-advance-phase-e2e`
