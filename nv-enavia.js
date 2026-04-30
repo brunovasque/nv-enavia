@@ -12,6 +12,8 @@ import {
   handleCloseFinalContract,
   // PR6 — loop supervisionado
   resolveNextAction,
+  // PR18 — endpoint supervisionado de avanço de fase
+  advanceContractPhase,
   // PR16 — startTask (transiciona task queued → in_progress antes da execução)
   startTask,
   buildExecutionHandoff,
@@ -4794,10 +4796,11 @@ async function handlePlannerBridge(request, env) {
 //   block_reason           — motivo do bloqueio (null quando can_execute=true)
 //
 // Mapeamento resolveNextAction.type → tipo operacional:
-//   start_task / start_micro_pr  → execute_next  (POST /contracts/execute)
-//   awaiting_human_approval      → approve        (POST /contracts/close-final)
-//   contract_complete            → block          (contrato já concluído, sem ação)
-//   contract_blocked / phase_complete / plan_rejected / no_action → block
+//   start_task / start_micro_pr  → execute_next   (POST /contracts/execute-next)
+//   awaiting_human_approval      → approve         (POST /contracts/close-final)
+//   phase_complete               → advance_phase   (POST /contracts/advance-phase) — PR18
+//   contract_complete            → block           (contrato já concluído, sem ação)
+//   contract_blocked / plan_rejected / no_action / contract_cancelled → block
 // ============================================================================
 function buildOperationalAction(nextAction, contractId) {
   const OP_TYPE_MAP = {
@@ -4806,18 +4809,19 @@ function buildOperationalAction(nextAction, contractId) {
     awaiting_human_approval: "approve",
     contract_complete:       "block",    // contrato já concluído — sem ação disponível
     contract_blocked:        "block",
-    phase_complete:          "block",
+    phase_complete:          "advance_phase", // PR18 — endpoint supervisionado de avanço de fase
     plan_rejected:           "block",
     contract_cancelled:      "block",
     no_action:               "block",
   };
 
   const EVIDENCE_MAP = {
-    execute_next: ["contract_id", "evidence[]"],
-    approve:      ["contract_id"],
-    close_final:  ["contract_id"],
-    reject:       ["contract_id"],
-    block:        [],
+    execute_next:  ["contract_id", "evidence[]"],
+    approve:       ["contract_id"],
+    close_final:   ["contract_id"],
+    reject:        ["contract_id"],
+    advance_phase: ["contract_id"], // PR18 — só requer contract_id; gate aplicado por advanceContractPhase
+    block:         [],
   };
 
   const opType        = OP_TYPE_MAP[nextAction.type] ?? "block";
@@ -5029,9 +5033,10 @@ async function handleGetLoopStatus(env) {
       if (nextAction.type === "start_task" || nextAction.type === "start_micro_pr") {
         availableActions = ["POST /contracts/execute-next"];
       } else if (nextAction.type === "phase_complete") {
-        // complete-task e execute exigem task in_progress — falhariam aqui deterministicamente.
-        // Não há endpoint de avanço de fase disponível; documentar em guidance.
-        guidance = "Phase complete. No phase-advance endpoint exists yet; manual phase transition required.";
+        // PR18 — endpoint supervisionado de avanço de fase agora disponível.
+        // Reutiliza advanceContractPhase (gate checkPhaseGate aplicado internamente).
+        availableActions = ["POST /contracts/advance-phase"];
+        guidance = "Phase complete. Use POST /contracts/advance-phase com { contract_id } para avançar à próxima fase (gate aplicado internamente por advanceContractPhase).";
       } else if (nextAction.type === "contract_complete") {
         availableActions = [];
       }
@@ -5523,6 +5528,98 @@ async function callDeployBridge(env, action, payload) {
 //     rollback: { available, type, recommendation, command },
 //     executor_path: { type, handler, uses_service_binding, service_binding_available, note },
 //     execution_result?, audit_id }
+// ============================================================================
+// PR18 — handleAdvancePhase (POST /contracts/advance-phase)
+//
+// Endpoint supervisionado para avançar a fase de um contrato quando
+// resolveNextAction retorna { type: "phase_complete", status: "ready" }.
+//
+// Reutiliza integralmente advanceContractPhase (contract-executor.js) — toda a
+// lógica de gate (checkPhaseGate), persistência KV e marcação de fase está
+// implementada lá. Este handler apenas:
+//   1. valida JSON do body;
+//   2. exige contract_id;
+//   3. delega para advanceContractPhase(env, contractId);
+//   4. mapeia resultado para response HTTP supervisionado.
+//
+// NÃO duplica gates. NÃO avança fase fora deste endpoint. NÃO toca produção.
+//
+// Body esperado:
+//   { contract_id?: string, contractId?: string }
+//
+// Respostas:
+//   200 → { ok: true, status: "advanced", contract_id, result }
+//   400 → { ok: false, status: "blocked", reason: "JSON inválido." }
+//   400 → { ok: false, status: "blocked", reason: "contract_id obrigatório." }
+//   409 → { ok: false, status: "blocked", reason, result }   (gate falhou ou erro)
+// ============================================================================
+async function handleAdvancePhase(request, env) {
+  let body = {};
+  try {
+    body = await request.json();
+  } catch (_) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        status: "blocked",
+        reason: "JSON inválido.",
+      },
+    };
+  }
+
+  const contractId = body?.contract_id || body?.contractId;
+
+  if (!contractId || typeof contractId !== "string") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        status: "blocked",
+        reason: "contract_id obrigatório.",
+      },
+    };
+  }
+
+  let result;
+  try {
+    result = await advanceContractPhase(env, contractId);
+  } catch (err) {
+    return {
+      status: 500,
+      body: {
+        ok: false,
+        status: "blocked",
+        reason: `Falha ao avançar fase: ${String(err)}`,
+        contract_id: contractId,
+      },
+    };
+  }
+
+  if (!result || result.ok !== true) {
+    return {
+      status: 409,
+      body: {
+        ok: false,
+        status: "blocked",
+        reason: result?.error || result?.reason || result?.gate?.reason || "Avanço de fase bloqueado.",
+        contract_id: contractId,
+        result: result || null,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      status: "advanced",
+      contract_id: contractId,
+      result,
+    },
+  };
+}
+
 // ============================================================================
 async function handleExecuteNext(request, env) {
   const auditId = `exec-next:${Date.now()}`;
@@ -8209,6 +8306,13 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
         return jsonResponse(result.body, result.status);
       }
 
+      // POST /contracts/advance-phase → 🛡️ PR18 — Endpoint supervisionado de avanço de fase
+      // Reutiliza advanceContractPhase (gate checkPhaseGate aplicado internamente).
+      if (method === "POST" && path === "/contracts/advance-phase") {
+        const result = await handleAdvancePhase(request, env);
+        return jsonResponse(result.body, result.status);
+      }
+
       // POST /contracts/close-final → 🛡️ Gate final pesado do contrato inteiro (PR 3)
       if (method === "POST" && path === "/contracts/close-final") {
         const result = await handleCloseFinalContract(request, env);
@@ -8663,6 +8767,7 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
             "  • POST /contracts/reject-plan → Rejeição formal do plano de decomposição (F2)",
             "  • POST /contracts/resolve-plan-revision → Resolução de revisão do plano (F2b)",
             "  • POST /contracts/complete-task → 🛡️ Concluir task com gate obrigatório de aderência contratual",
+            "  • POST /contracts/advance-phase → 🛡️ PR18 — Avançar fase supervisionado (gate checkPhaseGate)",
             "  • POST /contracts/close-final → 🛡️ Fechamento final pesado do contrato inteiro (gate PR 3)",
             "  • GET  /contracts?id=  → Ler estado completo do contrato",
             "  • GET  /contracts/summary?id= → Resumo do contrato",

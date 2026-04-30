@@ -1,57 +1,64 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-29
-**De:** PR17 — PR-DIAG — Diagnóstico READ-ONLY de phase_complete e avanço de fase
-**Para:** PR18 — PR-IMPL — Worker-only — Endpoint supervisionado de avanço de fase
+**De:** PR18 — PR-IMPL — Worker-only — Endpoint supervisionado de avanço de fase
+**Para:** PR19 — PR-PROVA — Smoke real do ciclo completo `execute-next → complete-task → advance-phase`
 
 ## O que foi feito nesta sessão
 
-### PR17 — PR-DIAG — Diagnóstico READ-ONLY de phase_complete e avanço de fase
+### PR18 — PR-IMPL — Endpoint supervisionado `POST /contracts/advance-phase`
 
-**Tipo:** `PR-DIAG`
-**Branch:** `claude/pr17-diag-phase-complete-advance-phase`
+**Tipo:** `PR-IMPL`
+**Branch:** `claude/pr18-impl-advance-phase-endpoint` (criada a partir de `origin/main` atualizada — commit base `38582b4`, contendo PR17 mergeada)
 
-**Escopo:** READ-ONLY. Arquivos de runtime não alterados (`nv-enavia.js`, `contract-executor.js`, etc.).
+**Arquivos alterados:**
 
-**Arquivos alterados (governança):**
+1. **`nv-enavia.js`** (Worker-only):
+   - Import de `advanceContractPhase` adicionado.
+   - `buildOperationalAction`: `phase_complete` agora mapeia para `advance_phase` (não mais `block`); `EVIDENCE_MAP` inclui `advance_phase: ["contract_id"]`.
+   - `handleGetLoopStatus`: `phase_complete` expõe `availableActions = ["POST /contracts/advance-phase"]` e `guidance` instrui o uso do endpoint.
+   - Novo handler `handleAdvancePhase` (delega para `advanceContractPhase`, sem duplicar lógica).
+   - Nova rota `POST /contracts/advance-phase`.
+   - Help text atualizado.
 
-1. `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR17 inserido no topo com diagnóstico completo.
-2. `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo.
-3. `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+2. **`tests/pr18-advance-phase-endpoint.smoke.test.js`** (novo):
+   - 45 asserts em 5 seções (A–E).
+   - Cobre input inválido, happy path com avanço de KV, gate bloqueado, integração com `loop-status`, e isolamento (execute-next NÃO avança fase implicitamente).
 
-**Arquivos NÃO alterados:**
-- `nv-enavia.js`, `contract-executor.js`, `executor/`, `panel/`, `wrangler.toml`
-- `.github/workflows/`
-- Qualquer arquivo `.js`, `.ts`, `.jsx`, `.tsx`
+3. **Governança:**
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR18 inserido no topo.
+   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo.
+   - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada atualizada para PR19.
 
-## Diagnóstico — Resumo executivo
+**Arquivos NÃO alterados (proibido pelo escopo):**
+- `contract-executor.js` (não foi necessário — função já estava completa)
+- `panel/`, `executor/`, `wrangler.toml`, `.github/workflows/`
 
-### Gap confirmado
+## Critérios de aceite — atendidos
 
-A função `advanceContractPhase` **existe, está completa, testada e exportada** em `contract-executor.js` (linha 1027–1117, export na linha 5120). O único gap é a ausência de endpoint HTTP supervisionado.
+| Critério | Status |
+|----------|--------|
+| Endpoint `POST /contracts/advance-phase` criado | ✅ |
+| Reutiliza `advanceContractPhase` existente | ✅ |
+| Não duplica lógica nem cria gate paralelo | ✅ |
+| Não relaxa gates existentes | ✅ |
+| Não avança fase fora do endpoint (execute-next isolado) | ✅ — Teste E1 confirma |
+| `loop-status` mostra ação disponível em `phase_complete` | ✅ — Teste D1 confirma |
+| `buildOperationalAction` retorna `type: advance_phase` | ✅ — Teste D2 confirma |
+| Não mexe em Panel / Executor / Deploy Worker | ✅ |
+| Smoke tests passam | ✅ — 45/45 + 91/91 + 183/183 = 319/319 |
+| Governança atualizada | ✅ |
 
-### Evidências coletadas
+## Smoke tests executados
 
-| Item | Localização | Resultado |
-|------|------------|-----------|
-| `phase_complete` gerado | `contract-executor.js:1479` (Rule 4) | ✅ Confirmado |
-| `advanceContractPhase` implementada | `contract-executor.js:1027-1117` | ✅ Confirmado — completa com gates |
-| `advanceContractPhase` exportada | `contract-executor.js:5120` | ✅ Confirmado |
-| `advanceContractPhase` importada em `nv-enavia.js` | Linhas 1–30 | ❌ **AUSENTE** |
-| Endpoint `POST /contracts/advance-phase` | Grep em `nv-enavia.js` | ❌ **AUSENTE** |
-| `phase_complete` → `block` em `buildOperationalAction` | `nv-enavia.js:4809` | ✅ Confirmado |
-| Guidance na linha 5034 documenta o gap | `nv-enavia.js:5034` | ✅ "No phase-advance endpoint exists yet" |
-| KV keys lidas/escritas | `rehydrateContract` + puts | `contract:{id}:state`, `contract:{id}:decomposition` |
-| Gate de verificação | `checkPhaseGate` em `contract-executor.js:975` | ✅ Já implementado e chamado internamente |
-
-### Patch mínimo para PR18
-
-1. Adicionar `advanceContractPhase` aos imports de `contract-executor.js` em `nv-enavia.js`
-2. Criar handler `handleAdvancePhase(request, env)` em `nv-enavia.js`
-3. Adicionar rota `POST /contracts/advance-phase` no routing do Worker
-4. Atualizar `buildOperationalAction` e `loop-status` para expor `availableActions = ["POST /contracts/advance-phase"]` quando `phase_complete`
-
-**Nenhuma lógica nova de gate ou advance precisa ser criada.** Reutilizar `advanceContractPhase` integralmente.
+| Teste | Comando | Resultado |
+|-------|---------|-----------|
+| Sintaxe Worker | `node --check nv-enavia.js` | ✅ |
+| Sintaxe novo teste | `node --check tests/pr18-advance-phase-endpoint.smoke.test.js` | ✅ |
+| PR18 (novo) | `node tests/pr18-advance-phase-endpoint.smoke.test.js` | **45 passed, 0 failed** ✅ |
+| PR13 (regressão) | `node tests/pr13-hardening-operacional.smoke.test.js` | **91 passed, 0 failed** ✅ |
+| PR14 (regressão) | `node tests/pr14-executor-deploy-real-loop.smoke.test.js` | **183 passed, 0 failed** ✅ |
 
 ## Contrato ativo
 
@@ -59,9 +66,9 @@ A função `advanceContractPhase` **existe, está completa, testada e exportada*
 
 ## Próxima ação autorizada
 
-**PR18** — `PR-IMPL` — Worker-only — Endpoint supervisionado de avanço de fase (`POST /contracts/advance-phase`).
+**PR19** — `PR-PROVA` — Smoke real ponta a ponta: `execute-next → complete-task → phase_complete → advance-phase → próxima task/fase`.
 
-**Pré-requisito:** PR17 concluída (esta PR) ✅
+**Pré-requisito:** PR18 concluída (esta PR) ✅
 
 ## Bloqueios
 

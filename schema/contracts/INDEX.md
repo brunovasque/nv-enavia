@@ -38,6 +38,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR17** — PR-DIAG — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase.
+**PR19** — PR-PROVA — Smoke real ponta a ponta: `execute-next → complete-task → phase_complete → advance-phase → próxima task/fase`.
 
-Contexto: o principal gap documentado é que o sistema chega em `phase_complete`, mas falta o mecanismo supervisionado de avanço de fase. PR17 é diagnóstico puro — sem alterar runtime.
+Contexto: PR17 (diagnóstico) e PR18 (implementação do endpoint) concluídas. PR19 valida o ciclo completo via smoke test integrado, sem alterar runtime.
+
+### Histórico recente
+
+- **PR17** ✅ (PR-DIAG, mergeada — PR #178, commit merge `38582b4`) — diagnóstico do gap `phase_complete → advance-phase`.
+- **PR18** (PR-IMPL, em revisão) — endpoint `POST /contracts/advance-phase` criado em `nv-enavia.js`.

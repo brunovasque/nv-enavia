@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-29 (atualizado após PR17)
-**Branch ativa:** `claude/pr17-diag-phase-complete-advance-phase`
-**Última tarefa:** PR17 — PR-DIAG — Diagnóstico READ-ONLY de `phase_complete` e avanço de fase. Gap confirmado: `advanceContractPhase` existe completa em `contract-executor.js` (linha 1027, exportada linha 5120) mas não está importada nem exposta via HTTP em `nv-enavia.js`. Nenhum endpoint `POST /contracts/advance-phase` existe. Patch mínimo para PR18 documentado. Sem alteração em runtime.
+**Data:** 2026-04-29 (atualizado após PR18)
+**Branch ativa:** `claude/pr18-impl-advance-phase-endpoint`
+**Última tarefa:** PR18 — PR-IMPL — Worker-only — Endpoint supervisionado `POST /contracts/advance-phase` criado em `nv-enavia.js`. Reutiliza integralmente `advanceContractPhase` de `contract-executor.js` (sem duplicar lógica). `phase_complete` agora mapeia para `advance_phase` em `buildOperationalAction`; `loop-status` expõe `availableActions = ["POST /contracts/advance-phase"]`. Novo smoke test `tests/pr18-advance-phase-endpoint.smoke.test.js` (45 asserts, 5 seções A–E). Regressões: PR13 91/91 ✅, PR14 183/183 ✅. Total 319/319 sem regressão.
 
 ## Contrato ativo
 
@@ -15,6 +15,17 @@
 | `CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ |
 | `CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ |
 | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Ativo 🟢 |
+
+## Implementação formalizada em PR18
+
+- Import `advanceContractPhase` adicionado em `nv-enavia.js`.
+- `buildOperationalAction`: `phase_complete` → `advance_phase` (não mais `block`); `EVIDENCE_MAP.advance_phase = ["contract_id"]`.
+- `handleGetLoopStatus`: `availableActions = ["POST /contracts/advance-phase"]` em `phase_complete`; guidance reescrita.
+- Novo handler `handleAdvancePhase`: valida JSON + `contract_id`, delega para `advanceContractPhase`, mapeia para 200/400/409/500.
+- Nova rota `POST /contracts/advance-phase` (próxima a `/contracts/complete-task`).
+- Help text atualizado.
+- Novo smoke test `tests/pr18-advance-phase-endpoint.smoke.test.js`: 45/45 ✅ (cobre input inválido, happy path, gate bloqueado, integração com loop-status, isolamento de execute-next).
+- `contract-executor.js` NÃO foi alterado (função já estava completa).
 
 ## Diagnóstico formalizado em PR17
 
