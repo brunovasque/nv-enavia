@@ -1,12 +1,12 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR32 — diagnóstico do chat engessado)
-**Branch ativa:** `copilot/claude-pr32-diag-chat-engessado-jarvis-brain`
-**Última tarefa:** PR32 — PR-DIAG — Diagnóstico READ-ONLY do chat engessado. Causa raiz identificada com evidência de arquivo:linha. Matriz de lacunas e recomendação para PR33 documentadas em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR33 — ajuste do contrato pós-diagnóstico PR32)
+**Branch ativa:** `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`
+**Última tarefa:** PR33 — PR-DOCS — Ajuste do contrato CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md com base nas descobertas da PR32. Nova Frente 2 corretiva inserida (PR33-PR36). Regras R1-R4 registradas. Obsidian Brain deslocado para PR37+. Contrato ampliado para PR31-PR64. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
-**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — Ativo 🟢
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — Ativo 🟢 (ampliado para PR31-PR64)
 
 **Objetivo do contrato:** Transformar a Enavia de sistema governado/documental em uma IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first.
 
@@ -14,7 +14,7 @@
 
 **Sistema operacional:** Estável. Runtime não alterado. Loop contratual supervisionado funcional.
 
-## Causa raiz do chat engessado (PR32)
+## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
 A Enavia responde como bot porque:
 1. O painel sempre coloca o sistema em "MODO OPERACIONAL ATIVO read_only" via target default (`panel/src/chat/useTargetState.js:35-49`).
@@ -25,9 +25,11 @@ A Enavia responde como bot porque:
 
 Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
+**Correção contratual (PR33):** O contrato foi atualizado com Regras R1-R4 para garantir que o Brain seja construído sobre a base correta. O Obsidian Brain não pode ser construído antes da correção conceitual. PR34 diagnosticará especificamente read_only, target default e sanitizers.
+
 ## Próxima PR autorizada
 
-**PR33 — PR-DOCS — Arquitetura do Obsidian Brain.**
+**PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers.**
 
 ## Histórico de contratos
 

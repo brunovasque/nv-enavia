@@ -1,8 +1,92 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR32 — PR-DIAG — Diagnóstico do chat engessado
-**Para:** PR33 — PR-DOCS — Arquitetura do Obsidian Brain
+**De:** PR33 — PR-DOCS — Ajuste do contrato Jarvis Brain após diagnóstico PR32
+**Para:** PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers
+
+## O que foi feito nesta sessão
+
+### PR33 — PR-DOCS — Ajuste do contrato pós-diagnóstico PR32
+
+**Tipo:** `PR-DOCS` (sem alteração de runtime)
+**Branch:** `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`
+
+**Arquivos atualizados:**
+
+1. **`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`** (ATUALIZADO):
+   - Título atualizado: PR31–PR64 (era PR31–PR60).
+   - Seção 0: próxima PR autorizada → PR34.
+   - Seção 4: Regras R1-R4 adicionadas após a tabela de ações.
+   - Seção 5: Nova Frente 2 corretiva (PR33-PR36) inserida. Frentes 2–12 renumeradas para 3–13. PRs 33-60 renumeradas para 37-64.
+   - Seção 6: Detalhamento completo de PR33, PR34, PR35, PR36 adicionado. Todos os blocos PR33→PR37, PR34→PR38, ..., PR60→PR64 renumerados. Notas sobre diagnóstico PR32 adicionadas em PR37, PR38, PR39, PR44, PR46.
+   - Seção 7: "a partir da PR33" → "a partir da PR37".
+   - Seção 11: Nota de atualização pós-PR33 adicionada no final.
+
+2. **`schema/contracts/INDEX.md`** (ATUALIZADO):
+   - Próxima PR autorizada → PR34.
+   - PR33 marcada como concluída.
+   - PRs do contrato: PR31-PR64.
+
+3. **`schema/status/ENAVIA_STATUS_ATUAL.md`** (ATUALIZADO):
+   - Última tarefa: PR33.
+   - Branch: copilot/claudepr33.
+   - Próxima PR: PR34.
+   - Contexto das Regras R1-R4 adicionado.
+
+4. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo):
+   - Handoff atualizado de PR33 para PR34.
+
+5. **`schema/execution/ENAVIA_EXECUTION_LOG.md`** (ATUALIZADO):
+   - Bloco PR33 adicionado no topo.
+
+6. **`schema/reports/PR33_AJUSTE_CONTRATO_JARVIS_POS_DIAGNOSTICO.md`** (NOVO):
+   - Relatório curto da PR33.
+
+**Arquivos NÃO alterados:**
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding ou KV alterado.
+- Nenhum endpoint criado.
+- Nenhum prompt do runtime modificado.
+- Nenhum brain/Intent Engine/Skill Router implementado.
+
+## Causa raiz e regras derivadas do diagnóstico PR32
+
+Registradas no contrato como Regras R1-R4:
+
+- **R1:** `read_only` é bloqueio de execução, NÃO regra de tom. A Enavia conversa livremente mesmo em read_only.
+- **R2:** Sanitizadores pós-LLM não podem substituir resposta viva legítima por fallback robótico.
+- **R3:** Target operacional não deve transformar toda conversa em modo operacional. Intent Engine decide o tom.
+- **R4:** O Brain (PR37+) nasce ciente do incidente `chat-engessado-readonly` (PR32).
+
+## Contrato ativo
+
+`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — **Ativo 🟢** (ampliado para PR31-PR64)
+
+## Próxima ação autorizada
+
+**PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers**
+
+### O que a PR34 deve investigar
+
+- `useTargetState.js:35-49` — como o painel força `read_only` por default e qual o impacto exato
+- `nv-enavia.js:4097-4099` — como `read_only` vira instrução de tom no runtime
+- `schema/enavia-cognitive-runtime.js:239-241` — instrução de tom derivada de `read_only`
+- `nv-enavia.js:3530-3583` — `_sanitizeChatReply` e como/quando substitui respostas
+- `nv-enavia.js:4177, 4397-4401` — outros sanitizadores/filtros
+- `schema/enavia-cognitive-runtime.js:319-326` — envelope JSON `{reply, use_planner}`
+- Impacto de cada um no comportamento final
+
+### Entrega esperada da PR34
+
+`schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`
+
+## Bloqueios
+
+- nenhum
+
+
 
 ## O que foi feito nesta sessão
 
