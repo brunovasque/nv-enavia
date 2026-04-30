@@ -1,8 +1,92 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
-**De:** PR31 — PR-DOCS — Ativação do contrato ENAVIA JARVIS BRAIN v1
-**Para:** PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada
+**De:** PR32 — PR-DIAG — Diagnóstico do chat engessado
+**Para:** PR33 — PR-DOCS — Arquitetura do Obsidian Brain
+
+## O que foi feito nesta sessão
+
+### PR32 — PR-DIAG — Diagnóstico READ-ONLY do chat engessado
+
+**Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
+**Branch:** `copilot/claude-pr32-diag-chat-engessado-jarvis-brain`
+
+**Arquivos criados:**
+
+1. **`schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`** (NOVO):
+   - Relatório com 18 seções obrigatórias + Anexo A.
+   - Mapeamento ponta-a-ponta do fluxo `/chat/run` (painel → worker → LLM → display).
+   - Causa raiz documentada com evidência de arquivo:linha.
+   - Matriz de lacunas (12 itens) ligadas a PRs do contrato Jarvis Brain.
+   - Riscos de implementar Brain/LLM Core/Skill Router sem corrigir causa raiz.
+   - Recomendação confirmada para PR33 — sem bloqueios.
+
+**Arquivos atualizados:**
+
+2. **`schema/contracts/INDEX.md`**:
+   - "Próxima PR autorizada" → PR33 — PR-DOCS — Arquitetura do Obsidian Brain.
+   - PR31 e PR32 marcadas como concluídas.
+
+3. **`schema/status/ENAVIA_STATUS_ATUAL.md`**:
+   - PR32 registrada como última tarefa.
+   - Causa raiz do chat engessado resumida com referências de arquivo:linha.
+   - Próxima PR: PR33.
+
+4. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo):
+   - Handoff atualizado de PR32 para PR33.
+
+5. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**:
+   - Bloco PR32 adicionado no topo.
+
+**Arquivos NÃO alterados:**
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+- Nenhum arquivo `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum teste criado ou modificado.
+- Nenhum secret, binding ou KV alterado.
+- Nenhum endpoint criado.
+- Nenhum prompt do runtime modificado.
+- Nenhum brain/Intent Engine/Skill Router implementado.
+
+## Causa raiz identificada (evidência completa em PR32_CHAT_ENGESSADO_DIAGNOSTICO.md)
+
+A Enavia responde como bot porque (a) o painel sempre coloca o sistema em "MODO OPERACIONAL ATIVO read_only" via target default (`panel/src/chat/useTargetState.js:35-49`); (b) o prompt traduz `read_only` como regra de tom em vez de bloqueio de execução (`nv-enavia.js:4097-4099`, `schema/enavia-cognitive-runtime.js:239-241`); (c) não existe LLM Core / Intent Engine / Skill Router / Brain conectado ao runtime (`grep -i "skill\|jarvis\|intent.engine\|skill.router" nv-enavia.js` = 0 resultados); (d) dois sanitizadores pós-LLM podem substituir respostas vivas por frases robóticas fixas (`nv-enavia.js:3530-3583, 4177, 4397-4401`); (e) o contrato JSON `{reply, use_planner}` força respostas curtas estruturadas (`schema/enavia-cognitive-runtime.js:319-326`).
+
+## Contrato ativo
+
+`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — **Ativo 🟢**
+
+## Próxima ação autorizada
+
+**PR33 — PR-DOCS — Arquitetura do Obsidian Brain**
+
+### O que a PR33 deve criar (seções 5–6 do contrato, linhas 105-111 e 246-262)
+
+- `schema/brain/INDEX.md`
+- `schema/brain/GRAPH.md`
+- `schema/brain/MEMORY_RULES.md`
+- `schema/brain/RETRIEVAL_POLICY.md`
+- `schema/brain/UPDATE_POLICY.md`
+- `schema/brain/SYSTEM_AWARENESS.md`
+- Pastas: `maps/`, `decisions/`, `contracts/`, `memories/`, `incidents/`, `learnings/`, `open-questions/`, `self-model/`
+
+### Recomendações **não bloqueantes** da PR32 para a equipe da PR33
+
+(Para conhecimento — não alteram o escopo da PR33 definido no contrato)
+
+1. `SYSTEM_AWARENESS.md` deve cobrir 4 dimensões reais: contratos, estado, sistema, skills — cada uma com fonte explícita.
+2. `MEMORY_RULES.md` deve diferenciar regra operacional ↔ personalidade ↔ checklist (causa raiz #2 surgiu por falta dessa separação).
+3. `RETRIEVAL_POLICY.md` deve antecipar PR42 (Intent Engine): o que carregar para `conversation` vs `planning` vs `pr_review` vs `system_question`.
+4. `self-model/how-to-answer.md` deve registrar explicitamente que `read_only` é bloqueio de execução, NÃO regra de tom.
+5. `incidents/chat-engessado-readonly.md` é o incidente real diagnosticado nesta PR32 — referenciar para que PR40 (LLM Core) e PR49 (Self-Audit) possam recuperar a evidência.
+
+### Entrega esperada da PR33
+
+Estrutura completa de `schema/brain/` criada, conforme contrato. Tipo: PR-DOCS, sem alteração de runtime.
+
+## Bloqueios
+
+- nenhum
+
 
 ## O que foi feito nesta sessão
 

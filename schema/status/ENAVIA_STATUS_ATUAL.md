@@ -1,22 +1,33 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR31 — ativação do contrato ENAVIA JARVIS BRAIN v1)
-**Branch ativa:** `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`
-**Última tarefa:** PR31 — PR-DOCS — Ativação do contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`. Novo contrato ativo criado. Governança atualizada. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR32 — diagnóstico do chat engessado)
+**Branch ativa:** `copilot/claude-pr32-diag-chat-engessado-jarvis-brain`
+**Última tarefa:** PR32 — PR-DIAG — Diagnóstico READ-ONLY do chat engessado. Causa raiz identificada com evidência de arquivo:linha. Matriz de lacunas e recomendação para PR33 documentadas em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`. Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
 **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — Ativo 🟢
 
-**Objetivo do novo contrato:** Transformar a Enavia de sistema governado/documental em uma IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first.
+**Objetivo do contrato:** Transformar a Enavia de sistema governado/documental em uma IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first.
 
 **Frase central:** "A Enavia pensa livremente, lembra com estrutura, sugere com inteligência e executa somente com governança."
 
 **Sistema operacional:** Estável. Runtime não alterado. Loop contratual supervisionado funcional.
 
+## Causa raiz do chat engessado (PR32)
+
+A Enavia responde como bot porque:
+1. O painel sempre coloca o sistema em "MODO OPERACIONAL ATIVO read_only" via target default (`panel/src/chat/useTargetState.js:35-49`).
+2. O prompt traduz `read_only` como regra de tom em vez de bloqueio de execução (`nv-enavia.js:4097-4099`, `schema/enavia-cognitive-runtime.js:239-241`).
+3. Não existe LLM Core / Intent Engine / Skill Router / Brain conectado ao runtime — apenas um prompt monolítico orientado a governança (`schema/enavia-cognitive-runtime.js:93-329`).
+4. Dois sanitizadores pós-LLM substituem respostas vivas por frases robóticas fixas (`nv-enavia.js:3530-3583, 4177, 4397-4401`).
+5. O contrato JSON `{reply, use_planner}` força respostas curtas estruturadas (`schema/enavia-cognitive-runtime.js:319-326`).
+
+Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
+
 ## Próxima PR autorizada
 
-**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada.**
+**PR33 — PR-DOCS — Arquitetura do Obsidian Brain.**
 
 ## Histórico de contratos
 
@@ -56,9 +67,9 @@
 
 ## Próxima etapa
 
-**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada.**
+**PR33 — PR-DOCS — Arquitetura do Obsidian Brain.**
 
-Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 concluída. Loop contratual reativado.
+Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 (DOCS) e PR32 (DIAG) concluídas. Loop contratual em sequência. Próxima entrega esperada: estrutura completa de `schema/brain/` (INDEX, GRAPH, MEMORY_RULES, RETRIEVAL_POLICY, UPDATE_POLICY, SYSTEM_AWARENESS + pastas `maps/`, `decisions/`, `contracts/`, `memories/`, `incidents/`, `learnings/`, `open-questions/`, `self-model/`).
 
 
 

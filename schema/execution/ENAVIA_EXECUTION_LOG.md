@@ -4,6 +4,70 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR32 — PR-DIAG — Diagnóstico do chat engessado
+
+- **Branch:** `copilot/claude-pr32-diag-chat-engessado-jarvis-brain`
+- **Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR31 ✅ (contrato Jarvis Brain ativado, mergeada)
+- **Escopo:** Docs-only. Diagnóstico read-only do chat. Nenhum runtime, endpoint, teste, prompt, brain, skill ou intent engine alterado/criado.
+
+### Objetivo
+
+Diagnosticar, em modo READ-ONLY, por que a Enavia responde como bot/checklist e não como IA estratégica LLM-first. Mapear o fluxo real do chat painel→worker, identificar a causa raiz com evidência de arquivo:linha e produzir matriz de lacunas que ancore as PRs subsequentes do contrato Jarvis Brain.
+
+### Arquivos criados
+
+- **`schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`** (NOVO):
+  - 18 seções obrigatórias + Anexo A (verificações de aderência).
+  - Mapeamento ponta-a-ponta: 19 passos do fluxo, 11 funções-chave catalogadas com arquivo:linha.
+  - Análise dos 3 blocos de prompt do `/chat/run` (chatSystemPrompt 8 seções + _pr3MemoryBlock + _operationalContextBlock).
+  - Análise de payload do painel: `panel/src/api/endpoints/chat.js`, `useTargetState`, `ChatPage.jsx:buildContext`.
+  - Causa raiz identificada (5 fatores compostos).
+  - Matriz de lacunas (12 itens) ligadas a PRs PR33–PR60.
+  - Riscos de implementar Brain/LLM Core/Skill Router sem corrigir causa raiz.
+  - Recomendação confirmada para PR33 + 5 observações não-bloqueantes.
+
+### Arquivos atualizados
+
+- **`schema/contracts/INDEX.md`**: "Próxima PR autorizada" → PR33 — PR-DOCS — Arquitetura do Obsidian Brain. PR31 e PR32 marcadas como concluídas.
+- **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR32 registrada. Causa raiz resumida com referências `arquivo:linha`. Próxima PR: PR33.
+- **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`**: handoff atualizado de PR32 para PR33 + resumo da causa raiz + recomendações não-bloqueantes para PR33.
+- **`schema/execution/ENAVIA_EXECUTION_LOG.md`** (este arquivo): bloco PR32 adicionado no topo.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`, `tests/`.
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum endpoint criado. Nenhum teste criado. Nenhum prompt do runtime modificado. Nenhum brain implementado. Nenhum secret/binding/KV alterado.
+
+### Causa raiz (resumo)
+
+A Enavia responde como bot porque:
+1. Painel sempre envia `target.mode = "read_only"` por default (`panel/src/chat/useTargetState.js:35-49`, `ALLOWED_MODES = ["read_only"]`).
+2. `read_only` é interpretado como REGRA DE TOM, não como bloqueio de execução (`nv-enavia.js:4097-4099`, `schema/enavia-cognitive-runtime.js:239-241`).
+3. Não existe LLM Core / Intent Engine / Skill Router / Brain — só prompt monolítico orientado a governança (`schema/enavia-cognitive-runtime.js:93-329`; `grep -i "skill\|jarvis\|intent.engine" nv-enavia.js` = 0).
+4. Sanitizadores pós-LLM substituem reply vivo por frase robótica fixa (`nv-enavia.js:_sanitizeChatReply 3530-3545`, `_isManualPlanReply 3572-3583, 4397-4401`).
+5. Contrato JSON `{reply, use_planner}` força respostas curtas estruturadas (`schema/enavia-cognitive-runtime.js:319-326`).
+
+### Smoke / verificações
+
+- `git diff --name-only` → apenas `.md` em `schema/reports/`, `schema/status/`, `schema/handoffs/`, `schema/execution/`, `schema/contracts/INDEX.md`.
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado. ✅
+- Relatório PR32 existe e contém evidências de arquivos/funções/rotas. ✅
+- Status, handoff e execution log atualizados. ✅
+- INDEX.md aponta PR33 como próxima PR autorizada. ✅
+
+### Próxima PR autorizada
+
+**PR33 — PR-DOCS — Arquitetura do Obsidian Brain.**
+
+### Bloqueios
+
+- nenhum
+
+---
+
 ## 2026-04-30 — PR31 — PR-DOCS — Ativação do contrato ENAVIA JARVIS BRAIN v1
 
 - **Branch:** `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`

@@ -43,9 +43,14 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada**
+**PR33 — PR-DOCS — Arquitetura do Obsidian Brain**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+### PRs do contrato Jarvis Brain já concluídas
+
+- **PR31** ✅ (PR-DOCS) — Ativação do contrato Jarvis Brain v1. Governança religada. Nenhum runtime alterado.
+- **PR32** ✅ (PR-DIAG) — Diagnóstico do chat engessado. Causa raiz identificada (target default + read_only como tom + ausência de LLM Core/Intent/Skill Router/Brain + sanitizers pós-LLM + envelope JSON). Relatório: `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`. Nenhum runtime alterado.
 
 ### Histórico do contrato encerrado (PR17–PR30)
 
