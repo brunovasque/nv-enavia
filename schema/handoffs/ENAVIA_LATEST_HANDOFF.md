@@ -1,6 +1,113 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-04-30
+**De:** PR34 — PR-DIAG — Diagnóstico profundo de `read_only`, `target` default e sanitizers/fallbacks
+**Para:** PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução
+
+## O que foi feito nesta sessão
+
+### PR34 — PR-DIAG — Diagnóstico profundo (READ-ONLY)
+
+**Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
+**Branch:** `copilot/claude-pr34-diag-readonly-target-sanitizers`
+
+**Arquivos criados:**
+
+1. **`schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`** (NOVO):
+   - Estrutura completa: 20 seções obrigatórias + critérios de aceite.
+   - Ancorado em arquivo:linha real do commit corrente (sem drift vs PR32).
+   - Mapeamento ponta-a-ponta de `read_only` (3 camadas: painel, Worker, runtime cognitivo).
+   - Mapeamento ponta-a-ponta de `target` default (sempre presente, ativa 3 blocos operacionais).
+   - Mapeamento ponta-a-ponta dos 5 sanitizers/fallbacks (F1: `_sanitizeChatReply`, F2: `_isManualPlanReply`+`_MANUAL_PLAN_FALLBACK`, F3: plain-text, F4: painel display, F5: bridge bloqueada).
+   - Análise do envelope `{reply, use_planner}` e suas proibições (markdown, headers, plano).
+   - Análise da relação planner vs conversa (`shouldActivatePlanner`, override por termos hardcoded).
+   - Causa técnica refinada em **7 camadas** (origem painel → leitura Worker → tradução semântica em prompts → geração LLM → pós-processamento sanitizers → envelope JSON → roteamento planner).
+   - Impacto em cada frente futura do Jarvis Brain (Brain, Self Model, LLM Core, Intent Engine, Skill Router, Response Policy, Self-Audit).
+   - Recomendações conceituais (sem código) para PR35 (Mode Policy: 3 modos canônicos + separação tom/intenção/execução) e PR36 (Response Policy: redesenhar sanitizers + relaxar envelope + telemetria visível).
+   - Sequência segura PR35 → PR36 → PR40 → PR42 → PR51 → PR52.
+
+**Arquivos atualizados (governança):**
+
+2. **`schema/contracts/INDEX.md`**: PR34 ✅. Próxima PR autorizada → PR35.
+3. **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR34 registrada. Próxima PR: PR35. Resumo do refinamento em 7 camadas.
+4. **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`** (este arquivo): handoff atualizado de PR34 para PR35.
+5. **`schema/execution/ENAVIA_EXECUTION_LOG.md`**: bloco PR34 adicionado no topo.
+
+**Arquivos NÃO alterados (proibidos pelo escopo desta PR):**
+
+- `nv-enavia.js` ✅ (não tocado)
+- `schema/enavia-cognitive-runtime.js` ✅ (não tocado)
+- `schema/enavia-identity.js`, `schema/enavia-capabilities.js`, `schema/enavia-constitution.js` ✅
+- `schema/operational-awareness.js`, `schema/planner-classifier.js`, `schema/planner-output-modes.js`, `schema/memory-retrieval.js` ✅
+- `panel/src/chat/useTargetState.js` ✅ (não tocado)
+- `panel/src/pages/ChatPage.jsx` ✅ (não tocado)
+- `panel/src/api/endpoints/chat.js` ✅ (não tocado)
+- `panel/src/chat/useChatState.js` ✅ (não tocado)
+- Nenhum sanitizer alterado.
+- Nenhum prompt real alterado.
+- Nenhum endpoint criado.
+- Nenhum teste criado.
+- Nenhum Brain/LLM Core/Intent Engine/Skill Router criado.
+- Nenhum deploy. Nenhuma alteração em produção.
+- PR35 NÃO iniciada nesta PR.
+
+## Próxima ação autorizada
+
+**PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução**
+
+### O que a PR35 deve produzir
+
+- Documento de política de modos (em `schema/policies/` ou pasta acordada pelo contrato), em português, sem alteração de runtime.
+- Definição dos 3 modos canônicos: `conversation`, `diagnosis`, `execution`.
+- Separação explícita entre 3 planos: capacidade de execução ↔ intenção da mensagem ↔ tom da resposta.
+- Redefinição de `read_only` como **bloqueio de execução** (gate determinístico futuro), nunca como regra de tom.
+- Política de ativação condicional do bloco operacional (só em `deploy_decision`/`execution_request`/`pr_review-com-execução`).
+- Política de `read_only` no prompt: nota factual, sem instrução de fala defensiva.
+- Registro de que `ALLOWED_MODES` no painel deve ser ampliado em contrato futuro de UI.
+
+### Pré-requisitos da PR35
+
+- PR34 mergeada ✅ (objetivo desta PR).
+- Diagnóstico PR34 disponível como referência conceitual.
+- Contrato ativo PR31-PR64 com Regras R1-R4 já registradas.
+
+### Entrega esperada da PR35
+
+Documento(s) markdown definindo a Mode Policy. Sem `.js`/`.ts`/`.jsx`/`.tsx`/`.toml`/`.yml` alterados. Sem implementação. Sem teste.
+
+## Causa técnica refinada (PR34)
+
+A causa-raiz da PR32 foi refinada em **7 camadas que se reforçam**:
+
+1. **Origem (painel):** `DEFAULT_TARGET.mode = "read_only"` + `ALLOWED_MODES = ["read_only"]` + `buildContext()` sempre incluindo `target`.
+2. **Leitura (Worker):** `hasTarget=true ⇒ isOperationalContext=true` ativa 3 blocos operacionais simultaneamente.
+3. **Tradução semântica (prompts):** `read_only` injetado como string textual ("não sugira", "foque exclusivamente em validação e leitura") em `nv-enavia.js:4097-4099` e `enavia-cognitive-runtime.js:239-241`.
+4. **Geração (LLM):** o LLM cumpre as instruções de tom defensivo.
+5. **Pós-processamento (sanitizers):** Layer 1 (`_sanitizeChatReply` ≥3 termos planner) e Layer 2 (`_isManualPlanReply` ≥2 padrões estruturais) podem destruir reply vivo.
+6. **Envelope JSON:** `{reply, use_planner}` + proibições de markdown/headers/plano constrangem expressividade.
+7. **Roteamento (planner):** `shouldActivatePlanner` ativa por palavras-chave (não por intenção); plano vai para `plannerSnapshot` que o painel não exibe de forma viva.
+
+## Regras R1-R4 (do contrato, registradas em PR33)
+
+- **R1:** `read_only` é bloqueio de execução, NÃO regra de tom. **Confirmada e detalhada na PR34 (§4–§7).**
+- **R2:** Sanitizadores pós-LLM não podem substituir resposta viva legítima por fallback robótico. **Confirmada e detalhada na PR34 (§10–§11).**
+- **R3:** Target operacional não deve transformar toda conversa em modo operacional. Intent Engine decide o tom. **Confirmada e detalhada na PR34 (§8–§9).**
+- **R4:** O Brain (PR37+) nasce ciente do incidente `chat-engessado-readonly`. **Reafirmada na PR34 (§15).**
+
+## Contrato ativo
+
+`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — **Ativo 🟢** (ampliado para PR31-PR64)
+
+## Bloqueios
+
+- nenhum
+
+---
+
+## Histórico — PR33 — PR-DOCS — Ajuste do contrato Jarvis Brain após diagnóstico PR32
+
+(handoff anterior preservado abaixo para referência)
+
 **De:** PR33 — PR-DOCS — Ajuste do contrato Jarvis Brain após diagnóstico PR32
 **Para:** PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers
 

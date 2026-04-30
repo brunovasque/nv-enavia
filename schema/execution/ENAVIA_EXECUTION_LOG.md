@@ -4,6 +4,86 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR34 — PR-DIAG — Diagnóstico de read_only, target default e sanitizers
+
+- **Branch:** `copilot/claude-pr34-diag-readonly-target-sanitizers`
+- **Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢 — ampliado para PR31-PR64)
+- **PR anterior validada:** PR33 ✅ (PR-DOCS — ajuste do contrato pós-diagnóstico, mergeada)
+- **Escopo:** Docs/Reports-only. Diagnóstico técnico profundo + governança. Nenhum runtime, endpoint, teste, prompt, brain, skill ou intent engine alterado/criado.
+
+### Objetivo
+
+Diagnosticar em profundidade, em modo READ-ONLY, os 3 fatores técnicos que mais matam o comportamento LLM-first da Enavia: (1) `read_only` interpretado como regra de tom; (2) `target.mode` default do painel ativando contexto operacional para qualquer conversa; (3) sanitizers/fallbacks pós-LLM substituindo respostas vivas por frases robóticas fixas. Refinar a causa-raiz da PR32 e propor — sem implementar — recomendações conceituais para PR35 (Mode Policy) e PR36 (Response Policy).
+
+### Arquivos criados
+
+- **`schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`** (NOVO):
+  - 20 seções obrigatórias (objetivo, fontes, resumo executivo, mapa técnico de read_only, onde nasce, onde entra no prompt, impacto no tom, mapa do target default, ativação operacional, sanitizers, fallbacks robóticos, envelope JSON, planner vs conversa, causa técnica refinada, impacto nas próximas frentes, PR35, PR36, correções futuras, riscos, próximos passos).
+  - Causa técnica refinada em **7 camadas** (origem painel → leitura Worker → tradução semântica → geração LLM → sanitizers → envelope JSON → roteamento planner).
+  - Sequência segura: PR35 → PR36 → PR40 → PR42 → PR51 → PR52.
+
+### Arquivos atualizados (governança)
+
+- **`schema/contracts/INDEX.md`**: PR34 ✅ adicionada. Próxima PR autorizada → PR35.
+- **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR34 registrada. Próxima PR: PR35. Refinamento em 7 camadas resumido.
+- **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`**: handoff atualizado de PR34 para PR35. Histórico PR33→PR34 preservado.
+
+### Arquivos NÃO alterados (proibidos pelo escopo)
+
+- `nv-enavia.js`, `schema/enavia-cognitive-runtime.js`, `schema/enavia-identity.js`, `schema/enavia-capabilities.js`, `schema/enavia-constitution.js`, `schema/operational-awareness.js`, `schema/planner-classifier.js`, `schema/planner-output-modes.js`, `schema/memory-retrieval.js`.
+- `panel/src/chat/useTargetState.js`, `panel/src/pages/ChatPage.jsx`, `panel/src/api/endpoints/chat.js`, `panel/src/chat/useChatState.js`.
+- `contract-executor.js`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`, `tests/`.
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum sanitizer alterado. Nenhum prompt real alterado.
+- Nenhum endpoint criado. Nenhum teste criado. Nenhum brain/LLM Core/Intent Engine/Skill Router criado.
+- Nenhum deploy. Nenhuma alteração em produção. PR35 NÃO iniciada.
+
+### Confirmação das Regras R1-R4 (PR33)
+
+- **R1:** `read_only` = bloqueio de execução, NÃO regra de tom — confirmada com evidência arquivo:linha (§4–§7 do relatório).
+- **R2:** Sanitizadores pós-LLM destroem resposta viva legítima — confirmada com evidência (§10–§11).
+- **R3:** Target operacional ativa contexto operacional para qualquer conversa — confirmada com evidência (§8–§9).
+- **R4:** Brain (PR37+) precisa nascer ciente do incidente — reafirmada (§15).
+
+### Diagnóstico
+
+- **read_only:** nasce no painel (`useTargetState.js:36-47`), chega ao Worker via payload, é injetado como string textual no prompt em 2 lugares (`nv-enavia.js:4097-4099` + `enavia-cognitive-runtime.js:239-241`) com semântica de tom ("não sugira", "foque exclusivamente em validação e leitura"). Não existe gate determinístico de execução amarrado a `read_only`.
+- **target default:** `DEFAULT_TARGET.mode = "read_only"` + `ALLOWED_MODES = ["read_only"]` + `buildContext()` sempre incluindo `target` ⇒ `hasTarget = true` em toda mensagem ⇒ `isOperationalContext = true` ⇒ ativa seção 5c do prompt + `_operationalContextBlock` de alta recência + `operationalDefaultsUsed`. Não há diferenciação entre conversa e operação.
+- **sanitizers:** F1 (`_sanitizeChatReply` ≥3 termos planner → `"Entendido. Estou com isso — pode continuar."`), F2 (`_isManualPlanReply` ≥2 padrões estruturais E `shouldActivatePlanner` → `_MANUAL_PLAN_FALLBACK`), F3 (plain-text fallback → `"Instrução recebida."`), F4 (painel display → `"Instrução recebida. Processando."`). Frases fixas substituem reply silenciosamente.
+- **envelope:** `{reply, use_planner}` JSON obrigatório + proibições explícitas de markdown/headers/plano dentro do reply (`enavia-cognitive-runtime.js:284-291, 319-326`) constrangem expressividade.
+- **causa refinada:** 7 camadas reforçam-se mutuamente. Nenhuma é "bug" isolado; o conjunto garante comportamento de bot mesmo com LLM bom.
+
+### Recomendações
+
+- **PR35 (Mode Policy):** definir 3 modos canônicos (conversation/diagnosis/execution); separar capacidade de execução ↔ intenção ↔ tom; redefinir `read_only` como gate determinístico; ativação condicional do bloco operacional só em intenções de execução.
+- **PR36 (Response Policy):** redesenhar Layer 1 como detector de JSON-leak (não menção textual); Layer 2 desativada em diagnosis/planning; envelope com markdown permitido dentro do reply; telemetria visível de sanitização.
+- **PRs futuras:** sequência crítica PR35 → PR36 → PR40 (LLM Core) → PR42 (Intent Engine) → PR51 (Response Policy viva) → PR52 (anti-bot test).
+
+### Smoke / verificações
+
+- `git diff --name-only` → apenas `.md` em `schema/contracts/`, `schema/status/`, `schema/handoffs/`, `schema/execution/`, `schema/reports/`. ✅
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado. ✅
+- `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md` existe. ✅
+- Relatório contém evidência ancorada arquivo:linha de: read_only, target default, sanitizers, fallback, envelope `{reply, use_planner}`. ✅
+- Status, handoff e execution log atualizados. ✅
+- INDEX.md aponta PR35 como próxima PR autorizada. ✅
+- Branch sincronizada com `origin/main` (`be0a8b6`). ✅
+
+### Próxima PR autorizada
+
+**PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução**
+
+### Bloqueios
+
+- nenhum
+
+### Rollback
+
+- Reverter o commit desta PR. Apenas arquivos `.md` foram criados/atualizados. Nenhum runtime impactado. Risco operacional: zero.
+
+---
+
 ## 2026-04-30 — PR33 — PR-DOCS — Ajuste do contrato pós-diagnóstico PR32
 
 - **Branch:** `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`

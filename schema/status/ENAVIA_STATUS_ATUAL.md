@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR33 — ajuste do contrato pós-diagnóstico PR32)
-**Branch ativa:** `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`
-**Última tarefa:** PR33 — PR-DOCS — Ajuste do contrato CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md com base nas descobertas da PR32. Nova Frente 2 corretiva inserida (PR33-PR36). Regras R1-R4 registradas. Obsidian Brain deslocado para PR37+. Contrato ampliado para PR31-PR64. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR34 — diagnóstico profundo de read_only, target default e sanitizers)
+**Branch ativa:** `copilot/claude-pr34-diag-readonly-target-sanitizers`
+**Última tarefa:** PR34 — PR-DIAG — Diagnóstico técnico profundo dos 3 fatores que mais matam o comportamento LLM-first da Enavia: (1) `read_only` interpretado como regra de tom; (2) `target.mode` default do painel ativando contexto operacional para qualquer conversa; (3) sanitizers/fallbacks pós-LLM substituindo respostas vivas por frases robóticas fixas. Causa técnica refinada em 7 camadas. Recomendações conceituais para PR35 (Mode Policy) e PR36 (Response Policy). Nenhum runtime alterado.
 
 ## Estado atual do sistema
 
@@ -25,11 +25,13 @@ A Enavia responde como bot porque:
 
 Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
-**Correção contratual (PR33):** O contrato foi atualizado com Regras R1-R4 para garantir que o Brain seja construído sobre a base correta. O Obsidian Brain não pode ser construído antes da correção conceitual. PR34 diagnosticará especificamente read_only, target default e sanitizers.
+**Correção contratual (PR33):** O contrato foi atualizado com Regras R1-R4 para garantir que o Brain seja construído sobre a base correta. O Obsidian Brain não pode ser construído antes da correção conceitual. PR34 diagnosticou especificamente read_only, target default e sanitizers.
+
+**Diagnóstico PR34 (refinamento):** A causa técnica foi refinada em 7 camadas (origem no painel → leitura no Worker → tradução semântica em prompts → geração no LLM → pós-processamento por sanitizers → constrangimento por envelope JSON → roteamento por planner). Recomendações conceituais para PR35 (Mode Policy: separar tom ↔ intenção ↔ execução) e PR36 (Response Policy: redesenhar sanitizers e relaxar envelope). Detalhes em `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers.**
+**PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução.**
 
 ## Histórico de contratos
 
