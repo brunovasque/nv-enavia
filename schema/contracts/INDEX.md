@@ -11,7 +11,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 |-------|-------|
 | **Arquivo** | `active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` |
 | **Estado** | Ativo 🟢 |
-| **PRs** | PR31–PR60 |
+| **PRs** | PR31–PR64 (ampliado de PR31-PR60 pela PR33) |
 | **Data de início** | 2026-04-30 |
 | **Objetivo** | Transformar a Enavia em IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit |
 
@@ -43,7 +43,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR33 — PR-DOCS — Arquitetura do Obsidian Brain**
+**PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
@@ -51,6 +51,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
 - **PR31** ✅ (PR-DOCS) — Ativação do contrato Jarvis Brain v1. Governança religada. Nenhum runtime alterado.
 - **PR32** ✅ (PR-DIAG) — Diagnóstico do chat engessado. Causa raiz identificada (target default + read_only como tom + ausência de LLM Core/Intent/Skill Router/Brain + sanitizers pós-LLM + envelope JSON). Relatório: `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`. Nenhum runtime alterado.
+- **PR33** ✅ (PR-DOCS) — Ajuste do contrato após diagnóstico PR32. Nova Frente 2 corretiva inserida (PR33-PR36). Regras R1-R4 adicionadas. Obsidian Brain deslocado para PR37+. Contrato ampliado para PR31-PR64. Nenhum runtime alterado.
 
 ### Histórico do contrato encerrado (PR17–PR30)
 

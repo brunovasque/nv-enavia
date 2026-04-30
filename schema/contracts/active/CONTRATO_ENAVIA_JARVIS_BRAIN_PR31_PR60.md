@@ -1,4 +1,4 @@
-# CONTRATO — ENAVIA JARVIS BRAIN v1 — PR31 a PR60
+# CONTRATO — ENAVIA JARVIS BRAIN v1 — PR31 a PR64
 
 ---
 
@@ -10,7 +10,7 @@
 | **Data de início** | 2026-04-30 |
 | **Contrato anterior** | `CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` — Encerrado ✅ |
 | **Objetivo** | Criar cérebro vivo da Enavia com LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first |
-| **Próxima PR autorizada** | PR32 — PR-DIAG — Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada |
+| **Próxima PR autorizada** | PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers |
 
 ---
 
@@ -91,9 +91,32 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
 | Memória inventada | 🔴 Proibido |
 | Afirmação sobre sistema sem fonte | 🔴 Proibido |
 
+### Regras adicionais derivadas do diagnóstico PR32
+
+> **Regra R1 — read_only é bloqueio de execução, não regra de tom**
+>
+> O parâmetro `read_only` significa apenas que a Enavia não pode executar ações com efeito colateral (deploy, escrita, mutação de estado). Não significa que ela deve adotar tom operacional rígido, responder como bot de checklist, ou suprimir raciocínio vivo.
+> A Enavia continua livre para conversar, raciocinar, explicar, acolher, discordar, diagnosticar, planejar e responder como IA estratégica mesmo em modo `read_only`.
+> Qualquer prompt, runtime, sanitizador ou regra que interprete `read_only` como restrição de tom está ERRADO e deve ser corrigido.
+
+> **Regra R2 — Sanitizadores pós-LLM não podem destruir resposta viva legítima**
+>
+> Sanitizadores pós-LLM existem para bloquear vazamento de JSON interno, envelope `{reply, use_planner}`, blocos de planner não solicitados e output de debug. Eles NÃO devem substituir resposta estratégica legítima por fallback robótico quando a resposta for útil e coerente.
+> Se um sanitizador substitui uma resposta viva por uma frase fixa como "Não posso executar isso em modo read_only", ele está causando o problema que este contrato existe para resolver.
+
+> **Regra R3 — Target operacional não transforma toda conversa em modo operacional**
+>
+> O painel envia `target.mode = "read_only"` por default para qualquer mensagem. Isso não deve ativar automaticamente tom operacional para conversas comuns.
+> O Intent Engine deve decidir se a mensagem é conversa, diagnóstico, planejamento, revisão de PR, deploy ou execução ANTES de aplicar qualquer tom operacional.
+> Toda mensagem de conversa deve ser tratada como conversa até que a intenção indique algo diferente.
+
+> **Regra R4 — O Brain nasce ciente do incidente chat-engessado-readonly**
+>
+> A estrutura do Obsidian Brain (PR37+) deve ser desenhada levando em conta o diagnóstico da PR32. O incidente `chat-engessado-readonly` deve ser registrado em `schema/brain/incidents/chat-engessado-readonly.md` para que PR44 (LLM Core) e PR53 (Self-Audit) possam recuperar a evidência. O self-model deve ensinar a Enavia a responder como IA estratégica antes de estruturar ação operacional.
+
 ---
 
-## 5. Escopo geral PR31–PR60
+## 5. Escopo geral PR31–PR64
 
 ### Frente 1 — Ativação e diagnóstico do chat engessado
 
@@ -102,88 +125,99 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
 | PR31 | PR-DOCS | Ativar contrato Jarvis Brain v1 |
 | PR32 | PR-DIAG | Diagnóstico do chat atual, memória atual, prompts, modos e causa da resposta engessada |
 
-### Frente 2 — Obsidian Brain completo
+### Frente 2 — Correção conceitual do Chat Runtime antes do Brain
+
+> Esta frente foi inserida após o diagnóstico PR32, que revelou fatores estruturais que precisam ser resolvidos antes de construir sobre o Brain. Sem esta correção conceitual, o Brain seria construído sobre uma base com interpretação errada de read_only, sanitizadores destrutivos e target default inadequado.
 
 | PR | Tipo | Objetivo |
 |----|------|----------|
-| PR33 | PR-DOCS | Arquitetura do Obsidian Brain |
-| PR34 | PR-DOCS | Self Model da Enavia |
-| PR35 | PR-DOCS | Migrar conhecimento consolidado para Brain |
+| PR33 | PR-DOCS | Ajuste do contrato após diagnóstico PR32 (esta PR) |
+| PR34 | PR-DIAG | Diagnóstico específico de read_only, target default e sanitizers |
+| PR35 | PR-DOCS | Política correta de modos: conversa vs diagnóstico vs execução |
+| PR36 | PR-DOCS | Especificação da Response Policy viva e anti-bot |
 
-### Frente 3 — Memory Runtime read-only
-
-| PR | Tipo | Objetivo |
-|----|------|----------|
-| PR36 | PR-DIAG | Diagnóstico da memória atual no runtime |
-| PR37 | PR-IMPL | Brain Loader read-only |
-| PR38 | PR-PROVA | Provar Brain Loader |
-
-### Frente 4 — LLM Core vivo
+### Frente 3 — Obsidian Brain completo
 
 | PR | Tipo | Objetivo |
 |----|------|----------|
-| PR39 | PR-DIAG | Diagnóstico do prompt atual do chat |
-| PR40 | PR-IMPL | LLM Core v1 |
-| PR41 | PR-PROVA | Teste de resposta viva |
+| PR37 | PR-DOCS | Arquitetura do Obsidian Brain |
+| PR38 | PR-DOCS | Self Model da Enavia |
+| PR39 | PR-DOCS | Migrar conhecimento consolidado para Brain |
 
-### Frente 5 — Intent Engine
-
-| PR | Tipo | Objetivo |
-|----|------|----------|
-| PR42 | PR-IMPL | Classificador de intenção |
-| PR43 | PR-PROVA | Teste de intenção |
-
-### Frente 6 — Skill Router cognitivo
+### Frente 4 — Memory Runtime read-only
 
 | PR | Tipo | Objetivo |
 |----|------|----------|
-| PR44 | PR-IMPL | Skill Router read-only |
-| PR45 | PR-PROVA | Teste de roteamento de skills |
+| PR40 | PR-DIAG | Diagnóstico da memória atual no runtime |
+| PR41 | PR-IMPL | Brain Loader read-only |
+| PR42 | PR-PROVA | Provar Brain Loader |
 
-### Frente 7 — Memory Retrieval inteligente
-
-| PR | Tipo | Objetivo |
-|----|------|----------|
-| PR46 | PR-IMPL | Retrieval por intenção |
-| PR47 | PR-PROVA | Testes de memória contextual |
-
-### Frente 8 — Self-Audit e descoberta de falhas
+### Frente 5 — LLM Core vivo
 
 | PR | Tipo | Objetivo |
 |----|------|----------|
-| PR48 | PR-DOCS | Self-Audit Framework |
-| PR49 | PR-IMPL | Self-Audit read-only |
-| PR50 | PR-PROVA | Self-Audit encontra lacunas reais |
+| PR43 | PR-DIAG | Diagnóstico do prompt atual do chat |
+| PR44 | PR-IMPL | LLM Core v1 |
+| PR45 | PR-PROVA | Teste de resposta viva |
 
-### Frente 9 — Conversa LLM-first com governança
-
-| PR | Tipo | Objetivo |
-|----|------|----------|
-| PR51 | PR-IMPL | Response Policy viva |
-| PR52 | PR-PROVA | Teste anti-bot |
-
-### Frente 10 — Brain Update supervisionado
+### Frente 6 — Intent Engine
 
 | PR | Tipo | Objetivo |
 |----|------|----------|
-| PR53 | PR-IMPL | Propor atualização de memória |
-| PR54 | PR-PROVA | Teste de atualização supervisionada |
+| PR46 | PR-IMPL | Classificador de intenção |
+| PR47 | PR-PROVA | Teste de intenção |
 
-### Frente 11 — Preparação para futuro Runtime de Skills
-
-| PR | Tipo | Objetivo |
-|----|------|----------|
-| PR55 | PR-DOCS | Blueprint do Runtime de Skills |
-| PR56 | PR-DIAG | Diagnóstico técnico para Runtime de Skills |
-
-### Frente 12 — Integração final
+### Frente 7 — Skill Router cognitivo
 
 | PR | Tipo | Objetivo |
 |----|------|----------|
-| PR57 | PR-PROVA | Teste de jornada completa Jarvis |
-| PR58 | PR-PROVA | Teste "conhece o próprio sistema" |
-| PR59 | PR-HARDENING | Segurança, custo e limites |
-| PR60 | PR-DOCS/PR-PROVA | Fechamento do Jarvis Brain v1 |
+| PR48 | PR-IMPL | Skill Router read-only |
+| PR49 | PR-PROVA | Teste de roteamento de skills |
+
+### Frente 8 — Memory Retrieval inteligente
+
+| PR | Tipo | Objetivo |
+|----|------|----------|
+| PR50 | PR-IMPL | Retrieval por intenção |
+| PR51 | PR-PROVA | Testes de memória contextual |
+
+### Frente 9 — Self-Audit e descoberta de falhas
+
+| PR | Tipo | Objetivo |
+|----|------|----------|
+| PR52 | PR-DOCS | Self-Audit Framework |
+| PR53 | PR-IMPL | Self-Audit read-only |
+| PR54 | PR-PROVA | Self-Audit encontra lacunas reais |
+
+### Frente 10 — Conversa LLM-first com governança
+
+| PR | Tipo | Objetivo |
+|----|------|----------|
+| PR55 | PR-IMPL | Response Policy viva |
+| PR56 | PR-PROVA | Teste anti-bot |
+
+### Frente 11 — Brain Update supervisionado
+
+| PR | Tipo | Objetivo |
+|----|------|----------|
+| PR57 | PR-IMPL | Propor atualização de memória |
+| PR58 | PR-PROVA | Teste de atualização supervisionada |
+
+### Frente 12 — Preparação para futuro Runtime de Skills
+
+| PR | Tipo | Objetivo |
+|----|------|----------|
+| PR59 | PR-DOCS | Blueprint do Runtime de Skills |
+| PR60 | PR-DIAG | Diagnóstico técnico para Runtime de Skills |
+
+### Frente 13 — Integração final
+
+| PR | Tipo | Objetivo |
+|----|------|----------|
+| PR61 | PR-PROVA | Teste de jornada completa Jarvis |
+| PR62 | PR-PROVA | Teste "conhece o próprio sistema" |
+| PR63 | PR-HARDENING | Segurança, custo e limites |
+| PR64 | PR-DOCS/PR-PROVA | Fechamento do Jarvis Brain v1 |
 
 ---
 
@@ -243,7 +277,80 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
 
 ---
 
-### PR33 — PR-DOCS — Arquitetura do Obsidian Brain
+### PR33 — PR-DOCS — Ajuste do contrato após diagnóstico PR32
+
+- **Objetivo:** Atualizar o contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` com base nas descobertas da PR32, antes de iniciar a arquitetura do Obsidian Brain. Inserir Frente 2 corretiva. Registrar novas regras sobre read_only, sanitizers e target default. Deslocar Obsidian Brain para PR37+.
+- **Tipo:** PR-DOCS
+- **Escopo permitido:** Apenas arquivos de governança e documentação. Nenhum runtime.
+- **Proibido:** Alterar nv-enavia.js, Panel, sanitizers, prompts reais, schema/enavia-cognitive-runtime.js. Não criar Brain, loader, endpoint ou teste.
+- **Arquivos esperados:**
+  - `schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (atualizado)
+  - `schema/contracts/INDEX.md` (atualizado — próxima PR → PR34)
+  - `schema/status/ENAVIA_STATUS_ATUAL.md` (atualizado)
+  - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (atualizado)
+  - `schema/execution/ENAVIA_EXECUTION_LOG.md` (atualizado)
+  - `schema/reports/PR33_AJUSTE_CONTRATO_JARVIS_POS_DIAGNOSTICO.md` (NOVO)
+- **Critérios de aceite:**
+  - Contrato atualizado com descobertas da PR32.
+  - Nova Frente 2 corretiva inserida (PR33-PR36).
+  - read_only definido como bloqueio de execução, não regra de tom (Regra R1).
+  - Sanitizers pós-LLM registrados como risco a corrigir (Regra R2).
+  - Target operacional registrado como risco a diagnosticar (Regra R3).
+  - Obsidian Brain deslocado para PR37+.
+  - INDEX aponta PR34 como próxima PR.
+  - Status, handoff e execution log atualizados.
+  - Nenhum runtime alterado.
+- **Smoke tests:** `git diff --name-only` — nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- **Próxima PR autorizada:** PR34 — PR-DIAG
+
+---
+
+### PR34 — PR-DIAG — Diagnóstico específico de read_only, target default e sanitizers
+
+- **Objetivo:** Diagnosticar em modo READ-ONLY: (a) como exatamente o parâmetro `read_only` afeta o tom e o raciocínio da Enavia, com evidência de código; (b) como o painel envia `target.mode = "read_only"` por default e o que isso ativa no runtime; (c) como os sanitizadores pós-LLM substituem respostas vivas.
+- **Tipo:** PR-DIAG (read-only, sem alteração de runtime)
+- **Escopo permitido:** Apenas leitura de código, análise e produção de relatório.
+- **O que investigar:**
+  - `useTargetState.js:35-49` — como o painel força `read_only` por default
+  - `nv-enavia.js:4097-4099` — como `read_only` é traduzido em instrução de tom
+  - `schema/enavia-cognitive-runtime.js:239-241` — instrução de tom derivada de `read_only`
+  - `nv-enavia.js:3530-3583` — `_sanitizeChatReply` e como substitui respostas
+  - `nv-enavia.js:4177, 4397-4401` — outros sanitizadores/filtros
+  - `schema/enavia-cognitive-runtime.js:319-326` — envelope JSON `{reply, use_planner}`
+  - Impacto de cada um no comportamento final da Enavia
+- **Arquivos esperados:**
+  - `schema/reports/PR34_READONLY_TARGET_SANITIZERS_DIAGNOSTICO.md` (NOVO)
+- **Critérios de aceite:** Evidência de código para cada fator. Impacto de cada um no comportamento documentado. Proposta de patch para PR35+.
+- **Smoke tests:** Confirmar que nenhum arquivo de runtime foi alterado.
+- **Próxima PR autorizada:** PR35 — PR-DOCS (Política de modos)
+
+---
+
+### PR35 — PR-DOCS — Política correta de modos: conversa vs diagnóstico vs execução
+
+- **Objetivo:** Criar documento de política que define como a Enavia deve se comportar em cada modo de operação. Separar claramente: (a) modo conversa, (b) modo diagnóstico, (c) modo planejamento, (d) modo execução. Definir que `read_only` afeta apenas (d).
+- **Tipo:** PR-DOCS
+- **Escopo permitido:** Apenas criação de documentação em `schema/`.
+- **Arquivos esperados:**
+  - `schema/policies/MODE_POLICY.md` (NOVO)
+- **Critérios de aceite:** Política clara por modo. read_only explicitamente limitado ao contexto de execução. Tom vivo garantido para conversa, diagnóstico e planejamento.
+- **Próxima PR autorizada:** PR36 — PR-DOCS (Response Policy)
+
+---
+
+### PR36 — PR-DOCS — Especificação da Response Policy viva e anti-bot
+
+- **Objetivo:** Criar documento de especificação da Response Policy que a Enavia deve seguir antes de qualquer implementação de PR41 (Brain Loader) ou PR44 (LLM Core). Definir como a Enavia deve responder como IA estratégica — não como bot de checklist.
+- **Tipo:** PR-DOCS
+- **Escopo permitido:** Apenas criação de documentação em `schema/`.
+- **Arquivos esperados:**
+  - `schema/policies/RESPONSE_POLICY.md` (NOVO)
+- **Critérios de aceite:** Política viva especificada. Anti-bot explícito. Integra Regras R1-R3 do contrato. Serve como guia para PR44 (LLM Core) e PR55 (Response Policy runtime).
+- **Próxima PR autorizada:** PR37 — PR-DOCS (Arquitetura do Obsidian Brain)
+
+---
+
+### PR37 — PR-DOCS — Arquitetura do Obsidian Brain
 
 - **Objetivo:** Criar a estrutura completa do Obsidian Brain como documentação antes de qualquer implementação.
 - **Tipo:** PR-DOCS
@@ -256,12 +363,17 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - `schema/brain/UPDATE_POLICY.md`
   - `schema/brain/SYSTEM_AWARENESS.md`
   - Pastas: `maps/`, `decisions/`, `contracts/`, `memories/`, `incidents/`, `learnings/`, `open-questions/`, `self-model/`
-- **Critérios de aceite:** Estrutura completa criada. Cada arquivo com conteúdo substantivo.
-- **Próxima PR autorizada:** PR34 — PR-DOCS (Self Model)
+- **Notas derivadas do diagnóstico PR32:**
+  - `MEMORY_RULES.md` deve diferenciar regra operacional ↔ personalidade ↔ checklist.
+  - `SYSTEM_AWARENESS.md` deve cobrir 4 dimensões reais: contratos, estado, sistema, skills.
+  - `incidents/chat-engessado-readonly.md` deve ser criado referenciando o diagnóstico PR32.
+  - `self-model/how-to-answer.md` deve registrar explicitamente que `read_only` é bloqueio de execução, NÃO regra de tom (Regra R1).
+- **Critérios de aceite:** Estrutura completa criada. Cada arquivo com conteúdo substantivo. Incidente PR32 referenciado.
+- **Próxima PR autorizada:** PR38 — PR-DOCS (Self Model)
 
 ---
 
-### PR34 — PR-DOCS — Self Model da Enavia
+### PR38 — PR-DOCS — Self Model da Enavia
 
 - **Objetivo:** Criar o self-model da Enavia: como ela se vê, o que pode fazer, o que não pode e como deve responder.
 - **Tipo:** PR-DOCS
@@ -271,23 +383,24 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - `schema/brain/self-model/limitations.md`
   - `schema/brain/self-model/current-state.md`
   - `schema/brain/self-model/how-to-answer.md`
+- **Nota derivada do diagnóstico PR32:** `how-to-answer.md` deve ensinar a Enavia a responder como IA estratégica antes de estruturar ação. `read_only` explicitamente definido como bloqueio de execução, nunca regra de tom.
 - **Critérios de aceite:** Self-model completo, honesto e fundamentado no estado real do sistema.
-- **Próxima PR autorizada:** PR35 — PR-DOCS (Migração de conhecimento)
+- **Próxima PR autorizada:** PR39 — PR-DOCS (Migração de conhecimento)
 
 ---
 
-### PR35 — PR-DOCS — Migração de conhecimento para Brain
+### PR39 — PR-DOCS — Migração de conhecimento para Brain
 
 - **Objetivo:** Migrar conhecimento consolidado dos contratos, status, handoffs, skills, maps, registries e relatório final PR30 para o brain.
 - **Tipo:** PR-DOCS
 - **Escopo:** Criar/popular arquivos do brain com base nos documentos existentes.
-- **Fontes:** Contratos encerrados, ENAVIA_SYSTEM_MAP.md, ENAVIA_ROUTE_REGISTRY.json, ENAVIA_WORKER_REGISTRY.md, skills documentais, relatório final PR30.
-- **Critérios de aceite:** Brain populado com conhecimento real. Sem invenção. Toda afirmação tem fonte.
-- **Próxima PR autorizada:** PR36 — PR-DIAG (Diagnóstico memória runtime)
+- **Fontes:** Contratos encerrados, ENAVIA_SYSTEM_MAP.md, ENAVIA_ROUTE_REGISTRY.json, ENAVIA_WORKER_REGISTRY.md, skills documentais, relatório final PR30, diagnóstico PR32 (incidente chat-engessado-readonly).
+- **Critérios de aceite:** Brain populado com conhecimento real. Sem invenção. Toda afirmação tem fonte. Incidente PR32 registrado em `incidents/`.
+- **Próxima PR autorizada:** PR40 — PR-DIAG (Diagnóstico memória runtime)
 
 ---
 
-### PR36 — PR-DIAG — Diagnóstico da memória atual no runtime
+### PR40 — PR-DIAG — Diagnóstico da memória atual no runtime
 
 - **Objetivo:** Mapear como o chat salva e busca memória atualmente.
 - **Tipo:** PR-DIAG (read-only)
@@ -298,23 +411,23 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - Retrieval atual
   - Memória aplicada na conversa
   - Memória salva após conversa
-- **Arquivos esperados:** `schema/reports/PR36_MEMORY_RUNTIME_DIAGNOSTICO.md`
-- **Próxima PR autorizada:** PR37 — PR-IMPL (Brain Loader)
+- **Arquivos esperados:** `schema/reports/PR40_MEMORY_RUNTIME_DIAGNOSTICO.md`
+- **Próxima PR autorizada:** PR41 — PR-IMPL (Brain Loader)
 
 ---
 
-### PR37 — PR-IMPL — Brain Loader read-only
+### PR41 — PR-IMPL — Brain Loader read-only
 
 - **Objetivo:** Implementar leitura do brain sem escrita. Carregar identidade, estado atual, hard-rules e incidentes conhecidos no contexto do chat.
 - **Tipo:** PR-IMPL
-- **Pré-requisito:** PR36 (diagnóstico da memória runtime)
+- **Pré-requisito:** PR40 (diagnóstico da memória runtime)
 - **Escopo:** Worker-only. Apenas leitura. Sem escrita de memória. Sem mudança de comportamento final ainda.
 - **Critérios de aceite:** Brain Loader lê arquivos do brain e os injeta no contexto. Sem efeito colateral. Testes passam.
-- **Próxima PR autorizada:** PR38 — PR-PROVA
+- **Próxima PR autorizada:** PR42 — PR-PROVA
 
 ---
 
-### PR38 — PR-PROVA — Prova do Brain Loader
+### PR42 — PR-PROVA — Prova do Brain Loader
 
 - **Objetivo:** Provar que o Brain Loader funciona corretamente.
 - **Tipo:** PR-PROVA
@@ -324,47 +437,51 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - Leitura de `hard-rules.md`
   - Leitura de incidente `chat-engessado-readonly.md`
 - **Critérios de aceite:** Testes passam. Leitura confirmada. Sem escrita. Sem side effects.
-- **Próxima PR autorizada:** PR39 — PR-DIAG (Diagnóstico prompt chat)
+- **Próxima PR autorizada:** PR43 — PR-DIAG (Diagnóstico prompt chat)
 
 ---
 
-### PR39 — PR-DIAG — Diagnóstico do prompt atual do chat
+### PR43 — PR-DIAG — Diagnóstico do prompt atual do chat
 
 - **Objetivo:** Mapear completamente o system prompt, prompt de segurança, prompt de memória, prompt de planner e response formatter do chat atual.
 - **Tipo:** PR-DIAG (read-only)
-- **Arquivos esperados:** `schema/reports/PR39_PROMPT_CHAT_DIAGNOSTICO.md`
-- **Próxima PR autorizada:** PR40 — PR-IMPL (LLM Core v1)
+- **Arquivos esperados:** `schema/reports/PR43_PROMPT_CHAT_DIAGNOSTICO.md`
+- **Próxima PR autorizada:** PR44 — PR-IMPL (LLM Core v1)
 
 ---
 
-### PR40 — PR-IMPL — LLM Core v1
+### PR44 — PR-IMPL — LLM Core v1
 
 - **Objetivo:** Criar `buildEnaviaCorePrompt()` ou equivalente real. Prompt que injeta identidade, estado atual, intenção detectada, memória relevante, skill sugerida e limites de forma viva e não engessada.
 - **Tipo:** PR-IMPL
-- **Pré-requisito:** PR39 (diagnóstico do prompt)
+- **Pré-requisito:** PR43 (diagnóstico do prompt)
 - **Escopo:** Worker-only. Apenas o core prompt. Sem redesign completo ainda.
+- **Regras obrigatórias derivadas de PR33/PR34/PR35/PR36:**
+  - `read_only` NÃO deve ser instrução de tom no LLM Core (Regra R1).
+  - Sanitizadores NÃO devem substituir resposta viva legítima (Regra R2).
+  - Intent deve ser detectado ANTES de aplicar tom operacional (Regra R3).
 - **Critérios de aceite:** Função criada. Testes passam. Resposta do chat demonstra raciocínio vivo.
-- **Próxima PR autorizada:** PR41 — PR-PROVA
+- **Próxima PR autorizada:** PR45 — PR-PROVA
 
 ---
 
-### PR41 — PR-PROVA — Teste de resposta viva
+### PR45 — PR-PROVA — Teste de resposta viva
 
 - **Objetivo:** Provar que o LLM Core v1 produz respostas vivas, não bot.
 - **Tipo:** PR-PROVA
 - **Fixtures obrigatórias:**
   - "Você sabe operar seu sistema?"
-  - "Por que você está engessada?"
+  - "Por que você estava engessada?"
   - "O que falta para virar Jarvis?"
   - "Crie o próximo contrato."
   - "Revise essa PR."
   - "O que você lembra do projeto?"
 - **Critérios de aceite:** Respostas demonstram raciocínio, contexto e inteligência. Não são respostas de bot de checklist.
-- **Próxima PR autorizada:** PR42 — PR-IMPL (Intent Engine)
+- **Próxima PR autorizada:** PR46 — PR-IMPL (Intent Engine)
 
 ---
 
-### PR42 — PR-IMPL — Classificador de intenção (Intent Engine)
+### PR46 — PR-IMPL — Classificador de intenção (Intent Engine)
 
 - **Objetivo:** Implementar classificador de intenção que categoriza cada mensagem do operador antes de gerar resposta.
 - **Tipo:** PR-IMPL
@@ -379,21 +496,22 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - `system_question` — pergunta sobre estado do sistema
   - `skill_request` — pedido de uso de skill específica
   - `execution_request` — pedido de executar algo
+- **Regra derivada da PR33/PR35:** Tom operacional (`read_only`, MODO OPERACIONAL ATIVO) só deve ser ativado para classes `deploy_decision` e `execution_request`. Para `conversation`, `diagnosis`, `planning`, `pr_review`, `memory_question` e `system_question`, o tom deve ser vivo e estratégico.
 - **Critérios de aceite:** Classificação correta em >90% dos casos de teste.
-- **Próxima PR autorizada:** PR43 — PR-PROVA
+- **Próxima PR autorizada:** PR47 — PR-PROVA
 
 ---
 
-### PR43 — PR-PROVA — Teste de intenção
+### PR47 — PR-PROVA — Teste de intenção
 
 - **Objetivo:** Provar que o Intent Engine classifica corretamente.
 - **Tipo:** PR-PROVA
 - **Critérios de aceite:** Suite de testes com cobertura de todas as 10 classes.
-- **Próxima PR autorizada:** PR44 — PR-IMPL (Skill Router)
+- **Próxima PR autorizada:** PR48 — PR-IMPL (Skill Router)
 
 ---
 
-### PR44 — PR-IMPL — Skill Router read-only
+### PR48 — PR-IMPL — Skill Router read-only
 
 - **Objetivo:** Implementar roteamento de skill conforme intenção. Skill é consultada como referência, não executada automaticamente.
 - **Tipo:** PR-IMPL
@@ -403,38 +521,38 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - `system_question` + `maps/routes/architecture` → `SYSTEM_MAPPER.md`
   - `contract_creation` + `loop contratual` → `CONTRACT_LOOP_OPERATOR.md`
 - **Critérios de aceite:** Skill correta selecionada conforme intenção. Sem execução automática.
-- **Próxima PR autorizada:** PR45 — PR-PROVA
+- **Próxima PR autorizada:** PR49 — PR-PROVA
 
 ---
 
-### PR45 — PR-PROVA — Teste de roteamento de skills
+### PR49 — PR-PROVA — Teste de roteamento de skills
 
 - **Objetivo:** Provar que o Skill Router seleciona a skill correta.
 - **Tipo:** PR-PROVA
 - **Critérios de aceite:** 4/4 mapeamentos testados e aprovados.
-- **Próxima PR autorizada:** PR46 — PR-IMPL (Memory Retrieval)
+- **Próxima PR autorizada:** PR50 — PR-IMPL (Memory Retrieval)
 
 ---
 
-### PR46 — PR-IMPL — Retrieval por intenção
+### PR50 — PR-IMPL — Retrieval por intenção
 
 - **Objetivo:** Buscar memória certa do brain conforme intenção detectada.
 - **Tipo:** PR-IMPL
 - **Escopo:** Worker-only. Leitura de brain. Sem escrita.
 - **Critérios de aceite:** Retrieval retorna memória relevante para cada classe de intenção testada.
-- **Próxima PR autorizada:** PR47 — PR-PROVA
+- **Próxima PR autorizada:** PR51 — PR-PROVA
 
 ---
 
-### PR47 — PR-PROVA — Testes de memória contextual
+### PR51 — PR-PROVA — Testes de memória contextual
 
 - **Objetivo:** Provar que o retrieval retorna memória correta para cada intenção.
 - **Tipo:** PR-PROVA
-- **Próxima PR autorizada:** PR48 — PR-DOCS (Self-Audit Framework)
+- **Próxima PR autorizada:** PR52 — PR-DOCS (Self-Audit Framework)
 
 ---
 
-### PR48 — PR-DOCS — Self-Audit Framework
+### PR52 — PR-DOCS — Self-Audit Framework
 
 - **Objetivo:** Criar framework conceitual e documental para detecção de falhas, lacunas e drift no sistema.
 - **Tipo:** PR-DOCS
@@ -448,32 +566,32 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - Drift entre documentação e código
   - Lacuna de testes
   - Lacuna de segurança
-- **Arquivos esperados:** `schema/brain/incidents/` populado, `schema/reports/PR48_SELF_AUDIT_FRAMEWORK.md`
-- **Próxima PR autorizada:** PR49 — PR-IMPL (Self-Audit read-only)
+- **Arquivos esperados:** `schema/brain/incidents/` populado, `schema/reports/PR52_SELF_AUDIT_FRAMEWORK.md`
+- **Próxima PR autorizada:** PR53 — PR-IMPL (Self-Audit read-only)
 
 ---
 
-### PR49 — PR-IMPL — Self-Audit read-only
+### PR53 — PR-IMPL — Self-Audit read-only
 
 - **Objetivo:** Criar função ou endpoint read-only que executa o framework de self-audit e gera relatório de lacunas.
 - **Tipo:** PR-IMPL
-- **Pré-requisito:** PR48 (framework documental)
+- **Pré-requisito:** PR52 (framework documental)
 - **Escopo:** Worker-only. Read-only. Sem correção automática.
 - **Critérios de aceite:** Relatório gerado. Lacunas reais identificadas. Sem correção automática.
-- **Próxima PR autorizada:** PR50 — PR-PROVA
+- **Próxima PR autorizada:** PR54 — PR-PROVA
 
 ---
 
-### PR50 — PR-PROVA — Self-Audit encontra lacunas reais
+### PR54 — PR-PROVA — Self-Audit encontra lacunas reais
 
 - **Objetivo:** Provar que o Self-Audit identifica lacunas reais do sistema.
 - **Tipo:** PR-PROVA
 - **Critérios de aceite:** Pelo menos 3 lacunas reais identificadas e documentadas.
-- **Próxima PR autorizada:** PR51 — PR-IMPL (Response Policy viva)
+- **Próxima PR autorizada:** PR55 — PR-IMPL (Response Policy viva)
 
 ---
 
-### PR51 — PR-IMPL — Response Policy viva
+### PR55 — PR-IMPL — Response Policy viva
 
 - **Objetivo:** Implementar política de resposta que elimina o comportamento de bot de checklist.
 - **Tipo:** PR-IMPL
@@ -482,12 +600,13 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - Se não puder executar, explicar sem soar bot — nunca responder "Não posso fazer isso"
   - Reconhecer frustração do operador
   - Aplicar governança quando houver ação técnica — mas não para conversa
-- **Critérios de aceite:** Respostas passam no teste anti-bot da PR52.
-- **Próxima PR autorizada:** PR52 — PR-PROVA
+- **Base obrigatória:** Política documental criada em PR36 (`RESPONSE_POLICY.md`).
+- **Critérios de aceite:** Respostas passam no teste anti-bot da PR56.
+- **Próxima PR autorizada:** PR56 — PR-PROVA
 
 ---
 
-### PR52 — PR-PROVA — Teste anti-bot
+### PR56 — PR-PROVA — Teste anti-bot
 
 - **Objetivo:** Provar que a Enavia não soa mais como bot rígido.
 - **Tipo:** PR-PROVA
@@ -497,28 +616,28 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - "Isso me deixa puto."
   - "Você sabe operar de ponta a ponta?"
 - **Critérios de aceite:** Respostas demonstram inteligência estratégica, empatia e autoconsciência.
-- **Próxima PR autorizada:** PR53 — PR-IMPL (Brain Update supervisionado)
+- **Próxima PR autorizada:** PR57 — PR-IMPL (Brain Update supervisionado)
 
 ---
 
-### PR53 — PR-IMPL — Propor atualização de memória
+### PR57 — PR-IMPL — Propor atualização de memória
 
 - **Objetivo:** Implementar mecanismo para propor atualizações no brain, sem escrita automática. Toda atualização requer aprovação explícita.
 - **Tipo:** PR-IMPL
 - **Critérios de aceite:** Proposta gerada. Escrita só após aprovação humana. Sem autonomia.
-- **Próxima PR autorizada:** PR54 — PR-PROVA
+- **Próxima PR autorizada:** PR58 — PR-PROVA
 
 ---
 
-### PR54 — PR-PROVA — Teste de atualização supervisionada
+### PR58 — PR-PROVA — Teste de atualização supervisionada
 
 - **Objetivo:** Provar que atualizações de memória só ocorrem com aprovação.
 - **Tipo:** PR-PROVA
-- **Próxima PR autorizada:** PR55 — PR-DOCS (Blueprint Runtime de Skills)
+- **Próxima PR autorizada:** PR59 — PR-DOCS (Blueprint Runtime de Skills)
 
 ---
 
-### PR55 — PR-DOCS — Blueprint do Runtime de Skills
+### PR59 — PR-DOCS — Blueprint do Runtime de Skills
 
 - **Objetivo:** Definir a arquitetura futura para execução de skills no runtime. Apenas blueprint — sem implementação.
 - **Tipo:** PR-DOCS
@@ -528,30 +647,30 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - `GET /skills/suggest`
   - `POST /skills/run-dry` (simulação sem efeito)
   - `POST /skills/run-approved` (execução com aprovação explícita)
-- **Arquivos esperados:** `schema/reports/PR55_SKILLS_RUNTIME_BLUEPRINT.md`
-- **Próxima PR autorizada:** PR56 — PR-DIAG (Diagnóstico técnico para Runtime)
+- **Arquivos esperados:** `schema/reports/PR59_SKILLS_RUNTIME_BLUEPRINT.md`
+- **Próxima PR autorizada:** PR60 — PR-DIAG (Diagnóstico técnico para Runtime)
 
 ---
 
-### PR56 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+### PR60 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
 
 - **Objetivo:** Mapear o que é necessário tecnicamente para implementar o Runtime de Skills.
 - **Tipo:** PR-DIAG (read-only)
-- **Arquivos esperados:** `schema/reports/PR56_SKILLS_RUNTIME_DIAGNOSTICO.md`
-- **Próxima PR autorizada:** PR57 — PR-PROVA (Jornada completa Jarvis)
+- **Arquivos esperados:** `schema/reports/PR60_SKILLS_RUNTIME_DIAGNOSTICO.md`
+- **Próxima PR autorizada:** PR61 — PR-PROVA (Jornada completa Jarvis)
 
 ---
 
-### PR57 — PR-PROVA — Teste de jornada completa Jarvis
+### PR61 — PR-PROVA — Teste de jornada completa Jarvis
 
 - **Objetivo:** Teste de ponta a ponta simulando uma jornada completa: o operador interage com a Enavia como Jarvis.
 - **Tipo:** PR-PROVA
 - **Critérios de aceite:** Jornada completa funcional — conversa → diagnóstico → plano → skill → resultado.
-- **Próxima PR autorizada:** PR58 — PR-PROVA
+- **Próxima PR autorizada:** PR62 — PR-PROVA
 
 ---
 
-### PR58 — PR-PROVA — Teste "conhece o próprio sistema"
+### PR62 — PR-PROVA — Teste "conhece o próprio sistema"
 
 - **Objetivo:** Provar que a Enavia conhece seu próprio sistema.
 - **Tipo:** PR-PROVA
@@ -562,11 +681,11 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - "Qual é o estado atual do sistema?"
   - "O que falta para completar o Jarvis Brain?"
 - **Critérios de aceite:** Respostas fundamentadas em fontes reais. Sem invenção.
-- **Próxima PR autorizada:** PR59 — PR-HARDENING
+- **Próxima PR autorizada:** PR63 — PR-HARDENING
 
 ---
 
-### PR59 — PR-HARDENING — Segurança, custo e limites
+### PR63 — PR-HARDENING — Segurança, custo e limites
 
 - **Objetivo:** Revisar limites de custo de contexto, segurança de memória, limites de execução e riscos de drift.
 - **Tipo:** PR-HARDENING
@@ -576,16 +695,16 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
   - Limites do Self-Audit
   - Proteção contra hallucination
   - Rate limits e proteção de custo
-- **Próxima PR autorizada:** PR60 — PR-DOCS/PR-PROVA (Fechamento)
+- **Próxima PR autorizada:** PR64 — PR-DOCS/PR-PROVA (Fechamento)
 
 ---
 
-### PR60 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
+### PR64 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
 
 - **Objetivo:** Encerrar formalmente o contrato Jarvis Brain v1. Criar relatório final. Preparar handoff.
 - **Tipo:** PR-DOCS/PR-PROVA
 - **Arquivos esperados:**
-  - `schema/reports/CONTRATO_JARVIS_BRAIN_PR31_PR60_FINAL_REPORT.md`
+  - `schema/reports/CONTRATO_JARVIS_BRAIN_PR31_PR64_FINAL_REPORT.md`
   - `schema/handoffs/CONTRATO_JARVIS_BRAIN_FINAL_HANDOFF.md`
   - Atualização de `schema/contracts/INDEX.md`
   - Atualização de governança
@@ -595,7 +714,7 @@ Só executa com contrato ativo, escopo definido e aprovação humana explícita.
 
 ## 7. Obsidian Brain — estrutura alvo
 
-A estrutura completa a ser criada a partir da PR33:
+A estrutura completa a ser criada a partir da PR37:
 
 ```
 schema/brain/
@@ -734,5 +853,12 @@ Ao final do contrato, a Enavia deve conseguir:
 
 ---
 
+### Atualização pós-PR33 (2026-04-30)
+
+A PR33 inseriu a **Frente 2 — Correção conceitual do Chat Runtime** entre o diagnóstico inicial e o Obsidian Brain, com base nas descobertas da PR32. O contrato foi ampliado de PR31–PR60 para **PR31–PR64**. As regras R1, R2, R3 e R4 foram adicionadas à seção 4. O Obsidian Brain foi deslocado para PR37+.
+
+---
+
 *Contrato criado em: 2026-04-30*
 *Branch de criação: `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`*
+*Atualizado em: 2026-04-30 (PR33) — Branch: `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`*

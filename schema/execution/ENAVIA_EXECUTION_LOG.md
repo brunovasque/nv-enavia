@@ -4,7 +4,56 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-04-30 — PR32 — PR-DIAG — Diagnóstico do chat engessado
+## 2026-04-30 — PR33 — PR-DOCS — Ajuste do contrato pós-diagnóstico PR32
+
+- **Branch:** `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`
+- **Tipo:** `PR-DOCS` (sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢 — ampliado para PR31-PR64)
+- **PR anterior validada:** PR32 ✅ (diagnóstico do chat engessado, mergeada)
+- **Escopo:** Docs-only. Atualização do contrato e governança. Nenhum runtime, endpoint, teste, prompt, brain, skill ou intent engine alterado/criado.
+
+### Objetivo
+
+Atualizar o contrato JARVIS BRAIN com base nas descobertas da PR32. Inserir Frente 2 corretiva antes do Obsidian Brain. Registrar Regras R1-R4 sobre read_only, sanitizers e target default. Deslocar Obsidian Brain para PR37+.
+
+### Arquivos atualizados
+
+- **`schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`** (ATUALIZADO):
+  - Seção 5: Nova Frente 2 corretiva (PR33-PR36). Frentes 3-13 (renumeradas). PRs 37-64 (renumeradas).
+  - Seção 4: Regras R1-R4 adicionadas.
+  - Seção 6: PR33-PR36 detalhadas. Todos os blocos PRs renumerados (+4).
+  - Contrato ampliado de PR31-PR60 para PR31-PR64.
+- **`schema/contracts/INDEX.md`**: PR33 ✅. Próxima PR → PR34.
+- **`schema/status/ENAVIA_STATUS_ATUAL.md`**: PR33 registrada. Próxima PR: PR34.
+- **`schema/handoffs/ENAVIA_LATEST_HANDOFF.md`**: handoff atualizado de PR33 para PR34.
+- **`schema/reports/PR33_AJUSTE_CONTRATO_JARVIS_POS_DIAGNOSTICO.md`** (NOVO): relatório curto.
+
+### Arquivos NÃO alterados
+
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`, `tests/`.
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado.
+- Nenhum endpoint criado. Nenhum teste criado. Nenhum prompt do runtime modificado. Nenhum brain implementado.
+
+### Regras adicionadas ao contrato (seção 4)
+
+- **R1:** `read_only` = bloqueio de execução, NÃO regra de tom.
+- **R2:** Sanitizadores pós-LLM não destroem resposta viva legítima.
+- **R3:** Target default não transforma toda conversa em modo operacional.
+- **R4:** Brain (PR37+) nasce ciente do incidente `chat-engessado-readonly`.
+
+### Smoke / verificações
+
+- `git diff --name-only` → apenas `.md` em `schema/contracts/`, `schema/status/`, `schema/handoffs/`, `schema/execution/`, `schema/reports/`. ✅
+- Nenhum `.js`, `.ts`, `.jsx`, `.tsx`, `.toml`, `.yml` alterado. ✅
+- Contrato menciona `read_only` como bloqueio de execução (Regra R1). ✅
+- Contrato menciona sanitizers como risco (Regra R2). ✅
+- Contrato menciona target default como risco (Regra R3). ✅
+- INDEX.md aponta PR34 como próxima PR autorizada. ✅
+- Status, handoff e execution log atualizados. ✅
+
+---
+
+
 
 - **Branch:** `copilot/claude-pr32-diag-chat-engessado-jarvis-brain`
 - **Tipo:** `PR-DIAG` (READ-ONLY — sem alteração de runtime)
