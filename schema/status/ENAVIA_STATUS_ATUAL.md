@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR35 — Mode Policy criada + contrato ajustado para PR36 como PR-IMPL)
-**Branch ativa:** `copilot/claudepr35-docs-mode-policy-e-ajuste-para-execucao`
-**Última tarefa:** PR35 — PR-DOCS — Mode Policy criada com 9 seções. `read_only` definido como gate de execução, não regra de tom. 3 modos canônicos definidos (conversation/diagnosis/execution). Contrato ajustado para PR36 ser PR-IMPL real (correção inicial do chat runtime). Risco de excesso documental reconhecido — objetivo agora é produto funcionando. Nenhum runtime alterado.
+**Data:** 2026-04-30 (atualizado após PR36 — Implementação inicial do chat runtime anti-bot)
+**Branch ativa:** `copilot/claudepr36-impl-chat-runtime-readonly-target-sanit`
+**Última tarefa:** PR36 — PR-IMPL — Worker-only. `read_only` virou nota factual (não tom). `target` default sozinho não ativa contexto operacional (helper `isOperationalMessage`). Sanitizers menos destrutivos (prosa estratégica preservada, snapshot JSON-like do planner ainda bloqueado). Telemetria `sanitization` aditiva. Smoke test novo (25/25 ✅), regressões PR13/PR14/PR19/PR20/PR21 verdes. Nenhum painel/contrato/policy/brain/endpoint alterado ou criado.
 
 ## Estado atual do sistema
 
@@ -33,7 +33,7 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR36 — PR-IMPL — Correção inicial do chat runtime: read_only como gate, target sem tom forçado e sanitizers não destrutivos.**
+**PR37 — PR-PROVA — Smoke anti-bot real do chat runtime.**
 
 ## Histórico de contratos
 

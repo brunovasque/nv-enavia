@@ -3509,35 +3509,59 @@ const _LLM_PARSE_MODE = {
   PLAIN_TEXT_FALLBACK: "plain_text_fallback",
   UNKNOWN:             "unknown",
 };
+// PR36: planner leak forte exige sinais de snapshot interno bruto, não menção em prosa.
+// Padrões abaixo capturam JSON-like / estrutura de payload interno: chave seguida de :, ", ou =,
+// que é como o planner de fato vaza. Prosa que apenas cite o conceito não bate.
 const _PLANNER_LEAK_PATTERNS = [
-  /\bnext_action\b/i,
-  /\breason\b[:=]/i,
-  /\bscope_summary\b/i,
-  /\bacceptance_criteria\b/i,
-  /\bplan_type\b/i,
-  /\bcomplexity_level\b/i,
-  /\boutput_mode\b/i,
-  /\bplan_version\b/i,
-  /\bneeds_human_approval\b/i,
-  /\bneeds_formal_contract\b/i,
+  /\bnext_action\s*[:=]/i,
+  /\bplanner_snapshot\b/i,
+  /\bcanonical_plan\b/i,
+  /\bapproval_gate\b/i,
+  /\bexecution_payload\b/i,
+  /\bscope_summary\s*[:=]/i,
+  /\bacceptance_criteria\s*[:=]/i,
+  /\bplan_type\s*[:=]/i,
+  /\bcomplexity_level\s*[:=]/i,
+  /\boutput_mode\s*[:=]/i,
+  /\bplan_version\s*[:=]/i,
+  /\bneeds_human_approval\s*[:=]/i,
+  /\bneeds_formal_contract\s*[:=]/i,
 ];
 
-// Threshold: 3+ distinct mechanical terms in reply = planner leak.
-// A casual mention of "reason" in natural text is fine; a dump of
-// next_action + reason + scope_summary is a mechanical leak.
-const _PLANNER_LEAK_THRESHOLD = 3;
+// PR36: threshold elevado + exigência de sinal estrutural (JSON-like) também.
+// Prosa estratégica que cite "critérios de aceite" ou "next_action" como conceito
+// não dispara; apenas snapshot bruto do planner vazando.
+const _PLANNER_LEAK_THRESHOLD = 4;
+// PR36: comprimento máximo de janela JSON-like inspecionada para detectar leak
+// estrutural do planner. Valor escolhido como compromisso: grande o suficiente
+// para capturar payloads internos típicos sem que a regex se torne cara.
+const _PLANNER_LEAK_STRUCTURAL_WINDOW = 200;
+// Sinal estrutural complementar: chaves JSON ou múltiplos campos no formato chave:"valor".
+const _PLANNER_LEAK_STRUCTURAL_PATTERNS = [
+  // Padrão JSON-like: aspas em torno de chaves operacionais conhecidas
+  /"\s*(next_action|planner_snapshot|canonical_plan|approval_gate|execution_payload|acceptance_criteria|scope_summary|plan_type|complexity_level|output_mode)\s*"\s*:/i,
+  // Bloco com chaves abertas + uma das chaves do planner (janela curta)
+  new RegExp(
+    "\\{[^}]{0," + _PLANNER_LEAK_STRUCTURAL_WINDOW + "}\\b(next_action|canonical_plan|approval_gate|execution_payload)\\b",
+    "i",
+  ),
+];
 
 function _sanitizeChatReply(reply) {
   if (!reply || typeof reply !== "string") return reply;
 
-  // Count how many planner-internal patterns are present in the reply
+  // Count how many planner-internal structural patterns are present in the reply
   let leakCount = 0;
   for (const pattern of _PLANNER_LEAK_PATTERNS) {
     if (pattern.test(reply)) leakCount++;
   }
 
-  // Threshold: 3+ distinct mechanical terms = planner leak
-  if (leakCount >= _PLANNER_LEAK_THRESHOLD) {
+  // PR36: estrutural JSON-like dispara independentemente da quantidade de termos.
+  const hasStructuralLeak = _PLANNER_LEAK_STRUCTURAL_PATTERNS.some((p) => p.test(reply));
+
+  // Threshold elevado para 4 termos com forma "campo:" — só dispara em snapshot bruto.
+  // Prosa natural ao operador que cite conceitos do planner não é mais destruída.
+  if (hasStructuralLeak || leakCount >= _PLANNER_LEAK_THRESHOLD) {
     return "Entendido. Estou com isso — pode continuar.";
   }
 
@@ -3557,20 +3581,44 @@ const _MANUAL_PLAN_PATTERNS = [
   /\bCriteria\b.*:/i,         // criteria: pattern
 ];
 
-// Threshold: 2+ structural plan patterns in reply = manual plan structure
-const _MANUAL_PLAN_THRESHOLD = 2;
+// PR36: threshold elevado e exigência de evidência forte de que é planner snapshot,
+// não resposta estratégica útil ao operador. Markdown/headers/etapas em prosa
+// estratégica legítima ao operador NÃO devem mais ser destruídos.
+const _MANUAL_PLAN_THRESHOLD = 5;
 
 // Natural fallback reply when a manual plan leak is detected in the reply surface.
 // The plan structure lives in plannerSnapshot — the reply must stay conversational.
 const _MANUAL_PLAN_FALLBACK =
   "Entendido. Já organizei as etapas internamente — pode avançar ou me dizer se quer ajustar algo.";
 
+// PR36: detecta se o reply parece prosa natural ao operador (texto explicativo)
+// vs snapshot bruto do planner. Prosa natural tem pontuação variada, parágrafos,
+// frases conectadas — não é apenas lista mecânica.
+// Heurística orientada a português do BR (alfabeto latino com acentos). É
+// intencionalmente simples — falsos negativos são preferíveis a falsos positivos
+// porque o sinal estrutural JSON-like (`_PLANNER_LEAK_STRUCTURAL_PATTERNS`) e o
+// threshold ainda capturam leak real do planner mesmo se este bypass não disparar.
+function _looksLikeNaturalProse(reply) {
+  if (!reply || typeof reply !== "string") return false;
+  // Resposta curta com bullets pode ser plano interno; resposta longa com prosa = útil ao operador.
+  if (reply.length < 200) return false;
+  // Conta marcas de prosa: pontuação final seguida de início de nova frase com letra
+  // maiúscula (com ou sem acento). Cobre PT-BR e EN; pode subcontar frases que
+  // começam com minúscula ou números — aceitável (ver nota acima).
+  const sentences = (reply.match(/[.!?]\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/g) || []).length;
+  // Se tem pelo menos 3 transições de frase, é prosa.
+  return sentences >= 3;
+}
+
 // Returns true if the reply looks like the LLM wrote a structured plan inline
 // (instead of a short natural conversational reply).
 // Counts total occurrences across all patterns (not just distinct patterns),
 // so "Fase 1 / Fase 2 / Fase 3" with a single pattern counts as 3 hits.
+// PR36: aumentado threshold + bypass para prosa natural útil ao operador.
 function _isManualPlanReply(reply) {
   if (!reply || typeof reply !== "string") return false;
+  // PR36: prosa natural útil ao operador não é considerada manual plan, mesmo com headers.
+  if (_looksLikeNaturalProse(reply)) return false;
   let count = 0;
   for (const pattern of _MANUAL_PLAN_PATTERNS) {
     // Re-create with global flag to count all occurrences (not just first match)
@@ -3581,6 +3629,17 @@ function _isManualPlanReply(reply) {
   }
   return count >= _MANUAL_PLAN_THRESHOLD;
 }
+
+// PR36: named exports aditivos para tornar helpers testáveis sem refatorar o runtime.
+// O worker do Cloudflare consome apenas o `export default {fetch}`; estes named exports
+// são opt-in para os smoke tests e não alteram o comportamento de produção.
+export {
+  _sanitizeChatReply,
+  _isManualPlanReply,
+  _looksLikeNaturalProse,
+  _MANUAL_PLAN_FALLBACK,
+  isOperationalMessage,
+};
 
 // ============================================================================
 // Chat Bridge — constantes de aprovação e termos perigosos (Bloco B)
@@ -3695,6 +3754,24 @@ async function _dispatchFromChat(env, pendingPlan) {
 // Separate from _CHAT_BRIDGE_OPERATIONAL_TERMS (planner activation) —
 // this set is broader and focused on whether the message implies
 // system/worker/validation intent that warrants operational mode.
+// PR36: Heurística mínima de intenção operacional.
+// Diferencia "target presente = contexto técnico disponível" de "intenção operacional = tom/estrutura operacional aplicável".
+// Conversa simples ("oi", "você está parecendo um bot") NÃO deve ativar tom operacional só porque há target.
+// Mensagem realmente operacional (deploy, executor, contrato, worker, health, diagnóstico técnico, logs, erro,
+// branch, merge, rollback, revisar PR, rota) ainda pode ativar contexto operacional.
+// Esta NÃO é o Intent Engine completo — é desacoplamento inicial seguro.
+const _CHAT_OPERATIONAL_INTENT_TERMS = [
+  "validar", "validação", "sistema", "worker", "plano", "executor", "execução", "executar",
+  "auditoria", "auditar", "deploy-worker", "deploy", "healthcheck", "health",
+  "contrato", "rota", "endpoint", "diagnóstico", "diagnosticar", "logs", "erro",
+  "branch", "merge", "rollback", "patch", "revisar pr", "revisar a pr", "review pr",
+  "produção", "prod", "staging", "kv", "binding",
+];
+function isOperationalMessage(message, _context) {
+  if (typeof message !== "string" || message.length === 0) return false;
+  const lower = message.toLowerCase();
+  return _CHAT_OPERATIONAL_INTENT_TERMS.some((t) => lower.includes(t));
+}
 const _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS = [
   "validar", "sistema", "worker", "plano", "executor", "execução",
   "auditoria", "deploy-worker", "healthcheck", "auditar",
@@ -3948,15 +4025,20 @@ async function handleChatLLM(request, env) {
   // Usado para: injetar target block no prompt, fortalecer instrução de memória e telemetria.
   const _chatTarget = context.target && typeof context.target === "object" ? context.target : null;
   const hasTarget = !!(_chatTarget && (_chatTarget.worker || _chatTarget.repo || _chatTarget.environment || _chatTarget.mode));
-  const isOperationalMessage = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
-  const isOperationalContext = hasTarget || isOperationalMessage;
+  // PR36: target sozinho NÃO ativa tom operacional. É apenas contexto técnico disponível.
+  // isOperationalContext exige sinal real de intenção operacional na mensagem (ou termo operacional clássico).
+  // Antes: const isOperationalContext = hasTarget || isOperationalMessage;
+  // Agora: depende da intenção, não da mera presença de target default do painel.
+  const isOperationalMessageLegacy = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
+  const hasOperationalMessageIntent = isOperationalMessage(message, context);
+  const isOperationalContext = hasOperationalMessageIntent || isOperationalMessageLegacy;
   const operationalDefaultsUsed = isOperationalContext
     ? [
         ...(_chatTarget?.mode === "read_only" ? ["read_only"] : []),
         "health_first", "no_deploy", "no_write", "approval_required",
       ]
     : [];
-  const obviousQuestionsSuppressed = hasTarget;
+  const obviousQuestionsSuppressed = isOperationalContext && hasTarget;
 
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
@@ -4079,7 +4161,9 @@ async function handleChatLLM(request, env) {
     // prompt sets behaviour for all contexts; this block is the authoritative anchor
     // for the specific operational turn.
     const _operationalContextBlock = [];
-    if (hasTarget) {
+    // PR36: bloco operacional pesado só quando intenção operacional real foi detectada.
+    // Antes: ativava por hasTarget sozinho (target default do painel ativava para qualquer "oi").
+    if (hasTarget && isOperationalContext) {
       const _tgt = _chatTarget;
       const targetDesc = [
         _tgt.worker      ? `worker: ${_tgt.worker}`           : null,
@@ -4095,7 +4179,7 @@ async function handleChatLLM(request, env) {
         : "";
 
       const readOnlyNote = _tgt.mode === "read_only"
-        ? "\nMODO READ-ONLY: resposta NÃO pode sugerir deploy, patch, merge, push ou escrita de qualquer tipo."
+        ? "\nModo atual: read_only. Ações com efeito colateral (deploy, patch, merge, push, escrita) estão bloqueadas sem aprovação/contrato. Isto é gate de execução, não regra de tom: você continua livre para conversar, opinar, sugerir, discordar, explicar e planejar."
         : "";
 
       _operationalContextBlock.push({
@@ -4146,6 +4230,11 @@ async function handleChatLLM(request, env) {
       max_tokens: CHAT_LLM_MAX_TOKENS,
     });
 
+    // PR36: telemetria mínima de sanitização/fallback.
+    // Sempre que o runtime substituir uma resposta por fallback ou sanitizer,
+    // registramos qual camada agiu — sem expor o conteúdo original ao operador.
+    const _sanitization = { applied: false, layer: null, reason: null };
+
     // Parse the structured response — fall back gracefully if the model returns
     // plain text (e.g. older model versions that ignore response_format).
     let reply = "";
@@ -4163,7 +4252,16 @@ async function handleChatLLM(request, env) {
       llmParseMode = _LLM_PARSE_MODE.JSON_PARSED;
     } catch {
       // Model returned plain text — use as-is, no planner
-      reply = llmResult.text || "Instrução recebida.";
+      const _rawText = llmResult.text;
+      if (!_rawText || _rawText.length === 0) {
+        reply = "Instrução recebida.";
+        // PR36: registra que o fallback plain-text foi acionado por reply vazio
+        _sanitization.applied = true;
+        _sanitization.layer = "plain_text_fallback";
+        _sanitization.reason = "llm_empty_text";
+      } else {
+        reply = _rawText;
+      }
       wantsPlan = false;
       llmParseMode = _LLM_PARSE_MODE.PLAIN_TEXT_FALLBACK;
     }
@@ -4176,6 +4274,13 @@ async function handleChatLLM(request, env) {
     const replyBeforeSanitize = reply;
     reply = _sanitizeChatReply(reply);
     const replyLayer1Sanitized = reply !== replyBeforeSanitize;
+    if (replyLayer1Sanitized) {
+      // PR36: telemetria — planner_terms layer agiu
+      _sanitization.applied = true;
+      _sanitization.layer = "planner_terms";
+      _sanitization.reason = "planner_leak_detected";
+      logNV("🛡️ [CHAT/LLM] Layer-1 sanitizer aplicado (planner_terms)", { session_id });
+    }
 
     // --- PR3: Arbitration Gate — PM4 é autoritativo ---
     //
@@ -4397,6 +4502,10 @@ async function handleChatLLM(request, env) {
     if (shouldActivatePlanner && _isManualPlanReply(reply)) {
       reply = _MANUAL_PLAN_FALLBACK;
       arbitrationDecision.reply_sanitized = "manual_plan_replaced";
+      // PR36: telemetria
+      _sanitization.applied = true;
+      _sanitization.layer = "manual_plan";
+      _sanitization.reason = "manual_plan_leak_detected";
       logNV("🛡️ [CHAT/LLM] Manual plan leak detectado no reply — sanitizado", { session_id });
     }
 
@@ -4435,6 +4544,8 @@ async function handleChatLLM(request, env) {
       memory_applied: _chatMemApplied,
       memory_hits: _chatMemHits,
       operational_context_applied: isOperationalContext,
+      // PR36: telemetria mínima de sanitização/fallback (campo aditivo, não-quebrante).
+      sanitization: _sanitization,
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
