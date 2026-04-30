@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR26)
-**Branch ativa:** `claude/pr26-docs-contract-loop-operator-skill`
-**Última tarefa:** PR26 — PR-DOCS — Criação de `schema/skills/CONTRACT_LOOP_OPERATOR.md` com 20 seções + `schema/skills/INDEX.md`. Primeira skill oficial supervisionada da ENAVIA. Cobre: identidade, objetivo, princípio de segurança sem engessamento, triggers, pré-condições, entradas/saídas, matriz operacional (7 estados), procedimento passo a passo (12 passos), bodies mínimos dos 5 endpoints de loop, critérios de parada (12 itens), critérios para sugerir nova skill, template de sugestão, relação com skills futuras (PR27–PR29), segurança/limites, 5 exemplos de uso, checklist final. Nenhum runtime alterado. Branch base: `fb8e640` (PR25 mergeada).
+**Data:** 2026-04-30 (atualizado após PR27)
+**Branch ativa:** `claude/pr27-docs-deploy-governance-operator-skill`
+**Última tarefa:** PR27 — PR-DOCS — Criação de `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` com 23 seções + atualização de `schema/skills/INDEX.md`. Segunda skill oficial supervisionada da ENAVIA. Cobre: identidade, objetivo, princípio de deploy seguro, matriz TEST vs PROD (8 tipos), 12 gates obrigatórios, relação com Contract Loop Operator/Worker Registry/Route Registry/Playbook, procedimento deploy TEST e promoção PROD (com aprovação humana obrigatória), rollback por tipo (DOCS/PROVA/IMPL/workflow/KV/PROD), diagnóstico de falhas (12 cenários), 7 exemplos de uso, segurança/limites, checklist final. Nenhum runtime alterado. Branch base: `2954fef` (PR26 mergeada).
 
 ## Contrato ativo
 
