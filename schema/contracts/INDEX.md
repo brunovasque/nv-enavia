@@ -38,20 +38,16 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR26** — PR-DOCS — Criar skill: Contract Loop Operator.
+**PR27** — PR-DOCS — Criar skill: Deploy Governance Operator.
 
-Criar `schema/skills/CONTRACT_LOOP_OPERATOR.md` — skill operacional supervisionada que encapsula o loop contratual completo (`execute-next → complete-task → advance-phase`). Documentar: objetivo/escopo, triggers, pré-condições, passos supervisionados, outputs, critérios de parada, referências a PR22–PR25.
+Criar `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` — skill supervisionada que governa deploy, rollback e promoção PROD/TEST. Documentar: quando deplorar TEST vs PROD, gates de deploy, rollback seguro por tipo, promoção supervisionada, relação com Contract Loop Operator (PR26), Worker Registry (PR25) e Playbook (PR24).
 
-Contexto: PR25 concluída — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado com 18 seções (inventário de infraestrutura). A frente System Map + Tool Registry (PR22–PR25) está fechada. Inicia-se a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
+Contexto: PR26 concluída — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial). Continua a frente de Skills (PR26–PR29). Todas as PRs desta frente são `PR-DOCS`, sem alteração de runtime.
 
 ### Histórico recente
 
-- **PR17** ✅ (PR-DIAG, mergeada — PR #178, commit merge `38582b4`) — diagnóstico do gap `phase_complete → advance-phase`.
-- **PR18** ✅ (PR-IMPL, mergeada — PR #179, commit merge `9b45395`) — endpoint `POST /contracts/advance-phase` criado em `nv-enavia.js`.
-- **PR19** ✅ (PR-PROVA, mergeada — PR #180, commit merge `fbf8813`) — smoke E2E do ciclo completo (52/52 ✅).
-- **PR20** ✅ (PR-IMPL, mergeada — PR #181, commit merge `028862d`) — `loop-status` expõe `complete-task` em `in_progress` (27/27 ✅).
-- **PR21** ✅ (PR-PROVA, mergeada — PR #182, commit merge `3d29b7d`) — matriz de estados do `loop-status` (53/53 ✅).
 - **PR22** ✅ (PR-DOCS, mergeada — PR #183, commit merge `fc7a4ec`) — `schema/system/ENAVIA_SYSTEM_MAP.md` criado (14 seções).
 - **PR23** ✅ (PR-DOCS, mergeada — PR #184, commit merge `beb3dfa`) — `schema/system/ENAVIA_ROUTE_REGISTRY.json` criado (68 rotas, 0 violações).
 - **PR24** ✅ (PR-DOCS, mergeada — PR #185, commit merge `b54e74c`) — `schema/playbooks/ENAVIA_OPERATIONAL_PLAYBOOK.md` criado (18 seções + Apêndice A).
-- **PR25** ✅ (PR-DOCS, em revisão) — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado (18 seções, inventário de infraestrutura).
+- **PR25** ✅ (PR-DOCS, mergeada — PR #186, commit merge `fb8e640`) — `schema/system/ENAVIA_WORKER_REGISTRY.md` criado (18 seções, inventário de infraestrutura).
+- **PR26** ✅ (PR-DOCS, em revisão) — `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado (20 seções, primeira skill oficial) + `schema/skills/INDEX.md`.

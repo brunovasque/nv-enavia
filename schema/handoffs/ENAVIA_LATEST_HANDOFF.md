@@ -1,82 +1,64 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-04-29
-**De:** PR25 — PR-DOCS — Criar `schema/system/ENAVIA_WORKER_REGISTRY.md`
-**Para:** PR26 — PR-DOCS — Criar skill: Contract Loop Operator
+**Data:** 2026-04-30
+**De:** PR26 — PR-DOCS — Criar `schema/skills/CONTRACT_LOOP_OPERATOR.md`
+**Para:** PR27 — PR-DOCS — Criar skill: Deploy Governance Operator
 
 ## O que foi feito nesta sessão
 
-### PR25 — PR-DOCS — Worker Registry
+### PR26 — PR-DOCS — Contract Loop Operator (primeira skill oficial)
 
 **Tipo:** `PR-DOCS`
-**Branch:** `claude/pr25-docs-enavia-worker-registry` (criada a partir de `origin/main` atualizada — commit base `b54e74c`, contendo PR24 mergeada — PR #185)
+**Branch:** `claude/pr26-docs-contract-loop-operator-skill` (criada a partir de `origin/main` atualizada — commit base `fb8e640`, contendo PR25 mergeada — PR #186)
 
-**Arquivo criado:**
+**Arquivos criados:**
 
-1. **`schema/system/ENAVIA_WORKER_REGISTRY.md`** (NOVO):
-   - 18 seções obrigatórias.
-   - Fontes: `wrangler.toml`, `wrangler.executor.template.toml`, `executor/wrangler.toml`, `.github/workflows/deploy.yml`, `.github/workflows/deploy-executor.yml`, `nv-enavia.js`, `contract-executor.js`, System Map, Route Registry, Playbook.
-   - Seção 1: Objetivo — inventário oficial de infraestrutura.
-   - Seção 2: 13 fontes consultadas com localização e conteúdo.
-   - Seção 3: Ambientes (PROD, TEST, Executor PROD/TEST, Deploy Worker PROD/TEST, externos).
-   - Seção 4: Workers (6 Cloudflare confirmados + 5 externos por URL).
-   - Seção 5: Service bindings EXECUTOR/DEPLOY_WORKER PROD e TEST separados; endpoints confirmados.
-   - Seção 6: KV ENAVIA_BRAIN (IDs visíveis); executor KV ENAVIA_GIT/GIT_KV; 14 key shapes confirmados.
-   - Seção 7: Secrets esperados por worker (nv-enavia, GitHub Actions, executor); coluna "Valor" = NUNCA DOCUMENTAR.
-   - Seção 8: 11 env vars nv-enavia PROD/TEST + 5 env vars executor PROD/TEST (com diferenças documentadas).
-   - Seção 9: 2 workflows (deploy.yml, deploy-executor.yml) com triggers, secrets e validações.
-   - Seção 10: Tabela Worker→Binding→Endpoint (7 relações confirmadas).
-   - Seção 11: Relação com Route Registry (uso conjunto para diagnóstico).
-   - Seção 12: Relação com Operational Playbook (infraestrutura complementa operação).
-   - Seção 13: Checklist de saúde (18 itens).
-   - Seção 14: Diagnóstico de 10 falhas comuns (sintoma → causa → onde verificar → ação segura).
-   - Seção 15: 15 fatos confirmados por evidência direta.
-   - Seção 16: 8 incertezas marcadas como [A VERIFICAR].
-   - Seção 17: "Isso é opcional. Não mexa agora." (9 itens).
-   - Seção 18: Regras de manutenção (8 regras).
+1. **`schema/skills/CONTRACT_LOOP_OPERATOR.md`** (NOVO):
+   - 20 seções obrigatórias.
+   - Primeira skill oficial supervisionada da ENAVIA.
+   - Frase obrigatória: "Segurança não significa engessamento. A skill deve proteger o sistema sem impedir evolução."
+   - Seção 3: Princípio de segurança sem engessamento — skill pode sugerir novas skills, propor melhorias, sem autonomia cega.
+   - Seção 9: Matriz operacional com 7 estados (queued, in_progress, phase_complete, contract_complete, plan_rejected, cancelled, blocked/no_action) + observação PR21.
+   - Seção 11: Bodies mínimos dos 5 endpoints confirmados no Route Registry (loop-status, execute-next, complete-task, advance-phase, close-final).
+   - Seção 12: 12 critérios de parada.
+   - Seção 13: 8 gatilhos para sugerir nova skill.
+   - Seção 14: Template padrão de sugestão de nova skill.
+   - Seção 15: Relação com Deploy Governance Operator (PR27), System Mapper (PR28), Contract Auditor (PR29).
+   - Seção 18: 5 exemplos de uso concretos (queued, in_progress, phase_complete, plan_rejected, sugestão de skill).
+   - Seção 20: "Isso é opcional. Não mexa agora." (9 itens: executor automático, endpoint /skills/run, UI de skills, etc.).
 
-2. **Governança:**
-   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR25 no topo.
+2. **`schema/skills/INDEX.md`** (NOVO):
+   - 1 skill ativa (Contract Loop Operator — PR26).
+   - 3 skills previstas (PR27–PR29).
+   - Seção de skills sugeridas (vazia no momento).
+   - Regras de uso e relação com documentos oficiais.
+
+3. **Governança:**
+   - `schema/execution/ENAVIA_EXECUTION_LOG.md` — bloco PR26 no topo.
    - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo.
    - `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado.
-   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR26.
+   - `schema/contracts/INDEX.md` — próxima PR autorizada = PR27.
 
-**Arquivos NÃO alterados (proibido pelo escopo):**
-- `nv-enavia.js`, `contract-executor.js`
-- `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`, `wrangler.executor.template.toml`
+**Arquivos NÃO alterados:**
+- `nv-enavia.js`, `contract-executor.js`, `panel/`, `executor/`, `.github/workflows/`, `wrangler.toml`
 - Nenhum teste criado ou modificado.
 
 ## Critérios de aceite — atendidos
 
 | Critério | Status |
 |----------|--------|
-| `schema/system/ENAVIA_WORKER_REGISTRY.md` criado | ✅ |
-| 18 seções obrigatórias presentes | ✅ |
-| Workers, bindings, KV, secrets, env vars, workflows documentados | ✅ |
-| Nenhum valor de secret exposto | ✅ |
-| Nenhum binding/worker/KV inventado | ✅ |
-| Incertezas marcadas como [A VERIFICAR] | ✅ (8 itens) |
-| Referências a ENAVIA_SYSTEM_MAP.md | ✅ (3 ocorrências) |
-| Referências a ENAVIA_ROUTE_REGISTRY.json | ✅ (13 ocorrências) |
-| Referências a ENAVIA_OPERATIONAL_PLAYBOOK.md | ✅ (4 ocorrências) |
-| "Isso é opcional. Não mexa agora." presente (Seção 17) | ✅ |
+| `schema/skills/CONTRACT_LOOP_OPERATOR.md` criado | ✅ |
+| `schema/skills/INDEX.md` criado | ✅ |
+| 20 seções obrigatórias presentes | ✅ |
+| Frase "Segurança não significa engessamento" presente | ✅ |
+| Skill permite sugestão de novas skills sob governança | ✅ (seções 13, 14, Exemplo 5) |
+| Skill não autoriza autonomia cega | ✅ (seções 3, 17) |
+| PR21 observação sobre `status_global:"blocked"` presente | ✅ (seção 9) |
+| Bodies mínimos dos 5 endpoints documentados | ✅ (seção 11) |
+| "Isso é opcional. Não mexa agora." presente | ✅ (seção 20) |
 | Nenhum runtime alterado | ✅ |
-| `git diff --name-only` (runtime) vazio | ✅ |
 | Governança atualizada | ✅ |
-| `schema/contracts/INDEX.md` aponta PR26 como próxima | ✅ |
-
-## Verificações executadas
-
-| Comando | Resultado |
-|---------|-----------|
-| `grep -c "^## [0-9]" ENAVIA_WORKER_REGISTRY.md` | `18` ✅ |
-| `grep -c "ENAVIA_SYSTEM_MAP"` | `3` ✅ |
-| `grep -c "ENAVIA_ROUTE_REGISTRY"` | `13` ✅ |
-| `grep -c "ENAVIA_OPERATIONAL_PLAYBOOK"` | `4` ✅ |
-| `grep -c "NUNCA DOCUMENTAR"` | `1` ✅ |
-| `grep "Isso é opcional"` | presente ✅ |
-| `git diff --name-only` (runtime) | `(vazio)` ✅ |
-| `.js/.ts/.toml/.yml alterados` | `0 arquivos` ✅ |
+| `schema/contracts/INDEX.md` aponta PR27 como próxima | ✅ |
 
 ## Contrato ativo
 
@@ -84,18 +66,19 @@
 
 ## Próxima ação autorizada
 
-**PR26** — `PR-DOCS` — Criar skill: Contract Loop Operator
+**PR27** — `PR-DOCS` — Criar skill: Deploy Governance Operator
 
-Criar `schema/skills/CONTRACT_LOOP_OPERATOR.md` — skill operacional supervisionada que encapsula o loop contratual completo (`execute-next → complete-task → advance-phase`). Documentar:
-- Objetivo e escopo da skill
-- Triggers de ativação
-- Pré-condições (contrato ativo, estado queued/in_progress/phase_complete)
-- Passos supervisionados com checkpoints
-- Outputs e evidências esperadas
-- Critérios de parada (plan_rejected, cancelled, contract_complete)
-- Referências ao System Map (PR22), Route Registry (PR23), Playbook (PR24), Worker Registry (PR25)
+Criar `schema/skills/DEPLOY_GOVERNANCE_OPERATOR.md` — skill supervisionada que governa deploy, rollback e promoção PROD/TEST. Deve cobrir:
+- Quando deplorar TEST vs PROD
+- Gates de deploy (validações antes do push)
+- Rollback seguro por tipo (DOCS, PROVA, IMPL, KV, PROD)
+- Promoção supervisionada para PROD
+- Referência ao Worker Registry (PR25) para infraestrutura
+- Referência ao Operational Playbook (PR24) para procedimentos
+- Relação com Contract Loop Operator (PR26) quando execute-next aciona deploy
+- Atualizar `schema/skills/INDEX.md` com a nova skill
 
-**Pré-requisito:** PR25 concluída (esta PR) ✅
+**Pré-requisito:** PR26 concluída (esta PR) ✅
 
 ## Bloqueios
 
