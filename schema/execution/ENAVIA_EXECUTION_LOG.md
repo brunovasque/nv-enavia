@@ -4,6 +4,66 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR42 — PR-DIAG — Diagnóstico da Memória Atual no Runtime
+
+- **Branch:** `copilot/claudepr42-diag-memoria-runtime-brain`
+- **Tipo:** `PR-DIAG` (read-only, nenhum runtime alterado)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR41 ✅ (declarada mergeada pelo operador — ver Seção 12.1 do relatório)
+- **Escopo:** Docs-only. Diagnóstico de memória runtime + relatório + governança.
+
+### Objetivo
+
+Diagnosticar como a memória atual funciona no runtime. Mapear bindings KV,
+chaves/shapes, fluxo de chat, participação do painel, relação com Brain documental
+e preparar recomendação técnica para PR43 Brain Loader.
+
+### Resultado
+
+✅ Diagnóstico completo — 13 seções mapeadas com evidência de código real.
+
+### Principais achados
+
+1. `ENAVIA_BRAIN` EXISTE com ID real em wrangler.toml (PROD + TEST)
+2. `DEPLOY_KV` e `PROOF_KV` não existem no repo
+3. `ENAVIA_GIT` e `GIT_KV` existem apenas no executor template (não no worker principal)
+4. KV ENAVIA_BRAIN é multipropósito — todos os namespaces em um único KV
+5. Fluxo legado (POST /): buildBrain carrega brain:index + brain:train:* no boot
+6. Fluxo LLM-first (POST /chat/run): pipeline PM2-PM9, retrieval por PM3
+7. Painel envia context.target — sem botão "Salvar na memória" no chat
+8. Brain documental NÃO está conectado ao runtime
+9. Brain Loader via bundle estático é viável para PR43
+10. PR41 discrepância registrada (não encontrado relatório no repo)
+
+### Arquivos criados
+
+- `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md`
+
+### Arquivos atualizados
+
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Verificações
+
+| Verificação | Resultado |
+|-------------|-----------|
+| `git diff --name-only` — nenhum `.js`, `.ts`, `.toml`, `.yml` alterado | ✅ |
+| `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md` criado | ✅ |
+| Relatório menciona `ENAVIA_BRAIN` explicitamente | ✅ (Seção 3.1) |
+| Relatório mapeia painel apenas como leitura | ✅ (Seção 6) |
+| Relatório recomenda PR43 com base em evidência | ✅ (Seção 11) |
+| Governança atualizada | ✅ |
+| Nenhum runtime alterado | ✅ |
+
+### Próxima PR
+
+**PR43 — PR-IMPL — Brain Loader read-only Worker-only**
+
+---
+
 ## 2026-04-30 — PR40 — PR-DOCS — Self Model da Enavia
 
 - **Branch:** `copilot/claude-pr40-docs-self-model-enavia`
