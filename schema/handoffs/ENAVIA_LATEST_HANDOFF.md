@@ -1,12 +1,104 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR51 — PR-IMPL — Skill Router read-only
-**Para:** PR52 — PR-PROVA — Teste de roteamento de skills
+**De:** PR52 — PR-PROVA — Teste de roteamento de skills
+**Para:** PR53 — PR-IMPL — Retrieval por intenção
 
 ## O que foi feito nesta sessão
 
-### PR51 — PR-IMPL — Skill Router read-only
+### PR52 — PR-PROVA — Teste de roteamento de skills
+
+**Tipo:** `PR-PROVA` (Worker-only, prova pura)
+**Branch:** `copilot/claude-pr52-prova-roteamento-skills`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR51 ✅ (PR-IMPL — Skill Router read-only — 168/168)
+
+**Objetivo:**
+Provar formalmente que o Skill Router read-only v1 (PR51) roteia corretamente pedidos
+de skill no fluxo real do chat/prompt, sem executar nenhuma skill, sem criar endpoint,
+sem criar `/skills/run`, sem falsa capacidade.
+
+**Resultado:**
+✅ **202/202 asserts. 1.290/1.290 total com regressões.**
+
+**Cenários provados (12):**
+- A: Skill Router presente e read-only ✅ (16/16)
+- B: Contract Loop Operator (3 mensagens) ✅ (18/18)
+- C: Contract Auditor (3 mensagens + URL PR) ✅ (14/14)
+- D: Deploy Governance Operator (3 mensagens) ✅ (14/14)
+- E: System Mapper (3 mensagens) ✅ (16/16)
+- F: Pedido explícito de skill (rode/use/acione a skill X) ✅ (18/18)
+- G: Pergunta sobre skill (/skills/run inexistente) ✅ (9/9)
+- H: Sem match (oi, qual o melhor caminho?) ✅ (13/13)
+- I: Integração com Classificador de Intenção ✅ (16/16)
+- J: Shape canônico de /chat/run ✅ (30/30, limitação de harness LLM documentada)
+- K: Segurança (read-only, sem execução, sem rede/KV/FS, sem markdown) ✅ (25/25)
+- L: Regressões de falsa capacidade ✅ (13/13)
+
+**Garantias provadas:**
+- Nenhuma skill executada
+- /skills/run não existe (confirmado via warning e ausência de endpoint)
+- Warning read-only em todo resultado
+- Falsa capacidade bloqueada (rode /skills/run, execute a skill agora, a skill já pode aplicar patch?)
+- Router é determinístico (mesma entrada → mesma saída)
+- Router não chama rede/KV/filesystem (retorna em < 100ms)
+- Router não altera input
+- Router não retorna conteúdo completo de markdowns
+- Intent Classifier intacto
+- LLM Core intacto
+- Brain Context intacto
+- Anti-bot intacto
+- Gates intactos
+
+**Arquivos novos:**
+- `tests/pr52-skill-routing-runtime.prova.test.js` — 202 asserts, 12 cenários A–L
+- `schema/reports/PR52_PROVA_ROTEAMENTO_SKILLS.md` — relatório completo
+
+**Arquivos modificados:**
+- `schema/contracts/INDEX.md` — próxima PR: PR53
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Arquivos NÃO alterados (confirmado por `git diff --name-only`):**
+`schema/enavia-skill-router.js`, `schema/enavia-intent-classifier.js`,
+`nv-enavia.js`, `schema/enavia-cognitive-runtime.js`, `schema/enavia-llm-core.js`,
+`schema/enavia-brain-loader.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets,
+sanitizers, gates. Nenhum endpoint criado. Nenhum Skill Executor implementado.
+Nenhuma escrita de memória.
+
+**Resultados dos testes:**
+- PR52 prova: **202/202** ✅
+- PR51 smoke: **168/168** ✅
+- PR50 prova: **124/124** ✅
+- PR49 smoke: **96/96** ✅
+- Regressões PR13–PR48: **700/700** ✅
+- **Total: 1.290/1.290** ✅
+
+---
+
+## Próxima PR autorizada
+
+**PR53 — PR-IMPL — Retrieval por intenção**
+
+Objetivo: implementar o Retrieval por intenção — conectar o Skill Router ao LLM Core
+para que a skill selecionada seja injetada no prompt, orientando a resposta da Enavia
+com conteúdo documental relevante.
+
+**Pré-requisito:** PR52 ✅ (concluída — 1.290/1.290 testes passando)
+
+**O que está disponível para a PR53:**
+- `routeEnaviaSkill()` testável e validado (PR51 + PR52)
+- 4 skills documentais mapeadas com sources apontando para .md
+- Campo `skill_routing` no response do `/chat/run`
+- `classifyEnaviaIntent()` integrado
+- `buildLLMCoreBlock()` estável (PR46 + PR48)
+- `getEnaviaBrainContext()` estável (PR43)
+
+---
+
+
 
 **Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
 **Branch:** `copilot/claudepr51-impl-skill-router-readonly`
