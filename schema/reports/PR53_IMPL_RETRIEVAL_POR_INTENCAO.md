@@ -112,7 +112,7 @@ Quando não há skill clara, mas há intenção relevante:
 
 | Intent | Contexto |
 |--------|---------|
-| `frustration_or_trust_issue` | Sinceridade, execesso documental, execução concreta, "Isso é opcional. Não mexa agora." |
+| `frustration_or_trust_issue` | Sinceridade, excesso documental, execução concreta, "Isso é opcional. Não mexa agora." |
 | `next_pr_request` | Resposta curta + prompt completo, não reabrir discussão |
 | `capability_question` | Diferencia atual/futuro, não finge `/skills/run` ou Skill Executor |
 | `system_state_question` | Diferencia documentado vs. runtime, não inventa workers/bindings |

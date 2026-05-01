@@ -412,9 +412,9 @@ console.log("\n📦 CENÁRIO K — Integração com buildChatSystemPrompt");
     "K2: seção não aparece quando applied=false",
   );
 
-  // K3: seção não ativa MODO OPERACIONAL ATIVO sozinha
+  // K3: seção não ativa MODO OPERACIONAL ATIVO sozinha (sem is_operational_context)
   ok(
-    !promptWith.includes("MODO OPERACIONAL ATIVO") || true,
+    !promptWith.includes("MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:"),
     "K3: retrieval não ativa MODO OPERACIONAL por si só (is_operational_context=false)",
   );
   // Validar mais estritamente: sem is_operational_context, não deve ter o bloco operacional
