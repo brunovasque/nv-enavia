@@ -1,98 +1,123 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta
-**Para:** PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1
+**De:** PR47 — PR-PROVA — Prova de Resposta Viva com LLM Core v1
+**Para:** PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1 (regras tonais truncadas)
 
 ## O que foi feito nesta sessão
 
-### PR46 — PR-IMPL — LLM Core v1
+### PR47 — PR-PROVA — Prova de Resposta Viva LLM Core v1
 
-**Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
-**Branch:** `copilot/claudepr46-impl-llm-core-v1`
+**Tipo:** `PR-PROVA` (sem alteração de runtime)
+**Branch:** `copilot/claudepr47-prova-resposta-viva-llm-core-v1`
 **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
-**PR anterior validada:** PR45 ✅
+**PR anterior validada:** PR46 ✅ (mergeada — PR #207)
 
 **Objetivo:**
-Implementar o LLM Core v1 da Enavia, consolidando identidade, capacidades, política de
-resposta e relação com o Brain Context em uma camada central do prompt do chat,
-reduzindo redundância sem perder segurança, anti-bot, governança ou envelope JSON.
+Provar que o LLM Core v1 (PR46) preserva ou melhora a qualidade da resposta da
+Enavia, sem voltar ao comportamento robótico, sem criar falsa capacidade, sem
+quebrar anti-bot, sem relaxar governança.
 
 **Arquivos novos:**
-- `schema/enavia-llm-core.js` — `buildLLMCoreBlock()` + `getLLMCoreMetadata()` (camada LLM Core v1, pure function determinística)
-- `tests/pr46-llm-core-v1.smoke.test.js` — smoke test (7 cenários A–G, 43 asserts)
-- `schema/reports/PR46_IMPL_LLM_CORE_V1.md` — relatório completo
+- `tests/pr47-resposta-viva-llm-core-v1.prova.test.js` — 10 cenários A–J, 79 asserts
+- `schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md` — relatório completo
 
 **Arquivos modificados:**
-- `schema/enavia-cognitive-runtime.js` — substituiu antigas seções 1+1b+2+3+4 do `buildChatSystemPrompt` por chamada única ao `buildLLMCoreBlock({ ownerName })`. Demais seções (Brain Context, target, MODO OPERACIONAL condicional, planner, memória, envelope JSON) inalteradas.
+- `schema/contracts/INDEX.md` — próxima PR autorizada virou PR48 cirúrgica
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
 
-**Arquivos NÃO alterados:**
-`nv-enavia.js`, `schema/enavia-brain-loader.js` (snapshot principal preservado por escopo),
-`schema/enavia-identity.js`, `schema/enavia-capabilities.js`, `schema/enavia-constitution.js`,
-`schema/operational-awareness.js`, painel, executor, deploy worker, workflows,
-`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets, sanitizers.
+**Arquivos NÃO alterados (nenhum runtime tocado):**
+`nv-enavia.js`, `schema/enavia-llm-core.js`, `schema/enavia-cognitive-runtime.js`,
+`schema/enavia-brain-loader.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets,
+sanitizers, prompt real, gates, endpoints.
 
-**Medição (chars / tokens estimados, todos os 6 cenários da PR45):**
+**Resultado da prova: ⚠️ FALHOU PARCIALMENTE — 75/79 asserts (94,9%)**
 
-| Cenário | PR45 baseline | PR46 atual | Δ chars | Δ tokens |
-|---------|--------------:|-----------:|--------:|---------:|
-| A — simples sem target | 10.945 | 10.496 | -449 | -112 |
-| B — simples target read_only | 11.187 | 10.738 | -449 | -112 |
-| C — identidade | 10.945 | 10.496 | -449 | -112 |
-| D — capacidade | 10.945 | 10.496 | -449 | -112 |
-| E — operacional real | 12.812 | 12.363 | -449 | -112 |
-| F — operacional completo + awareness | 13.689 | 13.240 | -449 | -112 |
+| Cenário | Resultado |
+|---------|-----------|
+| A — Identidade viva | ✅ 12/12 |
+| B — Pergunta de capacidade | ✅ 11/11 |
+| C — Frustração / anti-bot emocional | ⚠️ 7/9 (2 achados) |
+| D — Pedido de próxima PR | ⚠️ 4/6 (2 achados) |
+| E — Pedido operacional real | ✅ 7/7 |
+| F — Falsa capacidade bloqueada | ✅ 5/5 |
+| G — `read_only` como gate | ✅ 7/7 |
+| H — Tamanho/duplicação | ✅ 14/14 |
+| I — Envelope JSON preservado | ✅ 5/5 |
+| J — Sanitizers/gates preservados | ✅ 7/7 |
 
-**Economia: -4,1% por conversa, constante em todos os cenários.**
+**4 achados reais (causa raiz única):** o snapshot do Brain Loader trunca em
+4.000 chars antes de incluir regras 5–10 de
+`schema/brain/self-model/how-to-answer.md`. Especificamente ausentes do
+prompt em runtime:
 
-**Outros marcadores:**
-- "NV Imóveis": 9 → **3** ocorrências
-- "ENAVIA": 11 → ~7 ocorrências
-- "não é assistente": 1 (preservado para blindagem)
+- **C1:** "excesso documental" (regra 8)
+- **C2:** "Isso é opcional. Não mexa agora." (regra 8)
+- **D1:** "resposta curta + prompt completo" (regra 7)
+- **D2:** "sem reabrir discussão" (regra 7)
 
-**Por que a economia é menor que o estimado pela PR45 (~400-450 tok)?**
-A PR45 estimou assumindo redução também dos Brain blocks 1-3. O escopo desta PR46
-proíbe alteração do snapshot principal do Brain Loader. Por isso a economia veio
-exclusivamente da consolidação das antigas seções 1+1b+2+3+4 no Core. Documentado
-no relatório seção 9.
+**O que foi preservado integralmente:**
+- Identidade viva (Enavia, IA operacional estratégica, LLM-first, não é Enova/NV/atendente).
+- Capacidades sem falsa autonomia (Skill Router runtime / `/skills/run` /
+  Intent Engine completo declarados como ainda NÃO existentes).
+- Anti-bot operacional: frustração não ativa MODO OPERACIONAL.
+- `read_only` como gate de execução, não tom.
+- Skills documentais vs runtime: skills citadas como guias documentais.
+- Tamanho/duplicação sem regressão: A=10.496 (-449), B=10.738 (-449),
+  E=12.363 (-449), F=12.435 (-1.254) chars vs PR45 baseline. "NV Imóveis" 3x.
+- Envelope JSON `{reply, use_planner}` preservado.
 
 **Testes:**
-- `node --check` em `enavia-llm-core.js`, `enavia-cognitive-runtime.js`, `enavia-brain-loader.js`, `pr46-llm-core-v1.smoke.test.js` → OK
-- Smoke PR46: **43/43 ✅**
-- Regressões PR44 (38/38), PR43 (32/32), PR37 (56/56), PR36 (26/26), PR21 (53/53), PR20 (27/27), PR19 (52/52), PR14 (183/183), PR13 (91/91) → **558/558 ✅**
-- **TOTAL geral: 601/601 ✅**
-
-**Mantidos integralmente:**
-- Brain Context (injetado por padrão, desligável por flag, antes do envelope JSON)
-- Envelope JSON `{reply, use_planner}`
-- Target informativo factual + nota `read_only` como gate
-- `MODO OPERACIONAL ATIVO` apenas quando `is_operational_context=true`
-- Sanitizers (não tocados — em `nv-enavia.js`)
-- Gates de execução (não tocados)
-- Política de planner / `use_planner`
-- Continuidade + uso/criação de memória
-- Operational Awareness
-- `buildCognitivePromptBlock` e demais consumidores
+- `node --check` em `enavia-llm-core.js`, `enavia-cognitive-runtime.js`,
+  `enavia-brain-loader.js`, `pr47-resposta-viva-llm-core-v1.prova.test.js` → OK
+- PR47 prova: **75/79 (4 achados documentados)**
+- Regressões obrigatórias: PR46 (43/43) ✅, PR44 (38/38) ✅, PR43 (32/32) ✅,
+  PR37 (56/56) ✅, PR36 (26/26) ✅, PR21 (53/53) ✅, PR20 (27/27) ✅,
+  PR19 (52/52) ✅, PR14 (183/183) ✅, PR13 (91/91) ✅ → **601/601 ✅**
 
 ## Próxima etapa segura
 
-**PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1**
+**PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1 (regras tonais truncadas)**
 
-Validar com cenários reais (chat live ou simulação com LLM externo) que o LLM Core v1
-produz respostas vivas, naturais e não engessadas, mantendo anti-bot, gates de execução
-e falsa capacidade bloqueada.
+Conforme contrato PR47 ("Se a prova falhar… próxima PR deve ser PR48 — PR-IMPL —
+Correção cirúrgica do LLM Core v1"), a próxima PR NÃO é o Classificador de
+intenção, mas a correção cirúrgica.
 
-Se algo falhar antes da PR47:
-**PR47 — PR-IMPL — Correção cirúrgica do LLM Core v1**
+**Escopo sugerido (a detalhar no prompt da PR48):**
+1. Levar regras 6, 7 e 8 de `how-to-answer.md` para o **LLM Core** (ou para um
+   bloco compacto adjacente), evitando depender do truncamento variável do
+   Brain Loader.
+2. Frase canônica "Isso é opcional. Não mexa agora." precisa estar no prompt
+   em runtime.
+3. Política "próxima PR = resumo curto + prompt completo + sem reabrir
+   discussão" precisa estar no prompt em runtime.
+4. Reavaliar o snapshot do Brain Loader: ou aumentar limite por bloco para a
+   fonte `how-to-answer.md`, ou compactar as regras 1–4 para abrir espaço
+   para 5–10. Manter limite total ≤ 4.000 chars como princípio.
+
+**Escopo proibido em PR48 cirúrgica:**
+- Não implementar Intent Engine.
+- Não implementar Skill Router runtime.
+- Não criar `/skills/run`.
+- Worker-only / patch cirúrgico.
+
+Após PR48 cirúrgica + nova PR-PROVA verde, então sim avançar para PR49 com o
+Classificador de intenção (antiga PR48 — Intent Engine v1).
 
 ## Bloqueios
 
-Nenhum. Branch sem conflitos com `main`. Todos os testes passando. Governança atualizada.
+Nenhum bloqueio impeditivo de criar PR47. Branch sem conflitos com `main`.
+Nenhum runtime alterado. Governança atualizada. Achados são tonais e estão
+documentados no relatório PR47.
 
 ## Riscos restantes
 
-1. Duplicação Core ↔ Brain blocks 2-3 (R2/C3 PR45) ainda existe — endereçável quando
-   o escopo permitir alterar o snapshot do Brain Loader.
-2. Economia menor que o estimado pela PR45 — documentado.
-3. Validação subjetiva da resposta viva (qualidade humana) ainda não foi feita —
-   é exatamente o objetivo da PR47.
+1. **R1 (alto, mapeado):** Truncamento do Brain Loader corta regras 5–10 de
+   how-to-answer. Endereçável na PR48 cirúrgica.
+2. **R2 (baixo):** Identidade, capacidades, limitações e gates de segurança
+   seguem firmes — os achados são tonais, não de segurança.
+3. **R3 (baixo):** "próxima PR" aparece no prompt como capability, mas SEM a
+   política de tom associada (regra 7). Endereçável na PR48 cirúrgica.
