@@ -4,6 +4,67 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR60 — PR-PROVA — Prova anti-bot final
+
+- **Branch:** `copilot/claudepr60-prova-anti-bot-final`
+- **Tipo:** `PR-PROVA` (somente testes — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR59 ✅ (Response Policy viva — 96/96)
+
+### Objetivo
+
+Provar que a pilha cognitiva completa da Enavia reduziu comportamento robótico e preservou segurança. Validar em modo prova que LLM Core v1, Brain Context, Intent Classifier, Skill Router read-only, Intent Retrieval, Self-Audit read-only, Response Policy viva, anti-bot PR36/37, envelope JSON, gates de execução e governança funcionam em harmonia.
+
+### Implementação
+
+**Teste criado:** `tests/pr60-anti-bot-final.prova.test.js`
+- 16 cenários (A–P), 236 assertions
+- Pure unit tests. Sem rede, KV, FS ou LLM externo.
+
+**Módulos importados:**
+- `classifyEnaviaIntent`, `INTENT_TYPES`, `CONFIDENCE_LEVELS`
+- `routeEnaviaSkill`, `SKILL_IDS`, `ROUTER_MODES`
+- `buildIntentRetrievalContext`, `RETRIEVAL_MODE`
+- `runEnaviaSelfAudit`, `SELF_AUDIT_RISK_LEVELS`, `SELF_AUDIT_CATEGORIES`
+- `buildEnaviaResponsePolicy`, `buildResponsePolicyPromptBlock`, `RESPONSE_STYLES`, `POLICY_MODES`
+- `buildChatSystemPrompt`
+- `buildLLMCoreBlock`
+- `getEnaviaBrainContext`
+
+### Resultado
+
+- **Teste PR60:** 236/236 ✅
+- **Regressões:** 21 testes, todos passando:
+  - pr59: 96/96, pr57: ✅, pr56: ✅, pr54: ✅, pr53: ✅, pr52: ✅, pr51: ✅
+  - pr50: ✅, pr49: ✅, pr48: 20/20, pr47: 79/79, pr46: 43/43
+  - pr44: 38/38, pr43: 32/32, pr37: 56/56, pr36: 26/26
+  - pr21: 53/53, pr20: 27/27, pr19: 52/52, pr14: 183/183, pr13: 91/91
+
+### Finding documentado
+
+**I1 — Classificador: "você já consegue" → unknown**
+- Mensagem: "você já consegue executar skills de verdade?"
+- Classificador retorna `unknown` em vez de `capability_question`
+- Causa: "você já consegue" ≠ "você consegue" como substring (`_CAPABILITY_TERMS`)
+- Impacto: baixo — sistema se comporta com segurança, I2-I6 passam
+- Recomendação: adicionar "você já consegue" e variantes com advérbio à lista em PR futura
+
+### Arquivos criados
+
+- `tests/pr60-anti-bot-final.prova.test.js`
+- `schema/reports/PR60_PROVA_ANTI_BOT_FINAL.md`
+- Governança atualizada: INDEX.md, STATUS, HANDOFF, EXECUTION_LOG
+
+### O que NÃO foi alterado
+
+- Nenhum módulo de runtime
+- Nenhum endpoint criado
+- Nenhum reply alterado automaticamente
+- Nenhum fluxo bloqueado
+- Nenhum painel/executor/deploy worker/workflow alterado
+
+---
+
 ## 2026-05-01 — PR59 — PR-IMPL — Response Policy viva
 
 - **Branch:** `copilot/claudepr59-impl-response-policy-viva`
