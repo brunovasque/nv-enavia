@@ -1,8 +1,60 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR53 — PR-IMPL — Retrieval por Intenção
-**Para:** PR54 — PR-PROVA — Testes de memória contextual
+**De:** PR54 — PR-PROVA — Prova de Memória Contextual
+**Para:** PR55 — PR-DOCS — Self-Audit Framework
+
+## O que foi feito nesta sessão
+
+### PR54 — PR-PROVA — Prova de Memória Contextual
+
+**Tipo:** `PR-PROVA` (Worker-only, prova pura)
+**Branch:** `copilot/claudepr54-prova-memoria-contextual`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR53 ✅ (PR-IMPL — Retrieval por Intenção — 82/82 + 1.290/1.290)
+
+**Objetivo:**
+Provar que o Retrieval por Intenção v1 (PR53) funciona como memória contextual read-only no fluxo real do prompt/chat da Enavia.
+
+**Resultado:**
+✅ **93/93 asserts PR54 + 1.372/1.372 regressões = 1.465/1.465 total.**
+
+**Arquivos criados:**
+- `tests/pr54-memoria-contextual.prova.test.js` — 93 asserts (13 cenários A–M)
+- `schema/reports/PR54_PROVA_MEMORIA_CONTEXTUAL.md` — relatório completo
+
+**Arquivos modificados:**
+- `schema/contracts/INDEX.md` — próxima PR: PR55
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Garantias:**
+- Nenhum runtime alterado (enavia-intent-retrieval.js, enavia-intent-classifier.js, enavia-skill-router.js, enavia-cognitive-runtime.js, enavia-llm-core.js, enavia-brain-loader.js, nv-enavia.js — todos intactos)
+- Nenhuma skill executada
+- /skills/run não existe (confirmado via inspeção de código)
+- Nenhum endpoint criado
+- Nenhum Panel/Executor/Deploy Worker/workflow/wrangler alterado
+- Nenhum KV/binding/secret alterado
+- context_block não exposto no response — apenas metadados
+- Campo intent_retrieval aditivo e não-quebrante no response
+
+---
+
+## Próxima PR
+
+**PR55 — PR-DOCS — Self-Audit Framework**
+
+Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+### Estado do sistema ao passar o handoff
+
+- `schema/enavia-intent-retrieval.js` — Retrieval por Intenção v1 ativo ✅ (provado PR54)
+- `schema/enavia-skill-router.js` — Skill Router read-only v1 ativo ✅ (provado PR52)
+- `schema/enavia-intent-classifier.js` — Intent Classifier v1 ativo ✅ (provado PR50)
+- `schema/enavia-llm-core.js` — LLM Core v1 ativo ✅ (provado PR47+PR48)
+- `schema/enavia-brain-loader.js` — Brain Loader read-only ativo ✅ (provado PR44)
+- `nv-enavia.js` — Worker principal com `intent_retrieval`, `skill_routing`, `intent_classification` no response
 
 ## O que foi feito nesta sessão
 

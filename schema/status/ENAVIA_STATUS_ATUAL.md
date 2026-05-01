@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR53 — Retrieval por Intenção ✅)
-**Branch ativa:** `copilot/claudepr53-impl-retrieval-por-intencao`
-**Última tarefa:** PR53 — PR-IMPL — Retrieval por Intenção. `schema/enavia-intent-retrieval.js` criado com `buildIntentRetrievalContext()` (snapshot estático, 4 skills documentais + 5 intenções sem skill, limite 2.000 chars, truncamento seguro). Integrado em `buildChatSystemPrompt` (seção `7d`) e `nv-enavia.js` (campo aditivo `intent_retrieval`). Smoke PR53 82/82 ✅. Regressões 1.290/1.290 ✅. Total 1.372/1.372 ✅. Próxima PR: **PR54 — PR-PROVA — Testes de memória contextual**. Relatório: `schema/reports/PR53_IMPL_RETRIEVAL_POR_INTENCAO.md`.
+**Data:** 2026-05-01 (atualizado após PR54 — Prova de Memória Contextual ✅)
+**Branch ativa:** `copilot/claudepr54-prova-memoria-contextual`
+**Última tarefa:** PR54 — PR-PROVA — Prova de Memória Contextual. Teste `tests/pr54-memoria-contextual.prova.test.js` criado com 93 asserts (cenários A–M). Todos passaram. Retrieval por Intenção v1 validado formalmente como memória contextual read-only: contexto aplicado aparece no prompt, não aplicado não aparece, coerência por skill/intenção provada, bloco não ativa modo operacional sozinho, falsa capacidade bloqueada, campo `intent_retrieval` aditivo e seguro. Regressões 1.372/1.372 ✅. Total 1.465/1.465 ✅. Próxima PR: **PR55 — PR-DOCS — Self-Audit Framework**. Relatório: `schema/reports/PR54_PROVA_MEMORIA_CONTEXTUAL.md`.
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR54 — PR-PROVA — Testes de memória contextual**
+**PR55 — PR-DOCS — Self-Audit Framework**
 
+> ✅ PR54 (PR-PROVA) — concluída. `tests/pr54-memoria-contextual.prova.test.js` criado (93 asserts, 13 cenários A–M). Todos passaram. Retrieval por Intenção v1 validado formalmente como memória contextual read-only: contexto aplicado aparece no prompt com marcador canônico, não aplicado não aparece, coerência por skill/intenção provada, bloco não ativa modo operacional sozinho, falsa capacidade bloqueada, campo `intent_retrieval` aditivo e seguro, `/skills/run` confirmado inexistente. Regressões 1.372/1.372 ✅. Total 1.465/1.465 ✅. Relatório: `schema/reports/PR54_PROVA_MEMORIA_CONTEXTUAL.md`.
 > ✅ PR53 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-retrieval.js` criado com `buildIntentRetrievalContext()` (snapshot estático, 4 skills documentais + 5 intenções sem skill, limite 2.000 chars, truncamento seguro). Integrado em `buildChatSystemPrompt` (seção `7d`) e `nv-enavia.js` (campo aditivo `intent_retrieval`). Smoke PR53 82/82 ✅. Regressões 1.290/1.290 ✅. Total 1.372/1.372 ✅. Nenhum endpoint criado. Nenhuma skill executada. /skills/run não existe. Relatório: `schema/reports/PR53_IMPL_RETRIEVAL_POR_INTENCAO.md`.
 > ✅ PR52 (PR-PROVA) — concluída. `tests/pr52-skill-routing-runtime.prova.test.js` criado (202 asserts, 12 cenários A–L). Todos passaram. Skill Router read-only validado: 4 skills documentais roteadas, campo `skill_routing` provado, falsa capacidade bloqueada, /skills/run inexistente confirmado. Total 1.290/1.290 ✅. Relatório: `schema/reports/PR52_PROVA_ROTEAMENTO_SKILLS.md`.
 > ✅ PR51 (PR-IMPL cirúrgica) — concluída. `schema/enavia-skill-router.js` criado com `routeEnaviaSkill()` (4 skills documentais mapeadas, roteamento determinístico, integração com Classificador de Intenção). Campo aditivo `skill_routing` no response do `/chat/run`. Smoke PR51 168/168 ✅. Regressões 920/920 ✅. Total 1.088/1.088 ✅. Relatório: `schema/reports/PR51_IMPL_SKILL_ROUTER_READONLY.md`.
