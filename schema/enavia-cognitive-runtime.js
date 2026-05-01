@@ -15,6 +15,7 @@ import { getEnaviaIdentity } from "./enavia-identity.js";
 import { getEnaviaCapabilities } from "./enavia-capabilities.js";
 import { getEnaviaConstitution } from "./enavia-constitution.js";
 import { renderOperationalAwarenessBlock } from "./operational-awareness.js";
+import { getEnaviaBrainContext } from "./enavia-brain-loader.js";
 
 /**
  * Monta o contexto cognitivo completo da Enavia em runtime.
@@ -87,7 +88,7 @@ export function buildCognitivePromptBlock(opts = {}) {
  *   - bloco de alvo operacional ativo (quando context.target presente ou modo operacional ativo)
  *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
  *
- * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean }} [opts]
+ * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean, include_brain_context?: boolean }} [opts]
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
@@ -98,6 +99,9 @@ export function buildChatSystemPrompt(opts = {}) {
     ? opts.operational_awareness
     : null;
   const is_operational_context = opts.is_operational_context === true;
+  // PR43: Brain Context read-only é injetado por padrão. Pode ser desabilitado
+  // por flag interna em testes (sem env var nova). Não autoriza execução.
+  const include_brain_context = opts.include_brain_context !== false;
 
   const sections = [];
 
@@ -323,6 +327,18 @@ export function buildChatSystemPrompt(opts = {}) {
     "• Nunca salve memória baseada em uma única interação ambígua.",
     "• A memória deve ser clara, reutilizável e aplicável em sessões futuras.",
   );
+
+  // === 7c. PR43 — Brain Context read-only ===
+  // Snapshot estático e compacto do Obsidian Brain (self-model + system awareness).
+  // Aparece APÓS instruções de uso/criação de memória e ANTES do envelope JSON,
+  // para orientar tom e autoentendimento sem sobrescrever regras de segurança
+  // ou ativar tom operacional. NÃO autoriza execução. NÃO é estado runtime.
+  if (include_brain_context) {
+    const brainContext = getEnaviaBrainContext();
+    if (brainContext) {
+      sections.push("", brainContext);
+    }
+  }
 
   // === 8. Contrato de envelope JSON (estrutural, NÃO sufoca a fala) ===
   sections.push(

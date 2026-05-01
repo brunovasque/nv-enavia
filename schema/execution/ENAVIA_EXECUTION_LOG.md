@@ -4,6 +4,108 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-04-30 — PR43 — PR-IMPL — Brain Loader read-only Worker-only
+
+- **Branch:** `copilot/claudepr43-impl-brain-loader-readonly-worker`
+- **Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR42 ✅ (PR-DIAG — relatório `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md`)
+- **Escopo:** Worker-only. Loader + integração no cognitive runtime + smoke test + relatório + governança.
+
+### Objetivo
+
+Implementar o primeiro Brain Loader read-only conectando uma allowlist
+pequena do Obsidian Brain ao contexto do chat (`buildChatSystemPrompt`),
+sem escrita, sem painel, sem endpoint novo, sem alteração de infraestrutura.
+
+### Resultado
+
+✅ Brain Loader implementado, integrado e provado por smoke test.
+
+### Implementação
+
+- **Loader:** `schema/enavia-brain-loader.js` (novo).
+  - `getEnaviaBrainContext(options)` — função pura, determinística, sem FS/KV/rede.
+  - `getEnaviaBrainAllowlist()` — auditoria das fontes do snapshot.
+  - Constantes: `BRAIN_CONTEXT_TOTAL_LIMIT=4000`, `BRAIN_CONTEXT_PER_BLOCK_LIMIT=1500`, `BRAIN_CONTEXT_TRUNCATION_MARK="[brain-context-truncated]"`.
+  - Snapshot estático embutido com 7 blocos (resumo manual fiel das fontes).
+- **Allowlist (hard-coded no loader):**
+  1. `schema/brain/self-model/identity.md`
+  2. `schema/brain/self-model/capabilities.md`
+  3. `schema/brain/self-model/limitations.md`
+  4. `schema/brain/self-model/current-state.md`
+  5. `schema/brain/self-model/how-to-answer.md`
+  6. `schema/brain/SYSTEM_AWARENESS.md`
+  7. `schema/brain/memories/INDEX.md` (excerto)
+- **Integração:** `schema/enavia-cognitive-runtime.js` (edit).
+  - Import de `getEnaviaBrainContext`.
+  - Nova seção `7c` em `buildChatSystemPrompt` — `CONTEXTO DO BRAIN DA ENAVIA — READ-ONLY` —, posicionada após o bloco de uso/criação de memória (7b) e antes do envelope JSON (8).
+  - Flag interna `include_brain_context` (default true). **Sem env var nova.**
+- **Segurança:**
+  - Read-only, determinístico, sem rede, sem FS, sem KV.
+  - Cabeçalho do bloco deixa explícito que é documental, **não autoriza execução** e **não é estado runtime**.
+  - Não substitui `MODO OPERACIONAL ATIVO` nem nota factual de `read_only`.
+  - Não altera sanitizers.
+
+### Arquivos alterados
+
+- `schema/enavia-brain-loader.js` (NOVO)
+- `schema/enavia-cognitive-runtime.js` (EDIT — import + seção 7c)
+- `tests/pr43-brain-loader-readonly.smoke.test.js` (NOVO)
+- `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md` (NOVO)
+- `schema/contracts/INDEX.md` (EDIT — próxima PR autorizada e PR43 marcada)
+- `schema/status/ENAVIA_STATUS_ATUAL.md` (EDIT — estado pós-PR43)
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (EDIT — handoff PR43→PR44)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+**NÃO alterados:** `nv-enavia.js`, `wrangler.toml`, `wrangler.executor.template.toml`, painel, executor, deploy worker, workflows, secrets, bindings, KVs.
+
+### Smoke tests
+
+```
+node --check nv-enavia.js                                  ✅
+node --check schema/enavia-cognitive-runtime.js            ✅
+node --check schema/enavia-brain-loader.js                 ✅
+node --check tests/pr43-brain-loader-readonly.smoke.test.js ✅
+node tests/pr43-brain-loader-readonly.smoke.test.js        ✅ 32/32
+```
+
+### Regressões
+
+```
+node tests/pr37-chat-runtime-anti-bot-real.smoke.test.js   ✅ 56/56
+node tests/pr36-chat-runtime-anti-bot.smoke.test.js        ✅ 26/26
+node tests/pr21-loop-status-states.smoke.test.js           ✅ 53/53
+node tests/pr20-loop-status-in-progress.smoke.test.js      ✅ 27/27
+node tests/pr19-advance-phase-e2e.smoke.test.js            ✅ 52/52
+node tests/pr14-executor-deploy-real-loop.smoke.test.js    ✅ 183/183
+node tests/pr13-hardening-operacional.smoke.test.js        ✅ 91/91
+```
+
+Total agregado: **520/520 verdes**.
+
+### Bloqueios
+
+- Nenhum.
+
+### Observação
+
+Os arquivos `schema/brain/memories/operator-preferences.md`,
+`operating-style.md`, `project-principles.md`, `hard-rules.md` e
+`recurring-patterns.md` mencionados no enunciado da PR ainda não existem
+no repo (apenas `INDEX.md` em `memories/`, criado na PR39). O snapshot
+do loader incluiu um excerto rastreável desse INDEX. Quando os arquivos
+forem populados em PRs futuras, podem ser adicionados ao snapshot dentro
+do mesmo limite total.
+
+### Próxima PR autorizada
+
+**PR44 — PR-PROVA — Provar Brain Loader read-only no chat runtime**
+(se algum cenário falhar em runtime real, abrir como `PR-IMPL — Corrigir
+falhas do Brain Loader read-only`).
+
+---
+
 ## 2026-04-30 — PR42 — PR-DIAG — Diagnóstico da Memória Atual no Runtime
 
 - **Branch:** `copilot/claudepr42-diag-memoria-runtime-brain`

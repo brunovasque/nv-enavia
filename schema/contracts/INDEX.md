@@ -43,13 +43,14 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR43 — PR-IMPL — Brain Loader read-only Worker-only**
+**PR44 — PR-PROVA — Provar Brain Loader read-only no chat runtime**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
 > ✅ PR41 foi mergeada (PR #202) e populou o Obsidian Brain com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
-> ✅ PR42 diagnosticou a memória runtime. `ENAVIA_BRAIN` existe com IDs reais. Brain documental não está conectado. Brain Loader via bundle estático é viável.
-> PR43 irá implementar Brain Loader com allowlist de 6 arquivos (self-model + SYSTEM_AWARENESS), bundled estático, injetado em `buildChatSystemPrompt`, read-only, sem endpoint, sem painel.
+> ✅ PR42 diagnosticou a memória runtime. `ENAVIA_BRAIN` existe com IDs reais. Brain documental não estava conectado. Brain Loader via bundle estático foi recomendado.
+> ✅ PR43 implementou o Brain Loader read-only. `schema/enavia-brain-loader.js` criado (snapshot estático com allowlist de 7 fontes, limite total 4.000 chars, marca de truncamento). Integrado em `buildChatSystemPrompt` (seção `7c`) sem alterar painel, executor, deploy worker, workflows, KV, bindings ou secrets. Smoke PR43 32/32 ✅. Regressões PR37/PR36/PR21/PR20/PR19/PR14/PR13 verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
+> PR44 irá provar em runtime real que o Brain Context influencia tom/autoentendimento sem ativar tom operacional indevido, sem quebrar anti-bot e sem expor conteúdo interno.
 
 ### PRs do contrato Jarvis Brain já concluídas
 
@@ -63,6 +64,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR38** ✅ (PR-IMPL) — Correção cirúrgica dos 5 achados da PR37. Worker-only, patch cirúrgico. `buildChatSystemPrompt` corrigido: target informativo separado do bloco comportamental operacional pesado — `MODO OPERACIONAL ATIVO` só injetado quando `is_operational_context=true`. `_CHAT_OPERATIONAL_INTENT_TERMS` refinado: `"sistema"` e `"contrato"` isolados removidos (falsos positivos), termos compostos `"estado do contrato"`/`"contrato ativo"` adicionados, verbos imperativos (`"revise"`, `"verifique"`, `"cheque"`, `"inspecione"`) e termos técnicos (`"runtime"`, `"gate"`, `"gates"`) adicionados. PR37 agora passa 56/56 ✅. Regressões PR36/PR13/PR14/PR19/PR20/PR21 verdes. Relatório: `schema/reports/PR38_IMPL_CORRECAO_ACHADOS_PR37.md`.
 - **PR41** ✅ (PR-DOCS) — Popular Obsidian Brain com conhecimento consolidado. Mergeada como PR #202. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`. Nenhum runtime alterado.
 - **PR42** ✅ (PR-DIAG) — Diagnóstico da Memória Atual no Runtime. `ENAVIA_BRAIN` confirmado. KVs mapeados. Fluxo de chat diagnosticado. Painel mapeado. Brain Loader via bundle estático recomendado para PR43. Relatório: `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md`. Nenhum runtime alterado.
+- **PR43** ✅ (PR-IMPL) — Brain Loader read-only Worker-only. `schema/enavia-brain-loader.js` criado (snapshot estático com allowlist hard-coded de 7 fontes do Brain documental — self-model + SYSTEM_AWARENESS + excerto memories/INDEX). `getEnaviaBrainContext()` injetado em `buildChatSystemPrompt` (`schema/enavia-cognitive-runtime.js`, seção `7c`) antes do envelope JSON. Limite defensivo: 4.000 chars total, 1.500 por bloco, marca `[brain-context-truncated]`. Determinístico, sem FS/KV/rede. Flag interna `include_brain_context` (sem env var nova). NÃO altera painel/executor/deploy worker/workflows/wrangler/secrets/bindings. Smoke PR43 32/32 ✅. Regressões PR37/PR36/PR21/PR20/PR19/PR14/PR13 verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 
 ### Histórico do contrato encerrado (PR17–PR30)
 
