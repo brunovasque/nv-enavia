@@ -79,6 +79,48 @@ PR55 — PR-DOCS — Self-Audit Framework
 
 ---
 
+## 2026-05-01 — PR55 — PR-DOCS — Self-Audit Framework
+
+- **Branch:** `copilot/claude-pr55-docs-self-audit-framework`
+- **Tipo:** `PR-DOCS` (Docs-only, sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR54 ✅ (PR-PROVA — Prova de Memória Contextual — 93/93 + 1.465/1.465)
+- **Escopo:** Criação do Framework documental de Self-Audit.
+
+### Objetivo
+
+Criar o conjunto de regras, checklists, modelo de risco, sinais de alerta, contrato de saída e política de escalonamento que define como a Enavia vai se autoavaliar. Esta PR é puramente documental — sem runtime, sem endpoint, sem alteração de Worker.
+
+### Resultado
+
+✅ **8 arquivos documentais criados em `schema/self-audit/`. Governança atualizada. Nenhum runtime alterado.**
+
+### Arquivos novos
+
+- `schema/self-audit/INDEX.md` — visão geral, conexões, próxima PR
+- `schema/self-audit/FRAMEWORK.md` — 10 camadas de auditoria + fluxo futuro
+- `schema/self-audit/CHECKLISTS.md` — 6 checklists A–F, 48 itens
+- `schema/self-audit/RISK_MODEL.md` — 5 níveis + 13 categorias de risco
+- `schema/self-audit/SIGNALS.md` — 30+ sinais (FC, OP, ED, DC, SEC)
+- `schema/self-audit/OUTPUT_CONTRACT.md` — contrato JSON de saída futura
+- `schema/self-audit/ESCALATION_POLICY.md` — quando bloquear/alertar/observar
+- `schema/self-audit/ROADMAP.md` — PR55–PR61+ com dependências
+- `schema/reports/PR55_SELF_AUDIT_FRAMEWORK.md` — relatório completo
+
+### Arquivos modificados
+
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 6 atualizada (Self-Audit como documental)
+- `schema/contracts/INDEX.md` — próxima PR: PR56
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Próxima PR
+
+PR56 — PR-IMPL — Self-Audit read-only
+
+---
+
 ## 2026-05-01 — PR52 — PR-PROVA — Teste de roteamento de skills
 
 - **Branch:** `copilot/claude-pr52-prova-roteamento-skills`
