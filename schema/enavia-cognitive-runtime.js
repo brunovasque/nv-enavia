@@ -8,6 +8,9 @@
 // PR2 adiciona: buildChatSystemPrompt — montagem dinâmica do system prompt
 // conversacional LLM-first, usando a base cognitiva de forma viva.
 //
+// PR53 adiciona: suporte a intent_retrieval_context em buildChatSystemPrompt,
+// injetando bloco documental compacto por intenção quando applied=true.
+//
 // Escopo: WORKER-ONLY. Pure function. Sem side-effects.
 // ============================================================================
 
@@ -89,7 +92,7 @@ export function buildCognitivePromptBlock(opts = {}) {
  *   - bloco de alvo operacional ativo (quando context.target presente ou modo operacional ativo)
  *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
  *
- * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean, include_brain_context?: boolean }} [opts]
+ * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean, include_brain_context?: boolean, intent_retrieval_context?: object }} [opts]
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
@@ -106,6 +109,14 @@ export function buildChatSystemPrompt(opts = {}) {
   // PR43: Brain Context read-only é injetado por padrão. Pode ser desabilitado
   // por flag interna em testes (sem env var nova). Não autoriza execução.
   const include_brain_context = opts.include_brain_context !== false;
+  // PR53: Intent Retrieval context — bloco documental compacto por intenção.
+  // Injetado somente quando applied=true. Read-only. Não autoriza execução.
+  const intent_retrieval_context =
+    opts.intent_retrieval_context &&
+    typeof opts.intent_retrieval_context === "object" &&
+    opts.intent_retrieval_context.applied === true
+      ? opts.intent_retrieval_context
+      : null;
 
   const sections = [];
 
@@ -281,6 +292,24 @@ export function buildChatSystemPrompt(opts = {}) {
     const brainContext = getEnaviaBrainContext();
     if (brainContext) {
       sections.push("", brainContext);
+    }
+  }
+
+  // === 7d. PR53 — Intent Retrieval Context (read-only) ===
+  // Bloco documental compacto montado pelo Intent Retrieval v1.
+  // Injetado APÓS Brain Context e ANTES do envelope JSON.
+  // Só aparece quando applied=true. Não sobrescreve LLM Core nem Brain Context.
+  // Não autoriza execução. Não ativa MODO OPERACIONAL. Read-only.
+  if (intent_retrieval_context) {
+    const block = intent_retrieval_context.context_block;
+    if (typeof block === "string" && block.length > 0) {
+      sections.push(
+        "",
+        "CONTEXTO RECUPERADO POR INTENÇÃO — READ-ONLY",
+        "Este bloco orienta a resposta com base na intenção detectada.",
+        "Não autoriza execução de skill. Não ativa modo operacional sozinho.",
+        block,
+      );
     }
   }
 
