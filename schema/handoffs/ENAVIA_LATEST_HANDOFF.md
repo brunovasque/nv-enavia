@@ -1,113 +1,98 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR45 — PR-DIAG — Diagnóstico do prompt atual do chat pós-Brain Loader
-**Para:** PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta
+**De:** PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta
+**Para:** PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1
 
 ## O que foi feito nesta sessão
 
-### PR45 — PR-DIAG — Diagnóstico do prompt atual do chat pós-Brain Loader
+### PR46 — PR-IMPL — LLM Core v1
 
-**Tipo:** `PR-DIAG` (READ-ONLY, Worker-only)
-**Branch:** `copilot/claudepr45-diag-prompt-atual-chat-pos-brain`
-
-**Objetivo:**
-Diagnosticar o estado atual do system prompt completo pós-Brain Loader. Medir tamanho,
-mapear todos os blocos em ordem real, identificar redundâncias e conflitos, avaliar risco
-de engessamento e recomendar a PR46.
-
-**Arquivos novos:**
-- `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md` — relatório completo PR45.
-
-**Arquivos NÃO alterados:**
-`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
-`nv-enavia.js`, painel, executor, deploy worker, workflows, wrangler,
-KVs, bindings, secrets. Nenhum teste novo criado (diagnóstico puro).
-
-**Método:**
-Leitura direta dos arquivos + execução read-only via Node.js de `buildChatSystemPrompt`
-com múltiplos cenários. Nenhum LLM externo chamado.
-
-**Resultado:**
-- Prompt baseline (sem target, sem op_ctx): **10.945 chars / ~2.736 tokens**
-- Prompt máximo (target + op_ctx + awareness): **13.743 chars / ~3.436 tokens**
-- Brain Context: **+4.002 chars / +1.000 tokens** em toda conversa (constante)
-- Principal redundância: capacidades/limitações duplicadas entre seções 1-4 e Brain blocks 1-3 (~150–200 tokens)
-- Brain NÃO engessou — reforça naturalidade e anti-bot
-- PR46 é viável: consolidar no LLM Core
-
-## Estado para a próxima PR (PR46)
-
-A próxima PR autorizada é **PR46 — PR-IMPL — LLM Core v1**.
-
-**Contexto:**
-- Brain Loader read-only está operacional e validado (PR43/PR44).
-- Diagnóstico do prompt (PR45) identificou as duplicações e oportunidades.
-- O principal ganho da PR46 é criar `buildLLMCoreBlock()` / `buildLLMCorePrompt()` que
-  centraliza identidade + capacidades + guardrails, eliminando duplicação com Brain blocks 1-3.
-- Brain blocks 4-7 (Estado, Como responder, System awareness, Preferências) permanecem únicos.
-- Seção 1b (PAPEL PROIBIDO) candidata à redução (~1.142 → ~100 chars).
-- Gate `is_operational_context` no Worker: não alterar.
-- Sanitizers: não alterar.
-- Envelope JSON: não alterar.
-- Economia estimada: ~400–450 tokens por conversa.
-
-**Critério de entrada para PR46:** PR45 mergeada.
-
-
-
-## O que foi feito nesta sessão
-
-### PR44 — PR-PROVA — Prova do Brain Loader read-only no chat runtime
-
-**Tipo:** `PR-PROVA` (Worker-only, sem alteração de runtime)
-**Branch:** `copilot/claudepr44-prova-brain-loader-chat-runtime`
+**Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
+**Branch:** `copilot/claudepr46-impl-llm-core-v1`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR45 ✅
 
 **Objetivo:**
-Provar que o Brain Loader read-only implementado na PR43 realmente influencia
-o chat runtime da Enavia de forma segura — identidade/self-model presente,
-sem capacidade falsa, sem ativação indevida de tom operacional, sem quebrar
-anti-bot e sem quebrar regressões do loop contratual.
+Implementar o LLM Core v1 da Enavia, consolidando identidade, capacidades, política de
+resposta e relação com o Brain Context em uma camada central do prompt do chat,
+reduzindo redundância sem perder segurança, anti-bot, governança ou envelope JSON.
 
 **Arquivos novos:**
-- `tests/pr44-brain-loader-chat-runtime.prova.test.js` — 8 cenários A–H, 38 asserts.
-- `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md` — relatório completo.
+- `schema/enavia-llm-core.js` — `buildLLMCoreBlock()` + `getLLMCoreMetadata()` (camada LLM Core v1, pure function determinística)
+- `tests/pr46-llm-core-v1.smoke.test.js` — smoke test (7 cenários A–G, 43 asserts)
+- `schema/reports/PR46_IMPL_LLM_CORE_V1.md` — relatório completo
+
+**Arquivos modificados:**
+- `schema/enavia-cognitive-runtime.js` — substituiu antigas seções 1+1b+2+3+4 do `buildChatSystemPrompt` por chamada única ao `buildLLMCoreBlock({ ownerName })`. Demais seções (Brain Context, target, MODO OPERACIONAL condicional, planner, memória, envelope JSON) inalteradas.
 
 **Arquivos NÃO alterados:**
-`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
-`nv-enavia.js`, painel, executor, deploy worker, workflows, wrangler,
-KVs, bindings, secrets.
+`nv-enavia.js`, `schema/enavia-brain-loader.js` (snapshot principal preservado por escopo),
+`schema/enavia-identity.js`, `schema/enavia-capabilities.js`, `schema/enavia-constitution.js`,
+`schema/operational-awareness.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets, sanitizers.
+
+**Medição (chars / tokens estimados, todos os 6 cenários da PR45):**
+
+| Cenário | PR45 baseline | PR46 atual | Δ chars | Δ tokens |
+|---------|--------------:|-----------:|--------:|---------:|
+| A — simples sem target | 10.945 | 10.496 | -449 | -112 |
+| B — simples target read_only | 11.187 | 10.738 | -449 | -112 |
+| C — identidade | 10.945 | 10.496 | -449 | -112 |
+| D — capacidade | 10.945 | 10.496 | -449 | -112 |
+| E — operacional real | 12.812 | 12.363 | -449 | -112 |
+| F — operacional completo + awareness | 13.689 | 13.240 | -449 | -112 |
+
+**Economia: -4,1% por conversa, constante em todos os cenários.**
+
+**Outros marcadores:**
+- "NV Imóveis": 9 → **3** ocorrências
+- "ENAVIA": 11 → ~7 ocorrências
+- "não é assistente": 1 (preservado para blindagem)
+
+**Por que a economia é menor que o estimado pela PR45 (~400-450 tok)?**
+A PR45 estimou assumindo redução também dos Brain blocks 1-3. O escopo desta PR46
+proíbe alteração do snapshot principal do Brain Loader. Por isso a economia veio
+exclusivamente da consolidação das antigas seções 1+1b+2+3+4 no Core. Documentado
+no relatório seção 9.
 
 **Testes:**
-- `node --check schema/enavia-brain-loader.js` ✅
-- `node --check schema/enavia-cognitive-runtime.js` ✅
-- `node --check tests/pr44-brain-loader-chat-runtime.prova.test.js` ✅
-- `node tests/pr44-brain-loader-chat-runtime.prova.test.js`: **38/38 ✅**
+- `node --check` em `enavia-llm-core.js`, `enavia-cognitive-runtime.js`, `enavia-brain-loader.js`, `pr46-llm-core-v1.smoke.test.js` → OK
+- Smoke PR46: **43/43 ✅**
+- Regressões PR44 (38/38), PR43 (32/32), PR37 (56/56), PR36 (26/26), PR21 (53/53), PR20 (27/27), PR19 (52/52), PR14 (183/183), PR13 (91/91) → **558/558 ✅**
+- **TOTAL geral: 601/601 ✅**
 
-**Regressões:**
-- PR43 smoke: 32/32 ✅
-- PR37: 56/56 ✅
-- PR36: 26/26 ✅
-- PR21: 53/53 ✅
-- PR20: 27/27 ✅
-- PR19: 52/52 ✅
-- PR14: 183/183 ✅
-- PR13: 91/91 ✅
-- **Total regressões: 520/520 ✅**
-- **Total geral: 558/558 ✅**
+**Mantidos integralmente:**
+- Brain Context (injetado por padrão, desligável por flag, antes do envelope JSON)
+- Envelope JSON `{reply, use_planner}`
+- Target informativo factual + nota `read_only` como gate
+- `MODO OPERACIONAL ATIVO` apenas quando `is_operational_context=true`
+- Sanitizers (não tocados — em `nv-enavia.js`)
+- Gates de execução (não tocados)
+- Política de planner / `use_planner`
+- Continuidade + uso/criação de memória
+- Operational Awareness
+- `buildCognitivePromptBlock` e demais consumidores
 
-**Resultado:** ✅ PASSOU — Brain Loader read-only validado.
+## Próxima etapa segura
 
-## Estado para a próxima PR (PR45)
+**PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1**
 
-A próxima PR autorizada é **PR45 — PR-DIAG — Diagnóstico do prompt atual do chat**.
+Validar com cenários reais (chat live ou simulação com LLM externo) que o LLM Core v1
+produz respostas vivas, naturais e não engessadas, mantendo anti-bot, gates de execução
+e falsa capacidade bloqueada.
 
-Objetivo: diagnosticar o estado atual do system prompt completo em produção,
-medir o tamanho total, identificar seções que podem estar pesando no orçamento
-de tokens, e mapear o que ainda falta para o LLM Core completo.
+Se algo falhar antes da PR47:
+**PR47 — PR-IMPL — Correção cirúrgica do LLM Core v1**
 
-Contexto:
-- Brain Loader read-only está operacional e validado.
-- O prompt cresceu com a adição do Brain Context (~4.000 chars extras).
-- PR45 deve medir o impacto real no orçamento de tokens e planejar próximos passos.
+## Bloqueios
 
+Nenhum. Branch sem conflitos com `main`. Todos os testes passando. Governança atualizada.
+
+## Riscos restantes
+
+1. Duplicação Core ↔ Brain blocks 2-3 (R2/C3 PR45) ainda existe — endereçável quando
+   o escopo permitir alterar o snapshot do Brain Loader.
+2. Economia menor que o estimado pela PR45 — documentado.
+3. Validação subjetiva da resposta viva (qualidade humana) ainda não foi feita —
+   é exatamente o objetivo da PR47.
