@@ -60,10 +60,11 @@ const PR45_BASELINE = {
 // é esperada e documentada — "Aumento esperado pequeno é aceitável. Esta PR corrige
 // comportamento essencial." (problema PR48). Limite continua protegendo contra regressão
 // para além do PR48 real.
+// Cálculo: PR48_medido + 172 chars de margem segura (arredondado para centena).
 const PR46_MAX_TOLERANCE = {
-  A_simples_sem_target: 11400,        // PR45: 10945 | PR46: 10496 | PR48: 11228 (+732 vs PR46)
-  B_simples_target_readonly: 11600,   // PR45: 11187 | PR46: 10738 | PR48: 11470 (+732 vs PR46)
-  E_operacional: 13200,               // PR45: 12812 | PR46: 12363 | PR48: 13095 (+732 vs PR46)
+  A_simples_sem_target: 11400,        // PR45: 10945 | PR46: 10496 | PR48: 11228 (+732 vs PR46) | margem: +172
+  B_simples_target_readonly: 11600,   // PR45: 11187 | PR46: 10738 | PR48: 11470 (+732 vs PR46) | margem: +130
+  E_operacional: 13200,               // PR45: 12812 | PR46: 12363 | PR48: 13095 (+732 vs PR46) | margem: +105
   F_operacional_completo: PR45_BASELINE.F_operacional_completo, // PR48 ainda abaixo de PR45
 };
 
