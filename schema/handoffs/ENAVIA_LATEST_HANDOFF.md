@@ -1,63 +1,67 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR58 — PR-IMPL — Correção cirúrgica do Self-Audit missing_source ✅
-**Para:** PR59 — PR-IMPL — Response Policy viva
+**De:** PR59 — PR-IMPL — Response Policy viva ✅
+**Para:** PR60 — PR-PROVA — Prova anti-bot final
 
 ## O que foi feito nesta sessão
 
-### PR58 — PR-IMPL — Correção cirúrgica do Self-Audit missing_source
+### PR59 — PR-IMPL — Response Policy viva
 
-**Tipo:** `PR-IMPL` cirúrgica (Worker-only)
-**Branch:** `copilot/claudepr58-impl-correcao-self-audit-missing-source`
+**Tipo:** `PR-IMPL` (Worker-only)
+**Branch:** `copilot/claudepr59-impl-response-policy-viva`
 **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
-**PR anterior validada:** PR57 ⚠️ (PR-PROVA — 96/99, falha parcial Cenário H)
+**PR anterior validada:** PR58 ✅ (Self-Audit v1 completo — 99/99)
 
 **Objetivo:**
-Corrigir o detector `_detectMissingSource` em `schema/enavia-self-audit.js` para capturar nomes de workers com hífen (ex: `payments-worker`, `nv-enavia`).
+Implementar a Response Policy viva da Enavia — camada de política de resposta que usa os sinais do fluxo (intenção, skill routing, retrieval, self_audit, modo operacional, contexto) para orientar como a Enavia deve responder de forma mais viva, honesta, estratégica e segura.
 
-**Correção aplicada:**
+**Implementação:**
+- Novo módulo `schema/enavia-response-policy.js` com `buildEnaviaResponsePolicy()` e `buildResponsePolicyPromptBlock()`
+- 15 regras de resposta cobrindo: secret_exposure, fake_execution, false_capability, runtime_vs_documentation_confusion, unauthorized_action, scope_violation, contract_drift, docs_over_product, frustration, deploy_request, strategy_question, next_pr_request, pr_review, technical_diagnosis, caso limpo
+- `schema/enavia-cognitive-runtime.js` — seção 7e adicionada: injeção do policy_block após Intent Retrieval, antes do envelope JSON
+- `nv-enavia.js` — import + chamada após self_audit + campo aditivo `response_policy` no response
 
-```js
-// Antes:
-/o worker\s+\w+\s+já está (ativo|funcionando|online|em produção)/i
-
-// Depois:
-/o worker\s+[\w-]+\s+já está (ativo|funcionando|online|em produção)/i
-```
-
-**Resultado PR57 após correção:**
-- Antes: 96/99 (3 falhas — Cenário H)
-- Depois: **99/99 ✅**
-
-**Regressões:** 1.375/1.375 ✅
+**Resultado:**
+- Smoke PR59: **96/96 ✅**
+- Regressões: **1.375/1.375 ✅**
+- Total: **1.471/1.471 ✅**
 
 **Arquivos alterados:**
-- `schema/enavia-self-audit.js` — regex linha 402 (único arquivo de runtime alterado)
-- `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md` — criado
+- `schema/enavia-response-policy.js` — criado (novo módulo)
+- `schema/enavia-cognitive-runtime.js` — seção 7e + import
+- `nv-enavia.js` — import + chamada + campo response_policy
+- `tests/pr59-response-policy-viva.smoke.test.js` — criado (96 asserts A–O)
+- `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md` — criado
 - Governança atualizada (INDEX.md, STATUS, HANDOFF, EXECUTION LOG)
 
 **O que NÃO foi alterado:**
-- `nv-enavia.js` — intacto
-- Resposta não alterada automaticamente
+- Reply não alterado automaticamente
+- Fluxo não bloqueado programaticamente
 - Nenhum endpoint criado
-- Self-Audit continua read-only
-- Nenhuma Response Policy implementada
+- Não usa KV/rede/filesystem
+- Não chama LLM externo
+- Painel, executor, deploy workers, workflows, wrangler — intocados
+- Todos os módulos anteriores (LLM Core, Brain Loader, Intent Classifier, Skill Router, Intent Retrieval, Self-Audit) — intactos
 
 ## Próxima PR
 
-**PR59 — PR-IMPL — Response Policy viva**
+**PR60 — PR-PROVA — Prova anti-bot final**
 
-Self-Audit v1 completo e validado (99/99 ✅). Retorno ao fluxo principal do contrato.
+Response Policy viva v1 completa e validada (96/96 ✅). Retorno ao fluxo principal do contrato.
 
-A Response Policy deve implementar o uso efetivo do `should_block` e dos `findings` para modular a resposta da Enavia — conforme planejado no contrato e documentado em `schema/self-audit/ESCALATION_POLICY.md`.
+PR60 é a prova formal anti-bot final — valida que o pipeline completo (LLM Core + Brain Context + Intent Classifier + Skill Router + Intent Retrieval + Self-Audit + Response Policy) produz respostas vivas, não robóticas, estratégicas e seguras.
 
 ## Estado do sistema
 
+- Response Policy viva: ✅ completa e validada (96/96)
 - Self-Audit read-only: ✅ completo e validado (99/99)
 - Todos os módulos anteriores: ✅ estáveis (regressões 1.375/1.375)
-- Runtime principal (`nv-enavia.js`): não alterado nesta PR
-- Próxima frente: Response Policy viva (PR59)
+- Runtime principal (`nv-enavia.js`): response_policy aditivo integrado
+- Prompt (`schema/enavia-cognitive-runtime.js`): seção 7e adicionada
+- Próxima frente: Prova anti-bot final (PR60)
+
+
 
 ## O que foi feito nesta sessão
 

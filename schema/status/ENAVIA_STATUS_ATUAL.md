@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR58 — Correção cirúrgica do Self-Audit missing_source ✅)
-**Branch ativa:** `copilot/claudepr58-impl-correcao-self-audit-missing-source`
-**Última tarefa:** PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only. Regex `\w+` → `[\w-]+` em `_detectMissingSource` (`schema/enavia-self-audit.js` linha 402). PR57 agora passa **99/99 ✅** (antes: 96/99, falha Cenário H). Regressões 1.375/1.375 ✅. Nenhum arquivo proibido alterado. Self-Audit continua read-only. Resposta não alterada automaticamente. Nenhum endpoint criado. Relatório: `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md`. **Self-Audit v1 completo e validado. Retorno ao fluxo principal do contrato.**
+**Data:** 2026-05-01 (atualizado após PR59 — Response Policy viva ✅)
+**Branch ativa:** `copilot/claudepr59-impl-response-policy-viva`
+**Última tarefa:** PR59 — PR-IMPL — Response Policy viva. `schema/enavia-response-policy.js` criado com `buildEnaviaResponsePolicy()` (15 regras de resposta). Integrado em `schema/enavia-cognitive-runtime.js` (seção 7e) e `nv-enavia.js` (campo aditivo `response_policy`). Smoke PR59 96/96 ✅. Regressões 1.375/1.375 ✅. Total 1.471/1.471 ✅. Read-only. Não altera reply automaticamente. Não bloqueia fluxo programaticamente. Não cria endpoint. Não usa KV/rede/filesystem. Relatório: `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md`. **Response Policy viva v1 completa e validada.**
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR59 — PR-IMPL — Response Policy viva**
+**PR60 — PR-PROVA — Prova anti-bot final**
 
+> ✅ PR59 (PR-IMPL) — concluída. `schema/enavia-response-policy.js` criado com `buildEnaviaResponsePolicy()` (15 regras: secret_exposure, fake_execution, false_capability, runtime_vs_documentation_confusion, unauthorized_action, scope_violation, contract_drift, docs_over_product, frustration, deploy_request, strategy_question, next_pr_request, pr_review, technical_diagnosis, caso limpo). Integrado em `schema/enavia-cognitive-runtime.js` (seção 7e) e `nv-enavia.js` (campo aditivo `response_policy`). Smoke PR59 96/96 ✅. Regressões 1.375/1.375 ✅. Total 1.471/1.471 ✅. Read-only. Não altera reply. Não bloqueia fluxo. Não cria endpoint. Não usa KV/rede/FS. Relatório: `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md`. Response Policy viva v1 completa e validada.
 > ✅ PR58 (PR-IMPL cirúrgica) — concluída. Regex `\w+` → `[\w-]+` em `_detectMissingSource` (`schema/enavia-self-audit.js` linha 402). PR57 agora passa **99/99 ✅** (antes: 96/99, falha Cenário H). Regressões 1.375/1.375 ✅. Nenhum arquivo proibido alterado. Self-Audit continua read-only. Resposta não alterada automaticamente. Nenhum endpoint criado. Relatório: `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md`. Self-Audit v1 completo e validado. Retorno ao fluxo principal do contrato.
 > ✅ PR56 (PR-IMPL) — concluída. `schema/enavia-self-audit.js` criado com `runEnaviaSelfAudit()` (10 categorias: secret_exposure, fake_execution, unauthorized_action, scope_violation, contract_drift, false_capability, runtime_vs_documentation_confusion, wrong_mode, missing_source, docs_over_product). Campo aditivo `self_audit` integrado defensivamente em `nv-enavia.js`. Smoke PR56 64/64 ✅. Regressões 1.375/1.375 ✅. Total 1.439/1.439 ✅. Read-only. Não altera resposta. Não bloqueia fluxo. Não cria endpoint. Relatório: `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md`.
 > ✅ PR55 (PR-DOCS) — concluída. `schema/self-audit/` criada com 8 arquivos documentais: INDEX.md, FRAMEWORK.md (10 camadas), CHECKLISTS.md (48 itens A–F), RISK_MODEL.md (5 níveis + 13 categorias), SIGNALS.md (30+ sinais), OUTPUT_CONTRACT.md (contrato JSON), ESCALATION_POLICY.md, ROADMAP.md (PR55–PR61+). `schema/brain/SYSTEM_AWARENESS.md` atualizado para referenciar Self-Audit como documental. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR55_SELF_AUDIT_FRAMEWORK.md`.

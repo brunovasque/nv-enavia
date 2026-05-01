@@ -4,6 +4,67 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR59 — PR-IMPL — Response Policy viva
+
+- **Branch:** `copilot/claudepr59-impl-response-policy-viva`
+- **Tipo:** `PR-IMPL` (Worker-only)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR58 ✅ (Self-Audit v1 completo — 99/99)
+
+### Objetivo
+
+Implementar a Response Policy viva da Enavia: camada de política de resposta que usa todos os sinais do fluxo para orientar como a Enavia deve responder de forma mais viva, honesta, estratégica e segura.
+
+### Implementação
+
+**Novo módulo:** `schema/enavia-response-policy.js`
+- `buildEnaviaResponsePolicy(input)` — função principal
+- `buildResponsePolicyPromptBlock(policy)` — helper para injeção no prompt
+- 15 regras de resposta determinísticas cobrindo todas as categorias do Self-Audit e intenções canônicas
+- Pure function: sem LLM externo, sem KV, sem rede, sem filesystem, sem side-effects
+- Saída: `{ applied, mode, response_style, should_adjust_tone, should_warn, should_refuse_or_pause, policy_block, warnings, reasons }`
+
+**Modificação:** `schema/enavia-cognitive-runtime.js`
+- Import `buildResponsePolicyPromptBlock`
+- Parâmetro `response_policy` em `buildChatSystemPrompt()`
+- Seção 7e: injeção do bloco APÓS Intent Retrieval, ANTES do envelope JSON
+
+**Modificação:** `nv-enavia.js`
+- Import `buildEnaviaResponsePolicy`
+- Chamada após `_selfAudit` com todos os sinais do fluxo (try/catch defensivo)
+- `buildChatSystemPrompt()` recebe `response_policy: _responsePolicy || undefined`
+- Campo aditivo `response_policy` no response do `/chat/run` (metadados seguros, sem policy_block inteiro)
+
+### Resultado
+
+✅ **Smoke PR59 passou 96/96** (cenários A–O)
+✅ Regressões 1.375/1.375
+✅ Total 1.471/1.471
+✅ Read-only — resposta não alterada automaticamente
+✅ Não bloqueia fluxo programaticamente
+✅ Nenhum endpoint criado
+✅ Não usa KV/rede/filesystem
+✅ Não chama LLM externo
+✅ Nenhum arquivo proibido alterado
+
+### Arquivos alterados
+
+- `schema/enavia-response-policy.js` — criado (novo módulo)
+- `schema/enavia-cognitive-runtime.js` — import + parâmetro + seção 7e
+- `nv-enavia.js` — import + chamada + campo response_policy no response
+- `tests/pr59-response-policy-viva.smoke.test.js` — criado (96 asserts A–O)
+- `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md` — criado
+- `schema/contracts/INDEX.md` — PR59 ✅, próxima PR60
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — atualizado
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo) — atualizado
+
+### Próxima PR
+
+PR60 — PR-PROVA — Prova anti-bot final. Response Policy viva v1 completa e validada. Retorno ao fluxo principal do contrato.
+
+---
+
 ## 2026-05-01 — PR58 — PR-IMPL — Correção cirúrgica do Self-Audit missing_source
 
 - **Branch:** `copilot/claudepr58-impl-correcao-self-audit-missing-source`
