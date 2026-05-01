@@ -173,6 +173,58 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 
 ---
 
+## 7. Estado após PR60 — Stack cognitiva validada
+
+> **Atualizado em:** 2026-05-01 (PR61 — PR-DOCS/IMPL)
+>
+> **Alerta:** PR61 é documental/IMPL de memória proposta. Nenhum runtime foi alterado.
+> Esta seção documenta o estado real do sistema após PR60.
+
+### Módulos ativos no runtime
+
+| Módulo | Arquivo | Integração | O que faz |
+|--------|---------|------------|-----------|
+| LLM Core v1 | `schema/enavia-llm-core.js` | `buildChatSystemPrompt` seções 1-4 | Identidade, capacidades, limites consolidados |
+| Brain Context | `schema/enavia-brain-loader.js` | `buildChatSystemPrompt` seção 7c | Snapshot estático do brain (7 fontes, 4.000 chars) |
+| Intent Classifier | `schema/enavia-intent-classifier.js` | `/chat/run` campo `intent_classification` | 15 intenções canônicas |
+| Skill Router | `schema/enavia-skill-router.js` | `/chat/run` campo `skill_routing` | 4 skills documentais, roteamento read-only |
+| Intent Retrieval | `schema/enavia-intent-retrieval.js` | `buildChatSystemPrompt` seção 7d | Contexto de skill por intenção, 2.000 chars |
+| Self-Audit | `schema/enavia-self-audit.js` | `/chat/run` campo `self_audit` | 10 categorias de risco, read-only |
+| Response Policy | `schema/enavia-response-policy.js` | `buildChatSystemPrompt` seção 7e | 15 regras de resposta, orientação ao LLM |
+
+### Módulos read-only (detectam mas não executam)
+
+| Módulo | O que detecta | O que NÃO faz |
+|--------|---------------|----------------|
+| Self-Audit | 10 categorias de risco | Não bloqueia fluxo (exceto secret_exposure) |
+| Response Policy | Tipo de resposta adequado | Não reescreve reply automaticamente |
+| Skill Router | Skill mais adequada | Não executa skill |
+| Intent Retrieval | Contexto de skill por intenção | Não acessa KV/rede/FS em tempo real |
+
+### Módulos inexistentes (documentados, não implementados)
+
+| O que não existe | Por que importa saber |
+|-----------------|----------------------|
+| `/skills/run` | Skills são documentais — nenhuma executa automaticamente |
+| Skill Executor runtime | Executor de skills não foi implementado |
+| Escrita automática de memória | Brain é read-only — nenhum módulo escreve automaticamente |
+| Self-Audit blocking mecânico | Audit detecta mas não bloqueia (exceto secret_exposure) |
+| Response Policy rewrite | Policy orienta mas não reescreve reply mecanicamente |
+
+### Próximo foco
+
+- **PR61** (esta PR): Proposta de atualização de memória — documental/IMPL
+- **PR62** (próxima): PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain
+  - Ou PR-DOCS se a memória estiver incompleta após PR61
+
+### Finding I1 (documentado, não corrigido)
+
+- "você já consegue executar skills de verdade?" retorna `unknown` em vez de `capability_question`
+- Impacto: baixo — sistema seguro mesmo com unknown
+- Correção: PR futura dedicada (adicionar variantes à `_CAPABILITY_TERMS`)
+
+---
+
 ## 7. Como Evitar Alucinação Geral
 
 1. **Sempre citar a fonte** ao afirmar algo sobre o sistema.
