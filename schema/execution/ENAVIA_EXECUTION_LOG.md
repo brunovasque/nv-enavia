@@ -4,6 +4,117 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR47 — PR-PROVA — Prova de Resposta Viva com LLM Core v1
+
+- **Branch:** `copilot/claudepr47-prova-resposta-viva-llm-core-v1`
+- **Tipo:** `PR-PROVA` (sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR46 ✅ (mergeada — PR #207)
+- **Escopo:** prova pura. Não chama LLM externo. Testa o prompt, regras, blocos
+  e simulação determinística da resposta esperada.
+
+### Objetivo
+
+Provar que o LLM Core v1 (PR46) preserva ou melhora a qualidade da resposta da
+Enavia, sem voltar ao comportamento robótico, sem criar falsa capacidade, sem
+quebrar anti-bot, sem relaxar governança.
+
+### Resultado
+
+⚠️ **FALHOU PARCIALMENTE — 75/79 asserts (94,9%).** 8 de 10 cenários passaram
+totalmente. Cenários C (frustração) e D (próxima PR) falharam parcialmente —
+4 achados reais com causa raiz única (truncamento do Brain Loader em 4.000
+chars). Conforme contrato PR47, próxima PR vira cirúrgica (PR48 — PR-IMPL —
+Correção cirúrgica do LLM Core v1, NÃO o Classificador de intenção).
+Relatório: `schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md`.
+
+### Arquivos novos
+
+- `tests/pr47-resposta-viva-llm-core-v1.prova.test.js` — 10 cenários A–J, 79 asserts
+- `schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md` — relatório completo
+
+### Arquivos modificados
+
+- `schema/contracts/INDEX.md` — próxima PR autorizada virou PR48 cirúrgica
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados
+
+`nv-enavia.js`, `schema/enavia-llm-core.js`, `schema/enavia-cognitive-runtime.js`,
+`schema/enavia-brain-loader.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets,
+sanitizers, prompt real, gates, endpoints. Nenhum runtime tocado.
+
+### Achados reais (4)
+
+| ID | Cenário | Achado | Causa raiz |
+|----|---------|--------|-----------|
+| C1 | Frustração | "excesso documental" ausente do prompt em runtime | Brain truncado |
+| C2 | Frustração | "Isso é opcional. Não mexa agora." ausente do prompt em runtime | Brain truncado |
+| D1 | Próxima PR | "resposta curta + prompt completo" ausente do prompt em runtime | Brain truncado |
+| D2 | Próxima PR | "sem reabrir discussão" ausente do prompt em runtime | Brain truncado |
+
+Causa raiz única: o snapshot estático do `schema/enavia-brain-loader.js`
+satura o limite total de 4.000 chars logo após a regra 4 de
+`schema/brain/self-model/how-to-answer.md`. Regras 5–10 não chegam ao
+runtime. Verificado via `getEnaviaBrainContext()` terminando em
+`[brain-context-truncated]`.
+
+### Cenários que passaram totalmente
+
+- A (Identidade viva) 12/12 — Enavia, IA operacional estratégica, LLM-first,
+  não é Enova/NV/atendente.
+- B (Capacidade) 11/11 — Skill Router runtime / `/skills/run` / Intent Engine
+  declarados como ainda NÃO existentes; Brain Loader READ-ONLY.
+- E (Operacional real) 7/7 — `MODO OPERACIONAL ATIVO` injetado para
+  `is_operational_context=true`, contrato + aprovação preservados.
+- F (Falsa capacidade bloqueada) 5/5.
+- G (`read_only` como gate) 7/7 — não impede raciocínio nem deixa defensiva.
+- H (Tamanho/duplicação) 14/14 — A=10.496 (-449), B=10.738 (-449), E=12.363
+  (-449), F=12.435 (-1.254) chars vs PR45 baseline. "NV Imóveis" 9→3.
+- I (Envelope JSON) 5/5 — `{reply, use_planner}` literal preservado.
+- J (Sanitizers/gates) 7/7 — `isOperationalMessage` exportado, falsos
+  positivos PR37 corrigidos seguem corrigidos, Brain determinístico.
+
+### Smoke / regressões
+
+- `node --check schema/enavia-llm-core.js` ✅
+- `node --check schema/enavia-cognitive-runtime.js` ✅
+- `node --check schema/enavia-brain-loader.js` ✅
+- `node --check tests/pr47-resposta-viva-llm-core-v1.prova.test.js` ✅
+- PR47 prova: **75/79** (4 achados documentados)
+- PR46 smoke: **43/43** ✅
+- PR44 prova: **38/38** ✅
+- PR43 smoke: **32/32** ✅
+- PR37 prova: **56/56** ✅
+- PR36 smoke: **26/26** ✅
+- PR21 smoke: **53/53** ✅
+- PR20 smoke: **27/27** ✅
+- PR19 smoke: **52/52** ✅
+- PR14 smoke: **183/183** ✅
+- PR13 smoke: **91/91** ✅
+- **Regressões obrigatórias: 601/601 ✅**
+
+### Próxima PR
+
+**PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1 (regras tonais
+truncadas).** Levar regras 6, 7, 8 de `how-to-answer.md` para o LLM Core
+(ou bloco compacto adjacente). Worker-only, patch cirúrgico. NÃO é o
+Classificador de intenção (esse vira PR49 após cirúrgica + nova prova
+verde).
+
+### Rollback
+
+Reverter `tests/pr47-resposta-viva-llm-core-v1.prova.test.js`,
+`schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md` e ajustes em
+`schema/contracts/INDEX.md`, `schema/status/ENAVIA_STATUS_ATUAL.md`,
+`schema/handoffs/ENAVIA_LATEST_HANDOFF.md` e este log. Nenhum runtime para
+reverter — nada foi alterado.
+
+---
+
 ## 2026-05-01 — PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta
 
 - **Branch:** `copilot/claudepr46-impl-llm-core-v1`
