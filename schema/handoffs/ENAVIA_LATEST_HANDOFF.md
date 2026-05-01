@@ -1,8 +1,98 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1
-**Para:** PR49 — PR-IMPL — Classificador de intenção
+**De:** PR49 — PR-IMPL — Classificador de Intenção v1
+**Para:** PR50 — PR-PROVA — Teste de intenção
+
+## O que foi feito nesta sessão
+
+### PR49 — PR-IMPL — Classificador de Intenção v1
+
+**Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
+**Branch:** `copilot/claudepr49-impl-classificador-intencao`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR48 ✅ (PR-IMPL cirúrgica — PR47 79/79 após correção)
+
+**Objetivo:**
+Implementar o Classificador de Intenção v1 para separar, de forma determinística e
+segura, os principais tipos de mensagem antes de aplicar tom operacional, planner,
+skill futura ou resposta conversacional. Retorno ao contrato principal após exceção
+corretiva PR48.
+
+**Arquitetura implementada:**
+- `schema/enavia-intent-classifier.js` — Classificador de Intenção v1
+  - `classifyEnaviaIntent({ message, context })` → `{ intent, confidence, is_operational, reasons, signals }`
+  - `INTENT_TYPES` — 15 intenções canônicas
+  - `CONFIDENCE_LEVELS` — high/medium/low
+  - Pure function, determinístico, sem I/O, sem side-effects
+- `nv-enavia.js` (patch mínimo):
+  - Import do classificador
+  - `isOperationalMessage()` delegando ao classificador como fonte primária
+  - Campo aditivo `intent_classification` no response do `/chat/run`
+
+**Intenções canônicas implementadas:**
+`conversation`, `frustration_or_trust_issue`, `identity_question`, `capability_question`,
+`system_state_question`, `next_pr_request`, `pr_review`, `technical_diagnosis`,
+`execution_request`, `deploy_request`, `contract_request`, `skill_request`,
+`memory_request`, `strategy_question`, `unknown`
+
+**Garantias preservadas:**
+- Frustração não ativa modo operacional
+- Próxima PR não ativa modo operacional pesado
+- Revisão de PR ativa operação
+- Diagnóstico técnico ativa operação
+- Deploy/execução ativa operação com governança
+- Falsos positivos PR37/PR38 continuam corrigidos
+- LLM Core intacto
+- Brain Context intacto
+- Anti-bot intacto
+- read_only como gate (não tom) intacto
+
+**Arquivos novos:**
+- `schema/enavia-intent-classifier.js` — classificador v1
+- `tests/pr49-intent-classifier.smoke.test.js` — 96 asserts, 14 cenários
+- `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md` — relatório completo
+
+**Arquivos modificados:**
+- `nv-enavia.js` — import + isOperationalMessage + intent_classification aditivo
+- `schema/contracts/INDEX.md` — próxima PR: PR50
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Arquivos NÃO alterados (escopo cirúrgico preservado):**
+`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
+`schema/enavia-llm-core.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets,
+sanitizers, gates. Nenhum endpoint criado. Nenhum Skill Router implementado.
+Nenhuma escrita de memória.
+
+**Resultados dos testes:**
+- PR49 smoke: **96/96** ✅
+- PR47 prova: **79/79** ✅
+- Regressões: **601/601** ✅
+- **Total: 697/697** ✅
+
+---
+
+## Próxima PR autorizada
+
+**PR50 — PR-PROVA — Teste de intenção**
+
+Objetivo: criar prova formal do Classificador de Intenção v1, validando todos os
+cenários do smoke em versão prova, integração real com o prompt do chat via
+`isOperationalContext`, edge cases e mensagens ambíguas, e regressões completas.
+
+**Pré-requisito:** PR49 ✅ (concluída — 697/697 testes passando)
+
+**O que está disponível para a PR50:**
+- `classifyEnaviaIntent()` testável isoladamente
+- `isOperationalMessage()` delegando ao classificador
+- `intent_classification` no response do `/chat/run`
+- Todos os 15 INTENT_TYPES exportados e testáveis
+- `buildChatSystemPrompt()` com integração completa
+
+
 
 ## O que foi feito nesta sessão
 

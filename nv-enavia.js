@@ -43,6 +43,7 @@ import { searchRelevantMemory, searchMemory } from "./schema/memory-read.js";
 import { buildRetrievalContext, buildRetrievalSummary } from "./schema/memory-retrieval.js";
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
+import { classifyEnaviaIntent } from "./schema/enavia-intent-classifier.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -3770,6 +3771,9 @@ async function _dispatchFromChat(env, pendingPlan) {
 //   "revise", "verifique", "cheque", "inspecione" — cobrem forma imperativa de inspeção.
 // Adicionados (termos técnicos operacionais):
 //   "runtime", "gate", "gates" — termos de infraestrutura usados em contexto técnico real.
+// PR49: _CHAT_OPERATIONAL_INTENT_TERMS preservado para compatibilidade com
+//   _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS e isOperationalMessageLegacy. isOperationalMessage
+//   agora delega ao Classificador de Intenção v1 como fonte primária.
 const _CHAT_OPERATIONAL_INTENT_TERMS = [
   "validar", "validação", "worker", "plano", "executor", "execução", "executar",
   "auditoria", "auditar", "deploy-worker", "deploy", "healthcheck", "health",
@@ -3780,8 +3784,33 @@ const _CHAT_OPERATIONAL_INTENT_TERMS = [
   "runtime", "gate", "gates",
   "produção", "prod", "staging", "kv", "binding",
 ];
-function isOperationalMessage(message, _context) {
+// PR49: isOperationalMessage agora usa o Classificador de Intenção v1 como fonte primária.
+// Mantém fallback para _CHAT_OPERATIONAL_INTENT_TERMS para garantir retro-compatibilidade
+// com qualquer termo coberto pela heurística legada que não esteja no classificador novo.
+// A lógica antiga (isOperationalMessageLegacy) ainda existe em handleChatLLM para o
+// legado de _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS — sem alteração de comportamento.
+function isOperationalMessage(message, context) {
   if (typeof message !== "string" || message.length === 0) return false;
+  // Fonte primária: Classificador de Intenção v1
+  try {
+    const classification = classifyEnaviaIntent({ message, context });
+    if (classification && typeof classification.is_operational === "boolean") {
+      if (classification.is_operational) return true;
+      // Classificador disse não-operacional: verificar fallback legado para não regredir.
+      // next_pr_request e frustration/identity/capability/system_state devem retornar false
+      // mesmo que a heurística legada dispare. Os únicos casos onde confiamos no legado
+      // é quando o classificador retornou unknown (sem match) E a heurística legada dispara.
+      const isUnknown = classification.intent === "unknown";
+      if (!isUnknown) {
+        // O classificador identificou a intenção e a declarou não-operacional.
+        // Confiamos nessa decisão — não sobrescrevemos com legado.
+        return false;
+      }
+    }
+  } catch (_err) {
+    // Se o classificador falhar por qualquer razão, cair no legado.
+  }
+  // Fallback legado: heurística de termos simples (PR36/PR38)
   const lower = message.toLowerCase();
   return _CHAT_OPERATIONAL_INTENT_TERMS.some((t) => lower.includes(t));
 }
@@ -4042,6 +4071,13 @@ async function handleChatLLM(request, env) {
   // isOperationalContext exige sinal real de intenção operacional na mensagem (ou termo operacional clássico).
   // Antes: const isOperationalContext = hasTarget || isOperationalMessage;
   // Agora: depende da intenção, não da mera presença de target default do painel.
+  // PR49: Classificador de Intenção v1 rodado aqui para gerar intent_classification aditivo na resposta.
+  let _intentClassification = null;
+  try {
+    _intentClassification = classifyEnaviaIntent({ message, context });
+  } catch (_classifyErr) {
+    _intentClassification = null;
+  }
   const isOperationalMessageLegacy = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
   const hasOperationalMessageIntent = isOperationalMessage(message, context);
   const isOperationalContext = hasOperationalMessageIntent || isOperationalMessageLegacy;
@@ -4559,6 +4595,13 @@ async function handleChatLLM(request, env) {
       operational_context_applied: isOperationalContext,
       // PR36: telemetria mínima de sanitização/fallback (campo aditivo, não-quebrante).
       sanitization: _sanitization,
+      // PR49: classificação de intenção v1 (campo aditivo, não-quebrante, somente se disponível).
+      ...(_intentClassification ? { intent_classification: {
+        intent: _intentClassification.intent,
+        confidence: _intentClassification.confidence,
+        is_operational: _intentClassification.is_operational,
+        reasons: _intentClassification.reasons,
+      }} : {}),
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
       timestamp: Date.now(),
