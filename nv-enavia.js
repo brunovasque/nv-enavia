@@ -47,6 +47,7 @@ import { classifyEnaviaIntent } from "./schema/enavia-intent-classifier.js";
 import { routeEnaviaSkill } from "./schema/enavia-skill-router.js";
 import { buildIntentRetrievalContext } from "./schema/enavia-intent-retrieval.js";
 import { runEnaviaSelfAudit } from "./schema/enavia-self-audit.js";
+import { buildEnaviaResponsePolicy } from "./schema/enavia-response-policy.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -4134,6 +4135,26 @@ async function handleChatLLM(request, env) {
     _selfAudit = null;
   }
 
+  // PR59: Response Policy viva v1 — campo aditivo defensivo.
+  // Rodado após self_audit, usando todos os sinais do fluxo.
+  // Orienta COMO responder: tom, sinceridade, estratégia, segurança.
+  // Não altera reply. Não bloqueia fluxo programaticamente. Não chama LLM externo.
+  // Não usa KV/rede/filesystem. Read-only. Falha com segurança.
+  let _responsePolicy = null;
+  try {
+    _responsePolicy = buildEnaviaResponsePolicy({
+      message,
+      context,
+      intentClassification: _intentClassification || undefined,
+      skillRouting:         _skillRouting         || undefined,
+      intentRetrieval:      _intentRetrieval      || undefined,
+      selfAudit:            _selfAudit            || undefined,
+      isOperationalContext,
+    });
+  } catch (_responsePolicyErr) {
+    _responsePolicy = null;
+  }
+
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
     // Leitura de memória estruturada com separação explícita de blocos.
@@ -4155,15 +4176,17 @@ async function handleChatLLM(request, env) {
     // como envelope estrutural, sem sufocar a fala natural.
     const ownerName = env.OWNER || "usuário";
 
-    // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4+PR53) ---
+    // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4+PR53+PR59) ---
     // System prompt completo: base institucional + tom conversacional + contexto dinâmico
     // + awareness operacional real (PR4) + intent retrieval context (PR53)
+    // + response policy viva (PR59)
     const chatSystemPrompt = buildChatSystemPrompt({
       ownerName,
       context,
       operational_awareness: operationalAwareness,
       is_operational_context: isOperationalContext,
       intent_retrieval_context: _intentRetrieval || undefined,
+      response_policy: _responsePolicy || undefined,
     });
 
     // --- PR5: Inject conversation history between system and current message ---
@@ -4687,6 +4710,20 @@ async function handleChatLLM(request, env) {
       // Indica achados de risco, alertas e próxima ação segura. Read-only.
       // Não altera reply. Não bloqueia fluxo automaticamente. Não chama LLM externo.
       ...(_selfAudit ? { self_audit: _selfAudit } : {}),
+      // PR59: Response Policy viva v1 (campo aditivo seguro, não-quebrante).
+      // Orienta tom e estrutura da resposta. Read-only. Não altera reply.
+      // Não bloqueia fluxo programaticamente. Não chama LLM externo.
+      // policy_block inteiro NÃO é exposto — apenas metadados seguros.
+      ...(_responsePolicy ? { response_policy: {
+        applied:               _responsePolicy.applied,
+        mode:                  _responsePolicy.mode,
+        response_style:        _responsePolicy.response_style,
+        should_adjust_tone:    _responsePolicy.should_adjust_tone,
+        should_warn:           _responsePolicy.should_warn,
+        should_refuse_or_pause: _responsePolicy.should_refuse_or_pause,
+        warnings:              _responsePolicy.warnings,
+        reasons:               _responsePolicy.reasons,
+      }} : {}),
       timestamp: Date.now(),
       input: message,
       telemetry: {

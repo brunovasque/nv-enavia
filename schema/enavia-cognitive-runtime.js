@@ -11,6 +11,11 @@
 // PR53 adiciona: suporte a intent_retrieval_context em buildChatSystemPrompt,
 // injetando bloco documental compacto por intenção quando applied=true.
 //
+// PR59 adiciona: suporte a response_policy em buildChatSystemPrompt,
+// injetando bloco de política de resposta compacto quando applied=true
+// e policy_block não estiver vazio. Read-only. Não substitui LLM Core.
+// Não ativa MODO OPERACIONAL ATIVO sozinho. Não autoriza execução.
+//
 // Escopo: WORKER-ONLY. Pure function. Sem side-effects.
 // ============================================================================
 
@@ -20,6 +25,7 @@ import { getEnaviaConstitution } from "./enavia-constitution.js";
 import { renderOperationalAwarenessBlock } from "./operational-awareness.js";
 import { getEnaviaBrainContext } from "./enavia-brain-loader.js";
 import { buildLLMCoreBlock } from "./enavia-llm-core.js";
+import { buildResponsePolicyPromptBlock } from "./enavia-response-policy.js";
 
 /**
  * Monta o contexto cognitivo completo da Enavia em runtime.
@@ -92,7 +98,7 @@ export function buildCognitivePromptBlock(opts = {}) {
  *   - bloco de alvo operacional ativo (quando context.target presente ou modo operacional ativo)
  *   - contrato de envelope JSON (estrutural, sem sufocar a fala)
  *
- * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean, include_brain_context?: boolean, intent_retrieval_context?: object }} [opts]
+ * @param {{ ownerName?: string, context?: object, operational_awareness?: object, is_operational_context?: boolean, include_brain_context?: boolean, intent_retrieval_context?: object, response_policy?: object }} [opts]
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
@@ -116,6 +122,16 @@ export function buildChatSystemPrompt(opts = {}) {
     typeof opts.intent_retrieval_context === "object" &&
     opts.intent_retrieval_context.applied === true
       ? opts.intent_retrieval_context
+      : null;
+  // PR59: Response Policy viva — bloco de política de resposta compacto.
+  // Injetado somente quando applied=true e policy_block não estiver vazio.
+  // Read-only. Não substitui LLM Core. Não ativa MODO OPERACIONAL ATIVO sozinho.
+  // Não autoriza execução. Não contém dados sensíveis. Orienta tom/estrutura.
+  const response_policy =
+    opts.response_policy &&
+    typeof opts.response_policy === "object" &&
+    opts.response_policy.applied === true
+      ? opts.response_policy
       : null;
 
   const sections = [];
@@ -310,6 +326,20 @@ export function buildChatSystemPrompt(opts = {}) {
         "Não autoriza execução de skill. Não ativa modo operacional sozinho.",
         block,
       );
+    }
+  }
+
+  // === 7e. PR59 — Response Policy viva (read-only) ===
+  // Bloco compacto de política de resposta gerado pelo Response Policy v1.
+  // Injetado APÓS Intent Retrieval Context e ANTES do envelope JSON.
+  // Só aparece quando applied=true e policy_block não estiver vazio.
+  // Não substitui LLM Core, Brain Context ou Intent Retrieval.
+  // Não ativa MODO OPERACIONAL ATIVO sozinho. Não autoriza execução.
+  // Não contém dados sensíveis. Orienta tom e estrutura da resposta. Read-only.
+  if (response_policy) {
+    const policyBlock = buildResponsePolicyPromptBlock(response_policy);
+    if (typeof policyBlock === "string" && policyBlock.length > 0) {
+      sections.push("", policyBlock);
     }
   }
 
