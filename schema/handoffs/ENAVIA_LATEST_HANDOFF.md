@@ -1,12 +1,74 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR56 — PR-IMPL — Self-Audit read-only
-**Para:** PR57 — PR-PROVA — Teste do Self-Audit read-only
+**De:** PR57 — PR-PROVA — Prova do Self-Audit read-only (⚠️ falha parcial)
+**Para:** PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only
 
 ## O que foi feito nesta sessão
 
-### PR56 — PR-IMPL — Self-Audit read-only
+### PR57 — PR-PROVA — Prova do Self-Audit read-only
+
+**Tipo:** `PR-PROVA` (Worker-only, prova pura)
+**Branch:** `copilot/claudepr57-prova-self-audit-readonly`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR56 ✅ (PR-IMPL — Self-Audit read-only — 64/64 + 1.375/1.375)
+
+**Objetivo:**
+Provar formalmente que o Self-Audit read-only implementado na PR56 funciona corretamente como camada passiva de auditoria.
+
+**Resultado:**
+⚠️ **FALHOU PARCIALMENTE — 96/99 (3 falhas reais — Cenário H — missing_source com nome hiphenado)**
+
+**Arquivos criados:**
+- `tests/pr57-self-audit-readonly.prova.test.js` — 99 asserts, cenários A–P
+- `schema/reports/PR57_PROVA_SELF_AUDIT_READONLY.md` — relatório completo
+
+**Arquivos modificados:**
+- `schema/contracts/INDEX.md` — PR57 ⚠️, próxima PR58
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Validações que passaram:**
+- Contrato de saída (applied, mode, risk_level, findings, should_block, warnings, next_safe_action) ✅
+- Caso limpo não bloqueia ✅
+- False capability detectada (/skills/run) ✅
+- Fake execution detectada (deploy afirmado) ✅
+- Unauthorized action detectada (manda pra produção) ✅
+- Wrong mode detectado (frustração + isOperationalContext) ✅
+- Docs over product detectado ✅
+- Runtime vs documentação confusion detectada ✅
+- Secret exposure bloqueia (Bearer token) ✅
+- Scope violation detectada ✅
+- Contract drift detectado ✅
+- Campo aditivo validado (por inspeção de código + unitário) ✅
+- Resposta não alterada automaticamente ✅
+- Robustez (entradas nulas/inválidas) ✅
+- Sem endpoint e sem side effects ✅
+- Regressões 1.375/1.375 ✅
+
+**Achado real — falha no Cenário H:**
+- `_detectMissingSource` usa `/o worker\s+\w+\s+já está.../i` — `\w+` não captura hífens
+- `"O worker payments-worker já está ativo em produção."` não é detectado
+- Nomes reais de workers Enavia usam hífens (nv-enavia, payments-worker, nv-workers)
+- Correção: substituir `\w+` por `[\w\-]+` nos padrões do detector
+
+**Conforme contrato PR57: não avançar para Response Policy.**
+
+---
+
+**Próxima PR:**
+
+**PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only**
+
+Escopo:
+- Corrigir `_detectMissingSource` em `schema/enavia-self-audit.js`
+- Substituir `\w+` por `[\w\-]+` nos padrões regex de worker
+- Re-executar `tests/pr57-self-audit-readonly.prova.test.js` → deve passar 99/99
+- Re-executar todas as regressões → devem passar 1.375/1.375
+- Apenas após 99/99 confirmar avanço para Response Policy (PR59+)
+
+
 
 **Tipo:** `PR-IMPL` (Worker-only, campo aditivo)
 **Branch:** `copilot/claudepr56-impl-self-audit-readonly`

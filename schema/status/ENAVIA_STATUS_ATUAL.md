@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR56 — Self-Audit read-only ✅)
-**Branch ativa:** `copilot/claudepr56-impl-self-audit-readonly`
-**Última tarefa:** PR56 — PR-IMPL — Self-Audit read-only. `schema/enavia-self-audit.js` criado com `runEnaviaSelfAudit()` (10 categorias, pure function, determinístico). Campo aditivo `self_audit` integrado em `nv-enavia.js` no `/chat/run`. Smoke PR56 64/64 ✅. Regressões 1.375/1.375 ✅. Total 1.439/1.439 ✅. Read-only. Não altera resposta. Não bloqueia fluxo. Não cria endpoint. Relatório: `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md`. Próxima PR: **PR57 — PR-PROVA — Teste do Self-Audit read-only**.
+**Data:** 2026-05-01 (atualizado após PR57 — Prova do Self-Audit read-only ⚠️ falha parcial)
+**Branch ativa:** `copilot/claudepr57-prova-self-audit-readonly`
+**Última tarefa:** PR57 — PR-PROVA — Prova do Self-Audit read-only. `tests/pr57-self-audit-readonly.prova.test.js` criado (99 asserts, cenários A–P). **96/99 ✅ — 3 falhas reais no Cenário H** (missing_source com nome de worker hiphenado — `\w+` não captura hífens). Regressões 1.375/1.375 ✅. Contrato de saída validado. Campo aditivo validado. Resposta não alterada validada. Segurança/side effects validados. **Não avançar para Response Policy. Próxima PR: PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only.** Relatório: `schema/reports/PR57_PROVA_SELF_AUDIT_READONLY.md`.
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR57 — PR-PROVA — Teste do Self-Audit read-only**
+**PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only**
 
+> ⚠️ PR57 (PR-PROVA) — concluída com falha parcial. `tests/pr57-self-audit-readonly.prova.test.js` criado (99 asserts, cenários A–P). 96/99 ✅ — 3 falhas reais Cenário H (missing_source não detecta nomes hiphenados). Achado: `_detectMissingSource` usa `\w+` que não captura hífens. Regressões 1.375/1.375 ✅. **Conforme contrato: PR58 deve corrigir Self-Audit antes de Response Policy.** Relatório: `schema/reports/PR57_PROVA_SELF_AUDIT_READONLY.md`.
 > ✅ PR56 (PR-IMPL) — concluída. `schema/enavia-self-audit.js` criado com `runEnaviaSelfAudit()` (10 categorias: secret_exposure, fake_execution, unauthorized_action, scope_violation, contract_drift, false_capability, runtime_vs_documentation_confusion, wrong_mode, missing_source, docs_over_product). Campo aditivo `self_audit` integrado defensivamente em `nv-enavia.js`. Smoke PR56 64/64 ✅. Regressões 1.375/1.375 ✅. Total 1.439/1.439 ✅. Read-only. Não altera resposta. Não bloqueia fluxo. Não cria endpoint. Relatório: `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md`.
 > ✅ PR55 (PR-DOCS) — concluída. `schema/self-audit/` criada com 8 arquivos documentais: INDEX.md, FRAMEWORK.md (10 camadas), CHECKLISTS.md (48 itens A–F), RISK_MODEL.md (5 níveis + 13 categorias), SIGNALS.md (30+ sinais), OUTPUT_CONTRACT.md (contrato JSON), ESCALATION_POLICY.md, ROADMAP.md (PR55–PR61+). `schema/brain/SYSTEM_AWARENESS.md` atualizado para referenciar Self-Audit como documental. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR55_SELF_AUDIT_FRAMEWORK.md`.
 > ✅ PR54 (PR-PROVA) — concluída. `tests/pr54-memoria-contextual.prova.test.js` criado (93 asserts, 13 cenários A–M). Todos passaram. Retrieval por Intenção v1 validado formalmente como memória contextual read-only: contexto aplicado aparece no prompt com marcador canônico, não aplicado não aparece, coerência por skill/intenção provada, bloco não ativa modo operacional sozinho, falsa capacidade bloqueada, campo `intent_retrieval` aditivo e seguro, `/skills/run` confirmado inexistente. Regressões 1.372/1.372 ✅. Total 1.465/1.465 ✅. Relatório: `schema/reports/PR54_PROVA_MEMORIA_CONTEXTUAL.md`.
