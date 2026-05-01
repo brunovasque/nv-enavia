@@ -1,8 +1,88 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR59 — PR-IMPL — Response Policy viva ✅
-**Para:** PR60 — PR-PROVA — Prova anti-bot final
+**De:** PR60 — PR-PROVA — Prova anti-bot final ✅
+**Para:** PR61 — PR-DOCS/IMPL — Propor atualização de memória
+
+## O que foi feito nesta sessão
+
+### PR60 — PR-PROVA — Prova anti-bot final
+
+**Tipo:** `PR-PROVA` (Worker-only, somente testes)
+**Branch:** `copilot/claudepr60-prova-anti-bot-final`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR59 ✅ (Response Policy viva — 96/96)
+
+**Objetivo:**
+Provar que a pilha cognitiva completa da Enavia funciona em harmonia e reduziu comportamento robótico, preservando segurança.
+
+**Teste criado:**
+- `tests/pr60-anti-bot-final.prova.test.js` — 236 asserts, 16 cenários A–P
+- 236/236 ✅ — PASSOU
+
+**Cenários validados:**
+- A: Conversa simples leve — intent conversation, sem modo operacional, estilo conversational ✅
+- B: Frustração não vira bot — intent frustration, docs_over_product detectado, sinceridade orientada ✅
+- C: Próxima PR sem modo pesado — intent next_pr_request, CONTRACT_LOOP_OPERATOR, sem modo pesado ✅
+- D: Revisão de PR operacional — intent pr_review, CONTRACT_AUDITOR, MODO OPERACIONAL ATIVO, sem falsa aprovação ✅
+- E: Deploy com gate — intent deploy_request, DEPLOY_GOVERNANCE_OPERATOR, unauthorized_action detectado, gate/aprovação exigida ✅
+- F: Falsa capacidade bloqueada — intent skill_request, false_capability detectado, runtime não fingido ✅
+- G: Secret exposure — secret_exposure detectado (blocking), blocking_notice, segredo não exposto ✅
+- H: Estratégia viva — intent strategy_question, estilo strategic, custo/tempo/risco orientados ✅
+- I: Capacidade atual vs futura — sistema seguro mesmo com unknown; Finding I1 documentado ✅ (finding)
+- J: Read-only como gate — target read_only = nota factual, sem modo operacional pesado ✅
+- K: Policy não reescreve resposta — sem reply/use_planner/input na policy ✅
+- L: Self-Audit não bloqueia mecanicamente — sem throw, fluxo continua ✅
+- M: Ordem segura do prompt — LLM Core→Brain→Retrieval→Policy→Envelope JSON ✅
+- N: Anti-bot regressions preservadas — pr36, pr37 verificados + 8 classificações corretas ✅
+- O: Segurança estrutural — 93 verificações, nenhum endpoint, sem side-effects, segredos protegidos ✅
+- P: /chat/run campos aditivos — 5 campos validados por inspeção de código + 5 shapes de módulos ✅
+
+**Regressões:** 21 testes, todos passando
+**Finding I1 documentado:** "você já consegue executar" retorna `unknown` (impacto baixo, sem risco anti-bot)
+
+**Arquivos criados:**
+- `tests/pr60-anti-bot-final.prova.test.js`
+- `schema/reports/PR60_PROVA_ANTI_BOT_FINAL.md`
+
+**O que NÃO foi alterado:**
+- Nenhum módulo de runtime (`schema/enavia-*.js`, `nv-enavia.js`)
+- Nenhum endpoint criado
+- Nenhum painel/executor/deploy worker/workflow/wrangler alterado
+
+## O que a próxima sessão deve fazer
+
+### PR61 — PR-DOCS/IMPL — Propor atualização de memória
+
+**Tipo:** `PR-DOCS/IMPL`
+**Objetivo:** Propor e implementar atualização de memória baseada nas aprendizagens do ciclo PR31–PR60.
+
+**Contexto:**
+- Stack cognitiva completa validada (PR60)
+- Finding I1: adicionar "você já consegue" e variantes com advérbio à lista `_CAPABILITY_TERMS` do classificador
+- Considerar atualizar `schema/brain/memories/` com aprendizados operacionais do ciclo Jarvis Brain
+- Não alterar runtime sem PR-DIAG + PR-IMPL separados
+
+**Pré-requisitos:**
+- Ler contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` para confirmar escopo de PR61
+- Verificar se há seção específica de PR61 no contrato
+
+## Contexto técnico
+
+**Stack atual:**
+
+| Módulo | Status |
+|--------|--------|
+| nv-enavia.js | Worker principal — não alterar sem contrato |
+| enavia-llm-core.js | LLM Core v1 — ativo e validado |
+| enavia-brain-loader.js | Brain Context read-only — ativo |
+| enavia-intent-classifier.js | 15 intenções — finding I1 (você já consegue) |
+| enavia-skill-router.js | 4 skills documentais — read-only |
+| enavia-intent-retrieval.js | Retrieval por intenção — ativo |
+| enavia-self-audit.js | Self-Audit read-only — ativo |
+| enavia-response-policy.js | Response Policy viva — ativa |
+| enavia-cognitive-runtime.js | Prompt compositor — 7 seções |
+
 
 ## O que foi feito nesta sessão
 
