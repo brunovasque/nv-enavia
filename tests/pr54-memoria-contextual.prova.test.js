@@ -264,10 +264,10 @@ header("📋 CENÁRIO D — Contract Auditor contextual com modo operacional");
   ok(intentRetrieval.applied === true,
     "D2: retrieval applied=true");
 
-  // D3: context_block contém escopo, regressões, arquivos, evidência
+  // D3: context_block contém escopo, regressões, arquivos alterados e evidência
   const cb = intentRetrieval.context_block;
   ok(
-    cb.includes("escopo") || cb.includes("alterados") || cb.includes("regressões") || cb.includes("evidência") || cb.includes("evidencia"),
+    cb.includes("escopo") || cb.includes("alterados") || cb.includes("regressões") || cb.includes("evidência"),
     "D3: context_block contém escopo/arquivos alterados/regressões/evidência"
   );
 
@@ -389,8 +389,9 @@ header("📋 CENÁRIO G — Frustração sem skill");
     "G4: context_block contém 'Isso é opcional. Não mexa agora.'");
 
   // G5: não ativa MODO OPERACIONAL ATIVO
-  ok(!prompt.includes(MODO_OPERACIONAL) || prompt.split(MODO_OPERACIONAL).length === prompt.split(MODO_OPERACIONAL).length,
-    "G5a: is_operational=false para frustração");
+  // G5a: prompt construído sem is_operational não contém o modo pesado
+  ok(!prompt.includes(MODO_OPERACIONAL),
+    "G5a: prompt padrão (is_operational=false) não contém MODO OPERACIONAL ATIVO para frustração");
   ok(intentClassification.is_operational === false,
     "G5b: is_operational=false confirmado pelo classificador");
   const promptFrustracao = buildChatSystemPrompt({
