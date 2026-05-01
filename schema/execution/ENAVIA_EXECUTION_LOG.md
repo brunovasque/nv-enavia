@@ -4,6 +4,48 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR58 — PR-IMPL — Correção cirúrgica do Self-Audit missing_source
+
+- **Branch:** `copilot/claudepr58-impl-correcao-self-audit-missing-source`
+- **Tipo:** `PR-IMPL` cirúrgica (Worker-only)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR57 ⚠️ (PR-PROVA — 96/99, falha parcial Cenário H)
+
+### Objetivo
+
+Corrigir o regex `\w+` → `[\w-]+` no detector `_detectMissingSource` de `schema/enavia-self-audit.js` para capturar nomes de workers com hífen (ex: `payments-worker`, `nv-enavia`).
+
+### Correção
+
+**Arquivo:** `schema/enavia-self-audit.js`, linha 402
+
+Antes: `/o worker\s+\w+\s+já está (ativo|funcionando|online|em produção)/i`  
+Depois: `/o worker\s+[\w-]+\s+já está (ativo|funcionando|online|em produção)/i`
+
+### Resultado
+
+✅ **PR57 passou 99/99 após a correção** (antes: 96/99, 3 falhas Cenário H).  
+✅ Regressões 1.375/1.375.  
+✅ Nenhum arquivo proibido alterado.  
+✅ Self-Audit continua read-only.  
+✅ Resposta não alterada automaticamente.  
+✅ Nenhum endpoint criado.
+
+### Arquivos alterados
+
+- `schema/enavia-self-audit.js` — regex linha 402 (único runtime alterado)
+- `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md` — criado
+- `schema/contracts/INDEX.md` — PR58 ✅, próxima PR59
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — atualizado
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — atualizado
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo) — atualizado
+
+### Próxima PR
+
+PR59 — PR-IMPL — Response Policy viva. Self-Audit v1 completo e validado. Retorno ao fluxo principal do contrato.
+
+---
+
 ## 2026-05-01 — PR57 — PR-PROVA — Prova do Self-Audit read-only
 
 - **Branch:** `copilot/claudepr57-prova-self-audit-readonly`

@@ -43,10 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only**
+**PR59 — PR-IMPL — Response Policy viva**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
+> ✅ PR58 (PR-IMPL cirúrgica) — concluída. Regex `\w+` → `[\w-]+` em `_detectMissingSource` (`schema/enavia-self-audit.js` linha 402). PR57 agora passa **99/99 ✅** (antes: 96/99, falha Cenário H). Regressões 1.375/1.375 ✅. Nenhum arquivo proibido alterado. Self-Audit continua read-only. Resposta não alterada automaticamente. Nenhum endpoint criado. Relatório: `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md`. Self-Audit v1 completo e validado. Retorno ao fluxo principal do contrato.
 > ⚠️ PR57 (PR-PROVA) — concluída com falha parcial. `tests/pr57-self-audit-readonly.prova.test.js` criado (99 asserts, cenários A–P). **96/99 ✅ — 3 falhas reais no Cenário H (missing_source)**. Achado: `_detectMissingSource` usa `\w+` no regex, não captura nomes de worker com hífen (ex: `payments-worker`). Regressões 1.375/1.375 ✅. Total 1.471/1.474 (com 3 falhas). Contrato de saída ✅. Blocking ✅. Campo aditivo ✅. Resposta não alterada ✅. Segurança/side effects ✅. **Conforme contrato: não avançar para Response Policy. PR58 deve ser correção cirúrgica do Self-Audit.** Relatório: `schema/reports/PR57_PROVA_SELF_AUDIT_READONLY.md`.
 > ✅ PR56 (PR-IMPL) — concluída. `schema/enavia-self-audit.js` criado com `runEnaviaSelfAudit()` (10 categorias: secret_exposure, fake_execution, unauthorized_action, scope_violation, contract_drift, false_capability, runtime_vs_documentation_confusion, wrong_mode, missing_source, docs_over_product). Campo aditivo `self_audit` integrado defensivamente em `nv-enavia.js` no `/chat/run`. Smoke PR56 64/64 ✅. Regressões 1.375/1.375 ✅. Total 1.439/1.439 ✅. Read-only. Não altera resposta automaticamente. Não bloqueia fluxo. Não cria endpoint. Não usa KV/rede/filesystem. Relatório: `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md`.
 > ✅ PR55 (PR-DOCS) — concluída. `schema/self-audit/` criada com 8 arquivos: INDEX.md, FRAMEWORK.md (10 camadas), CHECKLISTS.md (48 itens, 6 checklists A–F), RISK_MODEL.md (5 níveis, 13 categorias), SIGNALS.md (30+ sinais em 5 grupos), OUTPUT_CONTRACT.md (contrato JSON aditivo), ESCALATION_POLICY.md, ROADMAP.md (PR55–PR61+). `schema/brain/SYSTEM_AWARENESS.md` atualizado para referenciar Self-Audit como documental. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR55_SELF_AUDIT_FRAMEWORK.md`.
