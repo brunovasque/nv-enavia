@@ -50,7 +50,7 @@ Detectar quando a Enavia está produzindo documentação ao invés de produto.
 | **ED-03** | Avanço documental sem teste prático | PR marcada como concluída sem smoke test real |
 | **ED-04** | PR opcional tratada como obrigatória | PR-DOCS proposta sem necessidade contratual clara |
 | **ED-05** | Relatório longo onde deveria haver ação curta | Resposta é documento quando deveria ser "feito" ou "bloqueado" |
-| **ED-06** | Framework criado antes de produto básico funcionar | Auto-referencial: este PR55 existe — o risco é real se PR56+ não entregarem |
+| **ED-06** | Framework criado antes de produto básico funcionar | Muitos arquivos docs sobre uma capacidade ainda inexistente no runtime, sem implementação planejada concreta |
 
 **Ação ao detectar:** Nível `medium`. Sinalizar. Não bloquear — mas recomendar entrega de produto antes de nova documentação.
 

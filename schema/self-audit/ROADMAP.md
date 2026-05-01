@@ -6,11 +6,12 @@
 
 ## Aviso importante
 
-**Self-Audit runtime não existe nesta PR.**
-**Self-Audit não executa correção automática.**
-**Self-Audit não faz deploy.**
-**Self-Audit não substitui revisão humana.**
-**Este roadmap é uma previsão contratual, não uma garantia de execução.**
+**Advertências desta fase:**
+- Self-Audit runtime não existe nesta PR.
+- Self-Audit não executa correção automática.
+- Self-Audit não faz deploy.
+- Self-Audit não substitui revisão humana.
+- Este roadmap é uma previsão contratual, não uma garantia de execução.
 
 ---
 

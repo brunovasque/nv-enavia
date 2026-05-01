@@ -102,7 +102,7 @@ A maior armadilha do Self-Audit é se tornar mais documentação em cima de docu
 
 Regras anti-excesso:
 
-1. **Uma PR-DOCS por frente, não uma por conceito.** Cada frente (Self-Audit, Skills, Brain) tem no máximo 1–2 PRs docs antes de uma PR-IMPL.
+1. **No máximo 1 PR-DOCS por frente antes de uma PR-IMPL.** Cada frente (Self-Audit, Skills, Brain) tem exatamente 1 PR docs antes de uma PR-IMPL.
 2. **PR-DOCS só se justificada pelo contrato.** Sem contrato autorizando = sem PR-DOCS.
 3. **Roadmap não é produto.** Um roadmap bonito não substitui testes passando.
 4. **Se o contrato diz PR-IMPL, a PR deve ser PR-IMPL.** Transformar em PR-DOCS sem justificativa é drift.
