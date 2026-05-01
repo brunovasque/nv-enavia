@@ -1,8 +1,76 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR49 — PR-IMPL — Classificador de Intenção v1
-**Para:** PR50 — PR-PROVA — Teste de intenção
+**De:** PR50 — PR-PROVA — Prova do Classificador de Intenção v1
+**Para:** PR51 — PR-IMPL — Skill Router read-only
+
+## O que foi feito nesta sessão
+
+### PR50 — PR-PROVA — Prova do Classificador de Intenção v1
+
+**Tipo:** `PR-PROVA` (Worker-only, prova pura)
+**Branch:** `copilot/claudepr50-prova-teste-intencao`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR49 ✅ (PR-IMPL — Classificador de Intenção v1)
+
+**Objetivo:**
+Provar formalmente que o Classificador de Intenção v1 (PR49) funciona corretamente no
+fluxo real do chat/prompt, preservando anti-bot, LLM Core, Brain Context, gates e
+comportamento operacional. Nenhum runtime alterado.
+
+**Resultado:**
+✅ **124/124 asserts. 821/821 total com regressões.**
+
+**Cenários provados (13):**
+- A: Conversa simples não operacional ✅
+- B: Frustração/desconfiança não operacional ✅
+- C: Identidade, capacidade e estado do sistema ✅
+- D: Próxima PR não operacional ✅
+- E: Revisão de PR (operacional) ✅
+- F: Diagnóstico técnico (operacional) ✅
+- G: Deploy/execução (operacional com governança) ✅
+- H: Contrato: ação vs pergunta conceitual ✅
+- I: Skill: execução vs pergunta, Skill Router inexistente ✅
+- J: Memória supervisionada, sem escrita ✅
+- K: Estratégia não operacional pesada ✅
+- L: Regressões PR37/PR38 preservadas ✅
+- M: Campo `intent_classification` validado ✅
+
+**Arquivos novos:**
+- `tests/pr50-intent-runtime.prova.test.js` — 124 asserts, 13 cenários
+- `schema/reports/PR50_PROVA_TESTE_INTENCAO.md` — relatório completo
+
+**Arquivos NÃO alterados (prova pura):**
+`schema/enavia-intent-classifier.js`, `nv-enavia.js`, `schema/enavia-cognitive-runtime.js`,
+`schema/enavia-llm-core.js`, `schema/enavia-brain-loader.js`, painel, executor,
+deploy worker, workflows, wrangler. Nenhum endpoint criado.
+
+**Resultados dos testes:**
+- PR50 prova: **124/124** ✅
+- PR49 smoke: **96/96** ✅
+- Regressões: **697/697** ✅
+- **Total: 821/821** ✅
+
+---
+
+## Próxima PR autorizada
+
+**PR51 — PR-IMPL — Skill Router read-only**
+
+Objetivo: Implementar o Skill Router read-only que roteia pedidos `skill_request`
+para skills documentais existentes (`schema/skills/`), sem criar endpoint `/skills/run`
+em runtime. Classificador identifica a intenção; Skill Router seleciona e retorna
+conteúdo documental da skill solicitada.
+
+**Pré-requisito:** PR50 ✅ (concluída — 821/821 testes passando)
+
+**O que está disponível para a PR51:**
+- `classifyEnaviaIntent()` com `INTENT_TYPES.SKILL_REQUEST`
+- Skills documentais em `schema/skills/` (4 skills: CONTRACT_LOOP_OPERATOR, DEPLOY_GOVERNANCE_OPERATOR, SYSTEM_MAPPER, CONTRACT_AUDITOR)
+- `isOperationalMessage()` já identifica `skill_request` como `is_operational=true`
+- `buildChatSystemPrompt()` estável
+
+
 
 ## O que foi feito nesta sessão
 

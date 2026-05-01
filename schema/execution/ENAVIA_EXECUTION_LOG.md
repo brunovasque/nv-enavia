@@ -4,6 +4,71 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR50 — PR-PROVA — Teste de intenção
+
+- **Branch:** `copilot/claudepr50-prova-teste-intencao`
+- **Tipo:** `PR-PROVA` (Worker-only, prova pura)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR49 ✅ (PR-IMPL — Classificador de Intenção v1)
+- **Escopo:** Prova formal do Classificador de Intenção v1 no fluxo real do chat/prompt.
+
+### Objetivo
+
+Provar que o Classificador de Intenção v1 (PR49) funciona corretamente no fluxo real do
+chat/prompt, preservando anti-bot, LLM Core, Brain Context, gates e comportamento operacional.
+Nenhum runtime alterado.
+
+### Resultado
+
+✅ **PASSOU — 124/124 asserts PR50. Regressões 697/697 ✅. Total: 821/821.**
+
+Todos os 13 cenários (A–M) passaram. Classificador de Intenção v1 validado formalmente.
+Conversa/frustração não operacional. Próxima PR não operacional. PR review/diagnóstico/deploy
+operacionais. Contrato conceitual sem falso positivo. Skill Router runtime inexistente
+confirmado. Memória sem escrita. Estratégia não operacional pesada. Regressões PR37/PR38
+preservadas. Campo `intent_classification` validado por inspeção + unitário.
+Nenhum runtime alterado. Próxima PR: **PR51 — PR-IMPL — Skill Router read-only**.
+Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
+
+### Arquivos novos
+
+- `tests/pr50-intent-runtime.prova.test.js` — 124 asserts (13 cenários A–M)
+- `schema/reports/PR50_PROVA_TESTE_INTENCAO.md` — relatório completo
+
+### Arquivos NÃO alterados (confirmado por `git diff --name-only`)
+
+- `schema/enavia-intent-classifier.js` ✅
+- `nv-enavia.js` ✅
+- `schema/enavia-cognitive-runtime.js` ✅
+- `schema/enavia-llm-core.js` ✅
+- `schema/enavia-brain-loader.js` ✅
+
+### Smoke tests
+
+- `node --check schema/enavia-intent-classifier.js` → ✅
+- `node --check tests/pr50-intent-runtime.prova.test.js` → ✅
+- `node tests/pr50-intent-runtime.prova.test.js` → ✅ 124/124
+
+### Regressões
+
+| Teste | Resultado |
+|-------|-----------|
+| PR49 smoke | ✅ 96/96 |
+| PR48 smoke | ✅ 20/20 |
+| PR47 prova | ✅ 79/79 |
+| PR46 smoke | ✅ 43/43 |
+| PR44 prova | ✅ 38/38 |
+| PR43 smoke | ✅ 32/32 |
+| PR37 prova | ✅ 56/56 |
+| PR36 smoke | ✅ 26/26 |
+| PR21 smoke | ✅ 53/53 |
+| PR20 smoke | ✅ 27/27 |
+| PR19 E2E | ✅ 52/52 |
+| PR14 smoke | ✅ 183/183 |
+| PR13 smoke | ✅ 91/91 |
+
+---
+
 ## 2026-05-01 — PR49 — PR-IMPL — Classificador de Intenção v1
 
 - **Branch:** `copilot/claudepr49-impl-classificador-intencao`
