@@ -56,11 +56,16 @@ const PR45_BASELINE = {
   F_operacional_completo: 13689,
 };
 // Teto seguro pós-PR46 (não pode regressar para PR45 baseline).
+// PR48 atualiza estes limites: adição de seção de comportamento operacional (+732 chars vs PR46)
+// é esperada e documentada — "Aumento esperado pequeno é aceitável. Esta PR corrige
+// comportamento essencial." (problema PR48). Limite continua protegendo contra regressão
+// para além do PR48 real.
+// Cálculo: PR48_medido + 172 chars de margem segura (arredondado para centena).
 const PR46_MAX_TOLERANCE = {
-  A_simples_sem_target: PR45_BASELINE.A_simples_sem_target,        // tem que ficar < baseline
-  B_simples_target_readonly: PR45_BASELINE.B_simples_target_readonly,
-  E_operacional: PR45_BASELINE.E_operacional,
-  F_operacional_completo: PR45_BASELINE.F_operacional_completo,
+  A_simples_sem_target: 11400,        // PR45: 10945 | PR46: 10496 | PR48: 11228 (+732 vs PR46) | margem: +172
+  B_simples_target_readonly: 11600,   // PR45: 11187 | PR46: 10738 | PR48: 11470 (+732 vs PR46) | margem: +130
+  E_operacional: 13200,               // PR45: 12812 | PR46: 12363 | PR48: 13095 (+732 vs PR46) | margem: +105
+  F_operacional_completo: PR45_BASELINE.F_operacional_completo, // PR48 ainda abaixo de PR45
 };
 
 // ---------------------------------------------------------------------------
@@ -151,14 +156,11 @@ header("Cenário C — Frustração / anti-bot emocional");
     "prompt instrui responder com sinceridade e tecnicamente");
   ok(!/Entendo como você se sente/i.test(prompt),
     "prompt NÃO usa frase canônica de empatia vazia");
-  // ACHADO PR47: regra 8 de how-to-answer ('Isso é opcional. Não mexa agora.')
-  // e a regra de sinalizar excesso documental NÃO chegam ao prompt em runtime —
-  // estão na fonte (schema/brain/self-model/how-to-answer.md regra 8) mas o
-  // snapshot do Brain Loader trunca em 4.000 chars antes de incluí-las.
+  // Regras 7 e 8 de how-to-answer agora estão no LLM Core (PR48) — não dependem do Brain Loader.
   ok(/excesso documental/i.test(prompt),
-    "[ACHADO PR47] prompt inclui regra de sinalizar excesso documental quando real");
+    "prompt inclui regra de sinalizar excesso documental quando real");
   ok(/Isso é opcional\. Não mexa agora\./.test(prompt),
-    "[ACHADO PR47] prompt inclui frase canônica 'Isso é opcional. Não mexa agora.'");
+    "prompt inclui frase canônica 'Isso é opcional. Não mexa agora.'");
   ok(/próxima PR|execução concreta|PR-IMPL|PR-PROVA/i.test(prompt),
     "prompt orienta puxar para execução concreta (próxima PR / PR-IMPL / PR-PROVA)");
 
@@ -185,15 +187,12 @@ header("Cenário D — Pedido de próxima PR");
   // "próxima PR" não é termo operacional clássico (deploy/healthcheck/etc),
   // mas "pr" e "patch" não devem ativar sozinhos. Validamos que regra de tom existe.
   const prompt = buildChatSystemPrompt({});
-  // ACHADO PR47: regra 7 de how-to-answer (próxima PR = resumo curto + prompt
-  // completo + sem reabrir discussão) NÃO chega ao prompt em runtime — está
-  // na fonte (schema/brain/self-model/how-to-answer.md regra 7) mas o snapshot
-  // do Brain Loader trunca em 4.000 chars antes de incluí-la.
+  // Regra 7 de how-to-answer agora está no LLM Core (PR48) — não depende do Brain Loader.
   ok(/próxima PR/i.test(prompt), "prompt cita 'próxima PR' (capabilities + brain)");
   ok(/(curto|curta).*prompt completo|prompt completo.*(curto|curta)/i.test(prompt),
-    "[ACHADO PR47] prompt orienta resposta curta + prompt completo");
+    "prompt orienta resposta curta + prompt completo");
   ok(/sem reabrir|não reabr|não repet/i.test(prompt),
-    "[ACHADO PR47] prompt orienta não reabrir discussão desnecessária");
+    "prompt orienta não reabrir discussão desnecessária");
 
   // Mesmo sem termo operacional clássico, o prompt continua direto e vivo
   ok(/direta|natural|conversacional/i.test(prompt),

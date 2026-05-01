@@ -190,9 +190,15 @@ header("Cenário G — Tamanho controlado vs PR45");
   console.log(`     • Cenário B: ${promptB.length} chars (PR45 baseline: ${PR45_BASELINE.B_simples_target_readonly}) → delta: ${promptB.length - PR45_BASELINE.B_simples_target_readonly}`);
   console.log(`     • Cenário E: ${promptE.length} chars (PR45 baseline: ${PR45_BASELINE.E_operacional}) → delta: ${promptE.length - PR45_BASELINE.E_operacional}`);
 
-  ok(promptA.length < PR45_BASELINE.A_simples_sem_target, "prompt A reduziu vs PR45 baseline");
-  ok(promptB.length < PR45_BASELINE.B_simples_target_readonly, "prompt B reduziu vs PR45 baseline");
-  ok(promptE.length < PR45_BASELINE.E_operacional, "prompt E reduziu vs PR45 baseline");
+  // PR48 adicionou seção de comportamento operacional (+732 chars vs PR46) para corrigir
+  // regras tonais truncadas pelo Brain Loader. Aumento aceito e documentado. Limite aqui
+  // protege contra regressão além do PR48 real (PR45_BASELINE + 1000 chars de margem segura).
+  ok(promptA.length < PR45_BASELINE.A_simples_sem_target + 1000,
+    `prompt A dentro do teto pós-PR48 (${promptA.length} < ${PR45_BASELINE.A_simples_sem_target + 1000})`);
+  ok(promptB.length < PR45_BASELINE.B_simples_target_readonly + 1000,
+    `prompt B dentro do teto pós-PR48 (${promptB.length} < ${PR45_BASELINE.B_simples_target_readonly + 1000})`);
+  ok(promptE.length < PR45_BASELINE.E_operacional + 1000,
+    `prompt E dentro do teto pós-PR48 (${promptE.length} < ${PR45_BASELINE.E_operacional + 1000})`);
 
   // Segurança não foi sacrificada: principais marcadores presentes
   ok(promptA.includes("ENAVIA — LLM CORE v1"), "LLM Core presente após redução");

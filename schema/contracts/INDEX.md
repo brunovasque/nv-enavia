@@ -43,11 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1 (regras tonais truncadas)**
+**PR49 — PR-IMPL — Classificador de intenção**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
-> ⚠️ PR47 (PR-PROVA) — falhou parcialmente (75/79 asserts; 8 de 10 cenários totais; 601/601 regressões verdes). 4 achados reais com causa raiz única: truncamento do snapshot do Brain Loader em 4.000 chars corta regras 5–10 de `schema/brain/self-model/how-to-answer.md` (incluindo "Isso é opcional. Não mexa agora.", regra de excesso documental, regra de próxima PR = curta + prompt completo, regra de não reabrir discussão). Identidade, capacidade, falsa capacidade, anti-bot operacional, read_only como gate, skills documentais vs runtime, tamanho/duplicação (-449 chars/-112 tokens) e envelope JSON: todos preservados. Conforme contrato PR47: próxima PR é cirúrgica, NÃO o Classificador de intenção. Relatório: `schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md`.
+> ✅ PR48 (PR-IMPL cirúrgica) — concluída. 4 achados da PR47 corrigidos: regras tonais críticas ("excesso documental", "Isso é opcional. Não mexa agora.", "resposta curta + prompt completo", "sem reabrir discussão") movidas para `buildLLMCoreBlock()` no LLM Core. Brain Loader não alterado. Limite preservado. PR47 passou 79/79 após correção. Regressões 601/601 ✅. Relatório: `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md`. Exceção corretiva encerrada — retorno ao contrato principal.
 
 > ✅ PR41 foi mergeada (PR #202) e populou o Obsidian Brain com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
 > ✅ PR42 diagnosticou a memória runtime. `ENAVIA_BRAIN` existe com IDs reais. Brain documental não estava conectado. Brain Loader via bundle estático foi recomendado.

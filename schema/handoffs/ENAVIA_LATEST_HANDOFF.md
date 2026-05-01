@@ -1,8 +1,101 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR47 — PR-PROVA — Prova de Resposta Viva com LLM Core v1
-**Para:** PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1 (regras tonais truncadas)
+**De:** PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1
+**Para:** PR49 — PR-IMPL — Classificador de intenção
+
+## O que foi feito nesta sessão
+
+### PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1
+
+**Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
+**Branch:** `copilot/claudepr48-impl-correcao-cirurgica-llm-core-v1`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR47 ✅ (mergeada — PR #208, falha parcial 75/79 documentada)
+
+**Objetivo:**
+Corrigir os 4 achados reais da PR47 (regras tonais truncadas pelo Brain Loader)
+sem abrir nova frente e sem avançar para Classificador de Intenção.
+
+**Causa raiz:**
+O snapshot do Brain Loader satura o limite de 4.000 chars logo após a regra 4
+de `schema/brain/self-model/how-to-answer.md`. Regras 5–10 não chegavam ao
+runtime. Especificamente ausentes: regra 7 (próxima PR = curta + prompt
+completo + sem reabrir) e regra 8 (excesso documental → "Isso é opcional. Não
+mexa agora.").
+
+**Correção:**
+Regras críticas movidas para `buildLLMCoreBlock()` no `schema/enavia-llm-core.js`,
+em nova seção `COMPORTAMENTO OPERACIONAL`. O LLM Core sempre entra no prompt
+e não pode ser truncado.
+
+**Arquivos novos:**
+- `tests/pr48-correcao-cirurgica-llm-core-v1.smoke.test.js` — 20 asserts
+- `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md` — relatório completo
+
+**Arquivos modificados:**
+- `schema/enavia-llm-core.js` — seção COMPORTAMENTO OPERACIONAL adicionada
+- `tests/pr47-resposta-viva-llm-core-v1.prova.test.js` — [ACHADO PR47] removidos; tolerâncias de tamanho atualizadas
+- `tests/pr46-llm-core-v1.smoke.test.js` — tolerâncias de tamanho atualizadas (consequência do LLM Core change)
+- `schema/contracts/INDEX.md` — próxima PR autorizada: PR49
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Arquivos NÃO alterados (escopo cirúrgico preservado):**
+`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
+`nv-enavia.js`, painel, executor, deploy worker, workflows, `wrangler.toml`,
+`wrangler.executor.template.toml`, KV/bindings/secrets, sanitizers, gates,
+endpoints.
+
+**Achados corrigidos:**
+
+| Achado | Descrição | Status |
+|--------|-----------|--------|
+| C1 | "excesso documental" ausente do prompt | ✅ Corrigido |
+| C2 | "Isso é opcional. Não mexa agora." ausente | ✅ Corrigido |
+| D1 | "resposta curta + prompt completo" ausente | ✅ Corrigido |
+| D2 | "sem reabrir discussão" ausente | ✅ Corrigido |
+
+**Medição de prompt pós-PR48:**
+
+| Cenário | PR46 | PR48 | Delta |
+|---------|------|------|-------|
+| A — simples | 10.496 | 11.228 | +732 |
+| B — target ro | 10.738 | 11.470 | +732 |
+| E — operacional | 12.363 | 13.095 | +732 |
+| F — completo | 12.435 | 13.167 | +732 |
+
+Aumento de +732 chars (~183 tokens) documentado e aceito conforme enunciado PR48.
+
+**Testes:**
+- `node --check` em todos os arquivos alterados → OK
+- PR48 smoke: **20/20** ✅
+- PR47 prova: **79/79** ✅ (era 75/79)
+- PR46 smoke: **43/43** ✅
+- Regressões obrigatórias: **601/601** ✅
+
+## Próxima etapa segura
+
+**PR49 — PR-IMPL — Classificador de intenção**
+
+Exceção corretiva PR48 encerrada. PR47 passou integralmente (79/79). Retorno ao
+fluxo principal do contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`.
+
+A PR49 deve implementar o Classificador de intenção conforme previsto
+originalmente como "PR48" no contrato antes do desvio cirúrgico.
+
+## Bloqueios
+
+Nenhum. Branch sem conflitos com main. Nenhum arquivo proibido foi alterado.
+Governança atualizada.
+
+## Riscos restantes
+
+1. **R1 (baixo):** +732 chars por conversa (aceito — comportamento corrigido).
+2. **R2 (baixo):** Brain Loader ainda trunca regras 5–10 de how-to-answer, mas
+   as críticas agora estão no LLM Core. Não é mais um risco ativo.
+
 
 ## O que foi feito nesta sessão
 
