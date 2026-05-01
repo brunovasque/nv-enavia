@@ -4,6 +4,85 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR51 — PR-IMPL — Skill Router read-only
+
+- **Branch:** `copilot/claudepr51-impl-skill-router-readonly`
+- **Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR50 ✅ (PR-PROVA — 821/821)
+- **Escopo:** Implementação do Skill Router read-only v1.
+
+### Objetivo
+
+Implementar o Skill Router read-only da Enavia, ligando o Classificador de Intenção (PR49)
+às skills documentais existentes. O router seleciona qual skill documental usar como
+referência para uma mensagem, sem executar nada e sem criar endpoint.
+
+### Resultado
+
+✅ **PASSOU — 168/168 PR51 smoke. Regressões 920/920 ✅. Total: 1.088/1.088.**
+
+Skill Router read-only v1 criado. 4 skills documentais mapeadas. Roteamento correto
+para CONTRACT_LOOP_OPERATOR, DEPLOY_GOVERNANCE_OPERATOR, SYSTEM_MAPPER e CONTRACT_AUDITOR.
+Integração com Intent Classifier validada. Campo aditivo `skill_routing` no `/chat/run`.
+Skill Executor não implementado. /skills/run não existe. Nenhuma skill executada.
+
+### Arquivos novos
+
+- `schema/enavia-skill-router.js` — Skill Router v1 (`routeEnaviaSkill`, 4 skills)
+- `tests/pr51-skill-router-readonly.smoke.test.js` — 168 asserts (10 cenários A–J)
+- `schema/reports/PR51_IMPL_SKILL_ROUTER_READONLY.md` — relatório completo
+
+### Arquivos modificados
+
+- `nv-enavia.js` — import `routeEnaviaSkill` + campo `skill_routing` aditivo no response
+- `schema/contracts/INDEX.md` — próxima PR: PR52
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados (confirmado por `git diff --name-only`)
+
+- `schema/enavia-brain-loader.js` ✅
+- `schema/enavia-cognitive-runtime.js` ✅
+- `schema/enavia-llm-core.js` ✅
+- `schema/enavia-intent-classifier.js` ✅
+- painel ✅ | executor ✅ | deploy worker ✅ | workflows ✅
+- `wrangler.toml` ✅ | `wrangler.executor.template.toml` ✅
+- KV/bindings/secrets ✅ | sanitizers ✅ | gates ✅
+
+### Smoke tests
+
+- `node --check schema/enavia-skill-router.js` → ✅
+- `node --check tests/pr51-skill-router-readonly.smoke.test.js` → ✅
+- `node --check nv-enavia.js` → ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → ✅ **168/168**
+
+### Regressões
+
+- PR50: 124/124 ✅
+- PR49: 96/96 ✅
+- PR48: 20/20 ✅
+- PR47: 79/79 ✅
+- PR46: 43/43 ✅
+- PR44: 38/38 ✅
+- PR43: 32/32 ✅
+- PR37: 56/56 ✅
+- PR36: 26/26 ✅
+- PR21: 53/53 ✅
+- PR20: 27/27 ✅
+- PR19: 52/52 ✅
+- PR14: 183/183 ✅
+- PR13: 91/91 ✅
+- **Total regressões: 920/920 ✅**
+- **Total geral: 1.088/1.088 ✅**
+
+### Próxima PR autorizada
+
+**PR52 — PR-PROVA — Teste de roteamento de skills**
+
+---
+
 ## 2026-05-01 — PR50 — PR-PROVA — Teste de intenção
 
 - **Branch:** `copilot/claudepr50-prova-teste-intencao`

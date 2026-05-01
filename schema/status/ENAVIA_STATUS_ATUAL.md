@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR50 — Prova do Classificador de Intenção v1 ✅)
-**Branch ativa:** `copilot/claudepr50-prova-teste-intencao`
-**Última tarefa:** PR50 — PR-PROVA — Prova do Classificador de Intenção v1. `tests/pr50-intent-runtime.prova.test.js` criado com 124 asserts (13 cenários A–M). Todos os cenários passaram: conversa/frustração não operacional, próxima PR não operacional, revisão de PR/diagnóstico/deploy operacionais com governança, contrato conceitual sem falso positivo, Skill Router runtime inexistente, memória sem escrita, estratégia não operacional, regressões PR37/PR38 preservadas, campo `intent_classification` validado. Nenhum runtime alterado. Smoke PR50 124/124 ✅. Regressões 697/697 ✅. Total 821/821 ✅. Próxima PR: **PR51 — PR-IMPL — Skill Router read-only**. Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
+**Data:** 2026-05-01 (atualizado após PR51 — Skill Router read-only ✅)
+**Branch ativa:** `copilot/claudepr51-impl-skill-router-readonly`
+**Última tarefa:** PR51 — PR-IMPL — Skill Router read-only. `schema/enavia-skill-router.js` criado com `routeEnaviaSkill()` — 4 skills documentais mapeadas, roteamento determinístico, integração com Classificador de Intenção, campo aditivo `skill_routing` no response do `/chat/run`. Smoke PR51 168/168 ✅. Regressões 920/920 ✅. Total 1.088/1.088 ✅. Próxima PR: **PR52 — PR-PROVA — Teste de roteamento de skills**. Relatório: `schema/reports/PR51_IMPL_SKILL_ROUTER_READONLY.md`.
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR51 — PR-IMPL — Skill Router read-only**
+**PR52 — PR-PROVA — Teste de roteamento de skills**
 
+> ✅ PR51 (PR-IMPL cirúrgica) — concluída. `schema/enavia-skill-router.js` criado com `routeEnaviaSkill()` (4 skills documentais mapeadas, roteamento determinístico, integração com Classificador de Intenção). Campo aditivo `skill_routing` no response do `/chat/run`. Smoke PR51 168/168 ✅. Regressões 920/920 ✅. Total 1.088/1.088 ✅. Relatório: `schema/reports/PR51_IMPL_SKILL_ROUTER_READONLY.md`.
 > ✅ PR50 (PR-PROVA) — concluída. `tests/pr50-intent-runtime.prova.test.js` criado com 124 asserts (13 cenários A–M). Todos passaram. Classificador de Intenção v1 validado formalmente: conversa/frustração não operacional, próxima PR não operacional, revisão de PR/diagnóstico/deploy operacionais com governança, contrato conceitual sem falso positivo, Skill Router runtime inexistente confirmado, memória sem escrita, estratégia não operacional pesada, regressões PR37/PR38 preservadas, campo `intent_classification` validado por inspeção + unitário. Nenhum runtime alterado. Smoke PR50 124/124 ✅. Regressões 697/697 ✅. Total 821/821 ✅. Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
 > ✅ PR49 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.

@@ -44,6 +44,7 @@ import { buildRetrievalContext, buildRetrievalSummary } from "./schema/memory-re
 import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavia-cognitive-runtime.js";
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
 import { classifyEnaviaIntent } from "./schema/enavia-intent-classifier.js";
+import { routeEnaviaSkill } from "./schema/enavia-skill-router.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -4074,6 +4075,19 @@ async function handleChatLLM(request, env) {
   } catch (_classifyErr) {
     _intentClassification = null;
   }
+  // PR51: Skill Router read-only rodado aqui para gerar skill_routing aditivo na resposta.
+  // Campo aditivo seguro — não quebra consumidor atual, não executa nada,
+  // não cria endpoint, não aciona runtime. Somente referência documental.
+  let _skillRouting = null;
+  try {
+    _skillRouting = routeEnaviaSkill({
+      message,
+      intentClassification: _intentClassification || undefined,
+      context,
+    });
+  } catch (_routeErr) {
+    _skillRouting = null;
+  }
   const isOperationalMessageLegacy = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
   const hasOperationalMessageIntent = isOperationalMessage(message, context);
   const isOperationalContext = hasOperationalMessageIntent || isOperationalMessageLegacy;
@@ -4600,6 +4614,19 @@ async function handleChatLLM(request, env) {
         confidence: _intentClassification.confidence,
         is_operational: _intentClassification.is_operational,
         reasons: _intentClassification.reasons,
+      }} : {}),
+      // PR51: Skill Router read-only v1 (campo aditivo, não-quebrante, somente se disponível).
+      // Indica qual skill documental foi selecionada para esta mensagem. Nunca executa skill.
+      // /skills/run não existe. mode sempre "read_only".
+      ...(_skillRouting ? { skill_routing: {
+        matched: _skillRouting.matched,
+        skill_id: _skillRouting.skill_id,
+        skill_name: _skillRouting.skill_name,
+        mode: _skillRouting.mode,
+        confidence: _skillRouting.confidence,
+        reason: _skillRouting.reason,
+        sources: _skillRouting.sources,
+        warning: _skillRouting.warning,
       }} : {}),
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),

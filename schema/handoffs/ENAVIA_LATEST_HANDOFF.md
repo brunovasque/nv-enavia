@@ -1,8 +1,101 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR50 — PR-PROVA — Prova do Classificador de Intenção v1
-**Para:** PR51 — PR-IMPL — Skill Router read-only
+**De:** PR51 — PR-IMPL — Skill Router read-only
+**Para:** PR52 — PR-PROVA — Teste de roteamento de skills
+
+## O que foi feito nesta sessão
+
+### PR51 — PR-IMPL — Skill Router read-only
+
+**Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
+**Branch:** `copilot/claudepr51-impl-skill-router-readonly`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR50 ✅ (PR-PROVA — 821/821)
+
+**Objetivo:**
+Implementar o Skill Router read-only v1, ligando o Classificador de Intenção às
+skills documentais existentes. O router seleciona a skill documental correta sem
+executar nada, sem criar endpoint, sem criar `/skills/run`.
+
+**Arquitetura implementada:**
+- `schema/enavia-skill-router.js` — Skill Router v1
+  - `routeEnaviaSkill({ message, intentClassification?, context? })` → shape canônico
+  - `SKILL_IDS` — IDs das 4 skills documentais
+  - `ROUTER_MODES` — `read_only`
+  - `CONFIDENCE_LEVELS` — high/medium/low
+  - Pure function, determinístico, sem I/O, sem side-effects
+- `nv-enavia.js` (patch mínimo):
+  - Import de `routeEnaviaSkill`
+  - Chamada defensiva (try/catch)
+  - Campo aditivo `skill_routing` no response do `/chat/run`
+
+**Skills documentais mapeadas:**
+- `CONTRACT_LOOP_OPERATOR` — loop contratual, próxima PR, sequência
+- `DEPLOY_GOVERNANCE_OPERATOR` — deploy, rollback, promoção, gate
+- `SYSTEM_MAPPER` — rotas, registry, workers, estado técnico
+- `CONTRACT_AUDITOR` — revisão de PR, auditoria, critérios de aceite
+
+**Garantias preservadas:**
+- Nenhuma skill executada
+- /skills/run não existe
+- Warning em todo resultado mencionando read-only
+- campo aditivo — não quebra consumidor atual
+- LLM Core intacto
+- Brain Context intacto
+- Intent Classifier intacto
+- Anti-bot intacto
+- Sanitizers intactos
+- gates intactos
+
+**Arquivos novos:**
+- `schema/enavia-skill-router.js` — Skill Router v1
+- `tests/pr51-skill-router-readonly.smoke.test.js` — 168 asserts, 10 cenários A–J
+- `schema/reports/PR51_IMPL_SKILL_ROUTER_READONLY.md` — relatório completo
+
+**Arquivos modificados:**
+- `nv-enavia.js` — import + _skillRouting + skill_routing aditivo
+- `schema/contracts/INDEX.md` — próxima PR: PR52
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Arquivos NÃO alterados:**
+`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
+`schema/enavia-llm-core.js`, `schema/enavia-intent-classifier.js`,
+painel, executor, deploy worker, workflows, `wrangler.toml`,
+`wrangler.executor.template.toml`, KV/bindings/secrets, sanitizers, gates.
+Nenhum endpoint criado. Nenhum Skill Executor implementado.
+Nenhuma escrita de memória.
+
+**Resultados dos testes:**
+- PR51 smoke: **168/168** ✅
+- PR50 prova: **124/124** ✅
+- PR49 smoke: **96/96** ✅
+- Regressões: **700/700** ✅ (PR13–PR48)
+- **Total: 1.088/1.088** ✅
+
+---
+
+## Próxima PR autorizada
+
+**PR52 — PR-PROVA — Teste de roteamento de skills**
+
+Objetivo: criar prova formal do Skill Router read-only v1, validando todos os
+cenários do smoke em versão prova, integração real com o intent classifier no
+fluxo do chat, edge cases, e regressões completas.
+
+**Pré-requisito:** PR51 ✅ (concluída — 1.088/1.088 testes passando)
+
+**O que está disponível para a PR52:**
+- `routeEnaviaSkill()` testável isoladamente
+- 4 skills documentais mapeadas
+- Campo `skill_routing` no response do `/chat/run`
+- `classifyEnaviaIntent()` integrado
+
+---
+
+
 
 ## O que foi feito nesta sessão
 
