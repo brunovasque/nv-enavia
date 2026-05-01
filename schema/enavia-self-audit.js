@@ -339,13 +339,13 @@ function _detectWrongMode(input, findings, counter) {
   const intent = input.intentClassification?.intent || "";
   const isOperational = input.isOperationalContext === true;
 
-  const frustraionIntents = [
+  const frustrationIntents = [
     "frustration_or_trust_issue",
     "frustration",
     "trust_issue",
   ];
 
-  const isFrustration = frustraionIntents.some(f => intent.includes(f));
+  const isFrustration = frustrationIntents.some(f => intent.includes(f));
 
   if (isFrustration && isOperational) {
     findings.push({
