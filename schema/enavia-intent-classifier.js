@@ -51,6 +51,17 @@ export const CONFIDENCE_LEVELS = {
 };
 
 // ---------------------------------------------------------------------------
+// Constantes de controle — thresholds e parâmetros de classificação
+// ---------------------------------------------------------------------------
+
+// Limite de caracteres para considerar uma mensagem "curta sem match".
+// Mensagens com até este valor e sem nenhum sinal reconhecido recebem intent=unknown
+// (não conversation) para não bloquear a heurística legada em isOperationalMessage.
+// 30 chars cobre cumprimentos curtos sem incluir frases que já teriam
+// casado em alguma das listas de sinais.
+const _SHORT_MESSAGE_THRESHOLD = 30;
+
+// ---------------------------------------------------------------------------
 // Sinais internos — listas determinísticas por categoria semântica
 // Normalizados para minúsculas na comparação.
 // ---------------------------------------------------------------------------
@@ -521,7 +532,7 @@ export function classifyEnaviaIntent(input) {
   // 15. Mensagem curta sem sinais — fallback para unknown (não conversation),
   //     para permitir que a heurística legada de isOperationalMessage atue.
   // ------------------------------------------------------------------
-  if (normalized.length <= 30) {
+  if (normalized.length <= _SHORT_MESSAGE_THRESHOLD) {
     reasons.push("mensagem curta sem sinais reconhecidos — classificado como desconhecido para não bloquear heurística legada");
     signals.push("short_message_no_match");
     return {

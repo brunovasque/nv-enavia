@@ -3795,17 +3795,13 @@ function isOperationalMessage(message, context) {
   try {
     const classification = classifyEnaviaIntent({ message, context });
     if (classification && typeof classification.is_operational === "boolean") {
+      // Se o classificador identificou is_operational=true, retornar true imediatamente.
       if (classification.is_operational) return true;
-      // Classificador disse não-operacional: verificar fallback legado para não regredir.
-      // next_pr_request e frustration/identity/capability/system_state devem retornar false
-      // mesmo que a heurística legada dispare. Os únicos casos onde confiamos no legado
-      // é quando o classificador retornou unknown (sem match) E a heurística legada dispara.
-      const isUnknown = classification.intent === "unknown";
-      if (!isUnknown) {
-        // O classificador identificou a intenção e a declarou não-operacional.
-        // Confiamos nessa decisão — não sobrescrevemos com legado.
-        return false;
-      }
+      // Se o classificador identificou a intenção (não unknown), confiar na decisão
+      // não-operacional — não sobrescrever com legado. Isso garante que frustração,
+      // next_pr, identity, capability e system_state retornem false corretamente.
+      if (classification.intent !== "unknown") return false;
+      // intent === "unknown": sem match no classificador — usar fallback legado.
     }
   } catch (_err) {
     // Se o classificador falhar por qualquer razão, cair no legado.
@@ -4596,6 +4592,9 @@ async function handleChatLLM(request, env) {
       // PR36: telemetria mínima de sanitização/fallback (campo aditivo, não-quebrante).
       sanitization: _sanitization,
       // PR49: classificação de intenção v1 (campo aditivo, não-quebrante, somente se disponível).
+      // `signals` é excluído propositalmente do response API — é campo de debugging interno
+      // com detalhes de termos casados que não agrega valor para o consumidor externo e
+      // pode expor detalhes de implementação do classificador desnecessariamente.
       ...(_intentClassification ? { intent_classification: {
         intent: _intentClassification.intent,
         confidence: _intentClassification.confidence,
