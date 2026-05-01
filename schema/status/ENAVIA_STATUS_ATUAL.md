@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR47 — Prova LLM Core v1 ⚠️ falhou parcialmente)
-**Branch ativa:** `copilot/claudepr47-prova-resposta-viva-llm-core-v1`
-**Última tarefa:** PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1. Teste `tests/pr47-resposta-viva-llm-core-v1.prova.test.js` criado (10 cenários A–J, 79 asserts). Resultado: **75/79 (94,9%) — falhou parcialmente**. 8 de 10 cenários passaram totalmente. Cenários C (frustração) e D (próxima PR) falharam parcialmente — 4 achados reais com causa raiz única: snapshot do Brain Loader trunca em 4.000 chars antes de incluir regras 5–10 de `schema/brain/self-model/how-to-answer.md`. Ausentes do prompt em runtime: "Isso é opcional. Não mexa agora." (regra 8), "excesso documental" (regra 8), "resposta curta + prompt completo" (regra 7), "sem reabrir discussão" (regra 7). Identidade, capacidade, falsa capacidade, anti-bot operacional, read_only como gate, skills documentais vs runtime, tamanho/duplicação (-449 chars/-112 tokens vs PR45) e envelope JSON: TODOS preservados. Regressões obrigatórias 601/601 ✅ (PR46 43, PR44 38, PR43 32, PR37 56, PR36 26, PR21 53, PR20 27, PR19 52, PR14 183, PR13 91). Nenhum runtime alterado. Conforme contrato PR47, próxima PR vira cirúrgica (NÃO o Classificador de intenção). Relatório: `schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md`.
+**Data:** 2026-05-01 (atualizado após PR48 — Correção cirúrgica LLM Core v1 ✅)
+**Branch ativa:** `copilot/claudepr48-impl-correcao-cirurgica-llm-core-v1`
+**Última tarefa:** PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1. Adicionada seção `COMPORTAMENTO OPERACIONAL` ao `buildLLMCoreBlock()` em `schema/enavia-llm-core.js` com os 4 achados corrigidos: "excesso documental", "Isso é opcional. Não mexa agora.", "resposta curta + prompt completo", "sem reabrir discussão". Brain Loader não alterado. Limite de 4.000 chars preservado. PR47 passou **79/79** após correção. Smoke PR48 20/20 ✅. PR46 43/43 ✅. Regressões 601/601 ✅. Exceção corretiva encerrada — retorno ao contrato principal. Próxima PR: **PR49 — PR-IMPL — Classificador de intenção**. Relatório: `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md`.
 
 ## Estado atual do sistema
 
@@ -33,9 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1 (regras tonais truncadas)**
+**PR49 — PR-IMPL — Classificador de intenção**
 
-> ✅ PR41 mergeada (PR #202): Brain populado com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
+> ✅ PR48 cirúrgica concluída. 4 achados corrigidos no LLM Core. PR47 passou 79/79. Exceção encerrada.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.
 > ✅ PR43 implementou Brain Loader read-only. `schema/enavia-brain-loader.js` criado. Allowlist de 7 fontes hard-coded. `getEnaviaBrainContext()` plugado em `buildChatSystemPrompt` (seção `7c`). Limite total 4.000 chars. Determinístico, sem FS/KV/rede. Smoke PR43 32/32. Regressões verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 > ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado, 38/38 ✅. Regressões 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.

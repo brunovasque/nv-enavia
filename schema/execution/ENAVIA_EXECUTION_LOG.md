@@ -4,7 +4,80 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-01 — PR47 — PR-PROVA — Prova de Resposta Viva com LLM Core v1
+## 2026-05-01 — PR48 — PR-IMPL — Correção Cirúrgica do LLM Core v1
+
+- **Branch:** `copilot/claudepr48-impl-correcao-cirurgica-llm-core-v1`
+- **Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR47 ✅ (mergeada — PR #208, falha parcial 75/79 documentada)
+- **Escopo:** correção das 4 regras tonais truncadas pelo Brain Loader. Worker-only.
+
+### Objetivo
+
+Corrigir os 4 achados da PR47 (C1, C2, D1, D2) sem abrir nova frente. Mover
+regras críticas de how-to-answer para o LLM Core, que sempre entra no prompt.
+
+### Resultado
+
+✅ **PASSOU — 79/79 asserts PR47 após correção.**
+
+4 achados corrigidos: "excesso documental", "Isso é opcional. Não mexa agora.",
+"resposta curta + prompt completo", "sem reabrir discussão" — todos no LLM Core.
+Brain Loader não alterado. Limite 4.000 chars preservado. Exceção corretiva
+encerrada. Próxima PR: **PR49 — PR-IMPL — Classificador de intenção**.
+Relatório: `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md`.
+
+### Achados corrigidos (C1, C2, D1, D2)
+
+- **C1:** "excesso documental" → adicionado ao LLM Core ✅
+- **C2:** "Isso é opcional. Não mexa agora." → adicionado ao LLM Core ✅
+- **D1:** "resposta curta + prompt completo" → adicionado ao LLM Core ✅
+- **D2:** "sem reabrir discussão" → adicionado ao LLM Core ✅
+
+### Arquivos novos
+
+- `tests/pr48-correcao-cirurgica-llm-core-v1.smoke.test.js` — 20 asserts
+- `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md` — relatório completo
+
+### Arquivos modificados
+
+- `schema/enavia-llm-core.js` — seção COMPORTAMENTO OPERACIONAL adicionada ao `buildLLMCoreBlock()`
+- `tests/pr47-resposta-viva-llm-core-v1.prova.test.js` — [ACHADO PR47] removidos; tolerâncias atualizadas
+- `tests/pr46-llm-core-v1.smoke.test.js` — tolerâncias de tamanho atualizadas
+- `schema/contracts/INDEX.md` — próxima PR: PR49
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados
+
+`schema/enavia-brain-loader.js` (não alterado — limite preservado),
+`schema/enavia-cognitive-runtime.js`, `nv-enavia.js`, painel, executor,
+deploy worker, workflows, `wrangler.toml`, KV/bindings/secrets, sanitizers,
+gates, endpoints. Nenhum runtime de produção tocado.
+
+### Testes executados
+
+- `node --check schema/enavia-llm-core.js` ✅
+- `node --check tests/pr47-resposta-viva-llm-core-v1.prova.test.js` ✅
+- `node --check tests/pr48-correcao-cirurgica-llm-core-v1.smoke.test.js` ✅
+- PR48 smoke: **20/20** ✅
+- PR47 prova: **79/79** ✅ (era 75/79)
+- PR46 smoke: **43/43** ✅
+- PR44 prova: 38/38 ✅
+- PR43 smoke: 32/32 ✅
+- PR37 smoke: 56/56 ✅
+- PR36 smoke: 26/26 ✅
+- PR21 smoke: 53/53 ✅
+- PR20 smoke: 27/27 ✅
+- PR19 smoke: 52/52 ✅
+- PR14 smoke: 183/183 ✅
+- PR13 smoke: 91/91 ✅
+- **Total regressões: 601/601** ✅
+
+---
+
+
 
 - **Branch:** `copilot/claudepr47-prova-resposta-viva-llm-core-v1`
 - **Tipo:** `PR-PROVA` (sem alteração de runtime)

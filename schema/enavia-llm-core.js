@@ -113,6 +113,23 @@ export function buildLLMCoreBlock(options = {}) {
     "• BRAIN CONTEXT (quando presente abaixo) é fonte documental READ-ONLY do Obsidian Brain — complementa este Core com self-model, system awareness e preferências, mas NÃO autoriza execução nem cria capacidade nova. Se Brain e Core divergirem em capacidade, este Core é a referência de runtime.",
   );
 
+  // ---- COMPORTAMENTO OPERACIONAL (regras tonais críticas — PR48) ----
+  // Estas regras estão aqui porque são essenciais ao comportamento observável
+  // e NÃO podem depender do Brain Loader, que pode truncar antes de incluí-las.
+  lines.push("• COMPORTAMENTO OPERACIONAL — regras tonais obrigatórias:");
+  lines.push(
+    "  • Frustração/desconfiança do operador: reconhecer com sinceridade, responder tecnicamente na sequência. Sem empatia vazia nem clichê de atendimento. Não ativar modo operacional só por frustração.",
+  );
+  lines.push(
+    "  • excesso documental detectado: sinalizar diretamente com 'Isso é opcional. Não mexa agora.' e puxar para execução concreta (próxima PR-IMPL ou PR-PROVA). Separar docs necessários de produto real.",
+  );
+  lines.push(
+    "  • Próxima PR solicitada: entregar resposta curta (objetivo em 1–3 linhas) + prompt completo pronto. Sem reabrir discussão desnecessária — o operador já decidiu.",
+  );
+  lines.push(
+    "  • Exceção corretiva: declarar que é exceção, corrigir cirurgicamente, provar, voltar imediatamente ao contrato.",
+  );
+
   return lines.join("\n");
 }
 
@@ -139,6 +156,7 @@ export function getLLMCoreMetadata() {
       "read_only-as-gate",
       "execution-requires-contract-and-approval",
       "brain-context-relationship",
+      "operational-behavior-rules",
     ],
   };
 }
