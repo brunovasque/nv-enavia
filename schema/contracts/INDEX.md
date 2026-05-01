@@ -43,10 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR55 — PR-DOCS — Self-Audit Framework**
+**PR56 — PR-IMPL — Self-Audit read-only**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
+> ✅ PR55 (PR-DOCS) — concluída. `schema/self-audit/` criada com 8 arquivos: INDEX.md, FRAMEWORK.md (10 camadas), CHECKLISTS.md (48 itens, 6 checklists A–F), RISK_MODEL.md (5 níveis, 13 categorias), SIGNALS.md (30+ sinais em 5 grupos), OUTPUT_CONTRACT.md (contrato JSON aditivo), ESCALATION_POLICY.md, ROADMAP.md (PR55–PR61+). `schema/brain/SYSTEM_AWARENESS.md` atualizado para referenciar Self-Audit como documental. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR55_SELF_AUDIT_FRAMEWORK.md`.
 > ✅ PR54 (PR-PROVA) — concluída. `tests/pr54-memoria-contextual.prova.test.js` criado (93 asserts, 13 cenários A–M). Todos passaram. Retrieval por Intenção v1 validado formalmente como memória contextual read-only: contexto aplicado aparece no prompt com marcador canônico, não aplicado não aparece, coerência por skill/intenção provada, bloco não ativa modo operacional sozinho, falsa capacidade bloqueada, campo `intent_retrieval` aditivo e seguro, `/skills/run` confirmado inexistente. Regressões 1.372/1.372 ✅. Total 1.465/1.465 ✅. Relatório: `schema/reports/PR54_PROVA_MEMORIA_CONTEXTUAL.md`.
 > ✅ PR53 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-retrieval.js` criado com `buildIntentRetrievalContext()` (snapshot estático, 4 skills documentais + 5 intenções sem skill, limite 2.000 chars, truncamento seguro). Integrado em `buildChatSystemPrompt` (seção `7d`) e `nv-enavia.js` (campo aditivo `intent_retrieval`). Smoke PR53 82/82 ✅. Regressões 1.290/1.290 ✅. Total 1.372/1.372 ✅. Nenhum endpoint criado. Nenhuma skill executada. /skills/run não existe. Relatório: `schema/reports/PR53_IMPL_RETRIEVAL_POR_INTENCAO.md`.
 > ✅ PR52 (PR-PROVA) — concluída. `tests/pr52-skill-routing-runtime.prova.test.js` criado (202 asserts, 12 cenários A–L). Todos passaram. Skill Router read-only validado formalmente: roteamento das 4 skills documentais provado, campo `skill_routing` validado (shape canônico + limitação de harness LLM documentada), falsa capacidade bloqueada, /skills/run inexistente confirmado, nenhuma skill executada, nenhum endpoint criado, regressões completas. Total 1.290/1.290 ✅. Relatório: `schema/reports/PR52_PROVA_ROTEAMENTO_SKILLS.md`.

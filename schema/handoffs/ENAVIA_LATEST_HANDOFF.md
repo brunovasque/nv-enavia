@@ -1,49 +1,56 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR54 — PR-PROVA — Prova de Memória Contextual
-**Para:** PR55 — PR-DOCS — Self-Audit Framework
+**De:** PR55 — PR-DOCS — Self-Audit Framework
+**Para:** PR56 — PR-IMPL — Self-Audit read-only
 
 ## O que foi feito nesta sessão
 
-### PR54 — PR-PROVA — Prova de Memória Contextual
+### PR55 — PR-DOCS — Self-Audit Framework
 
-**Tipo:** `PR-PROVA` (Worker-only, prova pura)
-**Branch:** `copilot/claudepr54-prova-memoria-contextual`
+**Tipo:** `PR-DOCS` (Docs-only, sem alteração de runtime)
+**Branch:** `copilot/claude-pr55-docs-self-audit-framework`
 **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
-**PR anterior validada:** PR53 ✅ (PR-IMPL — Retrieval por Intenção — 82/82 + 1.290/1.290)
+**PR anterior validada:** PR54 ✅ (PR-PROVA — Prova de Memória Contextual — 93/93 + 1.465/1.465)
 
 **Objetivo:**
-Provar que o Retrieval por Intenção v1 (PR53) funciona como memória contextual read-only no fluxo real do prompt/chat da Enavia.
+Criar o Framework documental de Self-Audit da Enavia, definindo como a Enavia vai se autoavaliar antes de responder, sugerir PR, revisar PR, usar skill, afirmar capacidade, orientar deploy ou sinalizar risco.
 
 **Resultado:**
-✅ **93/93 asserts PR54 + 1.372/1.372 regressões = 1.465/1.465 total.**
+✅ **8 arquivos criados em `schema/self-audit/`. Relatório criado. Governança atualizada. Nenhum runtime alterado.**
 
 **Arquivos criados:**
-- `tests/pr54-memoria-contextual.prova.test.js` — 93 asserts (13 cenários A–M)
-- `schema/reports/PR54_PROVA_MEMORIA_CONTEXTUAL.md` — relatório completo
+- `schema/self-audit/INDEX.md` — visão geral, conexões, próxima PR
+- `schema/self-audit/FRAMEWORK.md` — 10 camadas + fluxo futuro + regras
+- `schema/self-audit/CHECKLISTS.md` — 6 checklists A–F, 48 itens
+- `schema/self-audit/RISK_MODEL.md` — 5 níveis + 13 categorias de risco
+- `schema/self-audit/SIGNALS.md` — 30+ sinais em 5 grupos (FC, OP, ED, DC, SEC)
+- `schema/self-audit/OUTPUT_CONTRACT.md` — contrato JSON de saída futura
+- `schema/self-audit/ESCALATION_POLICY.md` — bloquear / alertar / observar
+- `schema/self-audit/ROADMAP.md` — PR55–PR61+ com dependências
+- `schema/reports/PR55_SELF_AUDIT_FRAMEWORK.md` — relatório completo
 
 **Arquivos modificados:**
-- `schema/contracts/INDEX.md` — próxima PR: PR55
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 6 atualizada para referenciar Self-Audit como documental e listar estado atual dos componentes
+- `schema/contracts/INDEX.md` — próxima PR: PR56
 - `schema/status/ENAVIA_STATUS_ATUAL.md`
 - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
 - `schema/execution/ENAVIA_EXECUTION_LOG.md`
 
 **Garantias:**
-- Nenhum runtime alterado (enavia-intent-retrieval.js, enavia-intent-classifier.js, enavia-skill-router.js, enavia-cognitive-runtime.js, enavia-llm-core.js, enavia-brain-loader.js, nv-enavia.js — todos intactos)
+- Nenhum runtime alterado (nv-enavia.js, enavia-cognitive-runtime.js, enavia-llm-core.js, enavia-brain-loader.js, enavia-intent-classifier.js, enavia-skill-router.js, enavia-intent-retrieval.js — todos intactos)
 - Nenhuma skill executada
-- /skills/run não existe (confirmado via inspeção de código)
+- /skills/run não existe (confirmado)
 - Nenhum endpoint criado
 - Nenhum Panel/Executor/Deploy Worker/workflow/wrangler alterado
 - Nenhum KV/binding/secret alterado
-- context_block não exposto no response — apenas metadados
-- Campo intent_retrieval aditivo e não-quebrante no response
+- `schema/enavia-self-audit.js` não existe — será criado na PR56
 
 ---
 
 ## Próxima PR
 
-**PR55 — PR-DOCS — Self-Audit Framework**
+**PR56 — PR-IMPL — Self-Audit read-only**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
@@ -55,8 +62,20 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - `schema/enavia-llm-core.js` — LLM Core v1 ativo ✅ (provado PR47+PR48)
 - `schema/enavia-brain-loader.js` — Brain Loader read-only ativo ✅ (provado PR44)
 - `nv-enavia.js` — Worker principal com `intent_retrieval`, `skill_routing`, `intent_classification` no response
+- `schema/self-audit/` — Framework documental ✅ (PR55)
+- `schema/enavia-self-audit.js` — ❌ Não existe ainda (PR56 criará)
 
-## O que foi feito nesta sessão
+### O que PR56 deve fazer
+
+1. Criar `schema/enavia-self-audit.js` com `runSelfAudit()` (read-only)
+2. Seguir `schema/self-audit/OUTPUT_CONTRACT.md` para formato de saída
+3. Usar `schema/self-audit/CHECKLISTS.md`, `RISK_MODEL.md` e `SIGNALS.md` como base
+4. Integrar como campo aditivo `self_audit` no response do `/chat/run`
+5. Integrar após `buildChatSystemPrompt` e antes da resposta final
+6. Não alterar resposta automaticamente (read-only)
+7. Não criar endpoint
+8. Não escrever em KV/memória
+9. Não alterar Panel, Executor, Deploy Worker, workflows
 
 ### PR53 — PR-IMPL — Retrieval por Intenção
 

@@ -152,19 +152,24 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 
 ---
 
-## 6. Estado do Obsidian Brain nesta PR
+## 6. Estado do sistema (atualizado após PR55)
 
 | Componente | Estado |
 |-----------|--------|
 | Estrutura documental (`schema/brain/`) | ✅ Criada (PR39) |
-| Runtime de memory retrieval | ❌ Não existe ainda |
-| Runtime de memory update | ❌ Não existe ainda |
-| Conexão ao LLM Core | ❌ Não existe ainda |
-| Intent Engine | ❌ Não existe ainda |
-| Skill Router | ❌ Não existe ainda |
+| Brain Loader read-only | ✅ Ativo (PR43) |
+| LLM Core v1 | ✅ Ativo (PR46+PR48) |
+| Intent Classifier v1 | ✅ Ativo (PR49) |
+| Skill Router read-only | ✅ Ativo (PR51) |
+| Intent Retrieval v1 | ✅ Ativo (PR53) |
+| Self-Audit Framework | ✅ Documental (PR55) — `schema/self-audit/` |
+| Self-Audit runtime | ❌ Não existe ainda — previsto para PR56 |
+| Runtime de memory update | ❌ Não existe ainda — previsto para PR60 |
+| `/skills/run` | ❌ Não existe — skills são documentais |
 
-> O Obsidian Brain é documental nesta PR39. Não é runtime. Não executa nada.
-> As PRs futuras (PR40+) irão popular e depois conectar o brain ao runtime.
+> O Self-Audit Framework foi criado na PR55 como documentação.
+> Nenhum runtime de Self-Audit existe ainda. A PR56 implementará `schema/enavia-self-audit.js`.
+> Ver `schema/self-audit/INDEX.md` para detalhes do framework.
 
 ---
 
