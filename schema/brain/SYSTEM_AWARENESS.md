@@ -225,7 +225,7 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 
 ---
 
-## 7. Como Evitar Alucinação Geral
+## 8. Como Evitar Alucinação Geral
 
 1. **Sempre citar a fonte** ao afirmar algo sobre o sistema.
 2. **Marcar incerteza explicitamente** quando não há fonte.
