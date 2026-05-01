@@ -399,7 +399,7 @@ function _detectMissingSource(input, findings, counter) {
 
   // Detectar afirmações de estado sem fonte
   const statePatterns = [
-    /o worker\s+\w+\s+já está (ativo|funcionando|online|em produção)/i,
+    /o worker\s+[\w-]+\s+já está (ativo|funcionando|online|em produção)/i,
     /o sistema (está|fica|roda) em produção/i,
     /o endpoint (está|fica|responde|existe)/i,
     /o deploy (está|foi|ficou) (completo|ativo|rodando)/i,

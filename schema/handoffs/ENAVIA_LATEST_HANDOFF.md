@@ -1,8 +1,63 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR57 — PR-PROVA — Prova do Self-Audit read-only (⚠️ falha parcial)
-**Para:** PR58 — PR-IMPL — Correção cirúrgica do Self-Audit read-only
+**De:** PR58 — PR-IMPL — Correção cirúrgica do Self-Audit missing_source ✅
+**Para:** PR59 — PR-IMPL — Response Policy viva
+
+## O que foi feito nesta sessão
+
+### PR58 — PR-IMPL — Correção cirúrgica do Self-Audit missing_source
+
+**Tipo:** `PR-IMPL` cirúrgica (Worker-only)
+**Branch:** `copilot/claudepr58-impl-correcao-self-audit-missing-source`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR57 ⚠️ (PR-PROVA — 96/99, falha parcial Cenário H)
+
+**Objetivo:**
+Corrigir o detector `_detectMissingSource` em `schema/enavia-self-audit.js` para capturar nomes de workers com hífen (ex: `payments-worker`, `nv-enavia`).
+
+**Correção aplicada:**
+
+```js
+// Antes:
+/o worker\s+\w+\s+já está (ativo|funcionando|online|em produção)/i
+
+// Depois:
+/o worker\s+[\w-]+\s+já está (ativo|funcionando|online|em produção)/i
+```
+
+**Resultado PR57 após correção:**
+- Antes: 96/99 (3 falhas — Cenário H)
+- Depois: **99/99 ✅**
+
+**Regressões:** 1.375/1.375 ✅
+
+**Arquivos alterados:**
+- `schema/enavia-self-audit.js` — regex linha 402 (único arquivo de runtime alterado)
+- `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md` — criado
+- Governança atualizada (INDEX.md, STATUS, HANDOFF, EXECUTION LOG)
+
+**O que NÃO foi alterado:**
+- `nv-enavia.js` — intacto
+- Resposta não alterada automaticamente
+- Nenhum endpoint criado
+- Self-Audit continua read-only
+- Nenhuma Response Policy implementada
+
+## Próxima PR
+
+**PR59 — PR-IMPL — Response Policy viva**
+
+Self-Audit v1 completo e validado (99/99 ✅). Retorno ao fluxo principal do contrato.
+
+A Response Policy deve implementar o uso efetivo do `should_block` e dos `findings` para modular a resposta da Enavia — conforme planejado no contrato e documentado em `schema/self-audit/ESCALATION_POLICY.md`.
+
+## Estado do sistema
+
+- Self-Audit read-only: ✅ completo e validado (99/99)
+- Todos os módulos anteriores: ✅ estáveis (regressões 1.375/1.375)
+- Runtime principal (`nv-enavia.js`): não alterado nesta PR
+- Próxima frente: Response Policy viva (PR59)
 
 ## O que foi feito nesta sessão
 
