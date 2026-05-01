@@ -4,6 +4,58 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR45 — PR-DIAG — Diagnóstico do prompt atual do chat pós-Brain Loader
+
+- **Branch:** `copilot/claudepr45-diag-prompt-atual-chat-pos-brain`
+- **Tipo:** `PR-DIAG` (READ-ONLY, Worker-only)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR44 ✅ (PR-PROVA — relatório `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`)
+- **Escopo:** READ-ONLY. Diagnóstico puro. Nenhum runtime alterado.
+
+### Objetivo
+
+Diagnosticar o estado atual do system prompt completo pós-Brain Loader. Medir tamanho
+por cenário, mapear blocos em ordem real, identificar redundâncias e conflitos, avaliar
+risco de engessamento, recomendar PR46.
+
+### Resultado
+
+✅ CONCLUÍDO — Diagnóstico completo. Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
+
+### Medições executadas
+
+| Cenário | Chars | Tokens est. |
+|---------|------:|:-----------:|
+| A — simples sem target | 10.945 | ~2.736 |
+| B — simples com target read_only | 11.205 | ~2.801 |
+| E — operacional (is_op=true) | 12.840 | ~3.210 |
+| F — operacional completo + awareness | 13.743 | ~3.436 |
+| Brain Context isolado | 4.002 | ~1.001 |
+| Baseline sem Brain Context | 6.943 | ~1.736 |
+
+### Principais achados
+
+- Brain Context adiciona +4.002 chars / +1.000 tokens a **toda** conversa (constante).
+- Principal redundância (problemática): capacidades/limitações duplicadas entre seções 1-4 e Brain blocks 1-3.
+- Brain NÃO engessou — reforça `inteligência antes de checklist`, `read_only é gate`, naturalidade.
+- Seção 1b (PAPEL PROIBIDO) volumosa (~286 tokens) — candidata à redução na PR46.
+- Conflito latente: duas listas de capacidades com wording diferente (C3).
+- Nenhum bloqueio real para PR46.
+
+### Arquivos criados/alterados
+
+- `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md` (NOVO)
+- `schema/contracts/INDEX.md` (EDIT — PR45 marcada ✅, próxima PR46)
+- `schema/status/ENAVIA_STATUS_ATUAL.md` (EDIT — estado pós-PR45)
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (EDIT — handoff PR45→PR46)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Próxima PR autorizada
+
+`PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta`
+
+---
+
 ## 2026-05-01 — PR44 — PR-PROVA — Prova Brain Loader read-only no chat runtime
 
 - **Branch:** `copilot/claudepr44-prova-brain-loader-chat-runtime`
