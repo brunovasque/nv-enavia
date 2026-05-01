@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR49 — Classificador de Intenção v1 ✅)
-**Branch ativa:** `copilot/claudepr49-impl-classificador-intencao`
-**Última tarefa:** PR49 — PR-IMPL — Classificador de Intenção v1. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1, determinístico, sem I/O, sem side-effects. `isOperationalMessage()` em `nv-enavia.js` atualizada para delegar ao classificador como fonte primária. Campo aditivo `intent_classification` adicionado ao response do `/chat/run`. Frustração não ativa operação. Próxima PR não ativa operação pesada. Revisão de PR, diagnóstico técnico e deploy ativam operação. Falsos positivos PR37/PR38 continuam corrigidos. LLM Core/Brain/anti-bot preservados. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Próxima PR: **PR50 — PR-PROVA — Teste de intenção**. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`.
+**Data:** 2026-05-01 (atualizado após PR50 — Prova do Classificador de Intenção v1 ✅)
+**Branch ativa:** `copilot/claudepr50-prova-teste-intencao`
+**Última tarefa:** PR50 — PR-PROVA — Prova do Classificador de Intenção v1. `tests/pr50-intent-runtime.prova.test.js` criado com 124 asserts (13 cenários A–M). Todos os cenários passaram: conversa/frustração não operacional, próxima PR não operacional, revisão de PR/diagnóstico/deploy operacionais com governança, contrato conceitual sem falso positivo, Skill Router runtime inexistente, memória sem escrita, estratégia não operacional, regressões PR37/PR38 preservadas, campo `intent_classification` validado. Nenhum runtime alterado. Smoke PR50 124/124 ✅. Regressões 697/697 ✅. Total 821/821 ✅. Próxima PR: **PR51 — PR-IMPL — Skill Router read-only**. Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
 
 ## Estado atual do sistema
 
@@ -33,9 +33,10 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR50 — PR-PROVA — Teste de intenção**
+**PR51 — PR-IMPL — Skill Router read-only**
 
-> ✅ PR49 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1. `isOperationalMessage()` atualizada para delegar ao classificador. Campo aditivo `intent_classification` no response do `/chat/run`. Frustração não ativa operação. Próxima PR não ativa operação pesada. Revisão de PR, diagnóstico técnico e deploy ativam operação. Falsos positivos PR37/PR38 continuam corrigidos. LLM Core/Brain/anti-bot preservados. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`. Retorno ao contrato principal — classificador ativo em runtime.
+> ✅ PR50 (PR-PROVA) — concluída. `tests/pr50-intent-runtime.prova.test.js` criado com 124 asserts (13 cenários A–M). Todos passaram. Classificador de Intenção v1 validado formalmente: conversa/frustração não operacional, próxima PR não operacional, revisão de PR/diagnóstico/deploy operacionais com governança, contrato conceitual sem falso positivo, Skill Router runtime inexistente confirmado, memória sem escrita, estratégia não operacional pesada, regressões PR37/PR38 preservadas, campo `intent_classification` validado por inspeção + unitário. Nenhum runtime alterado. Smoke PR50 124/124 ✅. Regressões 697/697 ✅. Total 821/821 ✅. Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
+> ✅ PR49 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.
 > ✅ PR43 implementou Brain Loader read-only. `schema/enavia-brain-loader.js` criado. Allowlist de 7 fontes hard-coded. `getEnaviaBrainContext()` plugado em `buildChatSystemPrompt` (seção `7c`). Limite total 4.000 chars. Determinístico, sem FS/KV/rede. Smoke PR43 32/32. Regressões verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 > ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado, 38/38 ✅. Regressões 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.

@@ -43,11 +43,12 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR50 — PR-PROVA — Teste de intenção**
+**PR51 — PR-IMPL — Skill Router read-only**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
-> ✅ PR49 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1. `isOperationalMessage()` atualizada para delegar ao classificador. Campo aditivo `intent_classification` no response do `/chat/run`. Frustração não ativa operação. Próxima PR não ativa operação pesada. Revisão de PR, diagnóstico técnico e deploy ativam operação. Falsos positivos PR37/PR38 continuam corrigidos. LLM Core/Brain/anti-bot preservados. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`. Classificador ativo em runtime.
+> ✅ PR50 (PR-PROVA) — concluída. `tests/pr50-intent-runtime.prova.test.js` criado com 124 asserts (13 cenários A–M). Todos passaram. Classificador de Intenção v1 validado formalmente: conversa/frustração não operacional, próxima PR não operacional, revisão de PR/diagnóstico/deploy operacionais com governança, contrato conceitual sem falso positivo, Skill Router runtime inexistente confirmado, memória sem escrita, estratégia não operacional pesada, regressões PR37/PR38 preservadas, campo `intent_classification` validado. Nenhum runtime alterado. Total 821/821 ✅. Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
+> ✅ PR49 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1. `isOperationalMessage()` atualizada para delegar ao classificador. Campo aditivo `intent_classification` no response do `/chat/run`. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`.
 
 > ✅ PR41 foi mergeada (PR #202) e populou o Obsidian Brain com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
 > ✅ PR42 diagnosticou a memória runtime. `ENAVIA_BRAIN` existe com IDs reais. Brain documental não estava conectado. Brain Loader via bundle estático foi recomendado.
@@ -75,6 +76,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR46** ✅ (PR-IMPL) — LLM Core v1 (Worker-only, patch cirúrgico). `schema/enavia-llm-core.js` criado (`buildLLMCoreBlock()` + `getLLMCoreMetadata()`), consolidando identidade, papel, tom, capacidades, limitações, falsa capacidade bloqueada, regra de ouro, ordem obrigatória, princípios de segurança, `read_only` como gate, execução com contrato/aprovação e relação com Brain Context. `buildChatSystemPrompt` em `schema/enavia-cognitive-runtime.js` substituiu antigas seções 1+1b+2+3+4 por chamada única ao Core. Brain Loader **inalterado** (snapshot principal preservado por escopo). Medições: A=10.496 (-449), B=10.738 (-449), E=12.363 (-449), F=13.240 (-449) chars vs PR45 baseline. Economia: **~-112 tokens (-4,1%) por conversa**. "NV Imóveis" 9→3 ocorrências. Brain Context, envelope JSON, target informativo, MODO OPERACIONAL condicional, sanitizers, gates de execução, planner policy, awareness, memória — todos mantidos. Smoke PR46 43/43 ✅. Regressões 558/558 ✅. Total 601/601 ✅. Nenhum painel/executor/deploy worker/workflow/wrangler/KV/binding/secret/endpoint alterado. Relatório: `schema/reports/PR46_IMPL_LLM_CORE_V1.md`.
 - **PR47** ✅ (PR-PROVA) — Prova de Resposta Viva com LLM Core v1. 79/79 ✅ após PR48 corrigir truncamento. Relatório: `schema/reports/PR47_PROVA_RESPOSTA_VIVA_LLM_CORE_V1.md`.
 - **PR48** ✅ (PR-IMPL) — Correção cirúrgica do LLM Core v1. Seção `COMPORTAMENTO OPERACIONAL` adicionada ao `buildLLMCoreBlock()`. PR47 passou 79/79. Regressões 601/601 ✅. Relatório: `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md`.
+- **PR50** ✅ (PR-PROVA) — Prova do Classificador de Intenção v1. `tests/pr50-intent-runtime.prova.test.js` criado (124 asserts, 13 cenários A–M). Todos passaram. Classificador v1 validado. Nenhum runtime alterado. Total 821/821 ✅. Relatório: `schema/reports/PR50_PROVA_TESTE_INTENCAO.md`.
 - **PR49** ✅ (PR-IMPL) — Classificador de Intenção v1. `schema/enavia-intent-classifier.js` criado (15 intenções canônicas, pure function, determinístico, sem I/O). `isOperationalMessage()` em `nv-enavia.js` delegando ao classificador. Campo aditivo `intent_classification` no response. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`.
 
 ### Histórico do contrato encerrado (PR17–PR30)
