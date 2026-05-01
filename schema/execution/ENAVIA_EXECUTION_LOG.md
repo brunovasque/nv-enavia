@@ -4,6 +4,45 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR53 — PR-IMPL — Retrieval por Intenção
+
+- **Branch:** `copilot/claudepr53-impl-retrieval-por-intencao`
+- **Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR52 ✅ (PR-PROVA — Skill Router read-only — 202/202)
+- **Escopo:** Criação do módulo Intent Retrieval v1. Integração no prompt e no response do chat.
+
+### Objetivo
+
+Implementar o Retrieval por Intenção v1 da Enavia: módulo determinístico, read-only e sem side effects que monta um bloco documental compacto orientado pela intenção detectada e pelo roteamento de skill.
+
+### Resultado
+
+✅ **PASSOU — 82/82 PR53 smoke. Total com regressões: 1.372/1.372.**
+
+Retrieval por intenção implementado. `buildIntentRetrievalContext()` exportado. Snapshot estático com 4 skills documentais e 5 intenções sem skill. Limite 2.000 chars com truncamento seguro. Integrado em `buildChatSystemPrompt` (seção `7d`) e `nv-enavia.js` (campo aditivo `intent_retrieval`). Nenhum endpoint criado. Nenhuma skill executada. /skills/run não existe.
+
+### Arquivos novos
+
+- `schema/enavia-intent-retrieval.js` — módulo principal do Retrieval por Intenção v1
+- `tests/pr53-intent-retrieval.smoke.test.js` — 82 asserts (12 cenários A–L)
+- `schema/reports/PR53_IMPL_RETRIEVAL_POR_INTENCAO.md` — relatório completo
+
+### Arquivos modificados
+
+- `schema/enavia-cognitive-runtime.js` — parâmetro `intent_retrieval_context` + seção 7d
+- `nv-enavia.js` — import + chamada + campo aditivo no response
+- `schema/contracts/INDEX.md` — próxima PR: PR54
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Próxima PR
+
+PR54 — PR-PROVA — Testes de memória contextual
+
+---
+
 ## 2026-05-01 — PR52 — PR-PROVA — Teste de roteamento de skills
 
 - **Branch:** `copilot/claude-pr52-prova-roteamento-skills`

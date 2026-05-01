@@ -1,8 +1,69 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR52 — PR-PROVA — Teste de roteamento de skills
-**Para:** PR53 — PR-IMPL — Retrieval por intenção
+**De:** PR53 — PR-IMPL — Retrieval por Intenção
+**Para:** PR54 — PR-PROVA — Testes de memória contextual
+
+## O que foi feito nesta sessão
+
+### PR53 — PR-IMPL — Retrieval por Intenção
+
+**Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
+**Branch:** `copilot/claudepr53-impl-retrieval-por-intencao`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR52 ✅ (PR-PROVA — Skill Router read-only — 202/202)
+
+**Objetivo:**
+Implementar o Retrieval por Intenção v1 da Enavia: módulo determinístico, read-only e sem side effects que monta um bloco documental compacto orientado pela intenção detectada e pelo roteamento de skill, para injeção no system prompt do chat.
+
+**Resultado:**
+✅ **82/82 asserts PR53 smoke. 1.290/1.290 regressões. Total: 1.372/1.372.**
+
+**Arquivos criados:**
+- `schema/enavia-intent-retrieval.js` — módulo principal (`buildIntentRetrievalContext()`)
+- `tests/pr53-intent-retrieval.smoke.test.js` — 82 asserts (cenários A–L)
+- `schema/reports/PR53_IMPL_RETRIEVAL_POR_INTENCAO.md` — relatório completo
+
+**Arquivos modificados:**
+- `schema/enavia-cognitive-runtime.js` — parâmetro `intent_retrieval_context` + seção 7d no prompt
+- `nv-enavia.js` — import + chamada a `buildIntentRetrievalContext` + campo aditivo `intent_retrieval` no response
+- `schema/contracts/INDEX.md` — próxima PR: PR54
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Garantias:**
+- Retrieval é determinístico, sem LLM, sem KV, sem rede, sem filesystem, read-only
+- Nenhuma skill executada
+- /skills/run não existe
+- Nenhum endpoint criado
+- Nenhum Panel/Executor/Deploy Worker/workflow/wrangler alterado
+- Nenhum KV/binding/secret alterado
+- `context_block` não exposto no response — apenas metadados
+- Campo `intent_retrieval` aditivo e não-quebrante no response
+
+---
+
+## Próxima PR
+
+**PR54 — PR-PROVA — Testes de memória contextual**
+
+Criar testes formais de prova que validem a memória contextual da Enavia — provando que as memórias (instruções manuais, aprendizado validado, memória histórica) são recuperadas, injetadas no prompt e influenciam a resposta conforme esperado.
+
+### Estado do sistema ao passar o handoff
+
+- `schema/enavia-intent-retrieval.js` — Retrieval por Intenção v1 ativo
+- `schema/enavia-skill-router.js` — Skill Router read-only v1 ativo
+- `schema/enavia-intent-classifier.js` — Intent Classifier v1 ativo
+- `schema/enavia-llm-core.js` — LLM Core v1 ativo
+- `schema/enavia-brain-loader.js` — Brain Loader read-only ativo
+- `nv-enavia.js` — Worker principal com `intent_retrieval`, `skill_routing`, `intent_classification` no response
+- Testes totais passing: **1.372/1.372**
+
+### Bloqueios
+
+Nenhum. Sistema estável.
+
 
 ## O que foi feito nesta sessão
 

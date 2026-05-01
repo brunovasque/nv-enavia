@@ -45,6 +45,7 @@ import { buildCognitivePromptBlock, buildChatSystemPrompt } from "./schema/enavi
 import { buildOperationalAwareness } from "./schema/operational-awareness.js";
 import { classifyEnaviaIntent } from "./schema/enavia-intent-classifier.js";
 import { routeEnaviaSkill } from "./schema/enavia-skill-router.js";
+import { buildIntentRetrievalContext } from "./schema/enavia-intent-retrieval.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -4088,6 +4089,21 @@ async function handleChatLLM(request, env) {
   } catch (_routeErr) {
     _skillRouting = null;
   }
+  // PR53: Intent Retrieval v1 — bloco documental compacto por intenção.
+  // Fire-and-forget defensivo: erros não derrubam a conversa.
+  // Determinístico, sem LLM, sem KV, sem rede, sem filesystem. Read-only.
+  // Não executa skill. Não cria endpoint. Campo aditivo seguro.
+  let _intentRetrieval = null;
+  try {
+    _intentRetrieval = buildIntentRetrievalContext({
+      message,
+      intentClassification: _intentClassification || undefined,
+      skillRouting: _skillRouting || undefined,
+      context,
+    });
+  } catch (_retrievalErr) {
+    _intentRetrieval = null;
+  }
   const isOperationalMessageLegacy = _CHAT_OPERATIONAL_CONTEXT_MSG_TERMS.some((t) => msgLower.includes(t));
   const hasOperationalMessageIntent = isOperationalMessage(message, context);
   const isOperationalContext = hasOperationalMessageIntent || isOperationalMessageLegacy;
@@ -4120,10 +4136,16 @@ async function handleChatLLM(request, env) {
     // como envelope estrutural, sem sufocar a fala natural.
     const ownerName = env.OWNER || "usuário";
 
-    // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4) ---
+    // --- Núcleo Cognitivo Runtime (PR1+PR2+PR4+PR53) ---
     // System prompt completo: base institucional + tom conversacional + contexto dinâmico
-    // + awareness operacional real (PR4)
-    const chatSystemPrompt = buildChatSystemPrompt({ ownerName, context, operational_awareness: operationalAwareness, is_operational_context: isOperationalContext });
+    // + awareness operacional real (PR4) + intent retrieval context (PR53)
+    const chatSystemPrompt = buildChatSystemPrompt({
+      ownerName,
+      context,
+      operational_awareness: operationalAwareness,
+      is_operational_context: isOperationalContext,
+      intent_retrieval_context: _intentRetrieval || undefined,
+    });
 
     // --- PR5: Inject conversation history between system and current message ---
     // This gives the LLM real context of the ongoing conversation.
@@ -4627,6 +4649,18 @@ async function handleChatLLM(request, env) {
         reason: _skillRouting.reason,
         sources: _skillRouting.sources,
         warning: _skillRouting.warning,
+      }} : {}),
+      // PR53: Intent Retrieval v1 (campo aditivo seguro, não-quebrante).
+      // Indica qual bloco documental foi recuperado por intenção. Read-only.
+      // Não inclui context_block inteiro no response — apenas metadados.
+      ...(_intentRetrieval ? { intent_retrieval: {
+        applied: _intentRetrieval.applied,
+        mode: _intentRetrieval.mode,
+        intent: _intentRetrieval.intent,
+        skill_id: _intentRetrieval.skill_id,
+        sources: _intentRetrieval.sources,
+        token_budget_hint: _intentRetrieval.token_budget_hint,
+        warnings: _intentRetrieval.warnings,
       }} : {}),
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
