@@ -1,10 +1,52 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR55 — PR-DOCS — Self-Audit Framework
-**Para:** PR56 — PR-IMPL — Self-Audit read-only
+**De:** PR56 — PR-IMPL — Self-Audit read-only
+**Para:** PR57 — PR-PROVA — Teste do Self-Audit read-only
 
 ## O que foi feito nesta sessão
+
+### PR56 — PR-IMPL — Self-Audit read-only
+
+**Tipo:** `PR-IMPL` (Worker-only, campo aditivo)
+**Branch:** `copilot/claudepr56-impl-self-audit-readonly`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR55 ✅ (PR-DOCS — Self-Audit Framework — mergeada)
+
+**Objetivo:**
+Implementar o Self-Audit read-only runtime da Enavia. Módulo determinístico que analisa metadados do fluxo de chat e retorna campo aditivo `self_audit` na resposta do `/chat/run`.
+
+**Resultado:**
+✅ **`schema/enavia-self-audit.js` criado. Campo `self_audit` aditivo no `/chat/run`. Smoke 64/64. Regressões 1.375/1.375. Total 1.439/1.439. Governança atualizada.**
+
+**Arquivos criados:**
+- `schema/enavia-self-audit.js` — módulo Self-Audit read-only v1 (`runEnaviaSelfAudit()`)
+- `tests/pr56-self-audit-readonly.smoke.test.js` — 64 asserts, cenários A–N
+- `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md` — relatório completo
+
+**Arquivos modificados:**
+- `nv-enavia.js` — import + chamada `runEnaviaSelfAudit()` + campo aditivo `self_audit`
+- `schema/contracts/INDEX.md` — PR56 ✅, próxima PR57
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (este arquivo)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md`
+
+**Categorias implementadas (10):**
+secret_exposure (blocking), fake_execution (blocking), unauthorized_action (blocking), scope_violation (blocking), contract_drift (blocking/high), false_capability (high), runtime_vs_documentation_confusion (medium), wrong_mode (medium/low), missing_source (medium/low), docs_over_product (medium).
+
+**Garantias:**
+- Não altera `reply` automaticamente
+- Não bloqueia fluxo automaticamente (`should_block` é campo informativo)
+- Não cria endpoint (`/self-audit`, `/audit/run` não existem)
+- Não escreve memória (zero KV, Brain, memória contextual)
+- Não chama LLM externo (pure function determinístico)
+- Não usa KV/rede/filesystem
+- Falha com segurança (try/catch defensivo)
+- `enavia-cognitive-runtime.js`, `enavia-llm-core.js`, `enavia-brain-loader.js`, `enavia-intent-classifier.js`, `enavia-skill-router.js`, `enavia-intent-retrieval.js` — todos intactos
+- Panel, Executor, Deploy Worker, workflows, wrangler.toml — todos intactos
+
+---
+
 
 ### PR55 — PR-DOCS — Self-Audit Framework
 

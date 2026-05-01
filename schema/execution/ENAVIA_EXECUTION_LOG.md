@@ -3397,3 +3397,29 @@ Nenhum. Diagnóstico completo. PR18 pode iniciar.
   - `node --check executor/tests/executor.contract.test.js` → OK ✅
 - **Escopo preservado:** sem mudanças em `nv-enavia.js`, `panel/`, Deploy Worker, KV ou `wrangler.toml`.
 - **Próxima etapa segura:** deploy do Executor em TEST e repetir o smoke real do loop para validar o mesmo comportamento no binding `EXECUTOR`.
+
+---
+
+## PR56 — PR-IMPL — Self-Audit read-only
+
+- **Data:** 2026-05-01
+- **Branch:** `copilot/claudepr56-impl-self-audit-readonly`
+- **Tipo:** PR-IMPL (Worker-only, campo aditivo)
+- **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+- **PR anterior validada:** PR55 ✅ (PR-DOCS — Self-Audit Framework)
+- **Objetivo:** Implementar Self-Audit read-only runtime. Módulo determinístico que analisa metadados do fluxo de chat e retorna campo aditivo `self_audit` na resposta do `/chat/run`.
+- **Arquivos criados:**
+  - `schema/enavia-self-audit.js` — `runEnaviaSelfAudit()` com 10 categorias de risco
+  - `tests/pr56-self-audit-readonly.smoke.test.js` — 64 asserts, cenários A–N
+  - `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md`
+- **Arquivos modificados:**
+  - `nv-enavia.js` — import + chamada + campo aditivo `self_audit` no `/chat/run`
+  - governança (`schema/contracts/INDEX.md`, `schema/status`, `schema/handoffs`, `schema/execution`)
+- **Testes:**
+  - `node tests/pr56-self-audit-readonly.smoke.test.js` → 64/64 ✅
+  - Regressões: 1.375/1.375 ✅ (pr54, pr53, pr52, pr51, pr50, pr49, pr48, pr47, pr46, pr44, pr43, pr37, pr36, pr21, pr20, pr19, pr14, pr13)
+  - Total geral: 1.439/1.439 ✅
+- **Categorias implementadas (10):** secret_exposure, fake_execution, unauthorized_action, scope_violation, contract_drift, false_capability, runtime_vs_documentation_confusion, wrong_mode, missing_source, docs_over_product.
+- **Garantias:** Read-only. Não altera reply. Não bloqueia fluxo automaticamente. Não cria endpoint. Não escreve memória. Não chama LLM externo. Não usa KV/rede/filesystem. Falha com segurança.
+- **Escopo preservado:** `enavia-cognitive-runtime.js`, `enavia-llm-core.js`, `enavia-brain-loader.js`, `enavia-intent-classifier.js`, `enavia-skill-router.js`, `enavia-intent-retrieval.js`, Panel, Executor, Deploy Worker, workflows, wrangler.toml — todos intactos.
+- **Próxima etapa segura:** PR57 — PR-PROVA — Teste do Self-Audit read-only.
