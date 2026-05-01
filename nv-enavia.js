@@ -46,6 +46,7 @@ import { buildOperationalAwareness } from "./schema/operational-awareness.js";
 import { classifyEnaviaIntent } from "./schema/enavia-intent-classifier.js";
 import { routeEnaviaSkill } from "./schema/enavia-skill-router.js";
 import { buildIntentRetrievalContext } from "./schema/enavia-intent-retrieval.js";
+import { runEnaviaSelfAudit } from "./schema/enavia-self-audit.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -4114,6 +4115,24 @@ async function handleChatLLM(request, env) {
       ]
     : [];
   const obviousQuestionsSuppressed = isOperationalContext && hasTarget;
+  // PR56: Self-Audit read-only v1 — campo aditivo defensivo.
+  // Rodado após intent classification, skill routing e intent retrieval.
+  // Não altera resposta. Não bloqueia fluxo. Não chama LLM externo.
+  // Não usa KV/rede/filesystem. Read-only. Falha com segurança.
+  let _selfAudit = null;
+  try {
+    const _selfAuditResult = runEnaviaSelfAudit({
+      message,
+      context,
+      intentClassification: _intentClassification || undefined,
+      skillRouting:         _skillRouting         || undefined,
+      intentRetrieval:      _intentRetrieval      || undefined,
+      isOperationalContext,
+    });
+    _selfAudit = _selfAuditResult?.self_audit ?? null;
+  } catch (_selfAuditErr) {
+    _selfAudit = null;
+  }
 
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
@@ -4664,6 +4683,10 @@ async function handleChatLLM(request, env) {
       }} : {}),
       ...(plannerSnapshot ? { planner: plannerSnapshot } : {}),
       ...(pendingPlanSaved ? { pending_plan_saved: true, pending_plan_expires_in: _PENDING_PLAN_TTL_SECONDS } : {}),
+      // PR56: Self-Audit read-only v1 (campo aditivo seguro, não-quebrante).
+      // Indica achados de risco, alertas e próxima ação segura. Read-only.
+      // Não altera reply. Não bloqueia fluxo automaticamente. Não chama LLM externo.
+      ...(_selfAudit ? { self_audit: _selfAudit } : {}),
       timestamp: Date.now(),
       input: message,
       telemetry: {
