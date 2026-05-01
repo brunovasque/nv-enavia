@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR44 — Prova Brain Loader read-only no Chat Runtime)
-**Branch ativa:** `copilot/claudepr44-prova-brain-loader-chat-runtime`
-**Última tarefa:** PR44 — PR-PROVA — Prova do Brain Loader read-only no chat runtime. `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado (8 cenários A–H, 38 asserts, 38/38 ✅). Brain Context provado: presente no prompt, desligável por flag, ordem correta, sem capacidade falsa, anti-bot preservado, operacional real coexistindo, limite/determinismo/allowlist validados, experiência simulada sem LLM. Regressões 520/520 + PR44 38/38 = 558/558 ✅. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
+**Data:** 2026-05-01 (atualizado após PR45 — Diagnóstico do prompt atual do chat pós-Brain Loader)
+**Branch ativa:** `copilot/claudepr45-diag-prompt-atual-chat-pos-brain`
+**Última tarefa:** PR45 — PR-DIAG — Diagnóstico do prompt atual do chat pós-Brain Loader. READ-ONLY. Prompt mapeado em ordem real, tamanho medido em 6 cenários (10.945–13.743 chars / 2.736–3.436 tokens), redundâncias e conflitos classificados. Brain Context NÃO engessou — reforça naturalidade. Duplicação caps/limitações (R2) é o principal ponto a resolver. Nenhum runtime alterado. Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
 
 ## Estado atual do sistema
 
@@ -33,13 +33,13 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR45 — PR-DIAG — Diagnóstico do prompt atual do chat**
+**PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta**
 
 > ✅ PR41 mergeada (PR #202): Brain populado com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.
 > ✅ PR43 implementou Brain Loader read-only. `schema/enavia-brain-loader.js` criado. Allowlist de 7 fontes hard-coded. `getEnaviaBrainContext()` plugado em `buildChatSystemPrompt` (seção `7c`). Limite total 4.000 chars. Determinístico, sem FS/KV/rede. Smoke PR43 32/32. Regressões verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 > ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado, 38/38 ✅. Regressões 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
-> PR44 irá provar em runtime real (TEST quando aplicável) que o Brain Context influencia tom/autoentendimento sem ativar tom operacional indevido, sem quebrar anti-bot, sem expor conteúdo interno e sem inflar contexto além do limite.
+> ✅ PR45 diagnosticou o prompt pós-Brain Loader. READ-ONLY. Prompt medido: 10.945–13.743 chars (2.736–3.436 tokens). Brain Context: +4.002 chars / +1.000 tokens constantes. Principal problema: duplicação caps/limitações entre seções 1-4 e Brain blocks 1-3. Brain NÃO engessou — reforça naturalidade. Recomendação PR46: consolidar identidade+caps no LLM Core, reduzir seção 1b. Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
 
 ## Histórico de contratos
 

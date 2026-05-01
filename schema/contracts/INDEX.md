@@ -43,7 +43,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR45 — PR-DIAG — Diagnóstico do prompt atual do chat**
+**PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 
@@ -51,7 +51,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 > ✅ PR42 diagnosticou a memória runtime. `ENAVIA_BRAIN` existe com IDs reais. Brain documental não estava conectado. Brain Loader via bundle estático foi recomendado.
 > ✅ PR43 implementou o Brain Loader read-only. `schema/enavia-brain-loader.js` criado (snapshot estático com allowlist de 7 fontes, limite total 4.000 chars, marca de truncamento). Integrado em `buildChatSystemPrompt` (seção `7c`) sem alterar painel, executor, deploy worker, workflows, KV, bindings ou secrets. Smoke PR43 32/32 ✅. Regressões PR37/PR36/PR21/PR20/PR19/PR14/PR13 verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 > ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado. 38/38 asserts passaram (cenários A–H). Regressões 520/520 + PR44 38/38 = 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
-> PR45 diagnosticará o estado atual do system prompt completo em produção, medirá o tamanho total e mapeará o que falta para o LLM Core completo.
+> ✅ PR45 diagnosticou o prompt pós-Brain Loader (READ-ONLY). Prompt medido: 10.945–13.743 chars (2.736–3.436 tokens). Brain Context: +4.002 chars / +1.000 tokens constantes. Redundância principal: capacidades/limitações duplicadas entre seções 1-4 e Brain blocks 1-3. Brain NÃO engessou. PR46 viável: criar `buildLLMCoreBlock()`, consolidar identidade+caps, reduzir seção 1b (~400–450 tokens de economia). Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
 
 ### PRs do contrato Jarvis Brain já concluídas
 
@@ -67,6 +67,7 @@ Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
 - **PR42** ✅ (PR-DIAG) — Diagnóstico da Memória Atual no Runtime. `ENAVIA_BRAIN` confirmado. KVs mapeados. Fluxo de chat diagnosticado. Painel mapeado. Brain Loader via bundle estático recomendado para PR43. Relatório: `schema/reports/PR42_MEMORY_RUNTIME_DIAGNOSTICO.md`. Nenhum runtime alterado.
 - **PR43** ✅ (PR-IMPL) — Brain Loader read-only Worker-only. `schema/enavia-brain-loader.js` criado (snapshot estático com allowlist hard-coded de 7 fontes do Brain documental — self-model + SYSTEM_AWARENESS + excerto memories/INDEX). `getEnaviaBrainContext()` injetado em `buildChatSystemPrompt` (`schema/enavia-cognitive-runtime.js`, seção `7c`) antes do envelope JSON. Limite defensivo: 4.000 chars total, 1.500 por bloco, marca `[brain-context-truncated]`. Determinístico, sem FS/KV/rede. Flag interna `include_brain_context` (sem env var nova). NÃO altera painel/executor/deploy worker/workflows/wrangler/secrets/bindings. Smoke PR43 32/32 ✅. Regressões PR37/PR36/PR21/PR20/PR19/PR14/PR13 verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 - **PR44** ✅ (PR-PROVA) — Prova do Brain Loader read-only no chat runtime. `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado (8 cenários A–H, 38 asserts). Todos 38/38 ✅. Brain Context provado: presente no prompt, desligável por flag, ordem correta (após memória, antes de JSON), sem capacidade falsa, anti-bot preservado, operacional real coexistindo, limite/determinismo/allowlist validados, experiência simulada sem LLM. Regressões 520/520 + PR44 38/38 = 558/558 ✅. NÃO alterou nenhum runtime. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
+- **PR45** ✅ (PR-DIAG) — Diagnóstico do prompt atual do chat pós-Brain Loader. READ-ONLY. Prompt mapeado (14 blocos em ordem real de montagem). Tamanho medido: baseline 10.945 chars / ~2.736 tokens; máximo 13.743 chars / ~3.436 tokens. Brain Context: +4.002 chars / +1.000 tokens constantes a toda conversa. Redundâncias classificadas (R1–R6): principal problemática = caps/limitações duplicadas entre seções 1-4 e Brain blocks 1-3. Conflitos (C1–C6): nenhum bloqueador. Brain NÃO engessou — reforça naturalidade. Recomendação PR46: LLM Core v1 consolidar identidade+caps (~400–450 tokens de economia). Nenhum runtime alterado. Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
 
 ### Histórico do contrato encerrado (PR17–PR30)
 
