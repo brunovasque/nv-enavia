@@ -4,6 +4,74 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR49 — PR-IMPL — Classificador de Intenção v1
+
+- **Branch:** `copilot/claudepr49-impl-classificador-intencao`
+- **Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR48 ✅ (PR-IMPL cirúrgica — PR47 79/79 após correção)
+- **Escopo:** Classificador de Intenção v1. Worker-only.
+
+### Objetivo
+
+Implementar o Classificador de Intenção v1 para separar, de forma determinística e segura,
+os principais tipos de mensagem antes de aplicar tom operacional, planner, skill futura
+ou resposta conversacional. Retorno ao contrato principal após exceção corretiva PR48.
+
+### Resultado
+
+✅ **PASSOU — 96/96 asserts PR49. Regressões 601/601 ✅. Total: 697/697.**
+
+Classificador de Intenção v1 criado. 15 intenções canônicas implementadas.
+Frustração não ativa operação. Próxima PR não ativa operação pesada. Revisão de PR ativa
+operação. Diagnóstico técnico ativa operação. Deploy/execução ativa operação com
+governança. Falsos positivos PR37/PR38 continuam corrigidos. LLM Core/Brain/anti-bot
+preservados. Smoke PR49 96/96 ✅. Regressões 601/601 ✅.
+Próxima PR: **PR50 — PR-PROVA — Teste de intenção**.
+Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`.
+
+### Arquivos novos
+
+- `schema/enavia-intent-classifier.js` — Classificador de Intenção v1
+- `tests/pr49-intent-classifier.smoke.test.js` — 96 asserts (14 cenários)
+- `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md` — relatório completo
+
+### Arquivos modificados
+
+- `nv-enavia.js` — import + isOperationalMessage delegando ao classificador + intent_classification aditivo no response
+- `schema/contracts/INDEX.md` — próxima PR: PR50
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados
+
+`schema/enavia-intent-classifier.js` (criado do zero — sem alterar existente),
+`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
+`schema/enavia-llm-core.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, KV/bindings/secrets, sanitizers, gates. Nenhum endpoint criado.
+
+### Testes executados
+
+- `node --check schema/enavia-intent-classifier.js` ✅
+- `node --check tests/pr49-intent-classifier.smoke.test.js` ✅
+- PR49 smoke: **96/96** ✅
+- PR48 smoke: **20/20** ✅
+- PR47 prova: **79/79** ✅
+- PR46 smoke: **43/43** ✅
+- PR44 prova: 38/38 ✅
+- PR43 smoke: 32/32 ✅
+- PR37 smoke: 56/56 ✅
+- PR36 smoke: 26/26 ✅
+- PR21 smoke: 53/53 ✅
+- PR20 smoke: 27/27 ✅
+- PR19 smoke: 52/52 ✅
+- PR14 smoke: 183/183 ✅
+- PR13 smoke: 91/91 ✅
+- **Total: 697/697** ✅
+
+---
+
 ## 2026-05-01 — PR48 — PR-IMPL — Correção Cirúrgica do LLM Core v1
 
 - **Branch:** `copilot/claudepr48-impl-correcao-cirurgica-llm-core-v1`

@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR48 — Correção cirúrgica LLM Core v1 ✅)
-**Branch ativa:** `copilot/claudepr48-impl-correcao-cirurgica-llm-core-v1`
-**Última tarefa:** PR48 — PR-IMPL — Correção cirúrgica do LLM Core v1. Adicionada seção `COMPORTAMENTO OPERACIONAL` ao `buildLLMCoreBlock()` em `schema/enavia-llm-core.js` com os 4 achados corrigidos: "excesso documental", "Isso é opcional. Não mexa agora.", "resposta curta + prompt completo", "sem reabrir discussão". Brain Loader não alterado. Limite de 4.000 chars preservado. PR47 passou **79/79** após correção. Smoke PR48 20/20 ✅. PR46 43/43 ✅. Regressões 601/601 ✅. Exceção corretiva encerrada — retorno ao contrato principal. Próxima PR: **PR49 — PR-IMPL — Classificador de intenção**. Relatório: `schema/reports/PR48_IMPL_CORRECAO_CIRURGICA_LLM_CORE_V1.md`.
+**Data:** 2026-05-01 (atualizado após PR49 — Classificador de Intenção v1 ✅)
+**Branch ativa:** `copilot/claudepr49-impl-classificador-intencao`
+**Última tarefa:** PR49 — PR-IMPL — Classificador de Intenção v1. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1, determinístico, sem I/O, sem side-effects. `isOperationalMessage()` em `nv-enavia.js` atualizada para delegar ao classificador como fonte primária. Campo aditivo `intent_classification` adicionado ao response do `/chat/run`. Frustração não ativa operação. Próxima PR não ativa operação pesada. Revisão de PR, diagnóstico técnico e deploy ativam operação. Falsos positivos PR37/PR38 continuam corrigidos. LLM Core/Brain/anti-bot preservados. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Próxima PR: **PR50 — PR-PROVA — Teste de intenção**. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`.
 
 ## Estado atual do sistema
 
@@ -33,9 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR49 — PR-IMPL — Classificador de intenção**
+**PR50 — PR-PROVA — Teste de intenção**
 
-> ✅ PR48 cirúrgica concluída. 4 achados corrigidos no LLM Core. PR47 passou 79/79. Exceção encerrada.
+> ✅ PR49 (PR-IMPL cirúrgica) — concluída. `schema/enavia-intent-classifier.js` criado com 15 intenções canônicas v1. `isOperationalMessage()` atualizada para delegar ao classificador. Campo aditivo `intent_classification` no response do `/chat/run`. Frustração não ativa operação. Próxima PR não ativa operação pesada. Revisão de PR, diagnóstico técnico e deploy ativam operação. Falsos positivos PR37/PR38 continuam corrigidos. LLM Core/Brain/anti-bot preservados. Smoke PR49 96/96 ✅. Regressões 697/697 ✅. Relatório: `schema/reports/PR49_IMPL_CLASSIFICADOR_INTENCAO.md`. Retorno ao contrato principal — classificador ativo em runtime.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.
 > ✅ PR43 implementou Brain Loader read-only. `schema/enavia-brain-loader.js` criado. Allowlist de 7 fontes hard-coded. `getEnaviaBrainContext()` plugado em `buildChatSystemPrompt` (seção `7c`). Limite total 4.000 chars. Determinístico, sem FS/KV/rede. Smoke PR43 32/32. Regressões verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 > ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado, 38/38 ✅. Regressões 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
