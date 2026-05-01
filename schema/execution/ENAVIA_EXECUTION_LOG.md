@@ -4,7 +4,83 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-01 — PR51 — PR-IMPL — Skill Router read-only
+## 2026-05-01 — PR52 — PR-PROVA — Teste de roteamento de skills
+
+- **Branch:** `copilot/claude-pr52-prova-roteamento-skills`
+- **Tipo:** `PR-PROVA` (Worker-only, prova pura)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR51 ✅ (PR-IMPL — Skill Router read-only — 168/168)
+- **Escopo:** Prova formal do Skill Router read-only v1 (PR51).
+
+### Objetivo
+
+Provar que o Skill Router read-only implementado na PR51 roteia corretamente pedidos de
+skill no fluxo real do chat/prompt, sem executar nenhuma skill, sem criar endpoint,
+sem criar `/skills/run`, sem falsa capacidade.
+
+### Resultado
+
+✅ **PASSOU — 202/202 PR52 prova. Total com regressões: 1.290/1.290.**
+
+Skill Router read-only validado formalmente. 4 skills documentais roteadas corretamente
+(CONTRACT_LOOP_OPERATOR, DEPLOY_GOVERNANCE_OPERATOR, SYSTEM_MAPPER, CONTRACT_AUDITOR).
+Campo `skill_routing` validado (shape canônico). Falsa capacidade bloqueada. /skills/run
+inexistente confirmado. Nenhuma skill executada. Nenhum endpoint criado.
+
+### Arquivos novos
+
+- `tests/pr52-skill-routing-runtime.prova.test.js` — 202 asserts (12 cenários A–L)
+- `schema/reports/PR52_PROVA_ROTEAMENTO_SKILLS.md` — relatório completo
+
+### Arquivos modificados
+
+- `schema/contracts/INDEX.md` — próxima PR: PR53
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados (confirmado por `git diff --name-only`)
+
+- `schema/enavia-skill-router.js` ✅
+- `schema/enavia-intent-classifier.js` ✅
+- `nv-enavia.js` ✅
+- `schema/enavia-cognitive-runtime.js` ✅
+- `schema/enavia-llm-core.js` ✅
+- `schema/enavia-brain-loader.js` ✅
+- painel ✅ | executor ✅ | deploy worker ✅ | workflows ✅
+- `wrangler.toml` ✅ | `wrangler.executor.template.toml` ✅
+- KV/bindings/secrets ✅ | sanitizers ✅ | gates ✅
+
+### Smoke tests
+
+- `node --check schema/enavia-skill-router.js` → ✅
+- `node --check tests/pr52-skill-routing-runtime.prova.test.js` → ✅
+- `node tests/pr52-skill-routing-runtime.prova.test.js` → ✅ **202/202**
+
+### Regressões
+
+| Teste | Resultado |
+|-------|-----------|
+| `tests/pr51-skill-router-readonly.smoke.test.js` | **168/168** ✅ |
+| `tests/pr50-intent-runtime.prova.test.js` | **124/124** ✅ |
+| `tests/pr49-intent-classifier.smoke.test.js` | **96/96** ✅ |
+| `tests/pr48-correcao-cirurgica-llm-core-v1.smoke.test.js` | **20/20** ✅ |
+| `tests/pr47-resposta-viva-llm-core-v1.prova.test.js` | **79/79** ✅ |
+| `tests/pr46-llm-core-v1.smoke.test.js` | **43/43** ✅ |
+| `tests/pr44-brain-loader-chat-runtime.prova.test.js` | **38/38** ✅ |
+| `tests/pr43-brain-loader-readonly.smoke.test.js` | **32/32** ✅ |
+| `tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` | **56/56** ✅ |
+| `tests/pr36-chat-runtime-anti-bot.smoke.test.js` | **26/26** ✅ |
+| `tests/pr21-loop-status-states.smoke.test.js` | **53/53** ✅ |
+| `tests/pr20-loop-status-in-progress.smoke.test.js` | **27/27** ✅ |
+| `tests/pr19-advance-phase-e2e.smoke.test.js` | **52/52** ✅ |
+| `tests/pr14-executor-deploy-real-loop.smoke.test.js` | **183/183** ✅ |
+| `tests/pr13-hardening-operacional.smoke.test.js` | **91/91** ✅ |
+| **Total geral (incluindo PR52)** | **1.290/1.290** ✅ |
+
+---
+
+
 
 - **Branch:** `copilot/claudepr51-impl-skill-router-readonly`
 - **Tipo:** `PR-IMPL` (Worker-only, cirúrgica)
