@@ -4,6 +4,59 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR44 — PR-PROVA — Prova Brain Loader read-only no chat runtime
+
+- **Branch:** `copilot/claudepr44-prova-brain-loader-chat-runtime`
+- **Tipo:** `PR-PROVA` (Worker-only, sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR43 ✅ (PR-IMPL — relatório `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`)
+- **Escopo:** Worker-only. Criação de teste de prova + relatório + governança. Nenhum runtime alterado.
+
+### Objetivo
+
+Provar que o Brain Loader read-only (PR43) influencia o chat runtime da Enavia
+de forma segura, validando identidade, ausência de capacidade falsa, anti-bot
+preservado e não ativação indevida de tom operacional.
+
+### Resultado
+
+✅ PASSOU — Brain Loader read-only validado. 38/38 asserts. Regressões 520/520.
+
+### Testes executados
+
+| Teste | Resultado |
+|-------|-----------|
+| `node --check schema/enavia-brain-loader.js` | ✅ |
+| `node --check schema/enavia-cognitive-runtime.js` | ✅ |
+| `node --check tests/pr44-brain-loader-chat-runtime.prova.test.js` | ✅ |
+| `node tests/pr44-brain-loader-chat-runtime.prova.test.js` | **38/38 ✅** |
+| `node tests/pr43-brain-loader-readonly.smoke.test.js` | **32/32 ✅** |
+| `node tests/pr37-chat-runtime-anti-bot-real.smoke.test.js` | **56/56 ✅** |
+| `node tests/pr36-chat-runtime-anti-bot.smoke.test.js` | **26/26 ✅** |
+| `node tests/pr21-loop-status-states.smoke.test.js` | **53/53 ✅** |
+| `node tests/pr20-loop-status-in-progress.smoke.test.js` | **27/27 ✅** |
+| `node tests/pr19-advance-phase-e2e.smoke.test.js` | **52/52 ✅** |
+| `node tests/pr14-executor-deploy-real-loop.smoke.test.js` | **183/183 ✅** |
+| `node tests/pr13-hardening-operacional.smoke.test.js` | **91/91 ✅** |
+| **Total geral** | **558/558 ✅** |
+
+### Arquivos criados/alterados
+
+- `tests/pr44-brain-loader-chat-runtime.prova.test.js` (NOVO)
+- `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md` (NOVO)
+- `schema/contracts/INDEX.md` (EDIT — PR44 marcada ✅, próxima PR45)
+- `schema/status/ENAVIA_STATUS_ATUAL.md` (EDIT — estado pós-PR44)
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (EDIT — handoff PR44→PR45)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Arquivos NÃO alterados
+
+`schema/enavia-brain-loader.js`, `schema/enavia-cognitive-runtime.js`,
+`nv-enavia.js`, painel, executor, deploy worker, workflows, wrangler,
+KVs, bindings, secrets.
+
+---
+
 ## 2026-04-30 — PR43 — PR-IMPL — Brain Loader read-only Worker-only
 
 - **Branch:** `copilot/claudepr43-impl-brain-loader-readonly-worker`

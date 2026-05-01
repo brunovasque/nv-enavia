@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-04-30 (atualizado após PR43 — Brain Loader read-only Worker-only)
-**Branch ativa:** `copilot/claudepr43-impl-brain-loader-readonly-worker`
-**Última tarefa:** PR43 — PR-IMPL — Worker-only. Brain Loader read-only criado em `schema/enavia-brain-loader.js`, com snapshot estático (allowlist hard-coded de 7 fontes do Brain documental), limite total 4.000 chars e marca de truncamento. Integrado em `buildChatSystemPrompt` (seção `7c`) antes do envelope JSON. Sem alteração de painel, executor, deploy worker, workflows, wrangler, KVs, bindings ou secrets. Smoke PR43 32/32 ✅. Regressões PR37/PR36/PR21/PR20/PR19/PR14/PR13 verdes.
+**Data:** 2026-05-01 (atualizado após PR44 — Prova Brain Loader read-only no Chat Runtime)
+**Branch ativa:** `copilot/claudepr44-prova-brain-loader-chat-runtime`
+**Última tarefa:** PR44 — PR-PROVA — Prova do Brain Loader read-only no chat runtime. `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado (8 cenários A–H, 38 asserts, 38/38 ✅). Brain Context provado: presente no prompt, desligável por flag, ordem correta, sem capacidade falsa, anti-bot preservado, operacional real coexistindo, limite/determinismo/allowlist validados, experiência simulada sem LLM. Regressões 520/520 + PR44 38/38 = 558/558 ✅. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
 
 ## Estado atual do sistema
 
@@ -33,11 +33,12 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR44 — PR-PROVA — Provar Brain Loader read-only no chat runtime**
+**PR45 — PR-DIAG — Diagnóstico do prompt atual do chat**
 
 > ✅ PR41 mergeada (PR #202): Brain populado com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.
 > ✅ PR43 implementou Brain Loader read-only. `schema/enavia-brain-loader.js` criado. Allowlist de 7 fontes hard-coded. `getEnaviaBrainContext()` plugado em `buildChatSystemPrompt` (seção `7c`). Limite total 4.000 chars. Determinístico, sem FS/KV/rede. Smoke PR43 32/32. Regressões verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
+> ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado, 38/38 ✅. Regressões 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
 > PR44 irá provar em runtime real (TEST quando aplicável) que o Brain Context influencia tom/autoentendimento sem ativar tom operacional indevido, sem quebrar anti-bot, sem expor conteúdo interno e sem inflar contexto além do limite.
 
 ## Histórico de contratos
