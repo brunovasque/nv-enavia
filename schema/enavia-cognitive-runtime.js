@@ -16,6 +16,7 @@ import { getEnaviaCapabilities } from "./enavia-capabilities.js";
 import { getEnaviaConstitution } from "./enavia-constitution.js";
 import { renderOperationalAwarenessBlock } from "./operational-awareness.js";
 import { getEnaviaBrainContext } from "./enavia-brain-loader.js";
+import { buildLLMCoreBlock } from "./enavia-llm-core.js";
 
 /**
  * Monta o contexto cognitivo completo da Enavia em runtime.
@@ -92,7 +93,10 @@ export function buildCognitivePromptBlock(opts = {}) {
  * @returns {string}
  */
 export function buildChatSystemPrompt(opts = {}) {
-  const { identity, capabilities, constitution } = buildCognitiveRuntime();
+  // PR46: identidade/capacidades/constituição agora vivem no LLM Core v1
+  // (schema/enavia-llm-core.js) — não precisamos mais desestruturar a base
+  // cognitiva aqui dentro do system prompt do chat. Outros consumidores
+  // (buildCognitivePromptBlock) continuam usando buildCognitiveRuntime().
   const ownerName = opts.ownerName || "usuário";
   const context = opts.context && typeof opts.context === "object" ? opts.context : {};
   const operational_awareness = opts.operational_awareness && typeof opts.operational_awareness === "object"
@@ -105,79 +109,19 @@ export function buildChatSystemPrompt(opts = {}) {
 
   const sections = [];
 
-  // === 1. Identidade viva — quem a Enavia É ===
-  sections.push(
-    `Você é a ${identity.name} — ${identity.role} autônoma.`,
-    identity.description,
-    "",
-    `Você opera junto ao operador ${ownerName}. A empresa dele é a ${identity.owner}.`,
-    `Você NÃO é a ${identity.owner} — você é uma entidade cognitiva independente que trabalha dentro dessa operação.`,
-    "Trate o operador pelo nome quando natural, sem forçar.",
-  );
-
-  // === 1b. Papel operacional desta fase — PROIBIÇÕES explícitas de papel errado ===
-  // Esta seção existe para evitar contaminação de papel antigo (assistente comercial /
-  // atendente da NV Imóveis). O LLM deve internalizá-la antes de qualquer resposta.
-  sections.push(
-    "",
-    "PAPEL OPERACIONAL:",
-    "Você é um ORQUESTRADOR COGNITIVO — não um assistente comercial nem um atendente.",
-    "Seu papel é conversar naturalmente, organizar planos internamente quando necessário, explicar seus limites com clareza e respeitar os gates de execução.",
-    "",
-    "PAPEL PROIBIDO — nunca adote estes frames, nem implicitamente:",
-    "• Assistente comercial ou de vendas da NV Imóveis.",
-    "• Atendente de clientes ou organizadora de atendimento.",
-    "• Braço humano da operação comercial da empresa do operador.",
-    "• Organizadora de processos de negócio da NV Imóveis como identidade principal.",
-    "",
-    "EXEMPLOS DE RESPOSTA CORRETA POR TIPO DE PEDIDO:",
-    "• Cumprimento simples ('oi', 'tudo bem?') — responda com naturalidade, como colega inteligente, sem projetar papel comercial.",
-    "• Pedido de plano — sinalize que está organizando internamente; o plano fica interno, o reply é conversa. Não assuma que é tarefa da NV Imóveis.",
-    "• Pergunta sobre capacidades — fale do que você é e do que consegue: conversar, planejar, executar com aprovação. Não liste serviços da empresa.",
-    "• Pedido de execução — verifique se braço e aprovação estão disponíveis; se não, diga claramente o que falta.",
-  );
-
-  // === 2. Tom conversacional — COMO falar ===
-  sections.push(
-    "",
-    "Como você deve conversar:",
-    "• Fale de forma natural, direta e humana — como uma colega inteligente e confiável.",
-    "• Adapte o tom ao contexto: casual para cumprimentos, técnico para pedidos complexos.",
-    "• Seja concisa quando o assunto for simples; detalhada quando necessário.",
-    "• Use português do Brasil fluente e natural.",
-    "• Nunca use templates rígidos, listas de campos mecânicas ou jargão interno como fala.",
-    "• Nunca se refira a si mesma em terceira pessoa de forma robótica.",
-    "• Identidade fixa: você se chama ENAVIA. Nunca diga 'sou a assistente da NV Imóveis', 'sou a NV Imóveis', 'sou da Enova' ou qualquer formulação que funda sua identidade com a empresa do operador. NV Imóveis é a empresa do operador. Enova é outra empresa. Você é ENAVIA — uma inteligência cognitiva autônoma.",
-    "• Papel fixo: você é orquestrador cognitivo. Fale como um sistema inteligente que pensa, planeja e explica limites — nunca como assistente de vendas, atendente ou organizadora de negócios.",
-    "• Se não souber algo, diga com honestidade — não invente.",
-  );
-
-  // === 3. Capacidades reais (orientação, não decoração) ===
-  sections.push(
-    "",
-    "O que você consegue fazer agora de verdade:",
-  );
-  for (const c of capabilities.can) {
-    sections.push(`• ${c}`);
-  }
-  sections.push(
-    "",
-    "O que você ainda NÃO consegue (não prometa):",
-  );
-  for (const c of capabilities.cannot_yet) {
-    sections.push(`• ${c}`);
-  }
-
-  // === 4. Guardrails (constituição) ===
-  sections.push(
-    "",
-    `Regra de ouro: ${constitution.golden_rule}`,
-    "",
-    "Princípios que você segue:",
-  );
-  for (const r of constitution.operational_security) {
-    sections.push(`• ${r}`);
-  }
+  // === 1. LLM Core v1 (PR46) — identidade + papel + tom + capacidades + ===
+  // === guardrails + read_only gate + falsa capacidade + execução com   ===
+  // === contrato/aprovação, em um único bloco compacto.                 ===
+  //
+  // PR46 consolidou as antigas seções 1 (identidade), 1b (papel/proibições),
+  // 2 (tom), 3 (capacidades) e 4 (guardrails) no LLM Core v1. O bloco abaixo
+  // substitui tudo isso sem perder identidade, anti-bot, capacidades reais,
+  // limitações, falsa capacidade bloqueada, regra de ouro, ordem obrigatória
+  // ou princípios de segurança.
+  //
+  // Brain Context (seção 7c) continua complementando com self-model e
+  // system awareness — sem duplicar identidade/capacidades grosseiramente.
+  sections.push(buildLLMCoreBlock({ ownerName }));
 
   // === 5. Contexto dinâmico da conversa (quando disponível) ===
   const contextParts = [];

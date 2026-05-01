@@ -4,6 +4,62 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta
+
+- **Branch:** `copilot/claudepr46-impl-llm-core-v1`
+- **Tipo:** `PR-IMPL` (Worker-only, patch cirúrgico)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR45 ✅ (PR-DIAG — relatório `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`)
+- **Escopo:** Worker-only. Patch cirúrgico. Consolidação de seções redundantes no LLM Core v1.
+
+### Objetivo
+
+Consolidar identidade, capacidades, política de resposta e relação com o Brain Context
+em uma camada central do prompt do chat (LLM Core v1), reduzindo redundância sem perder
+segurança, anti-bot, governança ou envelope JSON.
+
+### Resultado
+
+✅ CONCLUÍDO. Relatório: `schema/reports/PR46_IMPL_LLM_CORE_V1.md`.
+
+### Arquivos novos
+- `schema/enavia-llm-core.js` — `buildLLMCoreBlock()` + `getLLMCoreMetadata()` (pure function determinística, sem I/O).
+- `tests/pr46-llm-core-v1.smoke.test.js` — smoke test (cenários A–G, 43 asserts).
+- `schema/reports/PR46_IMPL_LLM_CORE_V1.md` — relatório completo.
+
+### Arquivos modificados
+- `schema/enavia-cognitive-runtime.js` — antigas seções 1, 1b, 2, 3, 4 substituídas por chamada única ao `buildLLMCoreBlock({ ownerName })`. Demais seções (Brain Context, target, MODO OPERACIONAL condicional, planner, memória, envelope JSON) inalteradas.
+
+### Arquivos NÃO alterados
+`nv-enavia.js`, `schema/enavia-brain-loader.js` (snapshot principal preservado por escopo),
+`schema/enavia-identity.js`, `schema/enavia-capabilities.js`, `schema/enavia-constitution.js`,
+`schema/operational-awareness.js`, painel, executor, deploy worker, workflows,
+`wrangler.toml`, `wrangler.executor.template.toml`, KV/bindings/secrets, sanitizers.
+
+### Medição (todos os 6 cenários da PR45)
+
+| Cenário | PR45 baseline | PR46 atual | Δ chars | Δ tokens |
+|---------|--------------:|-----------:|--------:|---------:|
+| A — simples sem target | 10.945 | 10.496 | -449 | -112 |
+| B — simples target read_only | 11.187 | 10.738 | -449 | -112 |
+| C — identidade | 10.945 | 10.496 | -449 | -112 |
+| D — capacidade | 10.945 | 10.496 | -449 | -112 |
+| E — operacional real | 12.812 | 12.363 | -449 | -112 |
+| F — operacional completo + awareness | 13.689 | 13.240 | -449 | -112 |
+
+**Economia: -4,1% por conversa, constante. "NV Imóveis" 9 → 3 ocorrências.**
+
+### Testes
+- Sintaxe (`node --check`): OK em `enavia-llm-core.js`, `enavia-cognitive-runtime.js`, `enavia-brain-loader.js`, `pr46-llm-core-v1.smoke.test.js`.
+- Smoke PR46: **43/43 ✅**
+- Regressões PR44 (38/38), PR43 (32/32), PR37 (56/56), PR36 (26/26), PR21 (53/53), PR20 (27/27), PR19 (52/52), PR14 (183/183), PR13 (91/91) → **558/558 ✅**
+- **TOTAL geral: 601/601 ✅**
+
+### Próxima etapa
+**PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1**
+
+---
+
 ## 2026-05-01 — PR45 — PR-DIAG — Diagnóstico do prompt atual do chat pós-Brain Loader
 
 - **Branch:** `copilot/claudepr45-diag-prompt-atual-chat-pos-brain`

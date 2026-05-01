@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR45 — Diagnóstico do prompt atual do chat pós-Brain Loader)
-**Branch ativa:** `copilot/claudepr45-diag-prompt-atual-chat-pos-brain`
-**Última tarefa:** PR45 — PR-DIAG — Diagnóstico do prompt atual do chat pós-Brain Loader. READ-ONLY. Prompt mapeado em ordem real, tamanho medido em 6 cenários (10.945–13.743 chars / 2.736–3.436 tokens), redundâncias e conflitos classificados. Brain Context NÃO engessou — reforça naturalidade. Duplicação caps/limitações (R2) é o principal ponto a resolver. Nenhum runtime alterado. Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
+**Data:** 2026-05-01 (atualizado após PR46 — LLM Core v1)
+**Branch ativa:** `copilot/claudepr46-impl-llm-core-v1`
+**Última tarefa:** PR46 — PR-IMPL — LLM Core v1 (Worker-only, patch cirúrgico). Camada `schema/enavia-llm-core.js` criada (`buildLLMCoreBlock()` + `getLLMCoreMetadata()`). Antigas seções 1+1b+2+3+4 do `buildChatSystemPrompt` consolidadas em chamada única ao LLM Core. Economia real: **-449 chars / ~-112 tokens (-4,1%) por conversa** em todos os 6 cenários da PR45. "NV Imóveis" reduzido de 9 para 3 ocorrências. Brain Loader **inalterado** (snapshot principal preservado por escopo). Brain Context, envelope JSON, target informativo, MODO OPERACIONAL condicional, sanitizers, gates de execução, planner policy, awareness, memória — todos mantidos. Smoke PR46 43/43 ✅. Regressões PR44/PR43/PR37/PR36/PR21/PR20/PR19/PR14/PR13 todas verdes (558/558). Total 601/601 ✅. Nenhum painel/executor/deploy worker/workflow/wrangler/KV/binding/secret/endpoint alterado. Relatório: `schema/reports/PR46_IMPL_LLM_CORE_V1.md`.
 
 ## Estado atual do sistema
 
@@ -33,13 +33,14 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR46 — PR-IMPL — LLM Core v1: consolidar identidade, Brain Context e política de resposta**
+**PR47 — PR-PROVA — Teste de resposta viva com LLM Core v1**
 
 > ✅ PR41 mergeada (PR #202): Brain populado com conhecimento consolidado. Relatório: `schema/reports/PR41_POPULAR_OBSIDIAN_BRAIN_REPORT.md`.
 > ✅ PR42 diagnosticou a memória runtime. ENAVIA_BRAIN existe com ID real. Brain não estava conectado ao runtime.
 > ✅ PR43 implementou Brain Loader read-only. `schema/enavia-brain-loader.js` criado. Allowlist de 7 fontes hard-coded. `getEnaviaBrainContext()` plugado em `buildChatSystemPrompt` (seção `7c`). Limite total 4.000 chars. Determinístico, sem FS/KV/rede. Smoke PR43 32/32. Regressões verdes (520/520). Relatório: `schema/reports/PR43_IMPL_BRAIN_LOADER_READONLY.md`.
 > ✅ PR44 provou o Brain Loader read-only no chat runtime. Teste `tests/pr44-brain-loader-chat-runtime.prova.test.js` criado, 38/38 ✅. Regressões 558/558. Nenhum runtime alterado. Relatório: `schema/reports/PR44_PROVA_BRAIN_LOADER_CHAT_RUNTIME.md`.
 > ✅ PR45 diagnosticou o prompt pós-Brain Loader. READ-ONLY. Prompt medido: 10.945–13.743 chars (2.736–3.436 tokens). Brain Context: +4.002 chars / +1.000 tokens constantes. Principal problema: duplicação caps/limitações entre seções 1-4 e Brain blocks 1-3. Brain NÃO engessou — reforça naturalidade. Recomendação PR46: consolidar identidade+caps no LLM Core, reduzir seção 1b. Relatório: `schema/reports/PR45_PROMPT_CHAT_POS_BRAIN_DIAGNOSTICO.md`.
+> ✅ PR46 implementou o LLM Core v1. `schema/enavia-llm-core.js` criado (`buildLLMCoreBlock()` + `getLLMCoreMetadata()`). Antigas seções 1+1b+2+3+4 consolidadas. "NV Imóveis" 9→3 ocorrências. Economia real: -449 chars / ~-112 tokens (-4,1%) por conversa. Brain Loader inalterado por escopo. Smoke PR46 43/43 ✅. Regressões 558/558 ✅. Total 601/601 ✅. Relatório: `schema/reports/PR46_IMPL_LLM_CORE_V1.md`.
 
 ## Histórico de contratos
 
