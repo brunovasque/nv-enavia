@@ -4,6 +4,73 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose`
+
+- **Branch:** `codex/pr72-prova-skills-propose-endpoint`
+- **Tipo:** `PR-PROVA` (`Tests-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR71 ✅ (`feat: PR71 endpoint /skills/propose read-only`)
+
+### Objetivo
+
+Provar formalmente que o endpoint `POST /skills/propose` (PR71) é read-only/proposal-only, seguro, sem side effects, sem `/skills/run` e sem alterar contrato do chat.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr72-skills-propose-endpoint.prova.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Cenários provados (22/22)
+
+1. skill conhecida: `mode=proposal`, `status=proposed`
+2. `requires_approval=true` somente quando `status=proposed`
+3. `side_effects=false` sempre
+4. skill desconhecida bloqueada por deny-by-default
+5. `selfAudit.risk_level=blocking` bloqueia
+6. `selfAudit.should_block=true` bloqueia
+7. `selfAudit.secret_exposure` bloqueia
+8. conversa comum sem skill roteada retorna `not_applicable`
+9. responsePolicy de pausa/recusa sem skill roteada retorna `not_applicable`
+10. `GET /skills/propose` retorna `405 METHOD_NOT_ALLOWED`
+11. JSON inválido retorna `400 INVALID_JSON`
+12. erro mantém `skill_execution` seguro (`mode=proposal`, `status=blocked`, `side_effects=false`)
+13. `/skills/run` continua inexistente (`404`)
+14. endpoint não retorna `reply`
+15. endpoint não retorna `use_planner`
+16. endpoint não usa KV
+17. endpoint não chama `fetch`
+18. endpoint não usa filesystem runtime
+19. endpoint não chama LLM externo
+20. `nv-enavia.js` não contém rota `/skills/run`
+21. `contract-executor.js` não foi alterado (fora do diff vs `origin/main`)
+22. `wrangler.toml` não foi alterado (fora do diff vs `origin/main`)
+
+### Testes executados
+
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` → 45/45 ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- Prova formal PR72 concluída ✅
+- Runtime preservado ✅
+- Endpoint `/skills/propose` confirmado seguro/proposal-only ✅
+- `/skills/run` permanece inexistente ✅
+- `contract-executor.js` e `wrangler.toml` preservados ✅
+- Próxima etapa liberada: PR73 ✅
+
+---
+
 ## 2026-05-02 — PR71 — PR-IMPL — Endpoint `/skills/propose` read-only
 
 - **Branch:** `codex/pr71-skills-propose-endpoint`
