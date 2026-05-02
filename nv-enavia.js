@@ -49,6 +49,7 @@ import { buildIntentRetrievalContext } from "./schema/enavia-intent-retrieval.js
 import { runEnaviaSelfAudit } from "./schema/enavia-self-audit.js";
 import { buildEnaviaResponsePolicy } from "./schema/enavia-response-policy.js";
 import { buildSkillExecutionProposal } from "./schema/enavia-skill-executor.js";
+import { registerSkillProposal, approveSkillProposal, rejectSkillProposal } from "./schema/enavia-skill-approval-gate.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -6839,14 +6840,125 @@ async function handleSkillsPropose(request) {
     responsePolicy: input.responsePolicy,
     chatContext: input.chatContext,
   });
+  const gate = registerSkillProposal(proposal.skill_execution);
 
   return jsonResponse(
     {
       ok: true,
       route: "POST /skills/propose",
+      proposal_id: gate.proposal_id,
+      proposal_status: gate.status,
+      side_effects: false,
+      executed: false,
       skill_execution: proposal.skill_execution,
     },
     200
+  );
+}
+
+function _blockedSkillGateResponse(route, code, message, detail) {
+  return jsonResponse(
+    {
+      ok: false,
+      error: code,
+      message,
+      detail: detail || null,
+      route,
+      side_effects: false,
+      executed: false,
+      proposal_status: "blocked",
+      skill_execution: {
+        mode: "proposal",
+        status: "blocked",
+        skill_id: null,
+        reason: message,
+        requires_approval: false,
+        side_effects: false,
+      },
+    },
+    code === "INVALID_JSON" ? 400 : 409
+  );
+}
+
+async function handleSkillsApprove(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return _blockedSkillGateResponse(
+      "POST /skills/approve",
+      "INVALID_JSON",
+      "JSON inválido em /skills/approve.",
+      String(err),
+    );
+  }
+
+  const input = body && typeof body === "object" && !Array.isArray(body) ? body : {};
+  const result = approveSkillProposal(input);
+  const route = "POST /skills/approve";
+  const blocked = result.ok !== true;
+  const proposal = result.proposal || null;
+
+  return jsonResponse(
+    {
+      ok: !blocked,
+      route,
+      proposal_id: result.proposal_id || null,
+      proposal_status: result.status,
+      side_effects: false,
+      executed: false,
+      ...(blocked ? { error: "APPROVAL_BLOCKED", message: result.reason || "Approval bloqueado." } : {}),
+      skill_execution: {
+        mode: "proposal",
+        status: result.status,
+        skill_id: proposal?.skill_id || null,
+        reason: result.reason || proposal?.reason || "Approval processado.",
+        requires_approval: false,
+        side_effects: false,
+      },
+    },
+    blocked ? 409 : 200
+  );
+}
+
+async function handleSkillsReject(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return _blockedSkillGateResponse(
+      "POST /skills/reject",
+      "INVALID_JSON",
+      "JSON inválido em /skills/reject.",
+      String(err),
+    );
+  }
+
+  const input = body && typeof body === "object" && !Array.isArray(body) ? body : {};
+  const result = rejectSkillProposal(input);
+  const route = "POST /skills/reject";
+  const blocked = result.ok !== true;
+  const proposal = result.proposal || null;
+
+  return jsonResponse(
+    {
+      ok: !blocked,
+      route,
+      proposal_id: result.proposal_id || null,
+      proposal_status: result.status,
+      side_effects: false,
+      executed: false,
+      ...(blocked ? { error: "REJECT_BLOCKED", message: result.reason || "Reject bloqueado." } : {}),
+      skill_execution: {
+        mode: "proposal",
+        status: result.status,
+        skill_id: proposal?.skill_id || null,
+        reason: result.reason || proposal?.reason || "Reject processado.",
+        requires_approval: false,
+        side_effects: false,
+      },
+    },
+    blocked ? 409 : 200
   );
 }
 
@@ -7346,6 +7458,40 @@ if (path === "/skills/propose") {
     );
   }
   return handleSkillsPropose(request);
+}
+
+if (path === "/skills/approve") {
+  if (method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "METHOD_NOT_ALLOWED",
+        message: "Use POST em /skills/approve.",
+        method,
+        path,
+        allowed_methods: ["POST"],
+      },
+      405
+    );
+  }
+  return handleSkillsApprove(request);
+}
+
+if (path === "/skills/reject") {
+  if (method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "METHOD_NOT_ALLOWED",
+        message: "Use POST em /skills/reject.",
+        method,
+        path,
+        allowed_methods: ["POST"],
+      },
+      405
+    );
+  }
+  return handleSkillsReject(request);
 }
 
   // 🧠 ENAVIA — PROPOSE ENDPOINT (DEPENDE DE AUDIT)

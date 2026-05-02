@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR72 — Prova formal do endpoint `/skills/propose` ✅)
-**Branch ativa:** `codex/pr72-prova-skills-propose-endpoint`
-**Última tarefa:** PR72 — PR-PROVA — prova formal do endpoint `POST /skills/propose` concluída. Endpoint validado como proposal-only/read-only, sem side effects, sem `/skills/run`, sem `reply` e sem `use_planner`.
+**Data:** 2026-05-02 (atualizado após PR73 — Approval Gate técnico proposal-only ✅)
+**Branch ativa:** `codex/pr73-approval-gate-proposal-only`
+**Última tarefa:** PR73 — PR-IMPL — approval gate técnico proposal-only concluído. Gate read-only criado com `proposal_id`, aprovação/rejeição explícita e sem execução real de skill.
 
 ## Estado atual do sistema
 
@@ -12,7 +12,7 @@
 
 **Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. PR71 implementada e PR72 provada: `POST /skills/propose` em `nv-enavia.js` com erro controlado (`METHOD_NOT_ALLOWED`, `INVALID_JSON`) e contrato seguro (`mode=proposal`, `status=proposed|not_applicable|blocked`, `side_effects=false`).
+**Sistema operacional:** Estável. PR73 implementada sobre PR69–PR72: módulo `schema/enavia-skill-approval-gate.js` criado, `/skills/propose` integrado com `proposal_id/proposal_status`, novos endpoints `POST /skills/approve` e `POST /skills/reject` sem side effects, sem `/skills/run`, sem KV/fetch/FS/LLM externo.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR73 — PR-IMPL — Approval Gate técnico proposal-only**
+**PR74 — PR-PROVA — Prova do Approval Gate**
+
+> ✅ PR73 (PR-IMPL) — concluída. Approval Gate técnico proposal-only implementado em `schema/enavia-skill-approval-gate.js` com statuses controlados (`proposed|approved|rejected|expired|blocked`) e persistência local em memória (sem KV/binding/tabela). `POST /skills/propose` passou a retornar `proposal_id` e `proposal_status` mantendo `skill_execution` original. Endpoints `POST /skills/approve` e `POST /skills/reject` adicionados em `nv-enavia.js` com bloqueio controlado para proposal desconhecida/inválida, blocked ou not_applicable; `side_effects=false` e `executed=false` sempre. `/skills/run` permanece inexistente. Teste novo `tests/pr73-approval-gate-proposal-only.smoke.test.js` criado e aprovado (48/48), junto das regressões obrigatórias PR72/PR71/PR70/PR69/PR51/PR57/PR59 passando.
 
 > ✅ PR72 (PR-PROVA) — concluída. `tests/pr72-skills-propose-endpoint.prova.test.js` criado com prova formal de 22 cenários obrigatórios: proposta válida (`mode=proposal`, `status=proposed`), regra `requires_approval` vinculada a `status=proposed`, `side_effects=false` sempre, deny-by-default para skill desconhecida, bloqueios por `selfAudit` (`risk_level=blocking`, `should_block=true`, `secret_exposure`), `not_applicable` para conversa comum e pausa/recusa sem skill roteada, `GET /skills/propose` => `405 METHOD_NOT_ALLOWED`, JSON inválido => `400 INVALID_JSON` com `skill_execution` seguro, `/skills/run` inexistente, ausência de `reply`/`use_planner`, ausência de KV/fetch/FS runtime/LLM externo no endpoint, ausência de rota `/skills/run` no Worker e confirmação de que `contract-executor.js` e `wrangler.toml` não entraram no diff vs `origin/main`. Testes obrigatórios PR72/PR71/PR70/PR69/PR51/PR57/PR59 passando.
 

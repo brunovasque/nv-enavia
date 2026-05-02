@@ -1,33 +1,31 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose` ✅
-**Para:** PR73 — PR-IMPL — Approval Gate técnico proposal-only
+**De:** PR73 — PR-IMPL — Approval Gate técnico proposal-only ✅
+**Para:** PR74 — PR-PROVA — Prova do Approval Gate
 
-## Handoff atual (PR72)
+## Handoff atual (PR73)
 
 ### O que foi feito
 
-- PR72 executada em escopo `Tests-only`.
-- Teste formal criado: `tests/pr72-skills-propose-endpoint.prova.test.js`.
-- Prova formal concluída para 22 cenários obrigatórios do endpoint `POST /skills/propose`:
-  - proposta válida com `mode=proposal` e `status=proposed`
-  - `requires_approval=true` somente quando `status=proposed`
+- PR73 executada em escopo `Worker-only`.
+- Módulo criado: `schema/enavia-skill-approval-gate.js`.
+- Fluxo `/skills/propose` integrado com `proposal_id` e `proposal_status`.
+- Endpoints criados:
+  - `POST /skills/approve`
+  - `POST /skills/reject`
+- Gate permanece proposal-only/read-only:
+  - sem `/skills/run`
+  - sem execução de skill
   - `side_effects=false` sempre
-  - deny-by-default para skill desconhecida
-  - bloqueios por `selfAudit` (`risk_level=blocking`, `should_block=true`, `secret_exposure`)
-  - `not_applicable` para conversa comum e para pausa/recusa sem skill roteada
-  - `GET /skills/propose` retorna `405 METHOD_NOT_ALLOWED`
-  - JSON inválido retorna `400 INVALID_JSON`
-  - resposta de erro mantém `skill_execution` seguro (`mode=proposal`, `status=blocked`, `side_effects=false`)
-  - `/skills/run` permanece inexistente
-  - endpoint não retorna `reply` nem `use_planner`
-  - endpoint sem KV/fetch/filesystem runtime/LLM externo
-  - `nv-enavia.js` sem rota `/skills/run`
-  - `contract-executor.js` e `wrangler.toml` fora do diff vs `origin/main`
+  - `executed=false` sempre
+  - proposal desconhecida/inválida => bloqueio controlado
+  - proposal blocked/not_applicable => não aprova
+  - sem KV/binding/tabela/fetch/filesystem runtime/LLM externo
 
 ### Testes executados
 
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` — 48/48 ✅
 - `node tests/pr72-skills-propose-endpoint.prova.test.js` — 45/45 ✅
 - `node tests/pr71-skills-propose-endpoint.smoke.test.js` — 43/43 ✅
 - `node tests/pr70-skill-execution-proposal.prova.test.js` — 28/28 ✅
@@ -38,8 +36,6 @@
 
 ### O que NÃO foi alterado
 
-- `nv-enavia.js` (runtime preservado)
-- `schema/enavia-skill-executor.js` (módulo preservado)
 - `contract-executor.js`
 - `wrangler.toml`
 - painel / executor / deploy-worker / workflows
@@ -48,7 +44,7 @@
 
 ### Próxima etapa segura
 
-- PR73 — `Worker-only` — criar Approval Gate técnico proposal-only (`proposal_id`, status `proposed|approved|rejected|expired|blocked`) sem execução real e sem `/skills/run`.
+- PR74 — `Tests-only` — prova formal do approval gate (deny-by-default, bloqueio de execução sem approval, invariantes de side effects).
 
 ---
 
