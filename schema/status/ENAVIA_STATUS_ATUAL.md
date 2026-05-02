@@ -1,20 +1,24 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR80 — Runner/Registry ✅)
-**Branch ativa:** `codex/pr80-skill-registry-runner`
-**Última tarefa:** PR80 — PR-IMPL — Registry/Runner de skills com endpoint governado `POST /skills/run` para skill registrada.
+**Data:** 2026-05-02 (atualizado após PR81 — Fechamento Skill Factory Real ✅)
+**Branch ativa:** `codex/pr81-skill-factory-real-fechamento`
+**Última tarefa:** PR81 — PR-IMPL + PR-PROVA — Fechamento ponta a ponta Skill Factory Real v1.
 
 ## Estado atual do sistema
 
-**Contrato ativo:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Ativo)
+## Atualização PR81 (fechamento)
+
+- Skill Factory Real v1 fechada ponta a ponta com prova do ciclo: pedido humano -> skill_spec -> bloqueio sem autorização -> pacote PR-ready com autorização -> registry/runner -> /skills/run com SYSTEM_MAPPER aprovada.
+- Regras de segurança preservadas: deny-by-default, método POST-only, erro controlado para JSON inválido, bloqueios para secrets/deploy/browser/comando externo/side effects sem allowlist.
+- Confirmado: sem alteração em wrangler.toml, sem alteração em contract-executor.js, sem mudanças em painel/deploy-worker/executor/workflows.
+- Confirmado: SELF_WORKER_AUDITOR ainda não criada nesta PR.
+**Contrato ativo:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Concluído ✅)
 
 **Objetivo:** Evoluir Skill Factory Real v1 com execução governada apenas para skill registrada e aprovada.
 
 **Sistema operacional:** Estável. PR80 adicionou `schema/enavia-skill-registry.js`, `schema/enavia-skill-runner.js` e endpoint `POST /skills/run` no `nv-enavia.js`, com bloqueio deny-by-default para skill não registrada e requirement de `proposal_status=approved`. `SYSTEM_MAPPER` é a primeira skill executável read-only no runner.
 
-## Próxima PR autorizada
-
-**PR81 — Fechamento ponta a ponta Skill Factory Real**.
+## Próxima PR autorizada`r`n`r`n**Aguardando próximo contrato/fase formal.**
 
 ---
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
@@ -34,9 +38,7 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 **Mode Policy PR35:** Política criada em `schema/policies/MODE_POLICY.md`. `read_only` definido como gate de execução. 3 modos canônicos (conversation/diagnosis/execution). Target default não decide tom. Contrato ajustado para PR36 ser PR-IMPL. Diagnóstico suficiente — próxima entrega é produto.
 
-## Próxima PR autorizada
-
-**PR81 — Fechamento ponta a ponta Skill Factory Real** (após PR80 concluída).
+## Próxima PR autorizada (histórico)\r\n\r\n**PR81 — Fechamento ponta a ponta Skill Factory Real** (concluída).
 
 > ✅ PR77 (PR-IMPL) — concluída. `schema/enavia-chat-skill-surface.js` criado com helper puro `buildChatSkillSurface()` e mensagem canônica `"Existe uma ação técnica proposta, aguardando aprovação."`. `nv-enavia.js` atualizado no fluxo `handleChatLLM` para adicionar metadado aditivo `chat_skill_surface` somente quando `skill_execution.status=proposed`; `reply` principal preservado; `skill_execution` permanece campo aditivo; `blocked/not_applicable` sem poluição adicional. Nenhuma execução automática de skill. Nenhum `/skills/run`. Nenhum endpoint novo. `buildSystemMapperResult` não chamado no chat. Teste novo `tests/pr77-chat-controlled-skill-integration.smoke.test.js` aprovado.
 
@@ -350,6 +352,8 @@ Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 (DOCS) e PR32 (
 
 ## Bloqueios
 - nenhum
+
+
 
 
 

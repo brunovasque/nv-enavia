@@ -4,6 +4,46 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR81 — PR-IMPL + PR-PROVA — Fechamento ponta a ponta Skill Factory Real
+
+- **Branch:** codex/pr81-skill-factory-real-fechamento
+- **Tipo:** PR-IMPL + PR-PROVA (Worker-only + Tests + Docs mínimo)
+- **Contrato:** CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md (Encerrado nesta PR)
+- **PR anterior validada:** PR80 ✅
+
+### Objetivo
+
+Provar o ciclo completo da Skill Factory Real v1: pedido humano -> skill_spec -> autorização -> pacote PR-ready -> registry/runner -> execução governada.
+
+### Implementação
+
+**Arquivos criados:**
+- tests/pr81-skill-factory-real.fechamento.test.js
+- schema/reports/PR81_SKILL_FACTORY_REAL.md
+
+**Arquivos alterados:**
+- schema/status/ENAVIA_STATUS_ATUAL.md
+- schema/handoffs/ENAVIA_LATEST_HANDOFF.md
+- schema/execution/ENAVIA_EXECUTION_LOG.md (este arquivo)
+- schema/contracts/ACTIVE_CONTRACT.md
+- schema/contracts/INDEX.md
+
+### Regras preservadas
+
+1. nenhuma skill nova real criada no runtime;
+2. nenhum PR/merge/deploy automático;
+3. nenhum fetch/KV/filesystem runtime/comando externo/LLM externo novo;
+4. wrangler.toml e contract-executor.js sem alteração;
+5. sem alterações em painel/executor/deploy-worker/workflows.
+
+### Resultado
+
+- PR81 concluída ✅
+- Skill Factory Real v1 fechada ponta a ponta ✅
+- SELF_WORKER_AUDITOR ainda não criada ✅
+- Próxima etapa recomendada: novo contrato para SELF_WORKER_AUDITOR supervisionada ✅
+
+---
 ## 2026-05-02 — PR80 — PR-IMPL — Runner/Registry para skills criadas
 
 - **Branch:** `codex/pr80-skill-registry-runner`
@@ -4845,4 +4885,6 @@ Nenhum. Diagnóstico completo. PR18 pode iniciar.
 - **Garantias:** Read-only. Não altera reply. Não bloqueia fluxo automaticamente. Não cria endpoint. Não escreve memória. Não chama LLM externo. Não usa KV/rede/filesystem. Falha com segurança.
 - **Escopo preservado:** `enavia-cognitive-runtime.js`, `enavia-llm-core.js`, `enavia-brain-loader.js`, `enavia-intent-classifier.js`, `enavia-skill-router.js`, `enavia-intent-retrieval.js`, Panel, Executor, Deploy Worker, workflows, wrangler.toml — todos intactos.
 - **Próxima etapa segura:** PR57 — PR-PROVA — Teste do Self-Audit read-only.
+
+
 
