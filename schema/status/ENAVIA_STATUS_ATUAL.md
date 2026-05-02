@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR74 — Prova formal do Approval Gate ✅)
-**Branch ativa:** `codex/pr74-prova-approval-gate`
-**Última tarefa:** PR74 — PR-PROVA — prova formal concluída. Gate confirmado como proposal-only/read-only, deny-by-default preservado, sem execução real de skill.
+**Data:** 2026-05-02 (atualizado após PR75 — SYSTEM_MAPPER read-only limitada ✅)
+**Branch ativa:** `codex/pr75-system-mapper-readonly`
+**Última tarefa:** PR75 — PR-IMPL — skill `SYSTEM_MAPPER` implementada como módulo puro read-only, sem side effects e sem `/skills/run`.
 
 ## Estado atual do sistema
 
@@ -12,7 +12,7 @@
 
 **Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. PR74 concluída sobre PR73: `tests/pr74-approval-gate.prova.test.js` valida 32 cenários obrigatórios do gate (aprovação/rejeição, bloqueios, expiração, JSON inválido, métodos inválidos, invariantes `side_effects=false`/`executed=false`, ausência de `/skills/run`, sem KV/fetch/FS/LLM externo, `wrangler.toml` e `contract-executor.js` preservados, `reply/use_planner` preservados).
+**Sistema operacional:** Estável. PR75 adicionou `schema/enavia-system-mapper-skill.js` com `buildSystemMapperResult(input)` (determinístico e read-only), retornando mapa seguro de allowlist/endpoints/gate/limitações, com bloqueio controlado quando `require_approved_proposal=true` sem `proposal_status=approved`. Nenhum endpoint novo foi criado, `/skills/run` segue inexistente, e arquivos proibidos (`wrangler.toml`, `contract-executor.js`, `nv-enavia.js`) permanecem fora do diff.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER**
+**PR76 — PR-PROVA — Prova da Skill SYSTEM_MAPPER**
+
+> ✅ PR75 (PR-IMPL) — concluída. Skill read-only limitada `SYSTEM_MAPPER` implementada como módulo puro em `schema/enavia-system-mapper-skill.js` com `buildSystemMapperResult(input)`. Contrato respeitado: `skill_id=SYSTEM_MAPPER`, `mode=read_only`, `side_effects=false`, `executed=false`, `executed_readonly=true` em sucesso, mapa pequeno/estruturado/determinístico de capacidades conhecidas (allowlist, endpoints `/skills/propose` `/skills/approve` `/skills/reject`, status de `/skills/run` inexistente, estado conhecido do gate e limitações). Gate opcional: quando `require_approved_proposal=true`, proposta sem `approved` retorna bloqueio controlado (`status=blocked`, `executed_readonly=false`) sem side effects. Teste novo `tests/pr75-system-mapper-readonly.smoke.test.js` criado para validar os 20 cenários mínimos obrigatórios.
 
 > ✅ PR74 (PR-PROVA) — concluída. Arquivo `tests/pr74-approval-gate.prova.test.js` criado com prova formal dos 32 cenários obrigatórios do Approval Gate: proposta válida com `proposal_id`, status inicial `proposed`, approve/reject válidos, bloqueios para proposal desconhecida/ausente/blocked/not_applicable, bloqueio de segunda aprovação/rejeição, bloqueio de proposal expirada para approve/reject, erros controlados para JSON inválido em `/skills/approve` e `/skills/reject`, `GET` em approve/reject retornando `405 METHOD_NOT_ALLOWED`, `side_effects=false` e `executed=false` em todas as respostas do gate, `/skills/run` inexistente, approval/reject sem execução de skill, ausência de KV/fetch/filesystem runtime/LLM externo, `wrangler.toml` e `contract-executor.js` fora do diff vs `origin/main`, `reply/use_planner` preservados. Bateria obrigatória PR74+PR73+PR72+PR71+PR70+PR69+PR51+PR57+PR59 passando.
 

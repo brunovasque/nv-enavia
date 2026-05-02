@@ -4,6 +4,71 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER
+
+- **Branch:** `codex/pr75-system-mapper-readonly`
+- **Tipo:** `PR-IMPL` (`Worker-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR74 ✅ (`test: PR74 prova formal approval gate`)
+
+### Objetivo
+
+Criar a primeira skill read-only limitada da Enavia (`SYSTEM_MAPPER`) sem side effects, sem `/skills/run` e sem execução perigosa.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-system-mapper-skill.js`
+  - `buildSystemMapperResult(input)` em modo `read_only`
+  - saída estruturada/determinística com:
+    - `skill_id`, `mode`, `side_effects=false`, `executed=false`
+    - `executed_readonly=true` em sucesso read-only
+    - mapa seguro de allowlist/endpoints/gate/limitações
+  - gate opcional por approval:
+    - quando `require_approved_proposal=true` sem `proposal_status=approved`, retorna bloqueio controlado (`status=blocked`, sem side effects)
+- `tests/pr75-system-mapper-readonly.smoke.test.js`
+  - cobre os 20 cenários mínimos obrigatórios da PR75
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Regras preservadas
+
+1. `/skills/run` permanece inexistente
+2. sem KV/binding/tabela
+3. sem fetch/rede externa
+4. sem filesystem runtime
+5. sem LLM externo
+6. sem comando externo
+7. sem alteração de `wrangler.toml`
+8. sem alteração de `contract-executor.js`
+9. sem alteração de `nv-enavia.js` (logo `reply/use_planner` preservados)
+
+### Testes executados
+
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` → 24/24 ✅
+- `node tests/pr74-approval-gate.prova.test.js` → 81/81 ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` → 48/48 ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` → 45/45 ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- PR75 concluída ✅
+- SYSTEM_MAPPER read-only limitada entregue ✅
+- deny-by-default e gate proposal-only preservados ✅
+- zero side effects externos ✅
+- próxima etapa liberada: PR76 (PR-PROVA) ✅
+
+---
+
 ## 2026-05-02 — PR74 — PR-PROVA — Prova formal do Approval Gate
 
 - **Branch:** `codex/pr74-prova-approval-gate`
