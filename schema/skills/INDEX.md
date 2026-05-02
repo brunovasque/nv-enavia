@@ -50,3 +50,27 @@ Nenhuma sugestão pendente no momento.
 | `ENAVIA_OPERATIONAL_PLAYBOOK.md` | `schema/playbooks/` | Procedimentos operacionais |
 | `ENAVIA_WORKER_REGISTRY.md` | `schema/system/` | Infraestrutura — obrigatório para skills de deploy |
 | Contrato ativo | `schema/contracts/active/` | Define ordem e escopo de PRs de skills |
+
+---
+
+## Blueprint do Runtime de Skills
+
+> **Adicionado em:** 2026-05-02 (PR65 — PR-DOCS)
+
+O blueprint documental do Runtime de Skills foi criado na PR65.
+Define a arquitetura futura, contrato de execução, gates de aprovação e rollout por fases.
+
+**Estado:** Blueprint documental — Runtime de Skills não existe ainda.
+
+| Documento | Localização | Conteúdo |
+|-----------|------------|---------|
+| `INDEX.md` | `schema/skills-runtime/` | Visão geral e estado atual |
+| `ARCHITECTURE.md` | `schema/skills-runtime/` | Fluxo alvo e 11 camadas |
+| `EXECUTION_CONTRACT.md` | `schema/skills-runtime/` | Contrato de execução futuro |
+| `APPROVAL_GATES.md` | `schema/skills-runtime/` | Gates de aprovação humana |
+| `SKILL_CAPABILITY_MATRIX.md` | `schema/skills-runtime/` | Matriz das 4 skills |
+| `SECURITY_MODEL.md` | `schema/skills-runtime/` | Modelo de segurança |
+| `ROLLOUT_PLAN.md` | `schema/skills-runtime/` | Fases 0–6 do rollout |
+| `OPEN_QUESTIONS.md` | `schema/skills-runtime/` | 12 perguntas para PR66 |
+
+**Próxima etapa:** PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills

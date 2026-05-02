@@ -1,8 +1,124 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills ✅
-**Para:** PR65 — PR-DOCS — Blueprint do Runtime de Skills
+**De:** PR65 — PR-DOCS — Blueprint do Runtime de Skills ✅
+**Para:** PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+
+## O que foi feito nesta sessão
+
+### PR65 — PR-DOCS — Blueprint do Runtime de Skills
+
+**Tipo:** `PR-DOCS` (documentação — sem alteração de runtime)
+**Branch:** `copilot/claudepr65-docs-blueprint-runtime-skills`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR64 ✅ (PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills)
+
+**Objetivo:**
+Criar o blueprint documental do Runtime de Skills da Enavia. Definir arquitetura, contrato de execução, gates de aprovação humana, matriz de capacidades, modelo de segurança, rollout por fases e perguntas abertas para diagnóstico.
+
+**Arquivos criados:**
+- `schema/skills-runtime/INDEX.md` — visão geral, estado atual, O que não existe
+- `schema/skills-runtime/ARCHITECTURE.md` — fluxo alvo 11 camadas, diagrama, princípios
+- `schema/skills-runtime/EXECUTION_CONTRACT.md` — formato JSON, modos, ciclo de vida, 10 regras
+- `schema/skills-runtime/APPROVAL_GATES.md` — 3 categorias (A/B/C), gate absoluto, matriz
+- `schema/skills-runtime/SKILL_CAPABILITY_MATRIX.md` — 4 skills + estado atual + capacidade futura
+- `schema/skills-runtime/SECURITY_MODEL.md` — 7 categorias de risco, allowlist, deny-by-default
+- `schema/skills-runtime/ROLLOUT_PLAN.md` — Fases 0–6 com critérios de avanço
+- `schema/skills-runtime/OPEN_QUESTIONS.md` — 12 perguntas para PR66 diagnosticar
+- `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md` — relatório completo
+
+**Arquivos atualizados:**
+- `schema/skills/INDEX.md` — referência ao blueprint do runtime futuro
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 9 adicionada (estado pós-PR65)
+- `schema/brain/open-questions/unresolved-technical-gaps.md` — G1 e G2 atualizados
+- `schema/brain/learnings/future-risks.md` — R10-R13 adicionados
+- `schema/contracts/INDEX.md` — PR66 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR65 concluída, PR66 como próxima
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR65
+
+**O que NÃO foi alterado:**
+- Nenhum módulo de runtime (`schema/enavia-*.js`, `nv-enavia.js`)
+- Nenhum endpoint criado
+- `/skills/run` não criado
+- `/skills/propose` não criado
+- Nenhum painel/executor/deploy worker/workflow/wrangler alterado
+- Nenhum KV/binding/secret alterado
+- Finding I1 documentado mas não corrigido
+- Runtime de Skills não implementado
+
+**Decisão formalizada:**
+
+| Item | Decisão |
+|------|---------|
+| Blueprint Runtime de Skills | ✅ Criado na PR65 |
+| Runtime de Skills | ❌ Não existe — blueprint apenas |
+| `/skills/run` | Não deve ser o primeiro endpoint |
+| `/skills/propose` | Primeiro endpoint — a criar em Fase 2+ |
+| Próxima ação | PR66 — PR-DIAG — Diagnóstico técnico |
+
+## O que a próxima sessão deve fazer
+
+### PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+
+**Tipo:** `PR-DIAG` (read-only — sem alteração de runtime)
+**Objetivo:**
+Responder as 12 perguntas abertas de `schema/skills-runtime/OPEN_QUESTIONS.md` com evidência do repositório.
+
+**Perguntas prioritárias:**
+1. Onde o runtime deve viver? (Worker principal ou separado?)
+2. Primeiro endpoint: `/skills/propose` em vez de `/skills/run`?
+3. Quais bindings são necessários?
+4. Onde registrar execuções?
+5. Como relacionar execução com Self-Audit?
+
+**Arquivos obrigatórios a ler na PR66:**
+- `schema/skills-runtime/OPEN_QUESTIONS.md` ← base das 12 perguntas
+- `nv-enavia.js` ← onde vive o runtime principal
+- `wrangler.toml` ← bindings existentes
+- `contract-executor.js` ← reutilizável?
+- `schema/system/ENAVIA_ROUTE_REGISTRY.json` ← conflitos de rota
+- `schema/system/ENAVIA_WORKER_REGISTRY.md` ← infraestrutura
+
+**Entregáveis obrigatórios:**
+- Relatório `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md`
+- Resposta para cada Q1–Q12 com evidência (arquivo + linha)
+- Decisão: onde vive o runtime
+- Decisão: primeiro endpoint
+- Lista de bindings necessários vs. existentes
+- Nenhum runtime alterado
+
+**Pré-requisitos:**
+- PR65 ✅ (esta PR)
+- Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+**Sequência prevista após PR66:**
+1. PR66 — PR-DIAG — Diagnóstico técnico ← PRÓXIMA
+2. PR67+ — PR-IMPL — Runtime read-only/proposal (`/skills/propose`)
+3. PR68+ — PR-IMPL — Mecanismo de aprovação humana
+4. PR69+ — PR-PROVA — Validação do fluxo completo
+
+## Contexto técnico
+
+**Stack atual:**
+
+| Módulo | Status | Finding |
+|--------|--------|---------|
+| nv-enavia.js | Worker principal — não alterar sem contrato | — |
+| enavia-llm-core.js | LLM Core v1 — ativo e validado | — |
+| enavia-brain-loader.js | Brain Context read-only — ativo (snapshot estático) | — |
+| enavia-intent-classifier.js | 15 intenções — Finding I1 (você já consegue) | Baixo impacto |
+| enavia-skill-router.js | Skill Router read-only — 4 skills documentais | — |
+| enavia-intent-retrieval.js | Retrieval por intenção — ativo | — |
+| enavia-self-audit.js | Self-Audit read-only — 10 categorias | — |
+| enavia-response-policy.js | Response Policy viva — 15 regras | — |
+| Brain documental | `schema/brain/` — 20+ arquivos | — |
+| Blueprint Runtime de Skills | ✅ Criado na PR65 — `schema/skills-runtime/` | — |
+| Runtime de Skills | ❌ Não existe — aguarda PR66→PR67+ | Próxima frente |
+| `/skills/run` | ❌ Não existe — skills continuam documentais | — |
+| Skill Executor | ❌ Não existe — blueprint apenas | — |
+
+
 
 ## O que foi feito nesta sessão
 

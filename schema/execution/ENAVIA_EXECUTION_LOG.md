@@ -4,6 +4,66 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR65 — PR-DOCS — Blueprint do Runtime de Skills
+
+- **Branch:** `copilot/claudepr65-docs-blueprint-runtime-skills`
+- **Tipo:** `PR-DOCS` (governança/documentação apenas — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR64 ✅ (PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills)
+
+### Objetivo
+
+Criar o blueprint documental do Runtime de Skills: arquitetura futura, contrato de execução, gates de aprovação humana, matriz de capacidades, modelo de segurança, rollout por fases e perguntas abertas para diagnóstico.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/skills-runtime/INDEX.md` — visão geral e estado atual
+- `schema/skills-runtime/ARCHITECTURE.md` — fluxo 11 camadas + diagrama + princípios
+- `schema/skills-runtime/EXECUTION_CONTRACT.md` — formato JSON + 10 regras + ciclo de vida
+- `schema/skills-runtime/APPROVAL_GATES.md` — 3 categorias + gate absoluto + matriz
+- `schema/skills-runtime/SKILL_CAPABILITY_MATRIX.md` — 4 skills + estado + capacidade futura
+- `schema/skills-runtime/SECURITY_MODEL.md` — 7 categorias de risco + allowlist + deny-by-default
+- `schema/skills-runtime/ROLLOUT_PLAN.md` — Fases 0–6 com critérios de avanço
+- `schema/skills-runtime/OPEN_QUESTIONS.md` — 12 perguntas para PR66 responder
+- `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md` — relatório completo
+
+**Arquivos atualizados:**
+- `schema/skills/INDEX.md` — referência ao blueprint do runtime futuro adicionada
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 9 adicionada (estado pós-PR65)
+- `schema/brain/open-questions/unresolved-technical-gaps.md` — G1 e G2 atualizados (blueprint criado, PR66 é próxima ação)
+- `schema/brain/learnings/future-risks.md` — R10-R13 adicionados (riscos do Runtime de Skills)
+- `schema/contracts/INDEX.md` — PR66 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR65 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR65→PR66
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Resultado
+
+- **Blueprint criado:** `schema/skills-runtime/` com 8 arquivos obrigatórios ✅
+- **Arquitetura:** fluxo 11 camadas documentado ✅
+- **Contrato de execução:** formato JSON + 10 regras ✅
+- **Gates de aprovação:** 3 categorias + gate absoluto ✅
+- **Matriz de capacidades:** 4 skills (estado atual + futuro) ✅
+- **Modelo de segurança:** 7 categorias + allowlist + deny-by-default ✅
+- **Rollout:** Fases 0–6 documentadas ✅
+- **Open questions:** 12 perguntas para PR66 ✅
+- **SYSTEM_AWARENESS seção 9:** estado pós-PR65 ✅
+- **G1/G2:** atualizados (blueprint criado, PR66 é próxima ação) ✅
+- **R10-R13:** riscos do Runtime de Skills adicionados ✅
+- **Relatório criado:** `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md` ✅
+- **Governança atualizada:** ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **`/skills/run` não criado** ✅
+- **`/skills/propose` não criado** ✅
+- **`nv-enavia.js` não alterado** ✅
+- **`schema/enavia-*.js` nenhum alterado** ✅
+- **Finding I1 não corrigido** ✅
+- **Próxima PR definida sem ambiguidade:** PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills ✅
+
+---
+
 ## 2026-05-02 — PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills
 
 - **Branch:** `copilot/claude-pr64-docs-encerrar-memoria-liberar-skills`
