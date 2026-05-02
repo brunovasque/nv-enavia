@@ -48,6 +48,7 @@ import { routeEnaviaSkill } from "./schema/enavia-skill-router.js";
 import { buildIntentRetrievalContext } from "./schema/enavia-intent-retrieval.js";
 import { runEnaviaSelfAudit } from "./schema/enavia-self-audit.js";
 import { buildEnaviaResponsePolicy } from "./schema/enavia-response-policy.js";
+import { buildSkillExecutionProposal } from "./schema/enavia-skill-executor.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -4155,6 +4156,22 @@ async function handleChatLLM(request, env) {
     _responsePolicy = null;
   }
 
+  // PR69: Skill Execution Proposal v1 — proposal-only, read-only, sem side effects.
+  // Campo aditivo seguro: não executa skill, não altera reply/use_planner,
+  // não cria endpoint e aplica deny-by-default com bloqueio por Self-Audit.
+  let _skillExecution = null;
+  try {
+    _skillExecution = buildSkillExecutionProposal({
+      skillRouting:         _skillRouting         || undefined,
+      intentClassification: _intentClassification || undefined,
+      selfAudit:            _selfAudit            || undefined,
+      responsePolicy:       _responsePolicy       || undefined,
+      chatContext:          context               || undefined,
+    });
+  } catch (_skillExecutionErr) {
+    _skillExecution = null;
+  }
+
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
     // Leitura de memória estruturada com separação explícita de blocos.
@@ -4724,6 +4741,9 @@ async function handleChatLLM(request, env) {
         warnings:              _responsePolicy.warnings,
         reasons:               _responsePolicy.reasons,
       }} : {}),
+      // PR69: Skill Execution Proposal v1 (campo aditivo, proposal-only).
+      // Não executa skill. Não altera reply/use_planner. Sem side effects.
+      ...(_skillExecution ? { skill_execution: _skillExecution.skill_execution } : {}),
       timestamp: Date.now(),
       input: message,
       telemetry: {
