@@ -1,30 +1,29 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR62 — PR-DOCS — Reconciliação do Contrato Jarvis Brain ✅
-**Para:** PR63 — PR-DIAG — Atualização supervisionada de memória: decidir se ainda é necessária
+**De:** PR63 — PR-DIAG — Diagnóstico da Atualização Supervisionada de Memória ✅
+**Para:** PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills
 
 ## O que foi feito nesta sessão
 
-### PR62 — PR-DOCS — Reconciliação do Contrato Jarvis Brain
+### PR63 — PR-DIAG — Diagnóstico da Atualização Supervisionada de Memória
 
-**Tipo:** `PR-DOCS` (governança apenas — sem alteração de runtime)
-**Branch:** `copilot/claudepr62-docs-reconciliar-contrato-jarvis-brain`
+**Tipo:** `PR-DIAG` (read-only — sem alteração de runtime)
+**Branch:** `copilot/claudepr63-diag-atualizacao-supervisionada-memoria`
 **Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
-**PR anterior validada:** PR61 ✅ (PR-DOCS/IMPL — Proposta de atualização de memória)
+**PR anterior validada:** PR62 ✅ (PR-DOCS — Reconciliação do Contrato Jarvis Brain)
 
 **Objetivo:**
-Corrigir o desalinhamento documental entre a numeração original prevista no contrato Jarvis Brain e a sequência real executada nas PRs PR57–PR61. Não apagar histórico, não fingir que o plano estava errado — reconciliar honestamente.
+Diagnosticar se a frente "Atualização supervisionada de memória" ainda é necessária após a PR61 documental. Responder 5 perguntas com evidência do repositório.
 
 **Arquivos criados:**
-- `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md` — relatório completo da reconciliação
+- `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md` — relatório completo do diagnóstico
 
 **Arquivos atualizados:**
-- `schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — seção 12 adicionada (reconciliação pós-execução real)
-- `schema/contracts/INDEX.md` — PR63 como próxima autorizada
-- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR62 concluída, PR63 como próxima
+- `schema/contracts/INDEX.md` — PR64 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR63 concluída, PR64 como próxima
 - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo
-- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR62
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR63
 
 **O que NÃO foi alterado:**
 - Nenhum módulo de runtime (`schema/enavia-*.js`, `nv-enavia.js`)
@@ -33,42 +32,40 @@ Corrigir o desalinhamento documental entre a numeração original prevista no co
 - Nenhum KV/binding/secret alterado
 - Finding I1 documentado mas não corrigido
 - Runtime de Skills não iniciado
+- Escrita supervisionada de memória não implementada
 
-**Resumo da reconciliação:**
-- Causa do desalinhamento: PRs corretivas inseridas durante ciclo Self-Audit (PR57 prova com falha + PR58 correção cirúrgica) deslocaram numeração de todas as PRs seguintes
-- Plano original documentado (PR55–PR64 conforme contrato)
-- Execução real documentada (PR55–PR61 reais)
-- Tabela de equivalência criada (frentes planejadas vs PRs reais)
-- Regra de interpretação: seguir a frente, não o número
-- Frentes concluídas: todas até Response Policy viva + Teste anti-bot (PR60 236/236) + Brain Update documental (PR61)
-- Frentes pendentes: atualização supervisionada real de memória, Runtime de Skills, Hardening, Fechamento
+**Decisão do diagnóstico:**
+
+| Item | Resultado |
+|------|-----------|
+| PR61 entregou: | Camada documental (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada do ciclo) |
+| Ainda não existe: | Mecanismo de escrita supervisionada automática no runtime |
+| Política atual: | Fluxo manual via PR (`UPDATE_POLICY.md` seção 8) — funcional e aprovado |
+| Lacunas: | G3 (escrita automática) — on-hold, não blocking |
+| Riscos: | R1 (docs_over_product) se implementar /memory/write antes de skills |
+| Decisão: | **Opção B — Parcialmente concluída** com absorção do mecanismo manual como suficiente por ora |
+| Próxima PR: | PR64 — PR-DOCS — Encerrar formalmente e liberar Blueprint Runtime de Skills |
 
 ## O que a próxima sessão deve fazer
 
-### PR63 — PR-DIAG — Atualização supervisionada de memória: decidir se ainda é necessária
+### PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills
 
-**Tipo:** `PR-DIAG` (read-only — sem alteração de runtime)
-**Objetivo:** Diagnosticar o estado da frente "Brain Update supervisionado" após a PR61 documental. Decidir se a escrita supervisionada real ainda é necessária, foi absorvida, ou deve ser formalmente cancelada antes de iniciar Blueprint do Runtime de Skills.
-
-**Contexto:**
-- PR61 propôs memória documentalmente (M1-M7, NR1-NR5, CF1-CF3) mas **não implementou** mecanismo de escrita supervisionada real
-- A frente "Teste de atualização supervisionada" (originalmente PR58 no plano) tem lacuna aberta
-- O operador orientou: não iniciar Runtime de Skills enquanto houver lacuna sobre atualização supervisionada
-- Tabela de equivalência (seção 12 do contrato) identifica esta frente como "⚠️ precisa decisão"
-
-**O que PR63 deve analisar:**
-1. O que a PR61 entregou realmente? (proposta documental vs escrita real supervisionada)
-2. A frente "Brain Update supervisionado" foi: concluída totalmente? parcialmente? ou precisa de PR-IMPL?
-3. Existe mecanismo de aprovação humana para escrita de memória no runtime? (verificar `schema/brain/UPDATE_POLICY.md`)
-4. Com base na evidência real, qual é a decisão: continuar para implementação real, ou marcar como absorvida/cancelada?
-5. Após decisão: qual é a próxima frente — ainda Brain Update ou Blueprint Runtime de Skills?
+**Tipo:** `PR-DOCS` (documentação — sem alteração de runtime)
+**Objetivo:**
+1. Documentar formalmente a decisão da PR63: mecanismo manual via PR é o modo vigente
+2. Registrar G3 como on-hold em `unresolved-technical-gaps.md`
+3. Atualizar o contrato com a decisão
+4. Liberar Blueprint do Runtime de Skills como próxima frente
 
 **Pré-requisitos:**
-- PR62 ✅ (esta PR)
-- Ler `schema/brain/UPDATE_POLICY.md`
-- Ler `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md`
-- Ler `schema/brain/open-questions/unresolved-technical-gaps.md`
-- Ler seção 12 do contrato (reconciliação)
+- PR63 ✅ (esta PR)
+- Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+**Sequência prevista após PR64:**
+1. PR64 — PR-DOCS — Encerrar frente supervisionada + liberar Blueprint
+2. PR65 — PR-DOCS — Blueprint do Runtime de Skills
+3. PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+4. PR67+ — PR-IMPL — Implementação do Runtime de Skills
 
 ## Contexto técnico
 
@@ -78,13 +75,13 @@ Corrigir o desalinhamento documental entre a numeração original prevista no co
 |--------|--------|---------|
 | nv-enavia.js | Worker principal — não alterar sem contrato | — |
 | enavia-llm-core.js | LLM Core v1 — ativo e validado | — |
-| enavia-brain-loader.js | Brain Context read-only — ativo | — |
+| enavia-brain-loader.js | Brain Context read-only — ativo (snapshot estático) | — |
 | enavia-intent-classifier.js | 15 intenções — Finding I1 (você já consegue) | Baixo impacto |
 | enavia-skill-router.js | Skill Router read-only — 4 skills documentais | — |
 | enavia-intent-retrieval.js | Retrieval por intenção — ativo | — |
 | enavia-self-audit.js | Self-Audit read-only — 10 categorias | — |
 | enavia-response-policy.js | Response Policy viva — 15 regras | — |
 | Brain documental | `schema/brain/` — 20+ arquivos | — |
-| Escrita supervisionada de memória | ❌ Não implementada no runtime | Lacuna aberta |
-| Runtime de Skills | ❌ Não existe | Aguarda decisão |
+| Escrita supervisionada de memória | ❌ Não implementada no runtime — G3 on-hold | Não blocking |
+| Runtime de Skills | ❌ Não existe — aguarda PR64→PR65→PR66→PR67+ | Próxima frente |
 
