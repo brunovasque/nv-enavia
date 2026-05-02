@@ -2,21 +2,21 @@
 
 Contrato ativo atual:
 
-- `schema/contracts/active/CONTRATO_ENAVIA_JARVIS_EXECUTION_PR79_PR83.md`
+- schema/contracts/active/CONTRATO_ENAVIA_JARVIS_REAL_PR79_PR86.md
 
 Status:
 
 - Ativo
 
-Próxima PR autorizada:
+Proxima PR autorizada:
 
-- PR79 — `/skills/run` read-only para SYSTEM_MAPPER
+- PR79 — skills/run real read-only para SYSTEM_MAPPER
 
-Observação:
+Observacao:
 
-Este arquivo é um ponteiro operacional curto para facilitar execução por Codex local/agents.
-O índice histórico permanece em `schema/contracts/INDEX.md`.
+Este arquivo e um ponteiro operacional curto para facilitar execucao por Codex local/agents.
+O indice historico permanece em schema/contracts/INDEX.md.
 
-Contrato anterior concluído:
+Contrato anterior concluido:
 
-- `schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` concluído na PR78.
+- schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md concluido na PR78.
