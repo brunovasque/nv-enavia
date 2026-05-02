@@ -4,6 +4,56 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-01 — PR61 — PR-DOCS/IMPL — Proposta de atualização de memória
+
+- **Branch:** `copilot/claudepr61-docs-impl-propor-atualizacao-memoria`
+- **Tipo:** `PR-DOCS/IMPL` (documental — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR60 ✅ (prova anti-bot final — 236/236)
+
+### Objetivo
+
+Consolidar os aprendizados do ciclo PR31–PR60 em memória documental útil para
+a Enavia consultar futuramente. Propor atualização de memória sem alterar runtime
+e sem escrever memória automática.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` — memória consolidada (30 PRs, 7 decisões, 13 aprendizados anti-bot)
+- `schema/brain/learnings/ANTI_BOT_FINAL_LEARNINGS.md` — 13 regras anti-bot validadas (PR36–PR60)
+- `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md` — M1-M7 permanentes, NR1-NR5 não runtime, CF1-CF3 correções futuras
+- `schema/brain/open-questions/unresolved-technical-gaps.md` — G1-G7 lacunas técnicas do ciclo
+- `schema/brain/learnings/future-risks.md` — R1-R9 riscos futuros identificados
+- `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md` — relatório completo da PR61
+
+**Arquivos atualizados:**
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 7 adicionada: estado após PR60 (módulos ativos, read-only, inexistentes)
+- `schema/brain/INDEX.md` — tabela de estado atualizada com novos arquivos
+- `schema/contracts/INDEX.md` — PR62 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR61 concluída, PR62 como próxima
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR61→PR62
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Resultado
+
+- **Memória consolidada:** criada ✅
+- **Aprendizados anti-bot:** 13 regras documentadas ✅
+- **Proposta de memória permanente:** M1-M7 + NR1-NR5 + CF1-CF3 ✅
+- **Lacunas técnicas:** G1-G7 documentadas ✅
+- **Riscos futuros:** R1-R9 documentados ✅
+- **SYSTEM_AWARENESS:** seção 7 adicionada ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **Finding I1:** documentado em G6, não corrigido ✅
+- **Governança:** atualizada ✅
+
+### Próxima PR autorizada
+
+**PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain**
+
+---
+
 ## 2026-05-01 — PR60 — PR-PROVA — Prova anti-bot final
 
 - **Branch:** `copilot/claudepr60-prova-anti-bot-final`

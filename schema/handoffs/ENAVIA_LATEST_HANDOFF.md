@@ -1,8 +1,93 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-01
-**De:** PR60 — PR-PROVA — Prova anti-bot final ✅
-**Para:** PR61 — PR-DOCS/IMPL — Propor atualização de memória
+**De:** PR61 — PR-DOCS/IMPL — Proposta de atualização de memória ✅
+**Para:** PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain
+
+## O que foi feito nesta sessão
+
+### PR61 — PR-DOCS/IMPL — Proposta de atualização de memória
+
+**Tipo:** `PR-DOCS/IMPL` (documental — sem alteração de runtime)
+**Branch:** `copilot/claudepr61-docs-impl-propor-atualizacao-memoria`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR60 ✅ (prova anti-bot final — 236/236)
+
+**Objetivo:**
+Consolidar os aprendizados do ciclo PR31–PR60 e propor atualização de memória da Enavia,
+sem alterar runtime e sem escrever memória automática.
+
+**Arquivos criados:**
+- `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` — memória consolidada do ciclo
+- `schema/brain/learnings/ANTI_BOT_FINAL_LEARNINGS.md` — 13 regras anti-bot validadas
+- `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md` — proposta de memória permanente
+- `schema/brain/open-questions/unresolved-technical-gaps.md` — G1-G7 lacunas técnicas
+- `schema/brain/learnings/future-risks.md` — R1-R9 riscos futuros
+- `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md` — relatório da PR61
+
+**Arquivos atualizados:**
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 7: estado após PR60
+- `schema/brain/INDEX.md` — tabela atualizada com novos arquivos
+- `schema/contracts/INDEX.md` — PR62 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — status PR61 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR61
+
+**O que NÃO foi alterado:**
+- Nenhum módulo de runtime (`schema/enavia-*.js`, `nv-enavia.js`)
+- Nenhum endpoint criado
+- Nenhum painel/executor/deploy worker/workflow/wrangler alterado
+- Nenhum KV/binding/secret alterado
+- Finding I1 documentado mas não corrigido
+
+## O que a próxima sessão deve fazer
+
+### PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain
+
+**Tipo:** `PR-DIAG`
+**Objetivo:** Diagnosticar o estado do sistema após o ciclo completo PR31–PR60 e planejar a próxima fase.
+
+**Contexto:**
+- Ciclo Jarvis Brain PR31–PR60 concluído e documentado
+- Stack cognitiva completa validada (PR60: 236/236)
+- Memória consolidada criada (PR61)
+- 7 lacunas técnicas identificadas (G1-G7)
+- Finding I1 documentado (baixo impacto)
+- 9 riscos futuros documentados (R1-R9)
+
+**O que a PR62 deve analisar:**
+- Estado atual do sistema após o ciclo completo
+- Priorização das lacunas G1-G7
+- Se o contrato PR31-PR64 precisa de ajuste de escopo
+- Qual é o próximo passo mais valioso: Finding I1, Skill Executor, Memory Write, nova frente
+- Se PR62 deve ser seguida por nova fase de contrato ou continuação do atual
+
+**Pré-requisitos:**
+- PR61 ✅ (esta PR)
+- Ler contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` seção PR62
+- Verificar lacunas G1-G7 em `schema/brain/open-questions/unresolved-technical-gaps.md`
+- Verificar riscos R1-R9 em `schema/brain/learnings/future-risks.md`
+
+## Contexto técnico
+
+**Stack atual:**
+
+| Módulo | Status | Finding |
+|--------|--------|---------|
+| nv-enavia.js | Worker principal — não alterar sem contrato | — |
+| enavia-llm-core.js | LLM Core v1 — ativo e validado | — |
+| enavia-brain-loader.js | Brain Context read-only — ativo | — |
+| enavia-intent-classifier.js | 15 intenções — Finding I1 (você já consegue) | Baixo impacto |
+| enavia-skill-router.js | 4 skills documentais — read-only | — |
+| enavia-intent-retrieval.js | Intent Retrieval v1 — ativo | — |
+| enavia-self-audit.js | Self-Audit read-only — 10 categorias | — |
+| enavia-response-policy.js | Response Policy viva — 15 regras | — |
+
+**Lacunas prioritárias:**
+- G1: Skill Executor runtime não existe
+- G2: /skills/run não existe
+- G3: Escrita automática de memória não existe
+- G6: Finding I1 (classificador, baixo impacto)
 
 ## O que foi feito nesta sessão
 

@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-01 (atualizado após PR60 — Prova anti-bot final ✅)
-**Branch ativa:** `copilot/claudepr60-prova-anti-bot-final`
-**Última tarefa:** PR60 — PR-PROVA — Prova anti-bot final. `tests/pr60-anti-bot-final.prova.test.js` criado com 236 asserts (16 cenários A–P). **236/236 ✅**. Stack cognitiva completa validada em harmonia. Regressões 21 testes, todos passando. Finding I1 documentado (impacto baixo). Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR60_PROVA_ANTI_BOT_FINAL.md`. **Stack anti-bot validada.**
+**Data:** 2026-05-01 (atualizado após PR61 — Proposta de atualização de memória ✅)
+**Branch ativa:** `copilot/claudepr61-docs-impl-propor-atualizacao-memoria`
+**Última tarefa:** PR61 — PR-DOCS/IMPL — Proposta de atualização de memória. Memória consolidada do ciclo PR31–PR60 criada. 7 arquivos criados + 2 atualizados no brain. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md`. **Memória do ciclo Jarvis Brain documentada.**
 
 ## Estado atual do sistema
 
@@ -33,9 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR61 — PR-DOCS/IMPL — Propor atualização de memória**
+**PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain**
 
-> ✅ PR60 (PR-PROVA) — concluída. `tests/pr60-anti-bot-final.prova.test.js` criado (236 asserts, 16 cenários A–P). **236/236 ✅**. Stack cognitiva completa validada em harmonia. Regressões 21 testes, todos passando. Finding I1 documentado (baixo impacto). Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR60_PROVA_ANTI_BOT_FINAL.md`.
+> ✅ PR61 (PR-DOCS/IMPL) — concluída. Memória consolidada do ciclo PR31–PR60 criada. `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` (30 PRs, 7 decisões, 13 aprendizados anti-bot). `schema/brain/learnings/ANTI_BOT_FINAL_LEARNINGS.md` (13 regras validadas). `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md` (M1-M7 permanentes, NR1-NR5 não runtime, CF1-CF3 correções futuras). `schema/brain/open-questions/unresolved-technical-gaps.md` (G1-G7). `schema/brain/learnings/future-risks.md` (R1-R9). `schema/brain/SYSTEM_AWARENESS.md` atualizado (seção 7). Nenhum runtime alterado. Relatório: `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md`.
 > ✅ PR59 (PR-IMPL) — concluída. `schema/enavia-response-policy.js` criado com `buildEnaviaResponsePolicy()` (15 regras: secret_exposure, fake_execution, false_capability, runtime_vs_documentation_confusion, unauthorized_action, scope_violation, contract_drift, docs_over_product, frustration, deploy_request, strategy_question, next_pr_request, pr_review, technical_diagnosis, caso limpo). Integrado em `schema/enavia-cognitive-runtime.js` (seção 7e) e `nv-enavia.js` (campo aditivo `response_policy`). Smoke PR59 96/96 ✅. Regressões 1.375/1.375 ✅. Total 1.471/1.471 ✅. Read-only. Não altera reply. Não bloqueia fluxo. Não cria endpoint. Não usa KV/rede/FS. Relatório: `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md`. Response Policy viva v1 completa e validada.
 > ✅ PR58 (PR-IMPL cirúrgica) — concluída. Regex `\w+` → `[\w-]+` em `_detectMissingSource` (`schema/enavia-self-audit.js` linha 402). PR57 agora passa **99/99 ✅** (antes: 96/99, falha Cenário H). Regressões 1.375/1.375 ✅. Nenhum arquivo proibido alterado. Self-Audit continua read-only. Resposta não alterada automaticamente. Nenhum endpoint criado. Relatório: `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md`. Self-Audit v1 completo e validado. Retorno ao fluxo principal do contrato.
 > ✅ PR56 (PR-IMPL) — concluída. `schema/enavia-self-audit.js` criado com `runEnaviaSelfAudit()` (10 categorias: secret_exposure, fake_execution, unauthorized_action, scope_violation, contract_drift, false_capability, runtime_vs_documentation_confusion, wrong_mode, missing_source, docs_over_product). Campo aditivo `self_audit` integrado defensivamente em `nv-enavia.js`. Smoke PR56 64/64 ✅. Regressões 1.375/1.375 ✅. Total 1.439/1.439 ✅. Read-only. Não altera resposta. Não bloqueia fluxo. Não cria endpoint. Relatório: `schema/reports/PR56_IMPL_SELF_AUDIT_READONLY.md`.

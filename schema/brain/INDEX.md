@@ -86,10 +86,29 @@ quando for conectado ao Intent Engine, ao LLM Core e ao Skill Router.
 
 ---
 
-## Estado desta PR
+## Estado desta pasta (atualizado após PR61)
 
-Esta PR (PR39) cria o esqueleto documental do brain. Nenhuma memória de runtime existe ainda.
-As PRs seguintes (PR40+) irão popular o brain com dados reais e, eventualmente, conectá-lo
-ao runtime conforme contrato Jarvis Brain.
+| Arquivo / Pasta | Status |
+|----------------|--------|
+| `INDEX.md` | Atualizado PR61 |
+| `ARCHITECTURE.md` | Criado PR39 |
+| `GRAPH.md` | Criado PR39 |
+| `MEMORY_RULES.md` | Criado PR39 |
+| `RETRIEVAL_POLICY.md` | Criado PR39 |
+| `UPDATE_POLICY.md` | Criado PR39 |
+| `SYSTEM_AWARENESS.md` | Atualizado PR61 (seção 7: estado após PR60) |
+| `maps/` | Criado PR39 |
+| `decisions/` | Criado PR39 |
+| `memories/INDEX.md` | Criado PR39 |
+| `memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` | Criado PR61 — memória consolidada do ciclo |
+| `memories/PROPOSED_MEMORY_UPDATES_PR61.md` | Criado PR61 — proposta de memória permanente |
+| `learnings/INDEX.md` | Criado PR39 |
+| `learnings/ANTI_BOT_FINAL_LEARNINGS.md` | Criado PR61 — aprendizados anti-bot validados |
+| `learnings/future-risks.md` | Criado PR61 — riscos futuros identificados |
+| `open-questions/INDEX.md` | Criado PR39 |
+| `open-questions/unresolved-technical-gaps.md` | Criado PR61 — lacunas técnicas do ciclo PR31-PR60 |
+| `incidents/` | Criado PR39 |
+| `self-model/` | Criado PR40 |
+| `contracts/` | Criado PR39 |
 
-**Próxima PR autorizada:** PR40 — PR-DOCS — Self Model da Enavia.
+**Próxima PR autorizada:** PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain.

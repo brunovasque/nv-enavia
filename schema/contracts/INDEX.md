@@ -43,9 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR61 — PR-DOCS/IMPL — Propor atualização de memória**
+**PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+> ✅ PR61 (PR-DOCS/IMPL) — concluída. Memória consolidada do ciclo PR31–PR60 criada. 7 arquivos criados + 2 atualizados no brain. `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` (30 PRs, 7 decisões, 13 aprendizados anti-bot, próximos passos). `schema/brain/learnings/ANTI_BOT_FINAL_LEARNINGS.md` (13 regras validadas). `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md` (M1-M7 permanentes, NR1-NR5 não runtime, CF1-CF3 correções futuras). `schema/brain/open-questions/unresolved-technical-gaps.md` (G1-G7 lacunas). `schema/brain/learnings/future-risks.md` (R1-R9 riscos). `schema/brain/SYSTEM_AWARENESS.md` atualizado (seção 7: estado após PR60). `schema/brain/INDEX.md` atualizado. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md`.
 
 > ✅ PR60 (PR-PROVA) — concluída. `tests/pr60-anti-bot-final.prova.test.js` criado (236 asserts, 16 cenários A–P). **236/236 ✅**. Stack cognitiva completa validada em harmonia: LLM Core v1, Brain Context, Intent Classifier, Skill Router read-only, Intent Retrieval, Self-Audit read-only, Response Policy viva, anti-bot PR36/37, envelope JSON, gates de execução, governança do contrato. Regressões 21 testes (todos passando). Finding I1 documentado (baixo impacto). Nenhum runtime alterado. Nenhum endpoint criado. Segurança estrutural verificada. Relatório: `schema/reports/PR60_PROVA_ANTI_BOT_FINAL.md`.
 > ✅ PR59 (PR-IMPL) — concluída. `schema/enavia-response-policy.js` criado com `buildEnaviaResponsePolicy()` (15 regras de resposta: secret_exposure, fake_execution, false_capability, runtime_vs_documentation_confusion, unauthorized_action, scope_violation, contract_drift, docs_over_product, frustration, deploy_request, strategy_question, next_pr_request, pr_review, technical_diagnosis, caso limpo). Integrado em `schema/enavia-cognitive-runtime.js` (seção 7e) e `nv-enavia.js` (campo aditivo `response_policy`). Smoke PR59 96/96 ✅. Regressões 1.375/1.375 ✅. Total 1.471/1.471 ✅. Read-only. Não altera reply automaticamente. Não bloqueia fluxo programaticamente. Não cria endpoint. Não usa KV/rede/filesystem. Relatório: `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md`. Response Policy viva v1 completa e validada. Próxima PR: PR60 — Prova anti-bot final.
