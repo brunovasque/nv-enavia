@@ -1,6 +1,50 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
+**De:** PR70 — PR-PROVA — Prova formal do Skill Execution Proposal ✅
+**Para:** PR71 — PR-IMPL — Endpoint `/skills/propose` (read-only)
+
+## Handoff atual (PR70)
+
+### O que foi feito
+
+- PR70 executada em escopo `Tests-only`.
+- Arquivo criado: `tests/pr70-skill-execution-proposal.prova.test.js`.
+- Prova formal concluída para 13 cenários obrigatórios do contrato:
+  - proposta válida para skill conhecida (`mode=proposal`, `status=proposed`, `requires_approval=true`, `side_effects=false`)
+  - deny-by-default para skill desconhecida
+  - bloqueios por `self_audit` (`risk_level=blocking`, `should_block=true`, `secret_exposure`)
+  - `not_applicable` para conversa comum/pausa sem skill roteada
+  - ausência de side effects (sem fetch/KV/FS runtime/LLM externo)
+  - `skill_execution` aditivo no `/chat/run`
+  - `reply` e `use_planner` preservados
+  - `/skills/propose` e `/skills/run` inexistentes
+
+### Testes executados
+
+- `node tests/pr70-skill-execution-proposal.prova.test.js` — 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` — 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` — 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` — 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` — 96/96 ✅
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js` (runtime preservado)
+- `schema/enavia-skill-executor.js` (runtime preservado)
+- `schema/enavia-skill-router.js`
+- `schema/enavia-self-audit.js`
+- `schema/enavia-response-policy.js`
+- nenhum endpoint novo
+- nenhum binding/KV/secret
+
+### Próxima etapa segura
+
+- PR71 — `Worker-only` — criar endpoint `/skills/propose` read-only, sem side effects e sem `/skills/run`.
+
+---
+
+**Data:** 2026-05-02
 **De:** PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1 ✅
 **Para:** Aguardando novo contrato da próxima fase
 

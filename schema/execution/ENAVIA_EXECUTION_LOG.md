@@ -4,6 +4,61 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR70 — PR-PROVA — Prova formal do Skill Execution Proposal
+
+- **Branch:** `codex/pr70-prova-skill-execution-proposal`
+- **Tipo:** `PR-PROVA` (`Tests-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR69 ✅ (`feat: PR69 skill execution proposal read-only`)
+
+### Objetivo
+
+Provar formalmente que a PR69 está em modo proposal-only/read-only, sem execução de skill, sem endpoint novo e sem side effects.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr70-skill-execution-proposal.prova.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Cenários provados
+
+1. skill conhecida gera proposta (`mode=proposal`, `status=proposed`, `requires_approval=true`, `side_effects=false`)
+2. skill desconhecida bloqueada por deny-by-default
+3. `self_audit.risk_level=blocking` bloqueia proposta
+4. `self_audit.should_block=true` bloqueia proposta
+5. `self_audit.secret_exposure` bloqueia proposta
+6. conversa comum sem skill routing retorna `not_applicable`
+7. `responsePolicy` com pausa/recusa sem skill roteada não gera proposta
+8. módulo sem fetch/KV/FS runtime/LLM externo
+9. `nv-enavia.js` contém `skill_execution` como campo aditivo
+10. `reply` permanece inalterado
+11. `use_planner` permanece inalterado
+12. `/skills/propose` inexistente
+13. `/skills/run` inexistente
+
+### Testes executados
+
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- Prova formal PR70 concluída ✅
+- Runtime preservado ✅
+- Nenhum endpoint novo ✅
+- Nenhum side effect ✅
+- Próxima etapa liberada: PR71 ✅
+
+---
+
 ## 2026-05-02 — PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
 
 - **Branch:** `copilot/claudepr68-docs-prova-fechamento-jarvis-brain-v1`
