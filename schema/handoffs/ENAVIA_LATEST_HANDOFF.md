@@ -1,8 +1,55 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills ✅
-**Para:** Aguardando definição do próximo contrato/fase
+**De:** PR79 — PR-IMPL — Skill Factory Core ✅
+**Para:** PR80 — Runner/Registry para skills criadas
+
+## Handoff atual (PR79)
+
+### O que foi feito
+
+- PR79 executada em escopo `Worker-only + docs/status mínimos`.
+- Novo módulo criado: `schema/enavia-skill-factory.js`.
+- Funções puras implementadas:
+  - `buildSkillSpec(input)`
+  - `validateSkillSpec(spec)`
+  - `buildSkillCreationPackage(spec, options)`
+- Endpoints criados em `nv-enavia.js`:
+  - `POST /skills/factory/spec`
+  - `POST /skills/factory/create`
+- Regras garantidas:
+  - sem autorização explícita, apenas `skill_spec`;
+  - com autorização explícita, retorna pacote PR-ready (sem criar arquivo runtime, sem abrir PR, sem deploy);
+  - skill `blocked` não gera pacote;
+  - `side_effects=false` e `executed=false` nas respostas desta PR.
+
+### Testes executados
+
+- `node tests/pr79-skill-factory-core.smoke.test.js`
+- `node tests/pr78-skills-runtime-fase1.fechamento.test.js`
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js`
+- `node tests/pr76-system-mapper.prova.test.js`
+- `node tests/pr75-system-mapper-readonly.smoke.test.js`
+- `node tests/pr74-approval-gate.prova.test.js`
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js`
+- `node tests/pr72-skills-propose-endpoint.prova.test.js`
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js`
+- `node tests/pr70-skill-execution-proposal.prova.test.js`
+- `node tests/pr69-skill-execution-proposal.smoke.test.js`
+- `node tests/pr51-skill-router-readonly.smoke.test.js`
+- `node tests/pr57-self-audit-readonly.prova.test.js`
+- `node tests/pr59-response-policy-viva.smoke.test.js`
+
+### O que NÃO foi alterado
+
+- `wrangler.toml`
+- `contract-executor.js`
+- painel / executor / deploy-worker / workflows
+- `/skills/run` (continua inexistente)
+
+### Próxima etapa segura
+
+- Executar somente PR80 (`Runner/Registry`) no mesmo contrato ativo, mantendo deny-by-default, approval gate e sem execução de skill não registrada.
 
 ## Handoff atual (PR78)
 

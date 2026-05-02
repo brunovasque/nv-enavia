@@ -51,6 +51,7 @@ import { buildEnaviaResponsePolicy } from "./schema/enavia-response-policy.js";
 import { buildSkillExecutionProposal } from "./schema/enavia-skill-executor.js";
 import { buildChatSkillSurface } from "./schema/enavia-chat-skill-surface.js";
 import { registerSkillProposal, approveSkillProposal, rejectSkillProposal } from "./schema/enavia-skill-approval-gate.js";
+import { buildSkillSpec, validateSkillSpec, buildSkillCreationPackage } from "./schema/enavia-skill-factory.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -6974,6 +6975,134 @@ async function handleSkillsReject(request) {
   );
 }
 
+function _blockedSkillFactoryResponse(route, code, message, detail, status = 409) {
+  return jsonResponse(
+    {
+      ok: false,
+      route,
+      error: code,
+      message,
+      detail: detail || null,
+      side_effects: false,
+      executed: false,
+      prepared: false,
+    },
+    status,
+  );
+}
+
+async function handleSkillFactorySpec(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return _blockedSkillFactoryResponse(
+      "POST /skills/factory/spec",
+      "INVALID_JSON",
+      "JSON inválido em /skills/factory/spec.",
+      String(err),
+      400,
+    );
+  }
+
+  const input = body && typeof body === "object" && !Array.isArray(body) ? body : {};
+  const skillSpec = buildSkillSpec(input);
+  const validation = validateSkillSpec(skillSpec);
+
+  if (!validation.ok) {
+    return _blockedSkillFactoryResponse(
+      "POST /skills/factory/spec",
+      "INVALID_SKILL_SPEC",
+      "Falha ao validar skill_spec gerada.",
+      validation.errors,
+      422,
+    );
+  }
+
+  return jsonResponse(
+    {
+      ok: true,
+      route: "POST /skills/factory/spec",
+      side_effects: false,
+      executed: false,
+      prepared: false,
+      skill_spec: skillSpec,
+    },
+    200,
+  );
+}
+
+async function handleSkillFactoryCreate(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return _blockedSkillFactoryResponse(
+      "POST /skills/factory/create",
+      "INVALID_JSON",
+      "JSON inválido em /skills/factory/create.",
+      String(err),
+      400,
+    );
+  }
+
+  const input = body && typeof body === "object" && !Array.isArray(body) ? body : {};
+  const skillSpecSource =
+    input.skill_spec && typeof input.skill_spec === "object" && !Array.isArray(input.skill_spec)
+      ? input.skill_spec
+      : buildSkillSpec(input);
+
+  const validation = validateSkillSpec(skillSpecSource);
+  if (!validation.ok) {
+    return _blockedSkillFactoryResponse(
+      "POST /skills/factory/create",
+      "INVALID_SKILL_SPEC",
+      "Skill spec inválida para preparação de pacote.",
+      validation.errors,
+      422,
+    );
+  }
+
+  if (input.approved_to_prepare_package !== true || typeof input.human_authorization_text !== "string" || input.human_authorization_text.trim().length === 0) {
+    return _blockedSkillFactoryResponse(
+      "POST /skills/factory/create",
+      "AUTHORIZATION_REQUIRED",
+      "approved_to_prepare_package=true e human_authorization_text são obrigatórios.",
+      null,
+      403,
+    );
+  }
+
+  const packageResult = buildSkillCreationPackage(skillSpecSource, {
+    approved_to_prepare_package: true,
+    human_authorization_text: input.human_authorization_text,
+  });
+
+  if (!packageResult.ok) {
+    const statusCode = packageResult.error === "SKILL_SPEC_BLOCKED" ? 409 : 422;
+    return _blockedSkillFactoryResponse(
+      "POST /skills/factory/create",
+      packageResult.error || "SKILL_FACTORY_CREATE_BLOCKED",
+      "Pacote de criação bloqueado.",
+      packageResult.detail || null,
+      statusCode,
+    );
+  }
+
+  return jsonResponse(
+    {
+      ok: true,
+      route: "POST /skills/factory/create",
+      side_effects: false,
+      executed: false,
+      prepared: true,
+      skill_spec: skillSpecSource,
+      skill_creation_package: packageResult.skill_creation_package,
+    },
+    200,
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -7504,6 +7633,40 @@ if (path === "/skills/reject") {
     );
   }
   return handleSkillsReject(request);
+}
+
+if (path === "/skills/factory/spec") {
+  if (method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "METHOD_NOT_ALLOWED",
+        message: "Use POST em /skills/factory/spec.",
+        method,
+        path,
+        allowed_methods: ["POST"],
+      },
+      405
+    );
+  }
+  return handleSkillFactorySpec(request);
+}
+
+if (path === "/skills/factory/create") {
+  if (method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "METHOD_NOT_ALLOWED",
+        message: "Use POST em /skills/factory/create.",
+        method,
+        path,
+        allowed_methods: ["POST"],
+      },
+      405
+    );
+  }
+  return handleSkillFactoryCreate(request);
 }
 
   // 🧠 ENAVIA — PROPOSE ENDPOINT (DEPENDE DE AUDIT)

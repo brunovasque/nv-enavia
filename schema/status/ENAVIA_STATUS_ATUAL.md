@@ -1,18 +1,18 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR78 — fechamento funcional da Fase 1 do Runtime de Skills ✅)
-**Branch ativa:** `codex/pr78-fechamento-skills-runtime-fase1`
-**Última tarefa:** PR78 — PR-PROVA — fechamento funcional da Fase 1 validado ponta a ponta sem execução automática e sem `/skills/run`.
+**Data:** 2026-05-02 (atualizado após PR79 — Skill Factory Core ✅)
+**Branch ativa:** `codex/pr79-skill-factory-core`
+**Última tarefa:** PR79 — PR-IMPL — Skill Factory Core implementada com geração de `skill_spec` validável e pacote de criação PR-ready sob autorização explícita.
 
 ## Estado atual do sistema
 
-**Contrato ativo:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Concluído na PR78)
+**Contrato ativo:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Ativo)
 
-**Objetivo:** Consolidar Runtime de Skills fase 1 governada: proposal-only + approval gate provado formalmente, mantendo segurança e sem side effects.
+**Objetivo:** Evoluir para Skill Factory Real v1: pedido humano -> skill_spec estruturada -> autorização explícita -> pacote de criação seguro e rastreável.
 
-**Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
+**Frase central:** "Spec primeiro, pacote só com autorização explícita; sem execução, sem deploy, sem efeitos colaterais."
 
-**Sistema operacional:** Estável. PR78 validou o ciclo ponta a ponta proposal-only -> `/skills/propose` -> approval gate -> `SYSTEM_MAPPER` read-only -> chat controlado, preservando `reply`, `use_planner`, `Self-Audit`, `Response Policy` e mantendo `/skills/run` inexistente.
+**Sistema operacional:** Estável. PR79 adicionou `schema/enavia-skill-factory.js` (`buildSkillSpec`, `validateSkillSpec`, `buildSkillCreationPackage`) e endpoints `POST /skills/factory/spec` + `POST /skills/factory/create` com bloqueio sem autorização, erro controlado para JSON inválido, `METHOD_NOT_ALLOWED` em GET, `side_effects=false` e `executed=false`. `/skills/run` permanece inexistente nesta PR.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,7 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**Contrato PR69-PR78 concluído na PR78. Aguardando definição do próximo contrato/fase.**
+**PR80 — Runner/Registry para skills criadas** (somente após PR79 validada).
 
 > ✅ PR77 (PR-IMPL) — concluída. `schema/enavia-chat-skill-surface.js` criado com helper puro `buildChatSkillSurface()` e mensagem canônica `"Existe uma ação técnica proposta, aguardando aprovação."`. `nv-enavia.js` atualizado no fluxo `handleChatLLM` para adicionar metadado aditivo `chat_skill_surface` somente quando `skill_execution.status=proposed`; `reply` principal preservado; `skill_execution` permanece campo aditivo; `blocked/not_applicable` sem poluição adicional. Nenhuma execução automática de skill. Nenhum `/skills/run`. Nenhum endpoint novo. `buildSystemMapperResult` não chamado no chat. Teste novo `tests/pr77-chat-controlled-skill-integration.smoke.test.js` aprovado.
 
