@@ -20,6 +20,8 @@ Se não conseguir acessar ou ler qualquer arquivo obrigatório, pare e me avise.
 
 Você está no repositório nv-enavia.
 
+Modo da sessão: <LOCAL-STAGING ou LOCAL-PR>
+
 Execute somente a microfase indicada abaixo:
 
 Microfase alvo: <INFORMAR_ID_DA_MICROFASE>
@@ -36,14 +38,39 @@ Regras obrigatórias:
 - Não refatore por estética.
 - Não remova guardrails existentes.
 - Não execute a próxima microfase.
-- Não faça push sem autorização explícita.
+- Não peça autorização para cada leitura, edição ou teste comum dentro da microfase aprovada.
+- Se estiver em LOCAL-STAGING, não faça push.
+- Se estiver em LOCAL-PR, push é permitido no branch autorizado da microfase, seguindo CLAUDE.md e schema/CODEX_WORKFLOW.md.
 - Se teste falhar, pare e reporte bloqueio.
+
+Ações pré-autorizadas dentro do escopo:
+
+- ler arquivos do repo;
+- editar arquivos compatíveis com o escopo;
+- rodar testes, lint, typecheck, build ou validação local;
+- consultar status, diff, log e branch;
+- criar commit local da microfase.
+
+Ações que exigem parada e autorização explícita:
+
+- push em modo LOCAL-STAGING;
+- merge;
+- alteração destrutiva de histórico;
+- alteração de branch remota;
+- produção;
+- secrets, bindings, variáveis de ambiente ou banco;
+- criação de tabela ou coluna;
+- dependência nova;
+- arquivo fora do escopo;
+- próxima microfase;
+- comando com risco de perda de dados.
 
 Depois da alteração:
 
 - Rode o teste obrigatório da microfase.
 - Mostre resumo do diff.
 - Crie commit local com o ID da microfase.
+- Se estiver em LOCAL-PR, faça push no branch autorizado.
 - Informe rollback.
 - Pare aguardando aprovação para próxima microfase.
 
@@ -51,10 +78,12 @@ Formato de resposta:
 
 WORKFLOW_ACK: ok
 
+Modo:
 Microfase:
 Escopo:
 Branch local:
 Commit local:
+Push:
 
 Resumo:
 - ...
