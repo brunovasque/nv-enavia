@@ -7,13 +7,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-| Campo | Valor |
-|-------|-------|
-| **Arquivo** | `active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` |
-| **Estado** | Ativo 🟢 |
-| **PRs** | PR31–PR64 (ampliado de PR31-PR60 pela PR33) |
-| **Data de início** | 2026-04-30 |
-| **Objetivo** | Transformar a Enavia em IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit |
+> ⬜ **Nenhum contrato ativo no momento.** O contrato Jarvis Brain v1 foi encerrado formalmente na PR68 (2026-05-02).
+> O próximo contrato deve ser criado pelo operador humano antes de iniciar nova fase de implementação.
+
+**Próxima ação:** Aguardando novo contrato da próxima fase.
+**Sugestões:** `CONTRATO_RUNTIME_SKILLS_V1` ou `CONTRATO_EXECUCAO_PRODUTO_ENAVIA_V1`
 
 ---
 
@@ -21,6 +19,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 | Arquivo | PRs | Estado | Data de encerramento |
 |---------|-----|--------|----------------------|
+| `active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` | PR31–PR68 | Encerrado ✅ | 2026-05-02 |
 | `active/CONTRATO_ENAVIA_LOOP_SKILLS_SYSTEM_MAP_PR17_PR30.md` | PR0, PR17–PR30 | Encerrado ✅ | 2026-04-30 |
 | `active/CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` | PR8–PR16 (+ fixes) | Encerrado ✅ | 2026-04-29 |
 | `active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` | PR1–PR7 | Encerrado ✅ | 2026-04-27 |
@@ -43,9 +42,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1**
+**⬜ Aguardando novo contrato da próxima fase**
 
-Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+> ✅ PR68 (PR-DOCS/PR-PROVA) — concluída. Fechamento formal do Jarvis Brain v1. Relatório de fechamento (`schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md`) e checklist de fechamento (`schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md`) criados. 22 frentes validadas como concluídas ou formalmente absorvidas. Artefatos obrigatórios confirmados. Artefatos inexistentes por decisão confirmados. Estado final documentado. SYSTEM_AWARENESS seção 11 adicionada. Contrato Jarvis Brain v1 encerrado formalmente. Nenhum runtime alterado. Nenhum endpoint criado. `schema/enavia-skill-executor.js` não criado. `/skills/propose` não criado. `/skills/run` não criado.
 
 > ✅ PR67 (PR-HARDENING) — concluída. Hardening documental/governança do Runtime de Skills criado. Pacote `schema/hardening/` com 6 arquivos: INDEX.md (visão geral), SKILLS_RUNTIME_HARDENING.md (D1–D10 deny-by-default, allowlist, aprovação humana, proteção de secrets, KV rules, Self-Audit, Response Policy, evidência), COST_LIMITS.md (C1–C5 riscos, limites por request/tempo/LLM/KV, política anti-gasto-invisível), BLAST_RADIUS.md (níveis 0–4, gates mínimos, matriz por skill, B1–B7), ROLLBACK_POLICY.md (rollback por artefato, regra PR-PROVA com falha), GO_NO_GO_CHECKLIST.md (32 critérios, 5 categorias). SECURITY_MODEL.md (seção 10 adicionada), ROLLOUT_PLAN.md (gate de hardening adicionado antes Fase 2), future-risks.md (R14–R17 adicionados), SYSTEM_AWARENESS.md (seção 10 adicionada). Nenhum runtime alterado. Nenhum endpoint criado. `/skills/propose` não criado. `/skills/run` não criado. `nv-enavia.js` não alterado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
 
