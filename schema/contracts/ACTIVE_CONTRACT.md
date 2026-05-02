@@ -2,18 +2,21 @@
 
 Contrato ativo atual:
 
-- `schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md`
+- `schema/contracts/active/CONTRATO_ENAVIA_JARVIS_EXECUTION_PR79_PR83.md`
 
 Status:
 
-- Concluído na PR78 (2026-05-02)
+- Ativo
 
 Próxima PR autorizada:
 
-- Aguardando próximo contrato/fase
+- PR79 — `/skills/run` read-only para SYSTEM_MAPPER
 
 Observação:
 
-A Fase 1 do Runtime de Skills foi fechada funcionalmente na PR78.
-Este arquivo permanece como ponteiro operacional curto para Codex local/agents.
+Este arquivo é um ponteiro operacional curto para facilitar execução por Codex local/agents.
 O índice histórico permanece em `schema/contracts/INDEX.md`.
+
+Contrato anterior concluído:
+
+- `schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` concluído na PR78.
