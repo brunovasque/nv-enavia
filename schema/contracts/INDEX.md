@@ -43,9 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR62 — PR-DIAG — Planejamento da próxima fase pós-Jarvis Brain**
+**PR63 — PR-DIAG — Atualização supervisionada de memória: decidir se ainda é necessária**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+> ✅ PR62 (PR-DOCS) — concluída. Reconciliação documental do contrato Jarvis Brain pós-execuções reais PR57–PR61. Seção 12 adicionada ao contrato com: plano original, execução real, tabela de equivalência (frentes planejadas vs PRs reais executadas), e regra de interpretação daqui para frente (seguir a frente, não o número). Próxima PR recomendada: PR63 — PR-DIAG — decidir se atualização supervisionada de memória (frente não concluída por PR61) ainda é necessária antes de iniciar Runtime de Skills. Relatório: `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md`.
 
 > ✅ PR61 (PR-DOCS/IMPL) — concluída. Memória consolidada do ciclo PR31–PR60 criada. 7 arquivos criados + 2 atualizados no brain. `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` (30 PRs, 7 decisões, 13 aprendizados anti-bot, próximos passos). `schema/brain/learnings/ANTI_BOT_FINAL_LEARNINGS.md` (13 regras validadas). `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md` (M1-M7 permanentes, NR1-NR5 não runtime, CF1-CF3 correções futuras). `schema/brain/open-questions/unresolved-technical-gaps.md` (G1-G7 lacunas). `schema/brain/learnings/future-risks.md` (R1-R9 riscos). `schema/brain/SYSTEM_AWARENESS.md` atualizado (seção 7: estado após PR60). `schema/brain/INDEX.md` atualizado. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md`.
 
