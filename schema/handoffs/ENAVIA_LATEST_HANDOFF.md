@@ -1,30 +1,34 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR71 — PR-IMPL — Endpoint `/skills/propose` (read-only) ✅
-**Para:** PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose`
+**De:** PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose` ✅
+**Para:** PR73 — PR-IMPL — Approval Gate técnico proposal-only
 
-## Handoff atual (PR71)
+## Handoff atual (PR72)
 
 ### O que foi feito
 
-- PR71 executada em escopo `Worker-only`.
-- Endpoint criado: `POST /skills/propose` em `nv-enavia.js`.
-- Reuso confirmado: `buildSkillExecutionProposal(input)` (módulo PR69/PR70).
-- Contrato aplicado no endpoint:
-  - `skill_execution.mode="proposal"`
-  - `status=proposed|not_applicable|blocked`
-  - `side_effects=false` sempre
+- PR72 executada em escopo `Tests-only`.
+- Teste formal criado: `tests/pr72-skills-propose-endpoint.prova.test.js`.
+- Prova formal concluída para 22 cenários obrigatórios do endpoint `POST /skills/propose`:
+  - proposta válida com `mode=proposal` e `status=proposed`
   - `requires_approval=true` somente quando `status=proposed`
+  - `side_effects=false` sempre
   - deny-by-default para skill desconhecida
-  - bloqueio para `selfAudit.risk_level=blocking` e `secret_exposure`
-  - erro controlado para método diferente de POST
-  - erro controlado para JSON inválido
+  - bloqueios por `selfAudit` (`risk_level=blocking`, `should_block=true`, `secret_exposure`)
+  - `not_applicable` para conversa comum e para pausa/recusa sem skill roteada
+  - `GET /skills/propose` retorna `405 METHOD_NOT_ALLOWED`
+  - JSON inválido retorna `400 INVALID_JSON`
+  - resposta de erro mantém `skill_execution` seguro (`mode=proposal`, `status=blocked`, `side_effects=false`)
   - `/skills/run` permanece inexistente
-- Teste criado: `tests/pr71-skills-propose-endpoint.smoke.test.js` (10 cenários mínimos obrigatórios).
+  - endpoint não retorna `reply` nem `use_planner`
+  - endpoint sem KV/fetch/filesystem runtime/LLM externo
+  - `nv-enavia.js` sem rota `/skills/run`
+  - `contract-executor.js` e `wrangler.toml` fora do diff vs `origin/main`
 
 ### Testes executados
 
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` — 45/45 ✅
 - `node tests/pr71-skills-propose-endpoint.smoke.test.js` — 43/43 ✅
 - `node tests/pr70-skill-execution-proposal.prova.test.js` — 28/28 ✅
 - `node tests/pr69-skill-execution-proposal.smoke.test.js` — 36/36 ✅
@@ -34,6 +38,7 @@
 
 ### O que NÃO foi alterado
 
+- `nv-enavia.js` (runtime preservado)
 - `schema/enavia-skill-executor.js` (módulo preservado)
 - `contract-executor.js`
 - `wrangler.toml`
@@ -43,7 +48,7 @@
 
 ### Próxima etapa segura
 
-- PR72 — `Tests-only` — prova formal do endpoint `/skills/propose` (contrato de erro, segurança read-only e ausência de side effects).
+- PR73 — `Worker-only` — criar Approval Gate técnico proposal-only (`proposal_id`, status `proposed|approved|rejected|expired|blocked`) sem execução real e sem `/skills/run`.
 
 ---
 
