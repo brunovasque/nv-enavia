@@ -1,19 +1,22 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR79 — Skill Factory Core ✅)
-**Branch ativa:** `codex/pr79-skill-factory-core`
-**Última tarefa:** PR79 — PR-IMPL — Skill Factory Core implementada com geração de `skill_spec` validável e pacote de criação PR-ready sob autorização explícita.
+**Data:** 2026-05-02 (atualizado após PR80 — Runner/Registry ✅)
+**Branch ativa:** `codex/pr80-skill-registry-runner`
+**Última tarefa:** PR80 — PR-IMPL — Registry/Runner de skills com endpoint governado `POST /skills/run` para skill registrada.
 
 ## Estado atual do sistema
 
 **Contrato ativo:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Ativo)
 
-**Objetivo:** Evoluir para Skill Factory Real v1: pedido humano -> skill_spec estruturada -> autorização explícita -> pacote de criação seguro e rastreável.
+**Objetivo:** Evoluir Skill Factory Real v1 com execução governada apenas para skill registrada e aprovada.
 
-**Frase central:** "Spec primeiro, pacote só com autorização explícita; sem execução, sem deploy, sem efeitos colaterais."
+**Sistema operacional:** Estável. PR80 adicionou `schema/enavia-skill-registry.js`, `schema/enavia-skill-runner.js` e endpoint `POST /skills/run` no `nv-enavia.js`, com bloqueio deny-by-default para skill não registrada e requirement de `proposal_status=approved`. `SYSTEM_MAPPER` é a primeira skill executável read-only no runner.
 
-**Sistema operacional:** Estável. PR79 adicionou `schema/enavia-skill-factory.js` (`buildSkillSpec`, `validateSkillSpec`, `buildSkillCreationPackage`) e endpoints `POST /skills/factory/spec` + `POST /skills/factory/create` com bloqueio sem autorização, erro controlado para JSON inválido, `METHOD_NOT_ALLOWED` em GET, `side_effects=false` e `executed=false`. `/skills/run` permanece inexistente nesta PR.
+## Próxima PR autorizada
 
+**PR81 — Fechamento ponta a ponta Skill Factory Real**.
+
+---
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
 A Enavia responde como bot porque:
@@ -33,7 +36,7 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR80 — Runner/Registry para skills criadas** (somente após PR79 validada).
+**PR81 — Fechamento ponta a ponta Skill Factory Real** (após PR80 concluída).
 
 > ✅ PR77 (PR-IMPL) — concluída. `schema/enavia-chat-skill-surface.js` criado com helper puro `buildChatSkillSurface()` e mensagem canônica `"Existe uma ação técnica proposta, aguardando aprovação."`. `nv-enavia.js` atualizado no fluxo `handleChatLLM` para adicionar metadado aditivo `chat_skill_surface` somente quando `skill_execution.status=proposed`; `reply` principal preservado; `skill_execution` permanece campo aditivo; `blocked/not_applicable` sem poluição adicional. Nenhuma execução automática de skill. Nenhum `/skills/run`. Nenhum endpoint novo. `buildSystemMapperResult` não chamado no chat. Teste novo `tests/pr77-chat-controlled-skill-integration.smoke.test.js` aprovado.
 
@@ -347,5 +350,6 @@ Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 (DOCS) e PR32 (
 
 ## Bloqueios
 - nenhum
+
 
 

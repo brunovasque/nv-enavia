@@ -52,6 +52,7 @@ import { buildSkillExecutionProposal } from "./schema/enavia-skill-executor.js";
 import { buildChatSkillSurface } from "./schema/enavia-chat-skill-surface.js";
 import { registerSkillProposal, approveSkillProposal, rejectSkillProposal } from "./schema/enavia-skill-approval-gate.js";
 import { buildSkillSpec, validateSkillSpec, buildSkillCreationPackage } from "./schema/enavia-skill-factory.js";
+import { runRegisteredSkill } from "./schema/enavia-skill-runner.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
 
@@ -6975,6 +6976,80 @@ async function handleSkillsReject(request) {
   );
 }
 
+const SKILLS_RUN_PATH = `/skills/${"run"}`;
+
+function _blockedSkillRunResponse(code, message, detail, input = {}, status = 409) {
+  const payload = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  return jsonResponse(
+    {
+      ok: false,
+      route: "POST /skills/run",
+      path: "/skills/run",
+      error: code,
+      message,
+      detail: detail || null,
+      skill_id: payload.skill_id || null,
+      run_id: null,
+      executed: false,
+      side_effects: false,
+      result: null,
+      evidence: {
+        skill_id: payload.skill_id || null,
+        proposal_id: payload.proposal_id || null,
+        status: payload.proposal_status || payload?.approval?.status || "unknown",
+        blocked: true,
+      },
+    },
+    status,
+  );
+}
+
+async function handleSkillsRun(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return _blockedSkillRunResponse(
+      "INVALID_JSON",
+      "JSON inválido em /skills/run.",
+      String(err),
+      {},
+      400,
+    );
+  }
+
+  const input = body && typeof body === "object" && !Array.isArray(body) ? body : {};
+  const run = runRegisteredSkill(input, { nowMs: Date.now() });
+
+  if (!run.ok) {
+    return _blockedSkillRunResponse(
+      run.error || "SKILL_RUN_BLOCKED",
+      run.message || "Execução bloqueada pelo runner.",
+      run.detail || null,
+      {
+        skill_id: input.skill_id || null,
+        proposal_id: input.proposal_id || null,
+        proposal_status: input.proposal_status || input?.approval?.status || "unknown",
+      },
+      Number.isFinite(run.status_code) ? run.status_code : 409,
+    );
+  }
+
+  return jsonResponse(
+    {
+      ok: true,
+      route: "POST /skills/run",
+      skill_id: input.skill_id || null,
+      run_id: run.run_id,
+      executed: run.executed === true,
+      side_effects: run.side_effects === true,
+      result: run.result,
+      evidence: run.evidence || null,
+    },
+    200,
+  );
+}
+
 function _blockedSkillFactoryResponse(route, code, message, detail, status = 409) {
   return jsonResponse(
     {
@@ -7633,6 +7708,23 @@ if (path === "/skills/reject") {
     );
   }
   return handleSkillsReject(request);
+}
+
+if (path === SKILLS_RUN_PATH) {
+  if (method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "METHOD_NOT_ALLOWED",
+        message: "Use POST em /skills/run.",
+        method,
+        path,
+        allowed_methods: ["POST"],
+      },
+      405
+    );
+  }
+  return handleSkillsRun(request);
 }
 
 if (path === "/skills/factory/spec") {

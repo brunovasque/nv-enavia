@@ -10,7 +10,7 @@ Status:
 
 Proxima PR autorizada:
 
-- PR79 — Skill Factory Core
+- PR80 — Runner/Registry para skills criadas
 
 Observacao:
 

@@ -1,10 +1,57 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR79 — PR-IMPL — Skill Factory Core ✅
-**Para:** PR80 — Runner/Registry para skills criadas
+**De:** PR80 — PR-IMPL — Runner/Registry para skills criadas ✅
+**Para:** PR81 — Fechamento ponta a ponta Skill Factory Real
 
-## Handoff atual (PR79)
+## Handoff atual (PR80)
+
+### O que foi feito
+
+- PR80 executada em escopo `Worker-only + docs/status mínimos`.
+- Novos módulos criados:
+  - `schema/enavia-skill-registry.js`
+  - `schema/enavia-skill-runner.js`
+- Endpoint criado no `nv-enavia.js`:
+  - `POST /skills/run`
+- Regras garantidas:
+  - somente skill registrada pode executar;
+  - somente `proposal_status=approved` pode executar;
+  - skill desconhecida/sem contrato bloqueia;
+  - side effect fora de allowlist bloqueia;
+  - resposta com `run_id`, `executed`, `side_effects`, `result`, `evidence`.
+- `SYSTEM_MAPPER` integrada como primeira skill executável read-only.
+
+### Testes executados
+
+- `node tests/pr80-skill-registry-runner.smoke.test.js`
+- `node tests/pr79-skill-factory-core.smoke.test.js`
+- `node tests/pr78-skills-runtime-fase1.fechamento.test.js`
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js`
+- `node tests/pr76-system-mapper.prova.test.js`
+- `node tests/pr75-system-mapper-readonly.smoke.test.js`
+- `node tests/pr74-approval-gate.prova.test.js`
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js`
+- `node tests/pr72-skills-propose-endpoint.prova.test.js`
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js`
+- `node tests/pr70-skill-execution-proposal.prova.test.js`
+- `node tests/pr69-skill-execution-proposal.smoke.test.js`
+- `node tests/pr51-skill-router-readonly.smoke.test.js`
+- `node tests/pr57-self-audit-readonly.prova.test.js`
+- `node tests/pr59-response-policy-viva.smoke.test.js`
+
+### O que NÃO foi alterado
+
+- `wrangler.toml`
+- `contract-executor.js`
+- painel / executor / deploy-worker / workflows
+- nenhum binding/KV/secret/produção
+
+### Próxima etapa segura
+
+- Executar somente PR81 para fechamento ponta a ponta Skill Factory Real, sem expandir escopo além do contrato ativo.
+
+## Handoff anterior (PR79)
 
 ### O que foi feito
 
