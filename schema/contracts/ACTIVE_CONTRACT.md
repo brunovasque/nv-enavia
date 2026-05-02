@@ -1,22 +1,22 @@
 # ACTIVE CONTRACT — NV-ENAVIA
 
-Contrato ativo atual:
+Contrato de referência atual:
 
 - schema/contracts/active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md
 
 Status:
 
-- Ativo
+- Concluído ✅ (PR81 — Fechamento ponta a ponta Skill Factory Real)
 
-Proxima PR autorizada:
+Próxima PR autorizada:
 
-- PR80 — Runner/Registry para skills criadas
+- Aguardando próximo contrato/fase formal
 
-Observacao:
+Observação:
 
-Este arquivo e um ponteiro operacional curto para facilitar execucao por Codex local/agents.
-O indice historico permanece em schema/contracts/INDEX.md.
+Este arquivo permanece como ponteiro operacional curto.
+O histórico completo e estados de encerramento ficam em `schema/contracts/INDEX.md`.
 
-Contrato anterior concluido:
+Contrato anterior concluído:
 
-- schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md concluido na PR78.
+- schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md concluído na PR78.

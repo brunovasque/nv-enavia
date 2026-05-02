@@ -1,8 +1,35 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR80 — PR-IMPL — Runner/Registry para skills criadas ✅
-**Para:** PR81 — Fechamento ponta a ponta Skill Factory Real
+**De:** PR81 — PR-IMPL + PR-PROVA — Fechamento Skill Factory Real ✅
+**Para:** Próximo contrato/fase (recomendado: SELF_WORKER_AUDITOR supervisionada)
+
+## Handoff atual (PR81)
+
+### O que foi feito
+
+- Teste final criado: tests/pr81-skill-factory-real.fechamento.test.js cobrindo o fluxo ponta a ponta e os guardrails obrigatórios.
+- Relatório final criado: schema/reports/PR81_SKILL_FACTORY_REAL.md.
+- Governança atualizada: schema/contracts/ACTIVE_CONTRACT.md, schema/contracts/INDEX.md, schema/status/ENAVIA_STATUS_ATUAL.md, schema/handoffs/ENAVIA_LATEST_HANDOFF.md, schema/execution/ENAVIA_EXECUTION_LOG.md.
+- Runtime preservado sem novos side effects.
+
+### O que existe após PR81
+
+- POST /skills/factory/spec gera skill_spec válida e bloqueia pedidos inseguros.
+- POST /skills/factory/create bloqueia sem autorização e gera pacote PR-ready com autorização explícita.
+- POST /skills/run executa somente skill registrada e aprovada.
+- SYSTEM_MAPPER registrada e executável com proposal_status=approved.
+
+### O que NÃO existe após PR81
+
+- Criação automática de skill real em runtime.
+- PR/merge/deploy automáticos.
+- Execução de spec/pacote da factory diretamente no runner.
+- SELF_WORKER_AUDITOR ainda não criada.
+
+### Próxima etapa segura
+
+- Abrir novo contrato para implementação supervisionada da skill SELF_WORKER_AUDITOR.
 
 ## Handoff atual (PR80)
 
@@ -143,8 +170,8 @@
 ---
 
 **Data:** 2026-05-02
-**De:** PR77 — PR-IMPL — Integração controlada com chat ✅
-**Para:** PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills
+**De:** PR81 — PR-IMPL + PR-PROVA — Fechamento Skill Factory Real ✅
+**Para:** Próximo contrato/fase (recomendado: SELF_WORKER_AUDITOR supervisionada)
 
 ## Handoff atual (PR77)
 
@@ -195,8 +222,8 @@
 ---
 
 **Data:** 2026-05-02
-**De:** PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1 ✅
-**Para:** Aguardando novo contrato da próxima fase
+**De:** PR81 — PR-IMPL + PR-PROVA — Fechamento Skill Factory Real ✅
+**Para:** Próximo contrato/fase (recomendado: SELF_WORKER_AUDITOR supervisionada)
 
 ## O que foi feito nesta sessão
 
@@ -684,5 +711,8 @@ Diagnosticar se a frente "Atualização supervisionada de memória" ainda é nec
 | Brain documental | `schema/brain/` — 20+ arquivos | — |
 | Escrita supervisionada de memória | ❌ Não implementada no runtime — G3 on-hold | Não blocking |
 | Runtime de Skills | ❌ Não existe — aguarda PR64→PR65→PR66→PR67+ | Próxima frente |
+
+
+
 
 
