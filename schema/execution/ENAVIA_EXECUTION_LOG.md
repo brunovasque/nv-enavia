@@ -4,6 +4,68 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR80 — PR-IMPL — Runner/Registry para skills criadas
+
+- **Branch:** `codex/pr80-skill-registry-runner`
+- **Tipo:** `PR-IMPL` (`Worker-only + docs/status mínimos`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Ativo)
+- **PR anterior validada:** PR79 ✅
+
+### Objetivo
+
+Criar runtime governado para execução de skill registrada via `POST /skills/run`, com approval obrigatório e deny-by-default.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-skill-registry.js`
+- `schema/enavia-skill-runner.js`
+- `tests/pr80-skill-registry-runner.smoke.test.js`
+
+**Arquivos alterados:**
+- `nv-enavia.js` (endpoint `POST /skills/run` + handler governado)
+- `schema/contracts/ACTIVE_CONTRACT.md` (próxima PR atualizada para PR80 durante execução)
+- `schema/contracts/INDEX.md` (ponteiro da próxima PR atualizado para PR80)
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Regras preservadas
+
+1. skill desconhecida não executa (deny-by-default)
+2. proposal sem `approved` não executa
+3. side effect fora da allowlist não executa
+4. sem fetch/KV/filesystem runtime/comando externo/LLM externo novo
+5. sem alteração em `wrangler.toml` e `contract-executor.js`
+6. sem alterações em painel/executor/deploy-worker/workflows
+
+### Testes executados
+
+- `node tests/pr80-skill-registry-runner.smoke.test.js` ✅
+- `node tests/pr79-skill-factory-core.smoke.test.js` ✅
+- `node tests/pr78-skills-runtime-fase1.fechamento.test.js` ✅
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js` ✅
+- `node tests/pr76-system-mapper.prova.test.js` ✅
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` ✅
+- `node tests/pr74-approval-gate.prova.test.js` ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` ✅
+
+### Resultado
+
+- PR80 concluída ✅
+- Runtime de skill registrada habilitado de forma governada ✅
+- `SYSTEM_MAPPER` executável read-only com approval válido ✅
+- Próxima etapa liberada: PR81 ✅
+
+---
+
 ## 2026-05-02 — PR79 — PR-IMPL — Skill Factory Core
 
 - **Branch:** `codex/pr79-skill-factory-core`

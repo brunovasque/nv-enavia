@@ -10,7 +10,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 🟢 **Contrato ativo:** `schema/contracts/active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md`
 
 **Status:** Ativo 🟢
-**Próxima PR autorizada:** PR79 — Skill Factory Core
+**Próxima PR autorizada:** PR80 — Runner/Registry para skills criadas
 
 ---
 
@@ -42,7 +42,10 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**🟢 PR79 — Skill Factory Core** (contrato ativo: `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md`)
+**🟢 PR80 — Runner/Registry para skills criadas** (contrato ativo: `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md`)
+
+> ✅ PR79 — Skill Factory Core concluída e validada como etapa anterior.
+> 🔜 PR81 — Fechamento ponta a ponta Skill Factory Real.
 
 > ✅ PR68 (PR-DOCS/PR-PROVA) — concluída. Fechamento formal do Jarvis Brain v1. Relatório de fechamento (`schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md`) e checklist de fechamento (`schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md`) criados. 22 frentes validadas como concluídas ou formalmente absorvidas. Artefatos obrigatórios confirmados. Artefatos inexistentes por decisão confirmados. Estado final documentado. SYSTEM_AWARENESS seção 11 adicionada. Contrato Jarvis Brain v1 encerrado formalmente. Nenhum runtime alterado. Nenhum endpoint criado. `schema/enavia-skill-executor.js` não criado. `/skills/propose` não criado. `/skills/run` não criado.
 
