@@ -1,18 +1,18 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR73 — Approval Gate técnico proposal-only ✅)
-**Branch ativa:** `codex/pr73-approval-gate-proposal-only`
-**Última tarefa:** PR73 — PR-IMPL — approval gate técnico proposal-only concluído. Gate read-only criado com `proposal_id`, aprovação/rejeição explícita e sem execução real de skill.
+**Data:** 2026-05-02 (atualizado após PR74 — Prova formal do Approval Gate ✅)
+**Branch ativa:** `codex/pr74-prova-approval-gate`
+**Última tarefa:** PR74 — PR-PROVA — prova formal concluída. Gate confirmado como proposal-only/read-only, deny-by-default preservado, sem execução real de skill.
 
 ## Estado atual do sistema
 
 **Contrato ativo:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
 
-**Objetivo:** Consolidar proposal-only read-only para skills com provas formais dos módulos PR69/PR70 e do endpoint PR71, preservando deny-by-default e guardrails de Self-Audit.
+**Objetivo:** Consolidar Runtime de Skills fase 1 governada: proposal-only + approval gate provado formalmente, mantendo segurança e sem side effects.
 
 **Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. PR73 implementada sobre PR69–PR72: módulo `schema/enavia-skill-approval-gate.js` criado, `/skills/propose` integrado com `proposal_id/proposal_status`, novos endpoints `POST /skills/approve` e `POST /skills/reject` sem side effects, sem `/skills/run`, sem KV/fetch/FS/LLM externo.
+**Sistema operacional:** Estável. PR74 concluída sobre PR73: `tests/pr74-approval-gate.prova.test.js` valida 32 cenários obrigatórios do gate (aprovação/rejeição, bloqueios, expiração, JSON inválido, métodos inválidos, invariantes `side_effects=false`/`executed=false`, ausência de `/skills/run`, sem KV/fetch/FS/LLM externo, `wrangler.toml` e `contract-executor.js` preservados, `reply/use_planner` preservados).
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR74 — PR-PROVA — Prova do Approval Gate**
+**PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER**
+
+> ✅ PR74 (PR-PROVA) — concluída. Arquivo `tests/pr74-approval-gate.prova.test.js` criado com prova formal dos 32 cenários obrigatórios do Approval Gate: proposta válida com `proposal_id`, status inicial `proposed`, approve/reject válidos, bloqueios para proposal desconhecida/ausente/blocked/not_applicable, bloqueio de segunda aprovação/rejeição, bloqueio de proposal expirada para approve/reject, erros controlados para JSON inválido em `/skills/approve` e `/skills/reject`, `GET` em approve/reject retornando `405 METHOD_NOT_ALLOWED`, `side_effects=false` e `executed=false` em todas as respostas do gate, `/skills/run` inexistente, approval/reject sem execução de skill, ausência de KV/fetch/filesystem runtime/LLM externo, `wrangler.toml` e `contract-executor.js` fora do diff vs `origin/main`, `reply/use_planner` preservados. Bateria obrigatória PR74+PR73+PR72+PR71+PR70+PR69+PR51+PR57+PR59 passando.
 
 > ✅ PR73 (PR-IMPL) — concluída. Approval Gate técnico proposal-only implementado em `schema/enavia-skill-approval-gate.js` com statuses controlados (`proposed|approved|rejected|expired|blocked`) e persistência local em memória (sem KV/binding/tabela). `POST /skills/propose` passou a retornar `proposal_id` e `proposal_status` mantendo `skill_execution` original. Endpoints `POST /skills/approve` e `POST /skills/reject` adicionados em `nv-enavia.js` com bloqueio controlado para proposal desconhecida/inválida, blocked ou not_applicable; `side_effects=false` e `executed=false` sempre. `/skills/run` permanece inexistente. Teste novo `tests/pr73-approval-gate-proposal-only.smoke.test.js` criado e aprovado (48/48), junto das regressões obrigatórias PR72/PR71/PR70/PR69/PR51/PR57/PR59 passando.
 
