@@ -4,6 +4,81 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR67 — PR-HARDENING — Hardening de Segurança, Custo e Limites
+
+- **Branch:** `copilot/claudepr67-hardening-seguranca-custo-limites`
+- **Tipo:** `PR-HARDENING` (documental/governança — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR66 ✅ (PR-DIAG — Diagnóstico técnico do Runtime de Skills)
+
+### Objetivo
+
+Consolidar segurança, custo, limites, riscos, critérios de bloqueio, orçamento operacional, blast radius, rollout seguro e condições mínimas antes de qualquer implementação futura do Runtime de Skills. Esta PR é hardening documental — nenhum runtime implementado.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/hardening/INDEX.md` — visão geral, contexto, como usar o pacote
+- `schema/hardening/SKILLS_RUNTIME_HARDENING.md` — D1–D10 deny-by-default, allowlist, aprovação humana, secrets, KV, Self-Audit, evidência
+- `schema/hardening/COST_LIMITS.md` — C1–C5 riscos, limites por request/tempo/LLM/KV, política anti-gasto-invisível
+- `schema/hardening/BLAST_RADIUS.md` — níveis 0–4, gates mínimos, matriz por skill, B1–B7
+- `schema/hardening/ROLLBACK_POLICY.md` — rollback por artefato, regra PR-PROVA com falha, escalonamento
+- `schema/hardening/GO_NO_GO_CHECKLIST.md` — 32 critérios, 5 categorias (C, S, L, BR, T)
+- `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md` — relatório completo
+
+**Arquivos atualizados:**
+- `schema/skills-runtime/SECURITY_MODEL.md` — seção 10 adicionada (referência ao hardening, reforço deny-by-default e `/skills/run` não permitido)
+- `schema/skills-runtime/ROLLOUT_PLAN.md` — seção 11 adicionada (gate de hardening obrigatório antes de Fase 2)
+- `schema/brain/learnings/future-risks.md` — R14–R17 adicionados (custo invisível, loop, blast radius, over-automation)
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 10 adicionada (estado pós-PR67)
+- `schema/contracts/INDEX.md` — PR68 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR67 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR67→PR68
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Resultado
+
+- **Pacote de hardening criado:** `schema/hardening/` com 6 arquivos ✅
+- **Deny-by-default documentado:** D1–D10 ✅
+- **Allowlist definida:** 4 skills ✅
+- **Aprovação humana documentada:** 13 tipos de ação ✅
+- **Limites de custo definidos:** por request/tempo/LLM/KV ✅
+- **Blast radius documentado:** níveis 0–4 ✅
+- **Rollback policy documentada:** por artefato ✅
+- **Go/No-Go checklist criado:** 32 critérios ✅
+- **SECURITY_MODEL atualizado** ✅
+- **ROLLOUT_PLAN atualizado** ✅
+- **Future risks R14–R17 adicionados** ✅
+- **SYSTEM_AWARENESS seção 10 adicionada** ✅
+- **Governança atualizada** ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **`/skills/propose` não criado** ✅
+- **`/skills/run` não criado** ✅
+- **`schema/enavia-skill-executor.js` não criado** ✅
+- **`nv-enavia.js` não alterado** ✅
+- **`contract-executor.js` não alterado** ✅
+- **`wrangler.toml` não alterado** ✅
+- **Nenhum `.js`/`.ts`/`.toml`/`.yml` alterado** ✅
+- **Nenhum binding/KV/secret alterado** ✅
+- **Testes não alterados** ✅
+
+### Smoke tests
+
+Tipo: PR-HARDENING — sem smoke tests de runtime necessários.
+
+Verificação de escopo:
+```bash
+git diff --name-only
+```
+Resultado: apenas arquivos `.md` criados/alterados em `schema/hardening/`, `schema/reports/`, `schema/skills-runtime/`, `schema/brain/`, `schema/contracts/`, `schema/status/`, `schema/handoffs/`, `schema/execution/`. Nenhum `.js`, `.ts`, `.toml`, `.yml` alterado.
+
+### Próxima PR
+
+**PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1**
+
+---
+
 ## 2026-05-02 — PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
 
 - **Branch:** `copilot/claudepr66-diag-runtime-skills`

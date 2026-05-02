@@ -244,3 +244,47 @@ Princípio: não expor mais do que o necessário.
 - Não ativa nenhuma regra de segurança no código atual
 - Todas as regras aqui são para implementação futura
 - A segurança atual do sistema está nos módulos existentes (Self-Audit, Response Policy)
+
+---
+
+## 10. Referência ao pacote de hardening (PR67)
+
+**Data:** 2026-05-02 (PR67)
+
+Este modelo de segurança foi aprofundado pelo pacote de hardening criado na PR67.
+Consultar `schema/hardening/` como fonte de verdade para:
+
+- **Deny-by-default:** `schema/hardening/SKILLS_RUNTIME_HARDENING.md` seção 2 — regras D1–D10
+- **Allowlist:** `schema/hardening/SKILLS_RUNTIME_HARDENING.md` seção 3
+- **Aprovação humana:** `schema/hardening/SKILLS_RUNTIME_HARDENING.md` seção 5
+- **Proteção de secrets:** `schema/hardening/SKILLS_RUNTIME_HARDENING.md` seção 6
+- **KV rules:** `schema/hardening/SKILLS_RUNTIME_HARDENING.md` seção 7
+- **Blast radius:** `schema/hardening/BLAST_RADIUS.md`
+- **Rollback policy:** `schema/hardening/ROLLBACK_POLICY.md`
+- **Go/No-Go checklist:** `schema/hardening/GO_NO_GO_CHECKLIST.md`
+
+### Reforço: deny-by-default
+
+O princípio deny-by-default foi formalizado com 10 regras absolutas (D1–D10).
+Destacando as mais críticas:
+
+| Regra | Condição bloqueante |
+|-------|-------------------|
+| D1 | `skill_id` não está no allowlist |
+| D5 | Self-Audit detecta `secret_exposure` |
+| D8 | `/skills/run` chamado antes de `/skills/propose` existir |
+| D9 | Endpoint novo sem PR-DIAG + PR-IMPL + PR-PROVA |
+| D10 | Self-Audit bloqueante impede avanço em PR futura |
+
+### Reforço: `/skills/run` não é permitido nesta fase
+
+> **`/skills/run` não deve ser criado antes de `/skills/propose`.**
+>
+> A sequência obrigatória é:
+> 1. Nenhum endpoint existe agora ← estado atual
+> 2. `/skills/propose` ← primeiro endpoint permitido
+> 3. `/skills/approve` ← após gate de aprovação implementado e validado
+> 4. `/skills/run` ← SOMENTE Fase 5 (PR73+), gate de aprovação funcionando
+
+Criar `/skills/run` antes desta sequência viola o princípio de governed execution
+e cria risco de autonomia cega (Risco R10 em `schema/brain/learnings/future-risks.md`).

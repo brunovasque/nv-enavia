@@ -281,6 +281,88 @@ Proposta de execução (safe) sendo confundida com execução real (risky), leva
 
 ---
 
+## Riscos adicionados na PR67
+
+### R14 — Custo invisível de runtime
+
+**Descrição:**
+Runtime de Skills que processa requests com custo de LLM, KV ou rede sem contabilização ou limite explícito.
+
+**Sinal de alerta:**
+- Latência aumenta progressivamente sem nova funcionalidade
+- Custo de inference sobe sem explicação
+- KV namespace cresce sem política de limpeza
+- Módulo chama LLM extra não declarado no contrato
+
+**Como mitigar:**
+- `schema/hardening/COST_LIMITS.md` — limites por request definidos antes de implementar
+- `max_skill_proposals_per_request = 1` na fase inicial
+- Sem LLM extra dentro do Skill Executor na fase proposal-only
+- Todo módulo novo deve ter custo estimado no corpo da PR
+
+**Fonte:** PR67 — `schema/hardening/COST_LIMITS.md` C1–C5
+
+---
+
+### R15 — Loop de execução
+
+**Descrição:**
+Skill que propõe outra skill que propõe outra skill — recursão sem profundidade máxima e sem saída natural.
+
+**Sinal de alerta:**
+- Mesmo `request_id` gera múltiplas propostas encadeadas
+- Latência por request cresce acima de threshold
+- Propostas por minuto excede 10 (monitoramento futuro)
+- `max_retries > 0` em fase onde deveria ser 0
+
+**Como mitigar:**
+- `max_retries = 0` na fase proposal-only
+- `max_execution_depth = 1` — sem skills invocando outras skills
+- Contrato deve declarar explicitamente profundidade máxima
+
+**Fonte:** PR67 — `schema/hardening/COST_LIMITS.md` C2
+
+---
+
+### R16 — Blast radius subestimado
+
+**Descrição:**
+PR-IMPL declara nível de blast radius mais baixo do que o real, levando a gates insuficientes para a ação executada.
+
+**Sinal de alerta:**
+- PR-IMPL declara "Nível 0" mas altera KV ou binding
+- PR-IMPL declara "Nível 1" mas cria endpoint público
+- PR-IMPL declara "Nível 2" mas realiza deploy
+- Side effect real > side effect declarado no contrato
+
+**Como mitigar:**
+- `schema/hardening/BLAST_RADIUS.md` — níveis 0–4 com exemplos detalhados
+- Go/No-Go checklist obriga declarar nível no corpo da PR
+- Regra B1: toda PR-IMPL deve declarar o nível de blast radius
+- Regra B6: transição de nível 2 para 3 exige nova PR-DIAG
+
+**Fonte:** PR67 — `schema/hardening/BLAST_RADIUS.md`
+
+---
+
+### R17 — Over-automation (automação antes de governança)
+
+**Descrição:**
+Implementar autonomia ou automação antes de ter governança, gates e rollback funcionando e validados.
+
+**Sinal de alerta:**
+- Gate de aprovação humana não existe mas execução foi criada
+- Rollback não está testado mas deploy foi feito
+- `/skills/run` criado antes de `/skills/propose`
+- Self-Audit não está integrado mas execução acontece
+- PR-PROVA não prevista para PR-IMPL de runtime
+
+**Como mitigar:**
+- `schema/hardening/GO_NO_GO_CHECKLIST.md` — 32 critérios antes de implementar
+- ROLLOUT_PLAN.md — fases incrementais com gate de hardening antes de Fase 2
+- Regra: aprovação humana antes de qualquer side effect externo
+- Princípio: governed execution — toda execução exige contrato, gate e evidência
+
 ## Backlinks
 
 - `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md` — memória do ciclo
