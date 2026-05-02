@@ -1,27 +1,31 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR70 — PR-PROVA — Prova formal do Skill Execution Proposal ✅
-**Para:** PR71 — PR-IMPL — Endpoint `/skills/propose` (read-only)
+**De:** PR71 — PR-IMPL — Endpoint `/skills/propose` (read-only) ✅
+**Para:** PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose`
 
-## Handoff atual (PR70)
+## Handoff atual (PR71)
 
 ### O que foi feito
 
-- PR70 executada em escopo `Tests-only`.
-- Arquivo criado: `tests/pr70-skill-execution-proposal.prova.test.js`.
-- Prova formal concluída para 13 cenários obrigatórios do contrato:
-  - proposta válida para skill conhecida (`mode=proposal`, `status=proposed`, `requires_approval=true`, `side_effects=false`)
+- PR71 executada em escopo `Worker-only`.
+- Endpoint criado: `POST /skills/propose` em `nv-enavia.js`.
+- Reuso confirmado: `buildSkillExecutionProposal(input)` (módulo PR69/PR70).
+- Contrato aplicado no endpoint:
+  - `skill_execution.mode="proposal"`
+  - `status=proposed|not_applicable|blocked`
+  - `side_effects=false` sempre
+  - `requires_approval=true` somente quando `status=proposed`
   - deny-by-default para skill desconhecida
-  - bloqueios por `self_audit` (`risk_level=blocking`, `should_block=true`, `secret_exposure`)
-  - `not_applicable` para conversa comum/pausa sem skill roteada
-  - ausência de side effects (sem fetch/KV/FS runtime/LLM externo)
-  - `skill_execution` aditivo no `/chat/run`
-  - `reply` e `use_planner` preservados
-  - `/skills/propose` e `/skills/run` inexistentes
+  - bloqueio para `selfAudit.risk_level=blocking` e `secret_exposure`
+  - erro controlado para método diferente de POST
+  - erro controlado para JSON inválido
+  - `/skills/run` permanece inexistente
+- Teste criado: `tests/pr71-skills-propose-endpoint.smoke.test.js` (10 cenários mínimos obrigatórios).
 
 ### Testes executados
 
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` — 43/43 ✅
 - `node tests/pr70-skill-execution-proposal.prova.test.js` — 28/28 ✅
 - `node tests/pr69-skill-execution-proposal.smoke.test.js` — 36/36 ✅
 - `node tests/pr51-skill-router-readonly.smoke.test.js` — 168/168 ✅
@@ -30,17 +34,16 @@
 
 ### O que NÃO foi alterado
 
-- `nv-enavia.js` (runtime preservado)
-- `schema/enavia-skill-executor.js` (runtime preservado)
-- `schema/enavia-skill-router.js`
-- `schema/enavia-self-audit.js`
-- `schema/enavia-response-policy.js`
-- nenhum endpoint novo
+- `schema/enavia-skill-executor.js` (módulo preservado)
+- `contract-executor.js`
+- `wrangler.toml`
+- painel / executor / deploy-worker / workflows
+- `/skills/run` (continua inexistente)
 - nenhum binding/KV/secret
 
 ### Próxima etapa segura
 
-- PR71 — `Worker-only` — criar endpoint `/skills/propose` read-only, sem side effects e sem `/skills/run`.
+- PR72 — `Tests-only` — prova formal do endpoint `/skills/propose` (contrato de erro, segurança read-only e ausência de side effects).
 
 ---
 

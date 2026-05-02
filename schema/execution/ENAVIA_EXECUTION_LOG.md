@@ -4,6 +4,65 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR71 — PR-IMPL — Endpoint `/skills/propose` read-only
+
+- **Branch:** `codex/pr71-skills-propose-endpoint`
+- **Tipo:** `PR-IMPL` (`Worker-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR70 ✅ (`test: PR70 prova formal skill execution proposal`)
+
+### Objetivo
+
+Criar endpoint `POST /skills/propose` usando o módulo validado em PR69/PR70, retornando proposta read-only sem executar skill e sem side effects.
+
+### Implementação
+
+**Arquivos alterados:**
+- `nv-enavia.js`
+  - novo handler `handleSkillsPropose(request)`
+  - nova rota `/skills/propose` com contrato `POST` e `METHOD_NOT_ALLOWED` para métodos diferentes
+  - parse JSON com erro controlado `INVALID_JSON`
+
+**Arquivos criados:**
+- `tests/pr71-skills-propose-endpoint.smoke.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Cenários cobertos na PR71
+
+1. `POST /skills/propose` com skill conhecida retorna `mode=proposal` e `status=proposed`
+2. skill desconhecida retorna `blocked` (deny-by-default)
+3. `selfAudit.risk_level=blocking` retorna `blocked`
+4. `selfAudit.secret_exposure` retorna `blocked`
+5. conversa comum sem skill roteada retorna `not_applicable`
+6. método diferente de `POST` retorna erro controlado (`405`, `METHOD_NOT_ALLOWED`)
+7. JSON inválido retorna erro controlado (`400`, `INVALID_JSON`)
+8. `/skills/run` continua inexistente (`404`)
+9. endpoint não altera `reply`/`use_planner`
+10. endpoint não usa KV/fetch/filesystem runtime/LLM externo
+
+### Testes executados
+
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- Endpoint `/skills/propose` entregue em modo proposal-only/read-only ✅
+- Sem execução de skill ✅
+- Sem side effects ✅
+- `/skills/run` permanece inexistente ✅
+- Próxima etapa liberada: PR72 ✅
+
+---
+
 ## 2026-05-02 — PR70 — PR-PROVA — Prova formal do Skill Execution Proposal
 
 - **Branch:** `codex/pr70-prova-skill-execution-proposal`
