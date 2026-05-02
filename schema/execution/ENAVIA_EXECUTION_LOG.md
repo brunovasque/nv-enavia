@@ -4,6 +4,79 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR77 — PR-IMPL — Integração controlada com chat
+
+- **Branch:** `codex/pr77-chat-controlled-skill-integration`
+- **Tipo:** `PR-IMPL` (`Worker-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR76 ✅ (`test: PR76 prova formal SYSTEM_MAPPER`)
+
+### Objetivo
+
+Permitir que o chat exponha proposta/estado de skill de forma controlada quando houver `skill_execution` em `status=proposed`, sem execução automática, sem `/skills/run`, sem endpoint novo e sem degradar o reply para modo robótico.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-chat-skill-surface.js`
+  - `buildChatSkillSurface(input)` (helper puro)
+  - retorna metadado somente para `status=proposed`
+  - mensagem canônica: `Existe uma ação técnica proposta, aguardando aprovação.`
+- `tests/pr77-chat-controlled-skill-integration.smoke.test.js`
+  - 24 checks cobrindo contrato PR77 (proposal-only, sem execução, reply preservado, guardrails preservados)
+
+**Arquivos alterados:**
+- `nv-enavia.js`
+  - import de `buildChatSkillSurface`
+  - integração no `handleChatLLM` para publicar `chat_skill_surface` como campo aditivo
+  - `chat_skill_surface` só aparece quando `skill_execution.status=proposed`
+  - `reply` e `use_planner` não foram alterados
+- `tests/pr76-system-mapper.prova.test.js`
+  - ajuste do assert 45 para regressão estável em PRs posteriores (remove acoplamento ao diff histórico da PR76 e mantém foco em não criar endpoint de execução de skill)
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Regras preservadas
+
+1. Não executa skill automaticamente no chat
+2. Não chama `buildSystemMapperResult` automaticamente
+3. Não cria `/skills/run`
+4. Não cria endpoint novo
+5. Não altera `use_planner`
+6. Não altera `wrangler.toml`
+7. Não altera `contract-executor.js`
+8. Mantém `Self-Audit` e `Response Policy` no fluxo
+9. `skill_execution` continua campo aditivo
+10. `blocked/not_applicable` não poluem o reply
+
+### Testes executados
+
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js` → 24/24 ✅
+- `node tests/pr76-system-mapper.prova.test.js` → 46/46 ✅
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` → 24/24 ✅
+- `node tests/pr74-approval-gate.prova.test.js` → 81/81 ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` → 48/48 ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` → 45/45 ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- PR77 concluída ✅
+- Chat expõe proposta governada com mensagem explícita de pendência de aprovação ✅
+- Sem execução real de skill e sem side effects ✅
+- `/skills/run` permanece inexistente ✅
+- Próxima etapa liberada: PR78 (PR-PROVA) ✅
+
+---
+
 ## 2026-05-02 — PR76 — PR-PROVA — Prova formal da Skill SYSTEM_MAPPER
 
 - **Branch:** `codex/pr76-prova-system-mapper`
