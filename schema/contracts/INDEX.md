@@ -43,9 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR63 — PR-DIAG — Atualização supervisionada de memória: decidir se ainda é necessária**
+**PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+> ✅ PR63 (PR-DIAG) — concluída. Diagnóstico da frente "Atualização supervisionada de memória" após PR61 documental. Decisão: **Opção B — Parcialmente concluída** com absorção do mecanismo manual. PR61 entregou a camada documental (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada). O mecanismo técnico de escrita supervisionada automática no runtime NÃO foi implementado e NÃO é blocking para Runtime de Skills. O fluxo manual via PR (agente propõe → operador aprova ao mergear) é o mecanismo vigente conforme `UPDATE_POLICY.md` seção 8. G3 permanece on-hold (não blocking). Não faz sentido implementar `/memory/write` antes de existirem skills para gerar conteúdo a memorizar. Próxima PR: PR64 — PR-DOCS — Encerrar formalmente a frente e liberar Blueprint Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md`.
 
 > ✅ PR62 (PR-DOCS) — concluída. Reconciliação documental do contrato Jarvis Brain pós-execuções reais PR57–PR61. Seção 12 adicionada ao contrato com: plano original, execução real, tabela de equivalência (frentes planejadas vs PRs reais executadas), e regra de interpretação daqui para frente (seguir a frente, não o número). Próxima PR recomendada: PR63 — PR-DIAG — decidir se atualização supervisionada de memória (frente não concluída por PR61) ainda é necessária antes de iniciar Runtime de Skills. Relatório: `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md`.
 

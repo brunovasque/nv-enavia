@@ -4,6 +4,75 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR63 — PR-DIAG — Diagnóstico da Atualização Supervisionada de Memória
+
+- **Branch:** `copilot/claudepr63-diag-atualizacao-supervisionada-memoria`
+- **Tipo:** `PR-DIAG` (read-only — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR62 ✅ (PR-DOCS — Reconciliação do Contrato Jarvis Brain)
+
+### Objetivo
+
+Diagnosticar se a frente "Atualização supervisionada de memória" ainda é necessária após a PR61 documental. Decidir com evidência do repositório se a frente foi concluída, é parcial, deve ser absorvida ou precisa PR-IMPL antes do Runtime de Skills.
+
+### Diagnóstico realizado
+
+**Base analisada:**
+- `schema/reports/PR61_PROPOSTA_ATUALIZACAO_MEMORIA.md`
+- `schema/brain/memories/PROPOSED_MEMORY_UPDATES_PR61.md`
+- `schema/brain/memories/JARVIS_BRAIN_PR31_PR60_MEMORY.md`
+- `schema/brain/UPDATE_POLICY.md`
+- `schema/brain/MEMORY_RULES.md`
+- `schema/brain/RETRIEVAL_POLICY.md`
+- `schema/brain/open-questions/unresolved-technical-gaps.md`
+- `schema/brain/learnings/future-risks.md`
+- `schema/brain/SYSTEM_AWARENESS.md`
+- `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md`
+
+**Evidências coletadas:**
+- PR61 criou 7 arquivos de memória documental ✅
+- PR61 NÃO criou mecanismo de escrita no runtime ❌
+- `UPDATE_POLICY.md` seção 8 define mecanismo manual como vigente ✅
+- `UPDATE_POLICY.md` seção 9 define runtime automatizado como "PR futura" ❌
+- G3 (`unresolved-technical-gaps.md`) confirma: escrita automática não existe ❌
+- `PROPOSED_MEMORY_UPDATES_PR61.md` NR1: não implementar escrita automática sem ciclo completo ❌
+
+**Decisão: Opção B — Parcialmente concluída** com absorção do mecanismo manual
+
+- Camada documental: CONCLUÍDA pela PR61
+- Mecanismo runtime: NÃO EXISTE (not blocking para Runtime de Skills)
+- Fluxo atual: agente propõe → operador aprova ao mergear PR (supervisionado, manual)
+- G3: marcado como on-hold — endereçar em fase futura pós-Runtime de Skills
+- Risco de implementar antes: R1 (docs_over_product) — não há skills para gerar conteúdo
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md` — relatório completo
+
+**Arquivos atualizados:**
+- `schema/contracts/INDEX.md` — PR64 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR63 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR63→PR64
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Resultado
+
+- **Diagnóstico criado:** `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md` ✅
+- **Decisão clara:** Opção B — parcialmente concluída / mecanismo manual absorvido como vigente ✅
+- **Governança atualizada:** ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **Runtime de Skills não iniciado** ✅
+- **Finding I1 não corrigido** ✅
+- **Próxima PR definida sem ambiguidade:** PR64 — PR-DOCS ✅
+
+### Próxima PR autorizada
+
+**PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills**
+
+---
+
 ## 2026-05-02 — PR62 — PR-DOCS — Reconciliação do Contrato Jarvis Brain
 
 - **Branch:** `copilot/claudepr62-docs-reconciliar-contrato-jarvis-brain`
