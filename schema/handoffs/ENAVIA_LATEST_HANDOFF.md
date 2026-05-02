@@ -1,31 +1,29 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER ✅
-**Para:** PR76 — PR-PROVA — Prova da Skill SYSTEM_MAPPER
+**De:** PR76 — PR-PROVA — Prova formal da Skill SYSTEM_MAPPER ✅
+**Para:** PR77 — PR-IMPL — Integração controlada com chat
 
-## Handoff atual (PR75)
+## Handoff atual (PR76)
 
 ### O que foi feito
 
-- PR75 executada em escopo `Worker-only`.
-- Skill `SYSTEM_MAPPER` criada como módulo puro em `schema/enavia-system-mapper-skill.js`.
-- Função `buildSystemMapperResult(input)` implementada em modo estritamente read-only:
-  - `skill_id=SYSTEM_MAPPER`
-  - `mode=read_only`
-  - `side_effects=false`
-  - `executed=false`
-  - `executed_readonly=true` quando permitido
-  - gate opcional por proposal aprovada (`require_approved_proposal=true`)
-- Skill retorna mapa pequeno/determinístico com:
-  - allowlist conhecida (inclui `SYSTEM_MAPPER`)
-  - endpoints de skills conhecidos (`/skills/propose`, `/skills/approve`, `/skills/reject`)
-  - confirmação de ausência de `/skills/run`
-  - estado conhecido do approval gate e limitações atuais
-- Teste novo criado: `tests/pr75-system-mapper-readonly.smoke.test.js`.
+- PR76 executada em escopo `Tests-only`.
+- Prova formal criada: `tests/pr76-system-mapper.prova.test.js`.
+- 46 cenários mandatórios cobertos com validação explícita de:
+  - contrato read-only da `SYSTEM_MAPPER`
+  - gate `require_approved_proposal` (approved libera; demais bloqueiam)
+  - side effects/execution invariantes (`side_effects=false`, `executed=false`)
+  - mapa de allowlist/endpoints com `/skills/run` inexistente
+  - limitações de segurança (`no_side_effects`, sem FS/rede/KV/LLM externo)
+  - determinismo, saída pequena/estruturada e não vazamento de segredos
+  - `nv-enavia.js`, `wrangler.toml`, `contract-executor.js`, `reply/use_planner` preservados
+  - ausência de endpoint novo na PR
+  - regressão obrigatória: smoke PR75 continua passando
 
 ### Testes executados
 
+- `node tests/pr76-system-mapper.prova.test.js` — 46/46 ✅
 - `node tests/pr75-system-mapper-readonly.smoke.test.js` — 24/24 ✅
 - `node tests/pr74-approval-gate.prova.test.js` — 81/81 ✅
 - `node tests/pr73-approval-gate-proposal-only.smoke.test.js` — 48/48 ✅
@@ -53,7 +51,7 @@
 
 ### Próxima etapa segura
 
-- PR76 — `Tests-only` — prova formal da skill `SYSTEM_MAPPER` read-only limitada.
+- PR77 — `Worker-only` — integração controlada com chat (sem execução automática e sem `/skills/run`).
 
 ---
 
