@@ -1,31 +1,32 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR74 — PR-PROVA — Prova formal do Approval Gate ✅
-**Para:** PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER
+**De:** PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER ✅
+**Para:** PR76 — PR-PROVA — Prova da Skill SYSTEM_MAPPER
 
-## Handoff atual (PR74)
+## Handoff atual (PR75)
 
 ### O que foi feito
 
-- PR74 executada em escopo `Tests-only`.
-- Teste formal criado: `tests/pr74-approval-gate.prova.test.js`.
-- Prova formal concluída com 32 cenários obrigatórios:
-  - proposta válida com `proposal_id` e status inicial `proposed`
-  - approve/reject válidos
-  - bloqueios para proposal desconhecida, ausente, blocked, not_applicable e expirada
-  - bloqueio de segunda aprovação/rejeição
-  - erros controlados para JSON inválido em `/skills/approve` e `/skills/reject`
-  - `GET` em approve/reject retorna `405 METHOD_NOT_ALLOWED`
-  - `side_effects=false` e `executed=false` em todas as respostas do gate
-  - `/skills/run` continua inexistente
-  - approve/reject não executam skill
-  - gate sem KV/fetch/filesystem runtime/LLM externo
-  - `wrangler.toml` e `contract-executor.js` preservados
-  - `reply/use_planner` preservados
+- PR75 executada em escopo `Worker-only`.
+- Skill `SYSTEM_MAPPER` criada como módulo puro em `schema/enavia-system-mapper-skill.js`.
+- Função `buildSystemMapperResult(input)` implementada em modo estritamente read-only:
+  - `skill_id=SYSTEM_MAPPER`
+  - `mode=read_only`
+  - `side_effects=false`
+  - `executed=false`
+  - `executed_readonly=true` quando permitido
+  - gate opcional por proposal aprovada (`require_approved_proposal=true`)
+- Skill retorna mapa pequeno/determinístico com:
+  - allowlist conhecida (inclui `SYSTEM_MAPPER`)
+  - endpoints de skills conhecidos (`/skills/propose`, `/skills/approve`, `/skills/reject`)
+  - confirmação de ausência de `/skills/run`
+  - estado conhecido do approval gate e limitações atuais
+- Teste novo criado: `tests/pr75-system-mapper-readonly.smoke.test.js`.
 
 ### Testes executados
 
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` — 24/24 ✅
 - `node tests/pr74-approval-gate.prova.test.js` — 81/81 ✅
 - `node tests/pr73-approval-gate-proposal-only.smoke.test.js` — 48/48 ✅
 - `node tests/pr72-skills-propose-endpoint.prova.test.js` — 45/45 ✅
@@ -41,18 +42,18 @@
 - `nv-enavia.js`
 - `schema/enavia-skill-approval-gate.js`
 - `schema/enavia-skill-executor.js`
+- `wrangler.toml`
+- `contract-executor.js`
 - `schema/enavia-skill-router.js`
 - `schema/enavia-self-audit.js`
 - `schema/enavia-response-policy.js`
-- `contract-executor.js`
-- `wrangler.toml`
 - painel / executor / deploy-worker / workflows
 - `/skills/run` (continua inexistente)
 - nenhum binding/KV/secret
 
 ### Próxima etapa segura
 
-- PR75 — `Worker-only` — skill read-only limitada `SYSTEM_MAPPER` com gate já provado na PR74.
+- PR76 — `Tests-only` — prova formal da skill `SYSTEM_MAPPER` read-only limitada.
 
 ---
 
