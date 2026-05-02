@@ -4,6 +4,70 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR73 — PR-IMPL — Approval Gate técnico proposal-only
+
+- **Branch:** `codex/pr73-approval-gate-proposal-only`
+- **Tipo:** `PR-IMPL` (`Worker-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR72 ✅ (`test: PR72 prova formal endpoint /skills/propose`)
+
+### Objetivo
+
+Criar approval gate técnico proposal-only para skills sem execução real e sem `/skills/run`.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-skill-approval-gate.js`
+- `tests/pr73-approval-gate-proposal-only.smoke.test.js`
+
+**Arquivos alterados:**
+- `nv-enavia.js`
+  - integração de `proposal_id`/`proposal_status` no `POST /skills/propose`
+  - novos endpoints `POST /skills/approve` e `POST /skills/reject`
+  - respostas com `side_effects=false` e `executed=false`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Contrato entregue
+
+1. proposal válida recebe `proposal_id`
+2. status de gate controlado: `proposed|approved|rejected|expired|blocked`
+3. approve só aprova proposal válida em `proposed`
+4. reject só rejeita proposal válida em `proposed`
+5. proposal `blocked` não aprova
+6. proposal `not_applicable` não aprova
+7. proposal desconhecida/inválida bloqueia de forma controlada
+8. approval/rejection não executam skill
+9. `side_effects=false` sempre
+10. `/skills/run` permanece inexistente
+11. sem KV/fetch/filesystem runtime/LLM externo
+12. sem alteração de `wrangler.toml` e `contract-executor.js`
+13. `reply` e `use_planner` preservados
+
+### Testes executados
+
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` → 48/48 ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` → 45/45 ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- Approval gate PR73 concluído ✅
+- Proposal-only preservado ✅
+- Sem side effect externo ✅
+- Próxima etapa liberada: PR74 (PR-PROVA) ✅
+
+---
+
 ## 2026-05-02 — PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose`
 
 - **Branch:** `codex/pr72-prova-skills-propose-endpoint`
