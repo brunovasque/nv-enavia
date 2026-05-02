@@ -1,8 +1,121 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR65 — PR-DOCS — Blueprint do Runtime de Skills ✅
-**Para:** PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+**De:** PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills ✅
+**Para:** PR67 — PR-IMPL — Skill Execution Proposal (read-only)
+
+## O que foi feito nesta sessão
+
+### PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+
+**Tipo:** `PR-DIAG` (read-only — sem alteração de runtime)
+**Branch:** `copilot/claudepr66-diag-runtime-skills`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR65 ✅ (PR-DOCS — Blueprint do Runtime de Skills)
+
+**Objetivo:**
+Responder as 12 perguntas abertas de `schema/skills-runtime/OPEN_QUESTIONS.md` com evidência do repositório.
+
+**Arquivos criados:**
+- `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md` — relatório completo com 12 respostas + decisões
+
+**Arquivos atualizados:**
+- `schema/contracts/INDEX.md` — PR67 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR66 concluída, PR67 como próxima
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR66
+
+**O que NÃO foi alterado:**
+- Nenhum módulo de runtime (`schema/enavia-*.js`, `nv-enavia.js`)
+- Nenhum endpoint criado
+- `/skills/run` não criado
+- `/skills/propose` não criado
+- Nenhum painel/executor/deploy worker/workflow/wrangler alterado
+- Nenhum KV/binding/secret alterado
+- `schema/skills-runtime/*.md` não alterados
+- Testes não alterados
+
+**Decisões do diagnóstico:**
+
+| Questão | Decisão |
+|---------|---------|
+| Onde vive o runtime? | Módulo interno `schema/enavia-skill-executor.js` (Opção C) |
+| Primeiro artefato? | `buildSkillExecutionProposal()` como pure function |
+| Primeiro endpoint? | `/skills/propose` — PR69 (após módulo validado) |
+| `/skills/run`? | ❌ Não criar antes da Fase 5 (PR73+) |
+| Bindings novos? | Nenhum na Fase 2 |
+| Rotas conflitantes? | Nenhuma — registry sem entradas `/skills/*` |
+| `contract-executor.js`? | Referência de padrões — não herança |
+| Self-Audit? | Integrável sem breaking change (`runEnaviaSelfAudit()`) |
+| Aprovação humana fase inicial? | Manual via operador. Gate técnico em PR71+ |
+
+## O que a próxima sessão deve fazer
+
+### PR67 — PR-IMPL — Skill Execution Proposal (read-only)
+
+**Tipo:** `PR-IMPL` (Worker-only — implementação)
+**Objetivo:**
+Criar `schema/enavia-skill-executor.js` como pure function com `buildSkillExecutionProposal()` em modo `proposal` apenas.
+
+**O que implementar:**
+- `schema/enavia-skill-executor.js` — pure function
+  - `buildSkillExecutionProposal(input)` — modo `proposal` apenas
+  - Validação de `skill_id` contra allowlist
+  - Chamada a `runEnaviaSelfAudit()` antes de retornar
+  - Retorno conforme `EXECUTION_CONTRACT.md`
+- Integração defensiva em `nv-enavia.js` como campo aditivo `skill_execution` no response do `/chat/run`
+- Smoke tests: `tests/pr67-skill-executor-proposal.smoke.test.js`
+
+**O que NÃO implementar:**
+- `/skills/propose` (endpoint — apenas na PR69)
+- `/skills/run` (Fase 5 — PR73+)
+- Execução de skill (modes `proposal` apenas)
+- Escrita em KV
+- Gate de aprovação técnico
+
+**Pré-requisitos:**
+- PR66 ✅ (esta PR)
+- Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+**Critério de conclusão:**
+- `buildSkillExecutionProposal()` funciona para as 4 skills do allowlist
+- `should_block` é `true` para `secret_exposure`
+- Campo `skill_execution` aparece no response do `/chat/run` (campo aditivo)
+- Smoke tests passando
+- PR-PROVA (PR68) pode ser criada
+
+**Sequência prevista após PR67:**
+1. PR67 — PR-IMPL — Skill Executor proposal-only ← PRÓXIMA
+2. PR68 — PR-PROVA — Validação do Skill Executor
+3. PR69 — PR-IMPL — Endpoint `/skills/propose`
+4. PR70 — PR-PROVA — Validação do endpoint
+5. PR71 — PR-IMPL — Mecanismo de aprovação (flag KV)
+6. PR72 — PR-PROVA — Validação do ciclo proposta→aprovação
+7. PR73+ — PR-IMPL — Execução limitada read-only (Fase 5)
+
+## Contexto técnico
+
+**Stack atual:**
+
+| Módulo | Status | Finding |
+|--------|--------|---------|
+| nv-enavia.js | Worker principal (9.143 linhas) — não alterar sem contrato | — |
+| enavia-llm-core.js | LLM Core v1 — ativo e validado | — |
+| enavia-brain-loader.js | Brain Context read-only — ativo (snapshot estático) | — |
+| enavia-intent-classifier.js | 15 intenções — Finding I1 (variantes com advérbio) | Baixo impacto — PR separada |
+| enavia-skill-router.js | Skill Router read-only — 4 skills documentais | — |
+| enavia-intent-retrieval.js | Retrieval por intenção — ativo | — |
+| enavia-self-audit.js | Self-Audit read-only — 10 categorias | Integrável sem breaking change |
+| enavia-response-policy.js | Response Policy viva — 15 regras | — |
+| Brain documental | `schema/brain/` — 20+ arquivos | — |
+| Blueprint Runtime de Skills | ✅ Criado na PR65 — `schema/skills-runtime/` | — |
+| Diagnóstico Runtime de Skills | ✅ Criado na PR66 — 12 perguntas respondidas | — |
+| Runtime de Skills | ❌ Não existe — aguarda PR67+ | Próxima frente |
+| `/skills/run` | ❌ Não existe — skills continuam documentais | — |
+| `/skills/propose` | ❌ Não existe — aguarda PR69 | — |
+| Skill Executor | ❌ Não existe — aguarda PR67 (próxima) | — |
+
+
 
 ## O que foi feito nesta sessão
 
