@@ -4,6 +4,65 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR79 — PR-IMPL — Skill Factory Core
+
+- **Branch:** `codex/pr79-skill-factory-core`
+- **Tipo:** `PR-IMPL` (`Worker-only + docs/status mínimos`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Ativo)
+- **PR anterior validada:** PR78 ✅
+
+### Objetivo
+
+Implementar o núcleo da Skill Factory: converter pedido humano em `skill_spec` estruturada e, apenas com autorização explícita, preparar pacote de criação PR-ready sem execução real.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-skill-factory.js`
+- `tests/pr79-skill-factory-core.smoke.test.js`
+- `schema/reports/PR79_SKILL_FACTORY_CORE.md`
+
+**Arquivos alterados:**
+- `nv-enavia.js` (endpoints `POST /skills/factory/spec` e `POST /skills/factory/create`)
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Regras preservadas
+
+1. sem autorização explícita não gera pacote de criação
+2. skill com `risk_level=blocked` não gera pacote
+3. sem deploy, sem merge automático, sem produção, sem browser action
+4. sem KV/banco/filesystem runtime/fetch/comando externo/LLM externo novo
+5. `side_effects=false` e `executed=false` nas respostas da PR79
+6. `/skills/run` permanece inexistente
+7. `wrangler.toml` e `contract-executor.js` intocados
+
+### Testes executados
+
+- `node tests/pr79-skill-factory-core.smoke.test.js` ✅
+- `node tests/pr78-skills-runtime-fase1.fechamento.test.js` ✅
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js` ✅
+- `node tests/pr76-system-mapper.prova.test.js` ✅
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` ✅
+- `node tests/pr74-approval-gate.prova.test.js` ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` ✅
+
+### Resultado
+
+- PR79 concluída ✅
+- Skill Factory Core ativa em proposal/spec mode ✅
+- Próxima etapa liberada: PR80 ✅
+
+---
+
 ## 2026-05-02 — PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills
 
 - **Branch:** `codex/pr78-fechamento-skills-runtime-fase1`
