@@ -2,7 +2,7 @@
 
 Contrato ativo atual:
 
-- schema/contracts/active/CONTRATO_ENAVIA_JARVIS_REAL_PR79_PR86.md
+- schema/contracts/active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md
 
 Status:
 
@@ -10,7 +10,7 @@ Status:
 
 Proxima PR autorizada:
 
-- PR79 — skills/run real read-only para SYSTEM_MAPPER
+- PR79 — Skill Factory Core
 
 Observacao:
 
