@@ -4,6 +4,61 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills
+
+- **Branch:** `codex/pr78-fechamento-skills-runtime-fase1`
+- **Tipo:** `PR-PROVA` (`Tests-only + Docs-only mínimo`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (fechado nesta PR)
+- **PR anterior validada:** PR77 ✅ (`feat: PR77 integração controlada com chat`)
+
+### Objetivo
+
+Validar ponta a ponta da Fase 1: proposal-only -> `/skills/propose` -> approval gate -> `SYSTEM_MAPPER` read-only limitada -> chat controlado.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr78-skills-runtime-fase1.fechamento.test.js`
+- `schema/reports/PR78_FECHAMENTO_SKILLS_RUNTIME_FASE1.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/ACTIVE_CONTRACT.md`
+
+### Regras preservadas
+
+1. `/skills/run` permanece inexistente
+2. nenhuma execução automática de skill no `/chat/run`
+3. `reply` e `use_planner` preservados
+4. `skill_execution` e `chat_skill_surface` permanecem aditivos
+5. Self-Audit e Response Policy permanecem no fluxo
+6. sem alteração em `wrangler.toml` e `contract-executor.js`
+
+### Testes executados
+
+- `node tests/pr78-skills-runtime-fase1.fechamento.test.js` ✅
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js` ✅
+- `node tests/pr76-system-mapper.prova.test.js` ✅
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` ✅
+- `node tests/pr74-approval-gate.prova.test.js` ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` ✅
+
+### Resultado
+
+- PR78 concluída ✅
+- Fase 1 do Runtime de Skills fechada funcionalmente ✅
+- Estado final preservado: proposal primeiro, sem `/skills/run` nesta fase ✅
+
+---
 ## 2026-05-02 — PR77 — PR-IMPL — Integração controlada com chat
 
 - **Branch:** `codex/pr77-chat-controlled-skill-integration`
@@ -4669,3 +4724,4 @@ Nenhum. Diagnóstico completo. PR18 pode iniciar.
 - **Garantias:** Read-only. Não altera reply. Não bloqueia fluxo automaticamente. Não cria endpoint. Não escreve memória. Não chama LLM externo. Não usa KV/rede/filesystem. Falha com segurança.
 - **Escopo preservado:** `enavia-cognitive-runtime.js`, `enavia-llm-core.js`, `enavia-brain-loader.js`, `enavia-intent-classifier.js`, `enavia-skill-router.js`, `enavia-intent-retrieval.js`, Panel, Executor, Deploy Worker, workflows, wrangler.toml — todos intactos.
 - **Próxima etapa segura:** PR57 — PR-PROVA — Teste do Self-Audit read-only.
+
