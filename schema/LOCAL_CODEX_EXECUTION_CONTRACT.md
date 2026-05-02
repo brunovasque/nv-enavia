@@ -3,7 +3,7 @@
 Contrato operacional para uso do Codex local no repositório `nv-enavia`.
 
 Este arquivo não substitui `CLAUDE.md` nem `schema/CODEX_WORKFLOW.md`.
-Ele é uma camada complementar para execução local com microfases, Git local e bloqueios explícitos.
+Ele é uma camada complementar para execução local com microfases, Git local, permissões controladas e bloqueios explícitos.
 
 ---
 
@@ -35,7 +35,74 @@ Se algum arquivo obrigatório não puder ser lido, pare e reporte o bloqueio.
 
 ---
 
-## 3. Modo de execução permitido
+## 3. Modos locais oficiais
+
+Existem dois modos locais permitidos.
+
+### 3.1. Modo LOCAL-STAGING
+
+Uso: explorar, diagnosticar, testar e preparar uma microfase localmente antes de abrir PR.
+
+Permissões:
+
+- pode ler arquivos;
+- pode editar arquivos dentro do escopo da microfase;
+- pode rodar testes locais;
+- pode gerar diff;
+- pode criar commit local;
+- não deve fazer push;
+- não deve abrir PR;
+- deve parar ao final da microfase.
+
+### 3.2. Modo LOCAL-PR
+
+Uso: executar microfase já aprovada para virar PR oficial.
+
+Permissões:
+
+- pode ler arquivos;
+- pode editar arquivos dentro do escopo da microfase;
+- pode rodar testes locais;
+- pode gerar diff;
+- pode criar commit;
+- pode fazer push no branch da microfase;
+- pode preparar ou atualizar PR;
+- deve seguir `CLAUDE.md` e `schema/CODEX_WORKFLOW.md` quanto a commit, push e evidências.
+
+Neste modo, o push não é considerado indevido, porque faz parte do fluxo oficial autorizado.
+
+---
+
+## 4. Política de autorização no terminal
+
+Dentro de uma microfase aprovada, o Codex local não deve pedir autorização para cada leitura, edição ou teste comum.
+
+Estão pré-autorizados dentro do escopo declarado:
+
+- ler arquivos do repo;
+- editar arquivos listados ou compatíveis com o escopo;
+- criar novos arquivos de documentação quando o escopo for `Docs-only`;
+- rodar comandos de teste, lint, typecheck, build ou validação local;
+- executar comandos Git seguros de inspeção, como status, diff, log e branch;
+- criar commit local da microfase.
+
+Exigem parada e autorização explícita:
+
+- push, exceto quando a sessão estiver em modo `LOCAL-PR`;
+- merge;
+- alterações destrutivas de histórico;
+- alteração de branch remota;
+- mexer em produção;
+- alterar secrets, bindings, variáveis de ambiente ou banco;
+- criar tabela ou coluna;
+- instalar dependência nova;
+- alterar arquivos fora do escopo;
+- avançar para próxima microfase;
+- rodar comandos com risco de perda de dados.
+
+---
+
+## 5. Modo de execução permitido
 
 O Codex local pode:
 
@@ -44,14 +111,15 @@ O Codex local pode:
 - rodar testes locais;
 - gerar diff;
 - criar commit local;
-- preparar instrução para PR.
+- preparar instrução para PR;
+- fazer push somente quando estiver em modo `LOCAL-PR`.
 
 O Codex local não pode:
 
 - executar contrato inteiro em loop cego;
 - misturar escopos;
 - alterar produção;
-- fazer push sem autorização explícita;
+- fazer push em modo `LOCAL-STAGING`;
 - avançar para a próxima microfase se a atual falhar;
 - criar arquitetura paralela sem autorização;
 - refatorar por estética;
@@ -60,7 +128,7 @@ O Codex local não pode:
 
 ---
 
-## 4. Escopos isolados
+## 6. Escopos isolados
 
 Cada microfase deve declarar exatamente um escopo:
 
@@ -76,7 +144,7 @@ Se uma tarefa exigir mais de um escopo, divida em microfases separadas.
 
 ---
 
-## 5. Ciclo obrigatório por microfase
+## 7. Ciclo obrigatório por microfase
 
 Para cada microfase, siga o ciclo:
 
@@ -90,13 +158,14 @@ Para cada microfase, siga o ciclo:
 8. Rodar testes obrigatórios da microfase.
 9. Mostrar `git diff --stat` e resumo do diff.
 10. Criar commit local com o ID da microfase.
-11. Parar.
+11. Se estiver em modo `LOCAL-PR`, fazer push no branch autorizado.
+12. Parar.
 
 A próxima microfase só pode começar depois de confirmação explícita.
 
 ---
 
-## 6. Regra de parada obrigatória
+## 8. Regra de parada obrigatória
 
 Pare imediatamente se ocorrer qualquer item abaixo:
 
@@ -107,7 +176,8 @@ Pare imediatamente se ocorrer qualquer item abaixo:
 - a microfase depende de informação ausente;
 - a tarefa exigiria mexer em produção;
 - o Codex precisaria criar tabela, coluna, secret ou binding não previsto;
-- o patch ficaria maior que o escopo declarado.
+- o patch ficaria maior que o escopo declarado;
+- o comando pretendido estiver na lista de ações que exigem autorização explícita.
 
 Quando parar, responda com:
 
@@ -123,7 +193,7 @@ Próxima ação segura:
 
 ---
 
-## 7. Commits locais
+## 9. Commits locais
 
 Cada microfase concluída deve gerar um commit próprio.
 
@@ -144,13 +214,14 @@ Nunca juntar múltiplas microfases sem necessidade.
 
 ---
 
-## 8. Push e PR
+## 10. Push e PR
 
-O Codex local não deve fazer push automaticamente.
+Push depende do modo da sessão:
 
-Push só é permitido quando o usuário autorizar explicitamente.
+- `LOCAL-STAGING`: push proibido; parar com commit local e relatório.
+- `LOCAL-PR`: push permitido e esperado no branch autorizado da microfase.
 
-Antes do push, deve apresentar:
+Antes do push em modo `LOCAL-PR`, deve apresentar ou registrar:
 
 - branch atual;
 - commits criados;
@@ -161,31 +232,29 @@ Antes do push, deve apresentar:
 
 ---
 
-## 9. Rollback
+## 11. Rollback
 
 Toda microfase deve ter rollback claro.
 
-Padrão mínimo:
-
-```bash
-git revert <commit_hash>
-```
+Padrão mínimo: reverter o commit da microfase.
 
 Se houver alteração de ambiente, segredo, binding, banco ou deploy, a microfase deve declarar rollback específico antes de implementar.
 
 ---
 
-## 10. Formato obrigatório de resposta local
+## 12. Formato obrigatório de resposta local
 
 Ao concluir uma microfase:
 
 ```md
 WORKFLOW_ACK: ok
 
+Modo:
 Microfase:
 Escopo:
 Branch local:
 Commit local:
+Push:
 
 Resumo:
 - ...
@@ -209,7 +278,9 @@ Próxima microfase:
 
 ---
 
-## 11. Princípio final
+## 13. Princípio final
 
 A Enavia pode usar Codex local como braço executor.
 Mas o Codex local nunca deve substituir governança, contrato, microfase, teste, diff e aprovação humana.
+
+O objetivo é reduzir pedidos repetitivos de permissão no terminal sem remover os freios importantes do projeto.
