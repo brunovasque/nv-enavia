@@ -43,9 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills**
+**PR67 — PR-IMPL — Skill Execution Proposal (read-only)**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+> ✅ PR66 (PR-DIAG) — concluída. Diagnóstico técnico do Runtime de Skills. 12 perguntas abertas respondidas com evidência do repositório. Decisões: Opção C (módulo interno `schema/enavia-skill-executor.js`), primeiro endpoint `/skills/propose` (não `/skills/run`), zero bindings novos para Fase 2, zero conflitos de rota, `contract-executor.js` como referência não herança, `runEnaviaSelfAudit()` integrável sem breaking change, padrão de pure function para testes. Sequência recomendada PR67-PR73+ documentada. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md`.
 
 > ✅ PR65 (PR-DOCS) — concluída. Blueprint documental do Runtime de Skills criado. Pasta `schema/skills-runtime/` com 8 arquivos: INDEX.md, ARCHITECTURE.md (fluxo 11 camadas), EXECUTION_CONTRACT.md (formato JSON + 10 regras), APPROVAL_GATES.md (3 categorias + gate absoluto), SKILL_CAPABILITY_MATRIX.md (4 skills), SECURITY_MODEL.md (7 categorias de risco + allowlist), ROLLOUT_PLAN.md (Fases 0–6), OPEN_QUESTIONS.md (12 perguntas para PR66). SYSTEM_AWARENESS.md (seção 9), unresolved-technical-gaps.md (G1 e G2 atualizados), future-risks.md (R10-R13 adicionados), skills/INDEX.md (referência ao blueprint), relatório PR65 criados/atualizados. Nenhum runtime alterado. Nenhum endpoint criado. `/skills/run` não criado. Relatório: `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md`.
 

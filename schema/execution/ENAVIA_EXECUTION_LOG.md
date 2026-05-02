@@ -4,7 +4,64 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-02 — PR65 — PR-DOCS — Blueprint do Runtime de Skills
+## 2026-05-02 — PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills
+
+- **Branch:** `copilot/claudepr66-diag-runtime-skills`
+- **Tipo:** `PR-DIAG` (read-only — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR65 ✅ (PR-DOCS — Blueprint do Runtime de Skills)
+
+### Objetivo
+
+Responder as 12 perguntas abertas de `schema/skills-runtime/OPEN_QUESTIONS.md` com evidência do repositório. Diagnosticar tecnicamente como implementar futuramente o Runtime de Skills sem executar nada nesta PR.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md` — relatório completo com 12 respostas + decisões técnicas
+
+**Arquivos atualizados:**
+- `schema/contracts/INDEX.md` — PR67 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR66 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR66→PR67
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Resultado
+
+- **12 perguntas respondidas com evidência:** Q1–Q12 ✅
+- **Onde vive o runtime:** Opção C — módulo interno `schema/enavia-skill-executor.js` ✅
+- **Primeiro endpoint:** `/skills/propose` (não `/skills/run`) ✅
+- **Bindings necessários:** Zero na Fase 2 — `ENAVIA_BRAIN` KV para Fase 3+ ✅
+- **Rotas verificadas:** Nenhum conflito — registry sem `/skills/*` ✅
+- **Reuso de módulos:** `runEnaviaSelfAudit()` integrável sem breaking change ✅
+- **Contrato técnico futuro:** `buildSkillExecutionProposal()` proposto ✅
+- **Sequência PR67-PR73+:** documentada ✅
+- **Relatório criado:** `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md` ✅
+- **Governança atualizada:** ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **`/skills/run` não criado** ✅
+- **`/skills/propose` não criado** ✅
+- **`nv-enavia.js` não alterado** ✅
+- **Nenhum binding/KV/secret alterado** ✅
+
+### Decisões
+
+| Decisão | Resultado |
+|---------|-----------|
+| Onde vive o runtime? | `schema/enavia-skill-executor.js` — módulo interno pure function |
+| Primeiro artefato? | `buildSkillExecutionProposal()` — PR67 |
+| Primeiro endpoint? | `/skills/propose` — PR69 |
+| `/skills/run`? | Fase 5 (PR73+) — após gate de aprovação validado |
+| Bindings novos? | Nenhum para Fase 2 |
+| `contract-executor.js`? | Referência de padrões — não herança |
+| Self-Audit? | Chamar `runEnaviaSelfAudit()` com contexto de execução |
+| Aprovação fase inicial? | Manual via operador |
+| Próxima PR: | PR67 — PR-IMPL — Skill Executor proposal-only |
+
+---
+
+
 
 - **Branch:** `copilot/claudepr65-docs-blueprint-runtime-skills`
 - **Tipo:** `PR-DOCS` (governança/documentação apenas — sem alteração de runtime)
