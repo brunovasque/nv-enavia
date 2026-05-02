@@ -43,9 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR67 — PR-IMPL — Skill Execution Proposal (read-only)**
+**PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+> ✅ PR67 (PR-HARDENING) — concluída. Hardening documental/governança do Runtime de Skills criado. Pacote `schema/hardening/` com 6 arquivos: INDEX.md (visão geral), SKILLS_RUNTIME_HARDENING.md (D1–D10 deny-by-default, allowlist, aprovação humana, proteção de secrets, KV rules, Self-Audit, Response Policy, evidência), COST_LIMITS.md (C1–C5 riscos, limites por request/tempo/LLM/KV, política anti-gasto-invisível), BLAST_RADIUS.md (níveis 0–4, gates mínimos, matriz por skill, B1–B7), ROLLBACK_POLICY.md (rollback por artefato, regra PR-PROVA com falha), GO_NO_GO_CHECKLIST.md (32 critérios, 5 categorias). SECURITY_MODEL.md (seção 10 adicionada), ROLLOUT_PLAN.md (gate de hardening adicionado antes Fase 2), future-risks.md (R14–R17 adicionados), SYSTEM_AWARENESS.md (seção 10 adicionada). Nenhum runtime alterado. Nenhum endpoint criado. `/skills/propose` não criado. `/skills/run` não criado. `nv-enavia.js` não alterado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
 
 > ✅ PR66 (PR-DIAG) — concluída. Diagnóstico técnico do Runtime de Skills. 12 perguntas abertas respondidas com evidência do repositório. Decisões: Opção C (módulo interno `schema/enavia-skill-executor.js`), primeiro endpoint `/skills/propose` (não `/skills/run`), zero bindings novos para Fase 2, zero conflitos de rota, `contract-executor.js` como referência não herança, `runEnaviaSelfAudit()` integrável sem breaking change, padrão de pure function para testes. Sequência recomendada PR67-PR73+ documentada. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md`.
 

@@ -295,7 +295,52 @@ Responder 12 perguntas abertas com evidência do repositório. Não implementar.
 
 ---
 
-## 10. Como Evitar Alucinação Geral
+## 10. Estado após PR67 — Hardening criado
+
+> **Adicionado em:** 2026-05-02 (PR67 — PR-HARDENING)
+>
+> Esta seção documenta o estado do sistema após a criação do pacote de hardening do Runtime de Skills.
+> Nenhum runtime foi alterado. Nenhum endpoint foi criado. Nenhum código alterado.
+
+### Estado pós-PR67
+
+| Item | Estado |
+|------|--------|
+| Blueprint Runtime de Skills | ✅ Criado na PR65 — `schema/skills-runtime/` |
+| Diagnóstico técnico | ✅ Criado na PR66 — `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md` |
+| Pacote de hardening | ✅ Criado na PR67 — `schema/hardening/` |
+| Runtime de Skills | ❌ **NÃO EXISTE** — hardening criado, runtime aguarda PR-IMPL futura |
+| `schema/enavia-skill-executor.js` | ❌ **NÃO EXISTE** — não foi criado |
+| `/skills/propose` | ❌ **NÃO EXISTE** — endpoint não criado |
+| `/skills/run` | ❌ **NÃO EXISTE** — endpoint não criado, aguarda Fase 5 (PR73+) |
+| Execução de skill | ❌ **Nenhuma skill executa** — completamente documental |
+| Binding/secrets novos | ❌ **Nenhum** — zero bindings adicionados |
+
+### O que o hardening define
+
+- **Segurança:** deny-by-default D1–D10, allowlist, aprovação humana — `schema/hardening/SKILLS_RUNTIME_HARDENING.md`
+- **Custo e limites:** C1–C5 riscos, limites por request/tempo/LLM/KV — `schema/hardening/COST_LIMITS.md`
+- **Blast radius:** níveis 0–4, gates mínimos, regras B1–B7 — `schema/hardening/BLAST_RADIUS.md`
+- **Rollback policy:** por artefato, regra PR-PROVA com falha — `schema/hardening/ROLLBACK_POLICY.md`
+- **Go/No-Go checklist:** 32 critérios, 5 categorias — `schema/hardening/GO_NO_GO_CHECKLIST.md`
+
+### Restrições absolutas do estado atual
+
+- **`/skills/run` não existe e NÃO deve ser criado antes de `/skills/propose`**
+- **`/skills/propose` não existe e só pode ser criado após PR-IMPL autorizada pelo contrato**
+- **Nenhuma skill executa** — todas são documentais
+- **Fase proposal-only** está limitada a blast radius níveis 0 e 1
+
+### Próxima etapa
+
+**PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1**
+(se hardening completo)
+
+Ou **PR68 — PR-HARDENING** se algum critério do hardening estiver incompleto.
+
+---
+
+## 11. Como Evitar Alucinação Geral
 
 1. **Sempre citar a fonte** ao afirmar algo sobre o sistema.
 2. **Marcar incerteza explicitamente** quando não há fonte.

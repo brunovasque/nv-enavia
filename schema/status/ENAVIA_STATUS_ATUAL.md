@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR66 — Diagnóstico técnico para Runtime de Skills ✅)
-**Branch ativa:** `copilot/claudepr66-diag-runtime-skills`
-**Última tarefa:** PR66 — PR-DIAG — Diagnóstico técnico do Runtime de Skills. 12 perguntas abertas respondidas com evidência do repositório. Decisões: módulo interno `schema/enavia-skill-executor.js` (Opção C), primeiro endpoint `/skills/propose`, zero bindings novos para Fase 2, zero conflitos de rota. Sequência PR67-PR73+ documentada. Nenhum runtime alterado. Relatório: `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md`.
+**Data:** 2026-05-02 (atualizado após PR67 — Hardening de Segurança, Custo e Limites ✅)
+**Branch ativa:** `copilot/claudepr67-hardening-seguranca-custo-limites`
+**Última tarefa:** PR67 — PR-HARDENING — Hardening documental/governança do Runtime de Skills. Pacote `schema/hardening/` criado com 6 arquivos: INDEX.md, SKILLS_RUNTIME_HARDENING.md, COST_LIMITS.md, BLAST_RADIUS.md, ROLLBACK_POLICY.md, GO_NO_GO_CHECKLIST.md. SECURITY_MODEL, ROLLOUT_PLAN, future-risks (R14–R17), SYSTEM_AWARENESS (seção 10) atualizados. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR67 — PR-IMPL — Skill Execution Proposal (read-only)**
+**PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1**
 
+> ✅ PR67 (PR-HARDENING) — concluída. Hardening documental/governança. Pacote `schema/hardening/` criado com 6 arquivos. SECURITY_MODEL, ROLLOUT_PLAN, future-risks (R14–R17), SYSTEM_AWARENESS (seção 10) atualizados. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
 > ✅ PR66 (PR-DIAG) — concluída. Diagnóstico técnico do Runtime de Skills. 12 perguntas abertas respondidas com evidência do repositório. Decisões: Opção C (módulo interno `schema/enavia-skill-executor.js`), primeiro endpoint `/skills/propose` (não `/skills/run`), zero bindings novos para Fase 2, zero conflitos de rota, `contract-executor.js` como referência não herança, `runEnaviaSelfAudit()` integrável sem breaking change, padrão de pure function para testes. Sequência recomendada PR67-PR73+ documentada. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md`.
 > ✅ PR65 (PR-DOCS) — concluída. Blueprint documental do Runtime de Skills criado. Pasta `schema/skills-runtime/` com 8 arquivos: INDEX.md, ARCHITECTURE.md (fluxo 11 camadas), EXECUTION_CONTRACT.md, APPROVAL_GATES.md, SKILL_CAPABILITY_MATRIX.md, SECURITY_MODEL.md, ROLLOUT_PLAN.md (Fases 0–6), OPEN_QUESTIONS.md (12 perguntas para PR66). SYSTEM_AWARENESS (seção 9), unresolved-technical-gaps (G1/G2 atualizados), future-risks (R10-R13 adicionados), skills/INDEX.md (referência ao blueprint) atualizados. Relatório: `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md`. Nenhum runtime alterado. Nenhum endpoint criado.
 > ✅ PR64 (PR-DOCS) — concluída. Encerramento formal da frente de atualização supervisionada de memória. Contrato atualizado (seção 12F). G3 on-hold. UPDATE_POLICY modo vigente documentado. future-risks R1 atualizado. SYSTEM_AWARENESS estado pós-PR64 adicionado. Próxima frente: Blueprint do Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.

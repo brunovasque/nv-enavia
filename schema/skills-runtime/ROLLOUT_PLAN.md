@@ -215,3 +215,47 @@ O Runtime de Skills será implementado em fases incrementais, cada uma com diagn
 - Não cria nenhum endpoint
 - Não altera nenhum módulo de runtime
 - Cada fase depende de PR-DIAG + PR-IMPL + PR-PROVA aprovadas pelo operador
+
+---
+
+## 11. Gate de hardening obrigatório antes de Fase 2 (adicionado PR67)
+
+**Data:** 2026-05-02 (PR67)
+
+Antes de iniciar qualquer PR-IMPL da Fase 2 (Runtime Read-Only / Proposal), o seguinte gate de hardening deve estar satisfeito:
+
+### Pré-requisitos obrigatórios para iniciar Fase 2
+
+| Pré-requisito | Estado | Referência |
+|---------------|--------|------------|
+| PR65 — Blueprint | ✅ Concluída | `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md` |
+| PR66 — Diagnóstico | ✅ Concluída | `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md` |
+| PR67 — Hardening | ✅ Concluída | `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md` |
+| Go/No-Go checklist preenchido | ☐ | `schema/hardening/GO_NO_GO_CHECKLIST.md` |
+| Deny-by-default documentado | ✅ | `schema/hardening/SKILLS_RUNTIME_HARDENING.md` |
+| Limites de custo definidos | ✅ | `schema/hardening/COST_LIMITS.md` |
+| Blast radius declarado | ✅ | `schema/hardening/BLAST_RADIUS.md` |
+| Rollback policy definida | ✅ | `schema/hardening/ROLLBACK_POLICY.md` |
+
+### Implementação só pode começar após:
+
+> ✅ PR67 — Hardening concluída
+> ✅ PR66 — Diagnóstico técnico concluído
+> ✅ PR65 — Blueprint documental concluído
+> ✅ Go/No-Go checklist preenchido e validado pelo operador
+
+Nenhuma PR-IMPL de runtime deve ser aberta sem esses pré-requisitos satisfeitos.
+
+### Limites a implementar junto com o módulo
+
+Ao criar `schema/enavia-skill-executor.js` (Fase 2), os seguintes limites devem ser implementados:
+
+- `max_skill_proposals_per_request = 1`
+- `max_retries = 0`
+- `allow_llm_extra_calls = false`
+- `allow_external_calls = false`
+- `allow_kv_write = false`
+- `require_evidence = true`
+- `require_self_audit = true`
+
+Ver especificação completa em `schema/hardening/COST_LIMITS.md` seção 3.

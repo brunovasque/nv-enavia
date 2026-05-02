@@ -1,8 +1,103 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills ✅
-**Para:** PR67 — PR-IMPL — Skill Execution Proposal (read-only)
+**De:** PR67 — PR-HARDENING — Hardening de Segurança, Custo e Limites ✅
+**Para:** PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
+
+## O que foi feito nesta sessão
+
+### PR67 — PR-HARDENING — Hardening de Segurança, Custo e Limites
+
+**Tipo:** `PR-HARDENING` (documental/governança — sem alteração de runtime)
+**Branch:** `copilot/claudepr67-hardening-seguranca-custo-limites`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+**PR anterior validada:** PR66 ✅ (PR-DIAG — Diagnóstico técnico do Runtime de Skills)
+
+**Objetivo:**
+Consolidar segurança, custo, limites, blast radius, rollback e go/no-go checklist antes de qualquer implementação futura do Runtime de Skills.
+
+**Arquivos criados:**
+- `schema/hardening/INDEX.md` — visão geral e como usar o pacote
+- `schema/hardening/SKILLS_RUNTIME_HARDENING.md` — D1–D10, allowlist, aprovação humana, secrets, KV, Self-Audit
+- `schema/hardening/COST_LIMITS.md` — C1–C5 riscos, limites por request/tempo/LLM/KV
+- `schema/hardening/BLAST_RADIUS.md` — níveis 0–4, gates mínimos, matriz por skill, B1–B7
+- `schema/hardening/ROLLBACK_POLICY.md` — rollback por artefato, regra PR-PROVA com falha
+- `schema/hardening/GO_NO_GO_CHECKLIST.md` — 32 critérios, 5 categorias
+- `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md` — relatório completo
+
+**Arquivos atualizados:**
+- `schema/skills-runtime/SECURITY_MODEL.md` — seção 10 (referência ao hardening, deny-by-default reforçado)
+- `schema/skills-runtime/ROLLOUT_PLAN.md` — seção 11 (gate de hardening antes de Fase 2)
+- `schema/brain/learnings/future-risks.md` — R14–R17 adicionados
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 10 adicionada
+- `schema/contracts/INDEX.md` — PR68 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR67 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR67
+
+**O que NÃO foi alterado:**
+- `nv-enavia.js` — não alterado ✅
+- `contract-executor.js` — não alterado ✅
+- `wrangler.toml` — não alterado ✅
+- `schema/enavia-*.js` — nenhum alterado ✅
+- `schema/enavia-skill-executor.js` — não criado ✅
+- Nenhum endpoint criado ✅
+- `/skills/propose` não criado ✅
+- `/skills/run` não criado ✅
+- Nenhum binding/KV/secret alterado ✅
+- Testes não alterados ✅
+- Panel, Executor, Deploy Worker, Workflows — não alterados ✅
+
+## O que a próxima sessão deve fazer
+
+### PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
+
+**Tipo:** `PR-DOCS` ou `PR-PROVA` (a definir pelo contrato)
+**Objetivo:**
+Formalizar o fechamento da fase Jarvis Brain com:
+1. Validação de que todos os artefatos do ciclo PR61–PR67 estão consistentes
+2. Documentação do estado final do sistema pós-ciclo
+3. Memória consolidada do ciclo PR61–PR67
+4. Declaração clara do estado: hardening criado, runtime não implementado
+5. Preparação para o próximo contrato
+
+**Pré-requisitos:**
+- PR67 ✅ (hardening concluído)
+- PR66 ✅ (diagnóstico técnico)
+- PR65 ✅ (blueprint)
+- Go/No-Go checklist de `schema/hardening/GO_NO_GO_CHECKLIST.md` satisfeito
+
+**O que NÃO implementar:**
+- Não implementar Runtime de Skills
+- Não criar `schema/enavia-skill-executor.js`
+- Não criar `/skills/propose`
+- Não criar `/skills/run`
+- Não alterar nenhum módulo de runtime
+
+## Contexto técnico
+
+**Stack atual:**
+
+| Módulo | Status | Finding |
+|--------|--------|---------|
+| nv-enavia.js | Worker principal (9.143 linhas) — não alterar sem contrato | — |
+| enavia-llm-core.js | LLM Core v1 — ativo e validado | — |
+| enavia-brain-loader.js | Brain Context read-only — ativo (snapshot estático) | — |
+| enavia-intent-classifier.js | 15 intenções — Finding I1 (variantes com advérbio) | Baixo impacto — PR separada |
+| enavia-skill-router.js | Skill Router read-only — 4 skills documentais | — |
+| enavia-intent-retrieval.js | Retrieval por intenção — ativo | — |
+| enavia-self-audit.js | Self-Audit read-only — 10 categorias | Integrável sem breaking change |
+| enavia-response-policy.js | Response Policy viva — 15 regras | — |
+| Brain documental | `schema/brain/` — 20+ arquivos | — |
+| Blueprint Runtime de Skills | ✅ Criado na PR65 — `schema/skills-runtime/` | — |
+| Diagnóstico Runtime de Skills | ✅ Criado na PR66 — 12 perguntas respondidas | — |
+| Hardening Runtime de Skills | ✅ Criado na PR67 — `schema/hardening/` | — |
+| Runtime de Skills | ❌ Não existe — aguarda PR-IMPL futura (após PR68) | Próxima frente |
+| `schema/enavia-skill-executor.js` | ❌ Não existe — aguarda PR-IMPL futura | — |
+| `/skills/run` | ❌ Não existe — aguarda Fase 5 (PR73+) | — |
+| `/skills/propose` | ❌ Não existe — aguarda PR-IMPL futura | — |
+
+
 
 ## O que foi feito nesta sessão
 
