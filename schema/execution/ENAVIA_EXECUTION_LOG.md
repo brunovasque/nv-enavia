@@ -4,6 +4,85 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR74 — PR-PROVA — Prova formal do Approval Gate
+
+- **Branch:** `codex/pr74-prova-approval-gate`
+- **Tipo:** `PR-PROVA` (`Tests-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR73 ✅ (`feat: PR73 approval gate técnico proposal-only`)
+
+### Objetivo
+
+Provar formalmente que o Approval Gate da PR73 impede execução sem aprovação, mantém deny-by-default e continua proposal-only/read-only.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr74-approval-gate.prova.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Cenários provados (32/32)
+
+1. proposta válida recebe `proposal_id`
+2. proposal inicial fica `proposed`
+3. approve de proposta válida retorna `approved`
+4. reject de proposta válida retorna `rejected`
+5. approve de proposal desconhecida bloqueia
+6. reject de proposal desconhecida bloqueia
+7. approve sem `proposal_id` bloqueia
+8. reject sem `proposal_id` bloqueia
+9. approve de proposal `blocked` bloqueia
+10. approve de proposal `not_applicable` bloqueia
+11. reject de proposal `blocked` bloqueia
+12. reject de proposal `not_applicable` bloqueia
+13. segunda aprovação de proposal já `approved` bloqueia
+14. segunda rejeição de proposal já `rejected` bloqueia
+15. proposal expirada não pode ser approved
+16. proposal expirada não pode ser rejected
+17. JSON inválido em `/skills/approve` retorna erro controlado
+18. JSON inválido em `/skills/reject` retorna erro controlado
+19. `GET /skills/approve` retorna `405 METHOD_NOT_ALLOWED`
+20. `GET /skills/reject` retorna `405 METHOD_NOT_ALLOWED`
+21. `side_effects=false` em todas as respostas do gate
+22. `executed=false` em todas as respostas do gate
+23. `/skills/run` continua inexistente
+24. approval não executa skill
+25. reject não executa skill
+26. gate não usa KV
+27. gate não chama fetch
+28. gate não usa filesystem runtime
+29. gate não chama LLM externo
+30. `wrangler.toml` não foi alterado
+31. `contract-executor.js` não foi alterado
+32. `reply/use_planner` preservados
+
+### Testes executados
+
+- `node tests/pr74-approval-gate.prova.test.js` → 81/81 ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` → 48/48 ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` → 45/45 ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- Prova formal PR74 concluída ✅
+- Approval Gate confirmado como proposal-only/read-only ✅
+- Deny-by-default preservado ✅
+- Nenhum side effect externo sem approval ✅
+- `/skills/run` permanece inexistente ✅
+- Próxima etapa liberada: PR75 (PR-IMPL — SYSTEM_MAPPER read-only limitada) ✅
+
+---
+
 ## 2026-05-02 — PR73 — PR-IMPL — Approval Gate técnico proposal-only
 
 - **Branch:** `codex/pr73-approval-gate-proposal-only`
