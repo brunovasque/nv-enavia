@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR75 — SYSTEM_MAPPER read-only limitada ✅)
-**Branch ativa:** `codex/pr75-system-mapper-readonly`
-**Última tarefa:** PR75 — PR-IMPL — skill `SYSTEM_MAPPER` implementada como módulo puro read-only, sem side effects e sem `/skills/run`.
+**Data:** 2026-05-02 (atualizado após PR76 — prova formal da SYSTEM_MAPPER ✅)
+**Branch ativa:** `codex/pr76-prova-system-mapper`
+**Última tarefa:** PR76 — PR-PROVA — prova formal da skill `SYSTEM_MAPPER` concluída com 46/46 cenários obrigatórios e bateria de regressão obrigatória passando.
 
 ## Estado atual do sistema
 
@@ -12,7 +12,7 @@
 
 **Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. PR75 adicionou `schema/enavia-system-mapper-skill.js` com `buildSystemMapperResult(input)` (determinístico e read-only), retornando mapa seguro de allowlist/endpoints/gate/limitações, com bloqueio controlado quando `require_approved_proposal=true` sem `proposal_status=approved`. Nenhum endpoint novo foi criado, `/skills/run` segue inexistente, e arquivos proibidos (`wrangler.toml`, `contract-executor.js`, `nv-enavia.js`) permanecem fora do diff.
+**Sistema operacional:** Estável. PR76 provou formalmente que `SYSTEM_MAPPER` permanece read-only, determinística e sem side effects: `mode=read_only`, `executed=false`, `executed_readonly` apenas quando permitido por gate, bloqueio seguro quando `require_approved_proposal=true` sem `approved`, saída pequena/estruturada, ausência de vazamento de segredo e ausência de `/skills/run`. Nenhum endpoint novo foi criado e arquivos proibidos (`wrangler.toml`, `contract-executor.js`, `nv-enavia.js`) seguem fora do diff.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR76 — PR-PROVA — Prova da Skill SYSTEM_MAPPER**
+**PR77 — PR-IMPL — Integração controlada com chat**
+
+> ✅ PR76 (PR-PROVA) — concluída. Arquivo `tests/pr76-system-mapper.prova.test.js` criado com prova formal dos 46 cenários obrigatórios da `SYSTEM_MAPPER`: contrato base read-only, allowlist/endpoints seguros, confirmação explícita de ausência de `/skills/run`, gate `require_approved_proposal` com liberação apenas para `approved`, bloqueio seguro para `proposed|rejected|blocked|ausente`, invariantes `side_effects=false` e `executed=false`, determinismo, saída pequena/estruturada, não vazamento (`OPENAI_API_KEY`, token/secret/authorization, SUPABASE_URL/bucket), inspeção estática sem fetch/KV/FS/runtime command/LLM externo, preservação de `reply/use_planner`, ausência de endpoint novo nesta PR e regressão obrigatória do smoke PR75 passando dentro da própria prova. Bateria obrigatória completa executada e aprovada (PR76, PR75, PR74, PR73, PR72, PR71, PR70, PR69, PR51, PR57, PR59).
 
 > ✅ PR75 (PR-IMPL) — concluída. Skill read-only limitada `SYSTEM_MAPPER` implementada como módulo puro em `schema/enavia-system-mapper-skill.js` com `buildSystemMapperResult(input)`. Contrato respeitado: `skill_id=SYSTEM_MAPPER`, `mode=read_only`, `side_effects=false`, `executed=false`, `executed_readonly=true` em sucesso, mapa pequeno/estruturado/determinístico de capacidades conhecidas (allowlist, endpoints `/skills/propose` `/skills/approve` `/skills/reject`, status de `/skills/run` inexistente, estado conhecido do gate e limitações). Gate opcional: quando `require_approved_proposal=true`, proposta sem `approved` retorna bloqueio controlado (`status=blocked`, `executed_readonly=false`) sem side effects. Teste novo `tests/pr75-system-mapper-readonly.smoke.test.js` criado para validar os 20 cenários mínimos obrigatórios.
 

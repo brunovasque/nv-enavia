@@ -4,6 +4,103 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR76 — PR-PROVA — Prova formal da Skill SYSTEM_MAPPER
+
+- **Branch:** `codex/pr76-prova-system-mapper`
+- **Tipo:** `PR-PROVA` (`Tests-only`)
+- **Contrato:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
+- **PR anterior validada:** PR75 ✅ (`feat: PR75 system mapper read-only limitada`)
+
+### Objetivo
+
+Provar formalmente que a skill `SYSTEM_MAPPER` da PR75 é read-only, limitada, determinística, segura, sem side effects, sem `/skills/run` e sem dependências externas perigosas.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr76-system-mapper.prova.test.js`
+  - cobre os 46 cenários obrigatórios da PR76
+  - valida contrato funcional da skill, segurança e invariantes de gate
+  - inclui regressão obrigatória do smoke PR75
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Cenários provados (46/46)
+
+1. `buildSystemMapperResult` existe e é função
+2. `skill_id=SYSTEM_MAPPER`
+3. `mode=read_only`
+4. `status=ok` no fluxo padrão
+5. `side_effects=false`
+6. `executed=false`
+7. `executed_readonly=true` quando permitido
+8. contém allowlist
+9. allowlist inclui `SYSTEM_MAPPER`
+10. contém endpoints de skills
+11. `/skills/propose` existe
+12. `/skills/approve` existe
+13. `/skills/reject` existe
+14. `/skills/run` inexistente
+15. `proposal_gate.persistence=in_memory_per_instance_only`
+16. `limitations` inclui `no_side_effects`
+17. `limitations` inclui `no_skills_run_endpoint`
+18. `limitations` inclui `no_runtime_filesystem`
+19. `limitations` inclui `no_external_network_or_llm`
+20. `limitations` inclui `no_kv_or_database_writes`
+21. `require_approved_proposal=true` + `approved` libera leitura
+22. `require_approved_proposal=true` + `proposed` bloqueia
+23. `require_approved_proposal=true` + `rejected` bloqueia
+24. `require_approved_proposal=true` + `blocked` bloqueia
+25. `require_approved_proposal=true` sem status bloqueia
+26. bloqueio mantém `side_effects=false`
+27. bloqueio mantém `executed=false`
+28. bloqueio mantém `executed_readonly=false`
+29. bloqueio retorna `result=null`
+30. saída determinística para mesma entrada
+31. saída pequena
+32. saída estruturada
+33. não expõe `OPENAI_API_KEY`
+34. não expõe token/secret/authorization
+35. não expõe `SUPABASE_URL` nem bucket
+36. módulo sem `fetch`
+37. módulo sem `KV put/get/list/delete`
+38. módulo sem `readFileSync/writeFileSync`
+39. módulo sem `child_process/exec/spawn`
+40. módulo sem `openai/gpt/anthropic`
+41. `nv-enavia.js` sem rota `/skills/run`
+42. `wrangler.toml` não alterado
+43. `contract-executor.js` não alterado
+44. `reply/use_planner` preservados
+45. nenhum endpoint novo nesta PR
+46. smoke PR75 continua passando
+
+### Testes executados
+
+- `node tests/pr76-system-mapper.prova.test.js` → 46/46 ✅
+- `node tests/pr75-system-mapper-readonly.smoke.test.js` → 24/24 ✅
+- `node tests/pr74-approval-gate.prova.test.js` → 81/81 ✅
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js` → 48/48 ✅
+- `node tests/pr72-skills-propose-endpoint.prova.test.js` → 45/45 ✅
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js` → 43/43 ✅
+- `node tests/pr70-skill-execution-proposal.prova.test.js` → 28/28 ✅
+- `node tests/pr69-skill-execution-proposal.smoke.test.js` → 36/36 ✅
+- `node tests/pr51-skill-router-readonly.smoke.test.js` → 168/168 ✅
+- `node tests/pr57-self-audit-readonly.prova.test.js` → 99/99 ✅
+- `node tests/pr59-response-policy-viva.smoke.test.js` → 96/96 ✅
+
+### Resultado
+
+- Prova formal PR76 concluída ✅
+- Skill `SYSTEM_MAPPER` comprovada como read-only limitada e segura ✅
+- `/skills/run` continua inexistente ✅
+- Sem alteração de runtime/endpoint nesta PR ✅
+- Próxima etapa liberada: PR77 (PR-IMPL) ✅
+
+---
+
 ## 2026-05-02 — PR75 — PR-IMPL — Skill read-only limitada: SYSTEM_MAPPER
 
 - **Branch:** `codex/pr75-system-mapper-readonly`
