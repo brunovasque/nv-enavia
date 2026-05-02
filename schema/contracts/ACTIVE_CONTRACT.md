@@ -6,13 +6,14 @@ Contrato ativo atual:
 
 Status:
 
-- Ativo
+- Concluído na PR78 (2026-05-02)
 
 Próxima PR autorizada:
 
-- PR69 — Skill Execution Proposal read-only
+- Aguardando próximo contrato/fase
 
 Observação:
 
-Este arquivo é um ponteiro operacional curto para facilitar execução por Codex local/agents.
+A Fase 1 do Runtime de Skills foi fechada funcionalmente na PR78.
+Este arquivo permanece como ponteiro operacional curto para Codex local/agents.
 O índice histórico permanece em `schema/contracts/INDEX.md`.

@@ -1,6 +1,54 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
+**De:** PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills ✅
+**Para:** Aguardando definição do próximo contrato/fase
+
+## Handoff atual (PR78)
+
+### O que foi feito
+
+- PR78 executada em escopo `Tests-only + Docs-only mínimo`.
+- Teste formal de fechamento criado: `tests/pr78-skills-runtime-fase1.fechamento.test.js`.
+- Relatório de fechamento criado: `schema/reports/PR78_FECHAMENTO_SKILLS_RUNTIME_FASE1.md`.
+- Fechamento ponta a ponta validado: proposal-only -> `/skills/propose` -> approval gate -> `SYSTEM_MAPPER` read-only -> chat controlado.
+- Confirmado: `/skills/run` permanece inexistente.
+- Confirmado: `reply` e `use_planner` preservados; `skill_execution` e `chat_skill_surface` seguem aditivos.
+
+### Testes executados
+
+- `node tests/pr78-skills-runtime-fase1.fechamento.test.js`
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js`
+- `node tests/pr76-system-mapper.prova.test.js`
+- `node tests/pr75-system-mapper-readonly.smoke.test.js`
+- `node tests/pr74-approval-gate.prova.test.js`
+- `node tests/pr73-approval-gate-proposal-only.smoke.test.js`
+- `node tests/pr72-skills-propose-endpoint.prova.test.js`
+- `node tests/pr71-skills-propose-endpoint.smoke.test.js`
+- `node tests/pr70-skill-execution-proposal.prova.test.js`
+- `node tests/pr69-skill-execution-proposal.smoke.test.js`
+- `node tests/pr51-skill-router-readonly.smoke.test.js`
+- `node tests/pr57-self-audit-readonly.prova.test.js`
+- `node tests/pr59-response-policy-viva.smoke.test.js`
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `schema/enavia-skill-executor.js`
+- `schema/enavia-skill-approval-gate.js`
+- `schema/enavia-system-mapper-skill.js`
+- `schema/enavia-chat-skill-surface.js`
+- `wrangler.toml`
+- `contract-executor.js`
+- painel / executor / deploy-worker / workflows
+
+### Próxima etapa segura
+
+- Abrir novo contrato/fase para evoluções além da Fase 1.
+- Manter `/skills/run` fora do escopo até contrato explícito de execução real.
+---
+
+**Data:** 2026-05-02
 **De:** PR77 — PR-IMPL — Integração controlada com chat ✅
 **Para:** PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills
 
@@ -542,4 +590,5 @@ Diagnosticar se a frente "Atualização supervisionada de memória" ainda é nec
 | Brain documental | `schema/brain/` — 20+ arquivos | — |
 | Escrita supervisionada de memória | ❌ Não implementada no runtime — G3 on-hold | Não blocking |
 | Runtime de Skills | ❌ Não existe — aguarda PR64→PR65→PR66→PR67+ | Próxima frente |
+
 
