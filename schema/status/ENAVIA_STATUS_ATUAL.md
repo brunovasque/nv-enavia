@@ -1,18 +1,18 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR70 — Prova formal do Skill Execution Proposal ✅)
-**Branch ativa:** `codex/pr70-prova-skill-execution-proposal`
-**Última tarefa:** PR70 — PR-PROVA — prova formal da PR69 (proposal-only/read-only). Teste formal criado e regressões obrigatórias executadas. Nenhum runtime alterado. Nenhum endpoint criado.
+**Data:** 2026-05-02 (atualizado após PR71 — Endpoint `/skills/propose` ✅)
+**Branch ativa:** `codex/pr71-skills-propose-endpoint`
+**Última tarefa:** PR71 — PR-IMPL — endpoint `POST /skills/propose` read-only criado com reutilização de `buildSkillExecutionProposal(input)`. Sem execução de skill. Sem side effects. Sem `/skills/run`.
 
 ## Estado atual do sistema
 
 **Contrato ativo:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
 
-**Objetivo:** Validar formalmente o módulo de proposta de execução de skill e avançar com segurança para endpoints read-only da frente de Skills Runtime.
+**Objetivo:** Consolidar proposal-only read-only para skills, agora com endpoint dedicado `/skills/propose`, preservando deny-by-default e guardrails de Self-Audit.
 
 **Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. PR69 implementada no runtime: `schema/enavia-skill-executor.js` + campo aditivo `skill_execution` no `/chat/run` (sem side effects).
+**Sistema operacional:** Estável. PR71 implementada no runtime: `POST /skills/propose` em `nv-enavia.js` com erro controlado para método inválido e JSON inválido, usando o módulo PR69/PR70.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR71 — PR-IMPL — Endpoint `/skills/propose` (read-only)**
+**PR72 — PR-PROVA — Prova formal do endpoint `/skills/propose`**
+
+> ✅ PR71 (PR-IMPL) — concluída. `POST /skills/propose` criado em `nv-enavia.js` usando `buildSkillExecutionProposal(input)`. Contrato respeitado: `skill_execution.mode=proposal`, `status=proposed|not_applicable|blocked`, `side_effects=false` sempre, `requires_approval=true` apenas quando `proposed`, deny-by-default para skill desconhecida, bloqueio por `selfAudit` (`risk_level=blocking`/`secret_exposure`), erro controlado para JSON inválido e método diferente de POST, `/skills/run` permanece inexistente. Novo teste `tests/pr71-skills-propose-endpoint.smoke.test.js` criado. Testes obrigatórios PR71/PR70/PR69/PR51/PR57/PR59 passando.
 
 > ✅ PR70 (PR-PROVA) — concluída. `tests/pr70-skill-execution-proposal.prova.test.js` criado. Prova formal de 13 cenários obrigatórios: proposta para skill conhecida, deny-by-default para skill desconhecida, bloqueios por self_audit (`risk_level=blocking`, `should_block=true`, `secret_exposure`), `not_applicable` para conversa comum/pausa sem skill roteada, ausência de side effects (sem fetch/KV/FS runtime/LLM externo), campo aditivo `skill_execution` no `/chat/run`, `reply` e `use_planner` preservados, `/skills/propose` e `/skills/run` inexistentes. Testes obrigatórios PR70/PR69/PR51/PR57/PR59 passando.
 

@@ -6803,6 +6803,53 @@ async function handleGetDecisions(env, request) {
   }
 }
 
+// ============================================================================
+// 🧪 PR71 — POST /skills/propose (proposal-only, read-only)
+// Reutiliza buildSkillExecutionProposal sem executar skill e sem side effects.
+// ============================================================================
+async function handleSkillsPropose(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "INVALID_JSON",
+        message: "JSON inválido em /skills/propose.",
+        detail: String(err),
+        skill_execution: {
+          mode: "proposal",
+          status: "blocked",
+          skill_id: null,
+          reason: "JSON inválido; proposta bloqueada.",
+          requires_approval: false,
+          side_effects: false,
+        },
+      },
+      400
+    );
+  }
+
+  const input = body && typeof body === "object" && !Array.isArray(body) ? body : {};
+  const proposal = buildSkillExecutionProposal({
+    skillRouting: input.skillRouting,
+    intentClassification: input.intentClassification,
+    selfAudit: input.selfAudit,
+    responsePolicy: input.responsePolicy,
+    chatContext: input.chatContext,
+  });
+
+  return jsonResponse(
+    {
+      ok: true,
+      route: "POST /skills/propose",
+      skill_execution: proposal.skill_execution,
+    },
+    200
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -7281,6 +7328,24 @@ if (request.method === "POST") {
 // ============================================================
 if (method === "POST" && path === "/enavia/observe") {
   return handleEnaviaObserve(request, env);
+}
+
+// PR71 — /skills/propose (proposal-only)
+if (path === "/skills/propose") {
+  if (method !== "POST") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "METHOD_NOT_ALLOWED",
+        message: "Use POST em /skills/propose.",
+        method,
+        path,
+        allowed_methods: ["POST"],
+      },
+      405
+    );
+  }
+  return handleSkillsPropose(request);
 }
 
   // 🧠 ENAVIA — PROPOSE ENDPOINT (DEPENDE DE AUDIT)
