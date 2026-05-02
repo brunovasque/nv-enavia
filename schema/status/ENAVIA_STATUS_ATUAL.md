@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR64 — Encerrar frente de memória supervisionada e liberar Blueprint Runtime de Skills ✅)
-**Branch ativa:** `copilot/claude-pr64-docs-encerrar-memoria-liberar-skills`
-**Última tarefa:** PR64 — PR-DOCS — Encerramento formal da frente de atualização supervisionada de memória. Contrato atualizado com seção 12F. UPDATE_POLICY, G3, future-risks e SYSTEM_AWARENESS atualizados. G3 on-hold. Próxima frente liberada: Blueprint do Runtime de Skills (PR65). Nenhum runtime alterado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.
+**Data:** 2026-05-02 (atualizado após PR65 — Blueprint do Runtime de Skills ✅)
+**Branch ativa:** `copilot/claudepr65-docs-blueprint-runtime-skills`
+**Última tarefa:** PR65 — PR-DOCS — Blueprint documental do Runtime de Skills. Pasta `schema/skills-runtime/` criada com 8 arquivos. Arquitetura futura, contrato de execução, gates de aprovação, matriz de capacidades, modelo de segurança, rollout por fases (0–6) e 12 open questions para PR66 documentados. Brain/governança atualizados. Nenhum runtime alterado. Relatório: `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md`.
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR65 — PR-DOCS — Blueprint do Runtime de Skills**
+**PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills**
 
+> ✅ PR65 (PR-DOCS) — concluída. Blueprint documental do Runtime de Skills criado. Pasta `schema/skills-runtime/` com 8 arquivos: INDEX.md, ARCHITECTURE.md (fluxo 11 camadas), EXECUTION_CONTRACT.md, APPROVAL_GATES.md, SKILL_CAPABILITY_MATRIX.md, SECURITY_MODEL.md, ROLLOUT_PLAN.md (Fases 0–6), OPEN_QUESTIONS.md (12 perguntas para PR66). SYSTEM_AWARENESS (seção 9), unresolved-technical-gaps (G1/G2 atualizados), future-risks (R10-R13 adicionados), skills/INDEX.md (referência ao blueprint) atualizados. Relatório: `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md`. Nenhum runtime alterado. Nenhum endpoint criado.
 > ✅ PR64 (PR-DOCS) — concluída. Encerramento formal da frente de atualização supervisionada de memória. Contrato atualizado (seção 12F). G3 on-hold. UPDATE_POLICY modo vigente documentado. future-risks R1 atualizado. SYSTEM_AWARENESS estado pós-PR64 adicionado. Próxima frente: Blueprint do Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.
 > ✅ PR63 (PR-DIAG) — concluída. Diagnóstico da frente "Atualização supervisionada de memória". Decisão: Opção B (parcialmente concluída) com absorção do mecanismo manual. PR61 entregou camada documental (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada). Mecanismo técnico de escrita supervisionada automática NÃO implementado e NÃO blocking para Runtime de Skills. Fluxo manual via PR é o mecanismo vigente (`UPDATE_POLICY.md` seção 8). G3 on-hold. Implementar `/memory/write` antes de skills gera R1 (docs_over_product). Relatório: `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md`.
 > ✅ PR62 (PR-DOCS) — concluída. Reconciliação documental do contrato Jarvis Brain. Seção 12 adicionada ao contrato com: plano original, execução real, tabela de equivalência, regra de interpretação. Próxima PR: PR63 — PR-DIAG — decidir se atualização supervisionada de memória foi absorvida pela PR61 documental ou precisa de implementação real. Relatório: `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md`.

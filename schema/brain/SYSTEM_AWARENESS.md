@@ -260,7 +260,42 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 
 ---
 
-## 9. Como Evitar Alucinação Geral
+## 9. Estado após PR65 — Blueprint Runtime de Skills
+
+> **Adicionado em:** 2026-05-02 (PR65 — PR-DOCS)
+>
+> Esta seção documenta o estado do sistema após a criação do blueprint documental do Runtime de Skills.
+> Nenhum runtime foi alterado. Nenhum endpoint foi criado.
+
+### Blueprint criado
+
+| Item | Estado |
+|------|--------|
+| Blueprint Runtime de Skills | ✅ Criado na PR65 — `schema/skills-runtime/` |
+| Runtime de Skills | ❌ NÃO EXISTE — blueprint apenas |
+| `/skills/run` | ❌ NÃO EXISTE |
+| `/skills/propose` | ❌ NÃO EXISTE |
+| Skill Executor | ❌ NÃO EXISTE |
+| Execução de skill | ❌ Nenhuma skill executa automaticamente |
+
+### O que o blueprint define
+
+- **Arquitetura:** fluxo de 11 camadas — `schema/skills-runtime/ARCHITECTURE.md`
+- **Contrato de execução:** formato JSON + regras — `schema/skills-runtime/EXECUTION_CONTRACT.md`
+- **Gates de aprovação:** 3 categorias + gate absoluto — `schema/skills-runtime/APPROVAL_GATES.md`
+- **Matriz de capacidades:** 4 skills, estado + futuro — `schema/skills-runtime/SKILL_CAPABILITY_MATRIX.md`
+- **Modelo de segurança:** 7 categorias de risco + allowlist — `schema/skills-runtime/SECURITY_MODEL.md`
+- **Rollout:** 7 fases (Fase 0–6) — `schema/skills-runtime/ROLLOUT_PLAN.md`
+- **Open questions:** 12 perguntas para PR66 — `schema/skills-runtime/OPEN_QUESTIONS.md`
+
+### Próxima etapa
+
+**PR66 — PR-DIAG — Diagnóstico técnico para Runtime de Skills**
+Responder 12 perguntas abertas com evidência do repositório. Não implementar.
+
+---
+
+## 10. Como Evitar Alucinação Geral
 
 1. **Sempre citar a fonte** ao afirmar algo sobre o sistema.
 2. **Marcar incerteza explicitamente** quando não há fonte.

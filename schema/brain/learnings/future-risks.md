@@ -194,7 +194,85 @@ Implementar endpoint novo sem diagnóstico + aprovação no contrato.
 
 ---
 
-## Como aplicar
+## Riscos adicionados na PR65
+
+### R10 — Criar /skills/run cedo demais
+
+**Descrição:**
+Implementar `/skills/run` como primeiro endpoint do Runtime de Skills, antes de ter gate de aprovação humana funcionando.
+
+**Sinal de alerta:**
+- Endpoint `/skills/run` criado antes de `/skills/propose`
+- Runtime de Skills implementado sem mecanismo de aprovação
+- "Vamos economizar uma fase" para implementar execução direta
+
+**Como mitigar:**
+- Primeiro endpoint deve ser `/skills/propose` (gera proposta sem executar)
+- `/skills/run` só deve ser criado após gate de aprovação implementado e validado (Fase 4+)
+- ROLLOUT_PLAN.md define a ordem correta das fases
+
+**Fonte:** PR65 — `schema/skills-runtime/ROLLOUT_PLAN.md`, Seção 9
+
+---
+
+### R11 — Execução sem aprovação humana
+
+**Descrição:**
+Skill executa ação com efeito externo sem aprovação humana explícita.
+
+**Sinal de alerta:**
+- `approval.status !== 'approved'` mas execução ocorre
+- "Aprovação implícita" por ausência de rejeição
+- Timeout de aprovação sendo tratado como aprovação
+
+**Como mitigar:**
+- EXECUTION_CONTRACT.md regra R3: `approved_execution` sem `approval.status === 'approved'` → bloquear
+- APPROVAL_GATES.md categoria A: lista exaustiva de ações que sempre exigem aprovação
+- SECURITY_MODEL.md regra deny-by-default
+
+**Fonte:** PR65 — `schema/skills-runtime/APPROVAL_GATES.md`, `schema/skills-runtime/SECURITY_MODEL.md`
+
+---
+
+### R12 — Falsa capacidade de execução
+
+**Descrição:**
+Sistema afirma que executou uma skill quando na verdade apenas gerou uma proposta ou descrição documental.
+
+**Sinal de alerta:**
+- "Skill executada com sucesso" quando `mode === 'proposal'`
+- Confusão entre `read_only`, `proposal` e `approved_execution`
+- Skill documental sendo descrita como operacional
+
+**Como mitigar:**
+- `mode` deve ser explícito e validado no contrato de execução
+- Self-Audit categoria `false_capability` detecta esse padrão
+- Response Policy orienta distinção clara entre proposta e execução
+
+**Fonte:** PR65 — `schema/skills-runtime/EXECUTION_CONTRACT.md`, R2 (future-risks)
+
+---
+
+### R13 — Misturar proposta com execução
+
+**Descrição:**
+Proposta de execução (safe) sendo confundida com execução real (risky), levando a falsos positivos ou falsos negativos no gate de aprovação.
+
+**Sinal de alerta:**
+- `mode: 'proposal'` sendo tratado como `mode: 'approved_execution'`
+- Gate de aprovação aplicado a read_only desnecessariamente
+- Gate de aprovação não aplicado a approved_execution por engano
+
+**Como mitigar:**
+- 3 modos claramente definidos em EXECUTION_CONTRACT.md
+- Validação de `mode` obrigatória antes de qualquer execução
+- Matrix de aprovação em APPROVAL_GATES.md define por modo
+
+**Fonte:** PR65 — `schema/skills-runtime/EXECUTION_CONTRACT.md`, Seção 3
+
+---
+
+## Backlinks
 
 1. Ao planejar nova fase, revisar esta lista de riscos.
 2. Ao detectar sinal de alerta, parar e declarar o risco explicitamente.

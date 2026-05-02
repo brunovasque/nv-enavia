@@ -23,47 +23,51 @@ Adicionada na PR61 após consolidação do ciclo.
 
 ### G1 — Skill Executor runtime não existe
 
-**Estado:** Aberta
-**PR de referência:** PR51, PR52, PR60
+**Estado:** Aberta — blueprint criado na PR65
+**PR de referência:** PR51, PR52, PR60, PR65
 
 **Contexto:**
 Skill Router read-only foi implementado (PR51) e validado (PR52).
 Mas o Skill Executor — o módulo que executaria a skill — não existe.
+PR65 criou o blueprint documental do Runtime de Skills (`schema/skills-runtime/`).
 
 **Questão em aberto:**
 Como implementar execução de skill de forma segura, com gate de aprovação humana e sem autonomia cega?
 
 **Por que está aberta:**
 Implementar sem PR-DIAG + PR-IMPL + PR-PROVA dedicadas viola o contrato.
+PR65 criou o blueprint, mas não o runtime.
 
 **Impacto se não resolvida:**
 Skills continuam documentais indefinidamente. Enavia não executa nenhuma skill.
 
-**Próxima ação sugerida:**
-PR-DIAG dedicada ao design do Skill Executor (nova fase do contrato).
+**Próxima ação:**
+PR66 — PR-DIAG — Diagnóstico técnico: responder 12 perguntas abertas de `schema/skills-runtime/OPEN_QUESTIONS.md`.
 
 ---
 
 ### G2 — /skills/run não existe
 
-**Estado:** Aberta
-**PR de referência:** PR52, PR53, PR54, PR60
+**Estado:** Aberta — blueprint criado na PR65
+**PR de referência:** PR52, PR53, PR54, PR60, PR65
 
 **Contexto:**
 Intent Retrieval retorna contexto de skills, Skill Router faz roteamento read-only.
 Mas o endpoint `/skills/run` que executaria a skill não foi criado.
+PR65 criou o blueprint e definiu que o primeiro endpoint deve ser `/skills/propose` (não `/skills/run` direto).
 
 **Questão em aberto:**
-Quando e como criar `/skills/run` de forma segura?
+Quando e como criar `/skills/propose` (primeiro endpoint) de forma segura?
 
 **Por que está aberta:**
 Criar endpoint sem contrato viola princípio de governed execution.
+Blueprint criado, mas diagnóstico técnico (PR66) ainda é necessário.
 
 **Impacto se não resolvida:**
 Usuário não pode solicitar execução de skill via API.
 
-**Próxima ação sugerida:**
-Incluir no planejamento da próxima fase (PR62 PR-DIAG).
+**Próxima ação:**
+PR66 — PR-DIAG — Diagnosticar onde o runtime deve viver, quais bindings são necessários, e confirmar que `/skills/propose` é o primeiro endpoint.
 
 ---
 
