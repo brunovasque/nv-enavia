@@ -2,18 +2,21 @@
 
 Contrato ativo atual:
 
-- `schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md`
+- schema/contracts/active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md
 
 Status:
 
-- Concluído na PR78 (2026-05-02)
+- Ativo
 
-Próxima PR autorizada:
+Proxima PR autorizada:
 
-- Aguardando próximo contrato/fase
+- PR79 — Skill Factory Core
 
-Observação:
+Observacao:
 
-A Fase 1 do Runtime de Skills foi fechada funcionalmente na PR78.
-Este arquivo permanece como ponteiro operacional curto para Codex local/agents.
-O índice histórico permanece em `schema/contracts/INDEX.md`.
+Este arquivo e um ponteiro operacional curto para facilitar execucao por Codex local/agents.
+O indice historico permanece em schema/contracts/INDEX.md.
+
+Contrato anterior concluido:
+
+- schema/contracts/active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md concluido na PR78.
