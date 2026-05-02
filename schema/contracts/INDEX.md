@@ -43,9 +43,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills**
+**PR65 — PR-DOCS — Blueprint do Runtime de Skills**
 
 Contrato ativo: `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
+
+> ✅ PR64 (PR-DOCS) — concluída. Encerramento formal da frente de atualização supervisionada de memória. Decisão herdada da PR63 formalizada no contrato (seção 12F): camada documental concluída pela PR61, mecanismo manual via PR é o modo vigente, G3 on-hold (não blocking), `/memory/write` não deve ser criado antes do Runtime de Skills. UPDATE_POLICY, unresolved-technical-gaps (G3), future-risks (R1) e SYSTEM_AWARENESS atualizados. Próxima frente liberada: Blueprint do Runtime de Skills. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.
 
 > ✅ PR63 (PR-DIAG) — concluída. Diagnóstico da frente "Atualização supervisionada de memória" após PR61 documental. Decisão: **Opção B — Parcialmente concluída** com absorção do mecanismo manual. PR61 entregou a camada documental (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada). O mecanismo técnico de escrita supervisionada automática no runtime NÃO foi implementado e NÃO é blocking para Runtime de Skills. O fluxo manual via PR (agente propõe → operador aprova ao mergear) é o mecanismo vigente conforme `UPDATE_POLICY.md` seção 8. G3 permanece on-hold (não blocking). Não faz sentido implementar `/memory/write` antes de existirem skills para gerar conteúdo a memorizar. Próxima PR: PR64 — PR-DOCS — Encerrar formalmente a frente e liberar Blueprint Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md`.
 

@@ -4,6 +4,57 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills
+
+- **Branch:** `copilot/claude-pr64-docs-encerrar-memoria-liberar-skills`
+- **Tipo:** `PR-DOCS` (governança/documentação apenas — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (Ativo 🟢)
+- **PR anterior validada:** PR63 ✅ (PR-DIAG — Diagnóstico da Atualização Supervisionada de Memória)
+
+### Objetivo
+
+Formalizar documentalmente a decisão da PR63: frente de atualização supervisionada de memória está parcialmente concluída e absorvida pelo fluxo manual via PR. Liberar Blueprint do Runtime de Skills como próxima frente.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md` — relatório completo
+
+**Arquivos atualizados:**
+- `schema/contracts/active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — seção 12F adicionada (decisão PR63/PR64)
+- `schema/brain/UPDATE_POLICY.md` — seção 10 adicionada (modo vigente pós-PR64)
+- `schema/brain/open-questions/unresolved-technical-gaps.md` — G3 atualizado: Aberta → on-hold (não blocking)
+- `schema/brain/learnings/future-risks.md` — R1 atualizado com nota de decisão PR63/PR64
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 8 adicionada (estado pós-PR64)
+- `schema/contracts/INDEX.md` — PR65 como próxima autorizada
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR64 concluída
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR64→PR65
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Resultado
+
+- **Contrato atualizado:** seção 12F com decisão PR63/PR64 ✅
+- **UPDATE_POLICY modo vigente:** documentado na seção 10 ✅
+- **G3:** on-hold — não blocking ✅
+- **future-risks R1:** nota PR63/PR64 adicionada ✅
+- **SYSTEM_AWARENESS:** estado pós-PR64 adicionado ✅
+- **Relatório criado:** `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md` ✅
+- **Governança atualizada:** ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **`/memory/write` não criado** ✅
+- **`/brain/write` não criado** ✅
+- **`/skills/run` não criado** ✅
+- **Runtime de Skills não iniciado** ✅
+- **Finding I1 não corrigido** ✅
+- **Próxima PR definida sem ambiguidade:** PR65 — PR-DOCS — Blueprint do Runtime de Skills ✅
+
+### Próxima PR autorizada
+
+**PR65 — PR-DOCS — Blueprint do Runtime de Skills**
+
+---
+
 ## 2026-05-02 — PR63 — PR-DIAG — Diagnóstico da Atualização Supervisionada de Memória
 
 - **Branch:** `copilot/claudepr63-diag-atualizacao-supervisionada-memoria`

@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR63 — Diagnóstico Atualização Supervisionada de Memória ✅)
-**Branch ativa:** `copilot/claudepr63-diag-atualizacao-supervisionada-memoria`
-**Última tarefa:** PR63 — PR-DIAG — Diagnóstico da frente "Atualização supervisionada de memória". Decisão: Opção B (parcialmente concluída) com absorção do mecanismo manual via PR. Frente não blocking para Runtime de Skills. G3 on-hold. Próxima PR: PR64 — PR-DOCS — Encerrar frente formalmente e liberar Blueprint Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md`.
+**Data:** 2026-05-02 (atualizado após PR64 — Encerrar frente de memória supervisionada e liberar Blueprint Runtime de Skills ✅)
+**Branch ativa:** `copilot/claude-pr64-docs-encerrar-memoria-liberar-skills`
+**Última tarefa:** PR64 — PR-DOCS — Encerramento formal da frente de atualização supervisionada de memória. Contrato atualizado com seção 12F. UPDATE_POLICY, G3, future-risks e SYSTEM_AWARENESS atualizados. G3 on-hold. Próxima frente liberada: Blueprint do Runtime de Skills (PR65). Nenhum runtime alterado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.
 
 ## Estado atual do sistema
 
@@ -33,8 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR64 — PR-DOCS — Encerrar frente de atualização supervisionada e liberar Blueprint Runtime de Skills**
+**PR65 — PR-DOCS — Blueprint do Runtime de Skills**
 
+> ✅ PR64 (PR-DOCS) — concluída. Encerramento formal da frente de atualização supervisionada de memória. Contrato atualizado (seção 12F). G3 on-hold. UPDATE_POLICY modo vigente documentado. future-risks R1 atualizado. SYSTEM_AWARENESS estado pós-PR64 adicionado. Próxima frente: Blueprint do Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.
 > ✅ PR63 (PR-DIAG) — concluída. Diagnóstico da frente "Atualização supervisionada de memória". Decisão: Opção B (parcialmente concluída) com absorção do mecanismo manual. PR61 entregou camada documental (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada). Mecanismo técnico de escrita supervisionada automática NÃO implementado e NÃO blocking para Runtime de Skills. Fluxo manual via PR é o mecanismo vigente (`UPDATE_POLICY.md` seção 8). G3 on-hold. Implementar `/memory/write` antes de skills gera R1 (docs_over_product). Relatório: `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md`.
 > ✅ PR62 (PR-DOCS) — concluída. Reconciliação documental do contrato Jarvis Brain. Seção 12 adicionada ao contrato com: plano original, execução real, tabela de equivalência, regra de interpretação. Próxima PR: PR63 — PR-DIAG — decidir se atualização supervisionada de memória foi absorvida pela PR61 documental ou precisa de implementação real. Relatório: `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md`.
 > ✅ PR59 (PR-IMPL) — concluída. `schema/enavia-response-policy.js` criado com `buildEnaviaResponsePolicy()` (15 regras: secret_exposure, fake_execution, false_capability, runtime_vs_documentation_confusion, unauthorized_action, scope_violation, contract_drift, docs_over_product, frustration, deploy_request, strategy_question, next_pr_request, pr_review, technical_diagnosis, caso limpo). Integrado em `schema/enavia-cognitive-runtime.js` (seção 7e) e `nv-enavia.js` (campo aditivo `response_policy`). Smoke PR59 96/96 ✅. Regressões 1.375/1.375 ✅. Total 1.471/1.471 ✅. Read-only. Não altera reply. Não bloqueia fluxo. Não cria endpoint. Não usa KV/rede/FS. Relatório: `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md`. Response Policy viva v1 completa e validada.

@@ -32,6 +32,13 @@ Ciclo de PRs que geram muita documentação (PR-DOCS, PR-DIAG) sem implementaç�
 
 **Fonte:** PR55 (Self-Audit Framework), PR60 Cenário B (frustração detectada)
 
+**Nota PR63/PR64 — Decisão de adiar runtime de escrita de memória:**
+> Implementar escrita de memória (`/memory/write`, `/brain/write`) antes do Runtime de Skills existir é uma instância clássica de R1: mais infraestrutura sem uso real.
+> A decisão das PRs63/PR64 é deliberada: adiar o runtime de escrita até que:
+> (a) Runtime de Skills exista e
+> (b) Skills estejam produzindo conteúdo operacional real para memorizar.
+> Criar `/memory/write` agora seria documentação de infraestrutura sem produto que a consuma.
+
 ---
 
 ### R2 — Falsa capacidade

@@ -225,7 +225,42 @@ o sistema ao qual pertence. Tem 4 dimensões: **contratos**, **estado**, **siste
 
 ---
 
-## 8. Como Evitar Alucinação Geral
+## 8. Estado após PR64 — modo vigente
+
+> **Adicionado em:** 2026-05-02 (PR64 — PR-DOCS)
+>
+> Esta seção documenta o estado do sistema após a formalização documental da PR64.
+> Nenhum runtime foi alterado. Nenhum endpoint foi criado.
+
+### Mecanismo de atualização de memória
+
+| Item | Estado |
+|------|--------|
+| Atualização de memória | **Manual via PR** — agente propõe, operador aprova ao mergear |
+| Escrita automática de memória | **Inexistente / on-hold** |
+| G3 (escrita automática) | **on-hold** — não blocking |
+| `/memory/write` | **Não existe** — não criar antes do Runtime de Skills |
+| `/brain/write` | **Não existe** — não criar antes do Runtime de Skills |
+
+### Runtime de Skills
+
+| Item | Estado |
+|------|--------|
+| Runtime de Skills | **Próxima frente liberada para blueprint** |
+| `/skills/run` | **Não existe** — skills continuam documentais |
+| Skill Executor | **Não existe** — não implementado |
+| Blueprint Runtime de Skills | **Autorizado** — PR65 (PR-DOCS) |
+
+### Decisão PR63/PR64
+
+- Frente de atualização supervisionada de memória: **formalmente encerrada/absorvida** por enquanto.
+- O fluxo manual via PR é o mecanismo vigente, supervisionado e suficiente.
+- Não faz sentido implementar escrita automática antes de existirem skills executando e gerando conteúdo real.
+- Finding I1 documentado, não corrigido — baixo impacto, PR futura dedicada.
+
+---
+
+## 9. Como Evitar Alucinação Geral
 
 1. **Sempre citar a fonte** ao afirmar algo sobre o sistema.
 2. **Marcar incerteza explicitamente** quando não há fonte.

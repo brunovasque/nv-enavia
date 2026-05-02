@@ -992,3 +992,41 @@ A PR33 inseriu a **Frente 2 — Correção conceitual do Chat Runtime** entre o 
 **Justificativa:** A PR61 foi documental — propôs atualizações de memória mas não implementou escrita supervisionada real. A frente "Teste de atualização supervisionada" (originalmente PR58 no plano) ainda tem lacuna aberta. O operador orientou: não iniciar Runtime de Skills enquanto houver lacuna sobre atualização supervisionada de memória. Portanto, a próxima PR deve ser um diagnóstico honesto sobre essa frente — se foi concluída pela PR61, se foi absorvida, ou se precisa de implementação real ainda.
 
 Somente após essa decisão (via PR63-DIAG) é que Blueprint do Runtime de Skills (PR64) pode ser aberto com segurança.
+
+---
+
+### F. Decisão PR63/PR64 — Atualização supervisionada de memória
+
+> **Adicionado em PR64 — 2026-05-02**
+
+#### Diagnóstico herdado da PR63
+
+- PR63 (PR-DIAG) diagnosticou que PR61 concluiu a **camada documental** da frente de atualização supervisionada de memória (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada do ciclo PR31-PR60).
+- A escrita automática/supervisionada no runtime **ainda não existe** e não foi implementada.
+- O fluxo manual via PR (agente propõe no handoff/relatório → operador aprova ao mergear) é o **mecanismo vigente e supervisionado** por enquanto, conforme `UPDATE_POLICY.md` seção 8.
+
+#### Decisão formal (PR64)
+
+| Item | Decisão |
+|------|---------|
+| Frente "atualização supervisionada" | **Formalmente encerrada/absorvida** por enquanto |
+| Camada documental (M1-M7) | Concluída pela PR61 ✅ |
+| Escrita automática runtime | Não implementada — **on-hold** (não blocking) |
+| G3 (escrita automática) | **on-hold** — não bloqueia próxima frente |
+| `/memory/write` | **Não criar agora** — sem skills para gerar conteúdo real |
+| `/brain/write` | **Não criar agora** — sem skills para gerar conteúdo real |
+| Runtime de escrita | **Adiar** até que Runtime de Skills exista e haja conteúdo operacional real para memorizar |
+
+#### Justificativa
+
+Não faz sentido implementar `/memory/write` ou runtime de escrita de memória antes do Runtime de Skills existir. Implementar escrita de memória sem produto que a utilize incorre diretamente no risco R1 (docs_over_product / infraestrutura sem uso real). O fluxo manual via PR é suficiente, supervisionado e seguro por ora.
+
+#### Próxima frente liberada
+
+**Blueprint do Runtime de Skills**
+
+A frente de atualização supervisionada de memória está formalmente absorvida. A próxima PR autorizada é:
+
+> `PR65 — PR-DOCS — Blueprint do Runtime de Skills`
+
+Esta PR deve definir o blueprint documental do Runtime de Skills — arquitetura, contrato de execução, gates de aprovação, interface do Skill Executor — sem implementar nenhum código de runtime.

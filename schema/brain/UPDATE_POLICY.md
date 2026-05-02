@@ -145,7 +145,32 @@ do contrato Jarvis Brain. Quando implementado:
 
 ---
 
-## 10. O Que Nunca Criar
+## 10. Estado após PR64 — modo vigente
+
+> **Adicionado em PR64 — 2026-05-02**
+
+### Mecanismo atual de atualização de memória
+
+- A atualização de memória é feita **via PR** — não existe escrita automática.
+- O agente propõe atualizações no relatório ou handoff da PR.
+- O operador aprova ao mergear a PR — supervisão humana garantida.
+- Não existe escrita automática de memória em nenhum módulo do runtime.
+
+### Runtime de escrita — status
+
+- O runtime de escrita de memória está **on-hold**.
+- Não será implementado antes que o Runtime de Skills exista.
+- A decisão de adiar é deliberada: implementar escrita de memória sem produto que a utilize é infraestrutura sem uso real (risco R1 — docs_over_product).
+- Futura escrita automática só deve ser reavaliada **depois que Runtime de Skills existir** e houver conteúdo operacional real gerado pelas skills para memorizar.
+
+### Próxima revisão desta política
+
+- Reavaliar quando `/skills/run` existir e Skills estiverem produzindo conteúdo operacional.
+- Não criar `/memory/write`, `/brain/write` ou módulo de escrita automática antes dessa condição.
+
+---
+
+## 11. O Que Nunca Criar
 
 | Proibido | Motivo |
 |----------|--------|

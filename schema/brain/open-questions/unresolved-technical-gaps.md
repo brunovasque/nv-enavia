@@ -69,25 +69,31 @@ Incluir no planejamento da próxima fase (PR62 PR-DIAG).
 
 ### G3 — Escrita automática de memória não existe
 
-**Estado:** Aberta
-**PR de referência:** PR41, PR43, PR60
+**Estado:** on-hold (não blocking)
+**Atualizado em:** 2026-05-02 (PR64)
+**PR de referência:** PR41, PR43, PR60, PR63, PR64
 
 **Contexto:**
 Brain Loader lê do brain (snapshot estático, read-only).
 Nenhum módulo escreve no brain automaticamente.
+PR63 diagnosticou que a camada documental foi concluída pela PR61.
+O fluxo manual via PR é o mecanismo vigente e suficiente por ora.
 
-**Questão em aberto:**
-Como implementar escrita de memória de forma segura, sem inventar conteúdo,
-sem duplicar, sem corromper o brain?
+**Decisão PR63/PR64:**
+G3 está formalmente **on-hold**. Não bloqueia o Runtime de Skills.
+Implementar escrita automática antes de Runtime de Skills existir incorre no risco R1 (docs_over_product).
 
-**Por que está aberta:**
-Risco alto de memória inconsistente se implementado sem design cuidadoso.
+**Motivo:**
+O fluxo manual via PR (agente propõe → operador aprova ao mergear) é funcional, supervisionado e seguro.
+Não há skills executando que gerariam conteúdo real para memorizar automaticamente.
 
-**Impacto se não resolvida:**
-Brain não aprende automaticamente — todo aprendizado é manual (via PR).
+**O que NÃO fazer agora:**
+- Não criar `/memory/write`
+- Não criar `/brain/write`
+- Não implementar módulo de escrita automática de memória
 
-**Próxima ação sugerida:**
-PR-DIAG do design de memory write antes de qualquer implementação.
+**Próxima ação:**
+Reavaliar após Runtime de Skills existir e haver conteúdo operacional real para memorizar.
 
 ---
 
