@@ -1,28 +1,25 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR76 — PR-PROVA — Prova formal da Skill SYSTEM_MAPPER ✅
-**Para:** PR77 — PR-IMPL — Integração controlada com chat
+**De:** PR77 — PR-IMPL — Integração controlada com chat ✅
+**Para:** PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills
 
-## Handoff atual (PR76)
+## Handoff atual (PR77)
 
 ### O que foi feito
 
-- PR76 executada em escopo `Tests-only`.
-- Prova formal criada: `tests/pr76-system-mapper.prova.test.js`.
-- 46 cenários mandatórios cobertos com validação explícita de:
-  - contrato read-only da `SYSTEM_MAPPER`
-  - gate `require_approved_proposal` (approved libera; demais bloqueiam)
-  - side effects/execution invariantes (`side_effects=false`, `executed=false`)
-  - mapa de allowlist/endpoints com `/skills/run` inexistente
-  - limitações de segurança (`no_side_effects`, sem FS/rede/KV/LLM externo)
-  - determinismo, saída pequena/estruturada e não vazamento de segredos
-  - `nv-enavia.js`, `wrangler.toml`, `contract-executor.js`, `reply/use_planner` preservados
-  - ausência de endpoint novo na PR
-  - regressão obrigatória: smoke PR75 continua passando
+- PR77 executada em escopo `Worker-only`.
+- Superfície controlada de proposta integrada no `/chat/run` sem execução automática.
+- Novo helper puro criado: `schema/enavia-chat-skill-surface.js`.
+- `chat_skill_surface` adicionado como metadado aditivo somente para `skill_execution.status=proposed`, com mensagem canônica:
+  - `Existe uma ação técnica proposta, aguardando aprovação.`
+- `blocked/not_applicable` não poluem o `reply`.
+- `reply` principal e `use_planner` preservados.
+- Sem `/skills/run`, sem endpoint novo, sem chamada automática de `buildSystemMapperResult`.
 
 ### Testes executados
 
+- `node tests/pr77-chat-controlled-skill-integration.smoke.test.js` — 24/24 ✅
 - `node tests/pr76-system-mapper.prova.test.js` — 46/46 ✅
 - `node tests/pr75-system-mapper-readonly.smoke.test.js` — 24/24 ✅
 - `node tests/pr74-approval-gate.prova.test.js` — 81/81 ✅
@@ -37,11 +34,11 @@
 
 ### O que NÃO foi alterado
 
-- `nv-enavia.js`
-- `schema/enavia-skill-approval-gate.js`
-- `schema/enavia-skill-executor.js`
 - `wrangler.toml`
 - `contract-executor.js`
+- `schema/enavia-system-mapper-skill.js`
+- `schema/enavia-skill-approval-gate.js`
+- `schema/enavia-skill-executor.js`
 - `schema/enavia-skill-router.js`
 - `schema/enavia-self-audit.js`
 - `schema/enavia-response-policy.js`
@@ -51,7 +48,7 @@
 
 ### Próxima etapa segura
 
-- PR77 — `Worker-only` — integração controlada com chat (sem execução automática e sem `/skills/run`).
+- PR78 — `Tests-only + Docs-only mínimo` — prova de fechamento funcional proposal-only → propose endpoint → approval gate → system mapper read-only → chat controlado.
 
 ---
 

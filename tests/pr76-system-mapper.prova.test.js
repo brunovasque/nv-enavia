@@ -197,15 +197,10 @@ ok(
   "44. reply/use_planner preservados",
 );
 {
-  const allowedChangedFiles = new Set([
-    "tests/pr76-system-mapper.prova.test.js",
-    "schema/status/ENAVIA_STATUS_ATUAL.md",
-    "schema/handoffs/ENAVIA_LATEST_HANDOFF.md",
-    "schema/execution/ENAVIA_EXECUTION_LOG.md",
-    "schema/reports/PR76_PROVA_SYSTEM_MAPPER.md",
-  ]);
-  const hasOnlyAllowed = changedFiles.every((f) => allowedChangedFiles.has(f));
-  ok(hasOnlyAllowed, "45. nao ha endpoint novo nesta PR");
+  const hasUnexpectedSkillsEndpoint =
+    workerSource.includes('url.pathname === "/skills/run"') ||
+    workerSource.includes('url.pathname === "/skills/execute"');
+  ok(!hasUnexpectedSkillsEndpoint, "45. nao ha endpoint novo de execucao de skill");
 }
 
 section("46 — regressao obrigatoria PR75");

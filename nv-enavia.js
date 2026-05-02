@@ -49,6 +49,7 @@ import { buildIntentRetrievalContext } from "./schema/enavia-intent-retrieval.js
 import { runEnaviaSelfAudit } from "./schema/enavia-self-audit.js";
 import { buildEnaviaResponsePolicy } from "./schema/enavia-response-policy.js";
 import { buildSkillExecutionProposal } from "./schema/enavia-skill-executor.js";
+import { buildChatSkillSurface } from "./schema/enavia-chat-skill-surface.js";
 import { registerSkillProposal, approveSkillProposal, rejectSkillProposal } from "./schema/enavia-skill-approval-gate.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
@@ -4172,6 +4173,14 @@ async function handleChatLLM(request, env) {
   } catch (_skillExecutionErr) {
     _skillExecution = null;
   }
+  let _chatSkillSurface = null;
+  try {
+    _chatSkillSurface = buildChatSkillSurface({
+      skillExecution: _skillExecution?.skill_execution,
+    });
+  } catch (_chatSkillSurfaceErr) {
+    _chatSkillSurface = null;
+  }
 
   try {
     // --- PR3: Memory Retrieval Pipeline (antes da resposta LLM) ---
@@ -4745,6 +4754,9 @@ async function handleChatLLM(request, env) {
       // PR69: Skill Execution Proposal v1 (campo aditivo, proposal-only).
       // Não executa skill. Não altera reply/use_planner. Sem side effects.
       ...(_skillExecution ? { skill_execution: _skillExecution.skill_execution } : {}),
+      // PR77: superfície controlada de proposta no chat (metadata-only).
+      // Não executa skill. Não altera reply/use_planner.
+      ...(_chatSkillSurface ? { chat_skill_surface: _chatSkillSurface } : {}),
       timestamp: Date.now(),
       input: message,
       telemetry: {

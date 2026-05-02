@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR76 — prova formal da SYSTEM_MAPPER ✅)
-**Branch ativa:** `codex/pr76-prova-system-mapper`
-**Última tarefa:** PR76 — PR-PROVA — prova formal da skill `SYSTEM_MAPPER` concluída com 46/46 cenários obrigatórios e bateria de regressão obrigatória passando.
+**Data:** 2026-05-02 (atualizado após PR77 — integração controlada com chat ✅)
+**Branch ativa:** `codex/pr77-chat-controlled-skill-integration`
+**Última tarefa:** PR77 — PR-IMPL — integração controlada do chat com proposta de skill concluída sem execução automática e com mensagem governada de proposta pendente.
 
 ## Estado atual do sistema
 
@@ -12,7 +12,7 @@
 
 **Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. PR76 provou formalmente que `SYSTEM_MAPPER` permanece read-only, determinística e sem side effects: `mode=read_only`, `executed=false`, `executed_readonly` apenas quando permitido por gate, bloqueio seguro quando `require_approved_proposal=true` sem `approved`, saída pequena/estruturada, ausência de vazamento de segredo e ausência de `/skills/run`. Nenhum endpoint novo foi criado e arquivos proibidos (`wrangler.toml`, `contract-executor.js`, `nv-enavia.js`) seguem fora do diff.
+**Sistema operacional:** Estável. PR77 integrou a superfície controlada de proposta no `/chat/run` com `chat_skill_surface` apenas quando `skill_execution.status=proposed`, sem executar skill, sem criar `/skills/run`, sem alterar `use_planner` e preservando `Self-Audit` + `Response Policy` como guardrails. `blocked/not_applicable` não poluem o reply.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR77 — PR-IMPL — Integração controlada com chat**
+**PR78 — PR-PROVA — Fechamento funcional da Fase 1 do Runtime de Skills**
+
+> ✅ PR77 (PR-IMPL) — concluída. `schema/enavia-chat-skill-surface.js` criado com helper puro `buildChatSkillSurface()` e mensagem canônica `"Existe uma ação técnica proposta, aguardando aprovação."`. `nv-enavia.js` atualizado no fluxo `handleChatLLM` para adicionar metadado aditivo `chat_skill_surface` somente quando `skill_execution.status=proposed`; `reply` principal preservado; `skill_execution` permanece campo aditivo; `blocked/not_applicable` sem poluição adicional. Nenhuma execução automática de skill. Nenhum `/skills/run`. Nenhum endpoint novo. `buildSystemMapperResult` não chamado no chat. Teste novo `tests/pr77-chat-controlled-skill-integration.smoke.test.js` aprovado.
 
 > ✅ PR76 (PR-PROVA) — concluída. Arquivo `tests/pr76-system-mapper.prova.test.js` criado com prova formal dos 46 cenários obrigatórios da `SYSTEM_MAPPER`: contrato base read-only, allowlist/endpoints seguros, confirmação explícita de ausência de `/skills/run`, gate `require_approved_proposal` com liberação apenas para `approved`, bloqueio seguro para `proposed|rejected|blocked|ausente`, invariantes `side_effects=false` e `executed=false`, determinismo, saída pequena/estruturada, não vazamento (`OPENAI_API_KEY`, token/secret/authorization, SUPABASE_URL/bucket), inspeção estática sem fetch/KV/FS/runtime command/LLM externo, preservação de `reply/use_planner`, ausência de endpoint novo nesta PR e regressão obrigatória do smoke PR75 passando dentro da própria prova. Bateria obrigatória completa executada e aprovada (PR76, PR75, PR74, PR73, PR72, PR71, PR70, PR69, PR51, PR57, PR59).
 
