@@ -1,18 +1,18 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR68 — Fechamento do Jarvis Brain v1 ✅)
-**Branch ativa:** `copilot/claudepr68-docs-prova-fechamento-jarvis-brain-v1`
-**Última tarefa:** PR68 — PR-DOCS/PR-PROVA — Fechamento formal do Jarvis Brain v1. Relatório de fechamento e checklist criados. 22 frentes validadas. Artefatos confirmados. Estado final documentado. Contrato Jarvis Brain v1 encerrado. Nenhum runtime alterado. Nenhum endpoint criado.
+**Data:** 2026-05-02 (atualizado após PR70 — Prova formal do Skill Execution Proposal ✅)
+**Branch ativa:** `codex/pr70-prova-skill-execution-proposal`
+**Última tarefa:** PR70 — PR-PROVA — prova formal da PR69 (proposal-only/read-only). Teste formal criado e regressões obrigatórias executadas. Nenhum runtime alterado. Nenhum endpoint criado.
 
 ## Estado atual do sistema
 
-**Contrato ativo:** ⬜ **Nenhum** — Jarvis Brain v1 encerrado formalmente na PR68. Aguardando novo contrato.
+**Contrato ativo:** `CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` (Ativo)
 
-**Objetivo:** Ciclo Jarvis Brain v1 concluído. Enavia tem base cognitiva/governada completa.
+**Objetivo:** Validar formalmente o módulo de proposta de execução de skill e avançar com segurança para endpoints read-only da frente de Skills Runtime.
 
-**Frase central:** "A Enavia pensa livremente, lembra com estrutura, sugere com inteligência e executa somente com governança."
+**Frase central:** "Proposal primeiro, execução depois; sempre com governança e deny-by-default."
 
-**Sistema operacional:** Estável. Runtime não alterado. Stack cognitiva completa: LLM Core + Brain Loader + Intent Classifier + Skill Router + Intent Retrieval + Self-Audit + Response Policy.
+**Sistema operacional:** Estável. PR69 implementada no runtime: `schema/enavia-skill-executor.js` + campo aditivo `skill_execution` no `/chat/run` (sem side effects).
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,7 +33,9 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**⬜ Aguardando novo contrato da próxima fase**
+**PR71 — PR-IMPL — Endpoint `/skills/propose` (read-only)**
+
+> ✅ PR70 (PR-PROVA) — concluída. `tests/pr70-skill-execution-proposal.prova.test.js` criado. Prova formal de 13 cenários obrigatórios: proposta para skill conhecida, deny-by-default para skill desconhecida, bloqueios por self_audit (`risk_level=blocking`, `should_block=true`, `secret_exposure`), `not_applicable` para conversa comum/pausa sem skill roteada, ausência de side effects (sem fetch/KV/FS runtime/LLM externo), campo aditivo `skill_execution` no `/chat/run`, `reply` e `use_planner` preservados, `/skills/propose` e `/skills/run` inexistentes. Testes obrigatórios PR70/PR69/PR51/PR57/PR59 passando.
 
 > ✅ PR68 (PR-DOCS/PR-PROVA) — concluída. Fechamento formal do Jarvis Brain v1. Relatório de fechamento (`schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md`) e checklist de fechamento (`schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md`) criados. 22 frentes validadas. Artefatos confirmados. Estado final documentado. SYSTEM_AWARENESS seção 11 adicionada. Contrato Jarvis Brain v1 encerrado. Nenhum runtime alterado. Nenhum endpoint criado. `schema/enavia-skill-executor.js` não criado. `/skills/propose` não criado. `/skills/run` não criado.
 > ✅ PR67 (PR-HARDENING) — concluída. Hardening documental/governança. Pacote `schema/hardening/` criado com 6 arquivos. SECURITY_MODEL, ROLLOUT_PLAN, future-risks (R14–R17), SYSTEM_AWARENESS (seção 10) atualizados. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
