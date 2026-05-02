@@ -340,7 +340,52 @@ Ou **PR68 — PR-HARDENING** se algum critério do hardening estiver incompleto.
 
 ---
 
-## 11. Como Evitar Alucinação Geral
+## 11. Estado após PR68 — Fechamento do Jarvis Brain v1
+
+> **Adicionado em:** 2026-05-02 (PR68 — PR-DOCS/PR-PROVA)
+>
+> Esta seção documenta o estado final do sistema após o fechamento formal do ciclo Jarvis Brain v1.
+> Nenhum runtime foi alterado. Nenhum endpoint foi criado. Esta é uma PR documental/governança pura.
+
+### Estado final do Jarvis Brain v1
+
+| Item | Estado |
+|------|--------|
+| Contrato Jarvis Brain v1 | ✅ **ENCERRADO FORMALMENTE** nesta PR68 |
+| Frentes concluídas | ✅ 22 frentes concluídas ou formalmente absorvidas |
+| Stack cognitiva | ✅ LLM Core + Brain Loader + Intent Classifier + Skill Router + Intent Retrieval + Self-Audit + Response Policy |
+| Provas principais | ✅ 236/236 na prova anti-bot final (PR60) |
+| Hardening | ✅ Pacote completo `schema/hardening/` criado na PR67 |
+| Runtime de Skills | ❌ **NÃO EXISTE** — planejado, diagnosticado e hardenizado; aguarda novo contrato |
+| `schema/enavia-skill-executor.js` | ❌ **NÃO EXISTE** — não criado neste ciclo |
+| `/skills/propose` | ❌ **NÃO EXISTE** — aguarda novo contrato |
+| `/skills/run` | ❌ **NÃO EXISTE** — aguarda novo contrato |
+| `/memory/write` | ❌ **NÃO EXISTE** — mecanismo manual via PR é o vigente |
+| Próxima PR autorizada | ⬜ **Aguardando novo contrato da próxima fase** |
+
+### Lacunas non-blocking registradas
+
+- G1: Runtime de Skills não implementado (por decisão)
+- G2: Endpoint `/skills/propose` não criado (por decisão)
+- G3: Escrita automática de memória on-hold (por decisão PR63/PR64)
+- G4: Finding I1 (regex Self-Audit) não corrigido (baixo impacto)
+- G5: Painel usa `target: read_only` como default (contornado por LLM Core)
+
+### Restrições absolutas do estado atual
+
+- **Nenhuma PR-IMPL pode ser iniciada sem novo contrato explícito**
+- **Go/No-Go checklist (`schema/hardening/GO_NO_GO_CHECKLIST.md`) deve ser satisfeito antes de qualquer PR-IMPL de runtime**
+- **`/skills/run` e `/skills/propose` não existem e não devem ser criados fora de contrato**
+- **Operador humano deve criar o próximo contrato antes de retomar implementação**
+
+### Artefatos de fechamento
+
+- `schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md` — relatório completo
+- `schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md` — checklist de fechamento
+
+---
+
+## 12. Como Evitar Alucinação Geral
 
 1. **Sempre citar a fonte** ao afirmar algo sobre o sistema.
 2. **Marcar incerteza explicitamente** quando não há fonte.

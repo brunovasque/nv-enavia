@@ -1,39 +1,31 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-02
-**De:** PR67 — PR-HARDENING — Hardening de Segurança, Custo e Limites ✅
-**Para:** PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
+**De:** PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1 ✅
+**Para:** Aguardando novo contrato da próxima fase
 
 ## O que foi feito nesta sessão
 
-### PR67 — PR-HARDENING — Hardening de Segurança, Custo e Limites
+### PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
 
-**Tipo:** `PR-HARDENING` (documental/governança — sem alteração de runtime)
-**Branch:** `copilot/claudepr67-hardening-seguranca-custo-limites`
-**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md`
-**PR anterior validada:** PR66 ✅ (PR-DIAG — Diagnóstico técnico do Runtime de Skills)
+**Tipo:** `PR-DOCS/PR-PROVA` (documental/governança — sem alteração de runtime)
+**Branch:** `copilot/claudepr68-docs-prova-fechamento-jarvis-brain-v1`
+**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (encerrado nesta PR)
+**PR anterior validada:** PR67 ✅ (PR-HARDENING — Hardening de Segurança, Custo e Limites)
 
 **Objetivo:**
-Consolidar segurança, custo, limites, blast radius, rollback e go/no-go checklist antes de qualquer implementação futura do Runtime de Skills.
+Fechar formalmente a frente Jarvis Brain v1, validando que o ciclo planejado/reconciliado foi concluído, documentado e está pronto para a próxima fase futura.
 
 **Arquivos criados:**
-- `schema/hardening/INDEX.md` — visão geral e como usar o pacote
-- `schema/hardening/SKILLS_RUNTIME_HARDENING.md` — D1–D10, allowlist, aprovação humana, secrets, KV, Self-Audit
-- `schema/hardening/COST_LIMITS.md` — C1–C5 riscos, limites por request/tempo/LLM/KV
-- `schema/hardening/BLAST_RADIUS.md` — níveis 0–4, gates mínimos, matriz por skill, B1–B7
-- `schema/hardening/ROLLBACK_POLICY.md` — rollback por artefato, regra PR-PROVA com falha
-- `schema/hardening/GO_NO_GO_CHECKLIST.md` — 32 critérios, 5 categorias
-- `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md` — relatório completo
+- `schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md` — relatório completo de fechamento
+- `schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md` — checklist de fechamento (9 seções, todos itens verificados)
 
 **Arquivos atualizados:**
-- `schema/skills-runtime/SECURITY_MODEL.md` — seção 10 (referência ao hardening, deny-by-default reforçado)
-- `schema/skills-runtime/ROLLOUT_PLAN.md` — seção 11 (gate de hardening antes de Fase 2)
-- `schema/brain/learnings/future-risks.md` — R14–R17 adicionados
-- `schema/brain/SYSTEM_AWARENESS.md` — seção 10 adicionada
-- `schema/contracts/INDEX.md` — PR68 como próxima autorizada
-- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR67 concluída
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 11 adicionada (estado final pós-PR68)
+- `schema/contracts/INDEX.md` — contrato Jarvis Brain v1 marcado como Encerrado ✅; próxima PR = aguardando novo contrato
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR68 concluída; contrato encerrado; próxima ação definida
 - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — este arquivo
-- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR67
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — log PR68
 
 **O que NÃO foi alterado:**
 - `nv-enavia.js` — não alterado ✅
@@ -50,33 +42,33 @@ Consolidar segurança, custo, limites, blast radius, rollback e go/no-go checkli
 
 ## O que a próxima sessão deve fazer
 
-### PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
+### Próxima fase — Aguardando novo contrato
 
-**Tipo:** `PR-DOCS` ou `PR-PROVA` (a definir pelo contrato)
-**Objetivo:**
-Formalizar o fechamento da fase Jarvis Brain com:
-1. Validação de que todos os artefatos do ciclo PR61–PR67 estão consistentes
-2. Documentação do estado final do sistema pós-ciclo
-3. Memória consolidada do ciclo PR61–PR67
-4. Declaração clara do estado: hardening criado, runtime não implementado
-5. Preparação para o próximo contrato
+**Estado:** ⬜ Nenhum contrato ativo. Jarvis Brain v1 encerrado formalmente.
 
-**Pré-requisitos:**
-- PR67 ✅ (hardening concluído)
-- PR66 ✅ (diagnóstico técnico)
-- PR65 ✅ (blueprint)
-- Go/No-Go checklist de `schema/hardening/GO_NO_GO_CHECKLIST.md` satisfeito
-
-**O que NÃO implementar:**
-- Não implementar Runtime de Skills
+**O que a próxima sessão NÃO deve fazer sem novo contrato:**
+- Não iniciar PR-IMPL de runtime
 - Não criar `schema/enavia-skill-executor.js`
 - Não criar `/skills/propose`
 - Não criar `/skills/run`
-- Não alterar nenhum módulo de runtime
+- Não alterar `nv-enavia.js`
+
+**O que a próxima sessão PODE fazer:**
+- Criar novo contrato se solicitado pelo operador
+- Responder perguntas sobre o estado do sistema
+- Documentar decisões do operador
+
+**Pré-requisito obrigatório antes de qualquer PR-IMPL futura:**
+- Novo contrato criado pelo operador humano
+- Go/No-Go checklist de `schema/hardening/GO_NO_GO_CHECKLIST.md` satisfeito
+
+**Sugestões de próximos contratos:**
+- `CONTRATO_RUNTIME_SKILLS_V1` — implementar Runtime de Skills (Opção A recomendada)
+- `CONTRATO_EXECUCAO_PRODUTO_ENAVIA_V1` — focar em produto/UX antes de skills (Opção B)
 
 ## Contexto técnico
 
-**Stack atual:**
+**Stack atual (completa):**
 
 | Módulo | Status | Finding |
 |--------|--------|---------|

@@ -4,6 +4,81 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-02 — PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1
+
+- **Branch:** `copilot/claudepr68-docs-prova-fechamento-jarvis-brain-v1`
+- **Tipo:** `PR-DOCS/PR-PROVA` (documental/governança — sem alteração de runtime)
+- **Contrato:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` (encerrado nesta PR)
+- **PR anterior validada:** PR67 ✅ (PR-HARDENING — Hardening de Segurança, Custo e Limites)
+
+### Objetivo
+
+Fechar formalmente a frente Jarvis Brain v1, validando que o ciclo planejado/reconciliado foi concluído, documentado e está pronto para a próxima fase futura. Esta PR é documental/governança pura — nenhum runtime implementado.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md` — relatório completo (12 seções): objetivo, base analisada, 22 frentes concluídas, artefatos existentes, artefatos inexistentes por decisão, estado final, provas, lacunas, riscos, Go/No-Go final, o que não foi implementado, próxima fase recomendada
+- `schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md` — checklist de fechamento (9 seções): contrato reconciliado, frentes concluídas, provas, hardening, lacunas, riscos, runtime não implementado, endpoint não criado, próximo contrato
+
+**Arquivos atualizados:**
+- `schema/brain/SYSTEM_AWARENESS.md` — seção 11 adicionada (estado final pós-PR68, restrições absolutas do estado atual, artefatos de fechamento)
+- `schema/contracts/INDEX.md` — contrato Jarvis Brain v1 encerrado ✅ (2026-05-02); próxima PR = aguardando novo contrato
+- `schema/status/ENAVIA_STATUS_ATUAL.md` — PR68 concluída; contrato encerrado; próxima ação: aguardando novo contrato
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — handoff PR68→próximo contrato
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` — este log
+
+### Validações obrigatórias executadas
+
+**Artefatos que devem existir — verificados:**
+- `schema/brain/` ✅
+- `schema/skills/` ✅
+- `schema/skills-runtime/` ✅
+- `schema/self-audit/` ✅
+- `schema/hardening/` ✅
+- `schema/enavia-llm-core.js` ✅
+- `schema/enavia-brain-loader.js` ✅
+- `schema/enavia-intent-classifier.js` ✅
+- `schema/enavia-skill-router.js` ✅
+- `schema/enavia-intent-retrieval.js` ✅
+- `schema/enavia-self-audit.js` ✅
+- `schema/enavia-response-policy.js` ✅
+
+**Artefatos que NÃO devem existir — confirmados ausentes:**
+- `schema/enavia-skill-executor.js` ✅ não existe
+- `/skills/propose` ✅ não existe como rota
+- `/skills/run` ✅ não existe como rota (apenas comentário na linha 4684)
+- `/memory/write` ✅ não existe
+- `/brain/write` ✅ não existe
+
+### Resultado
+
+- **Jarvis Brain v1 encerrado formalmente** ✅
+- **22 frentes concluídas ou formalmente absorvidas** ✅
+- **Relatório de fechamento criado** ✅
+- **Checklist de fechamento criado** ✅
+- **Estado final documentado** ✅
+- **SYSTEM_AWARENESS seção 11 adicionada** ✅
+- **Contrato encerrado no INDEX.md** ✅
+- **Nenhum runtime alterado** ✅
+- **Nenhum endpoint criado** ✅
+- **`/skills/propose` não criado** ✅
+- **`/skills/run` não criado** ✅
+- **`schema/enavia-skill-executor.js` não criado** ✅
+- **`nv-enavia.js` não alterado** ✅
+- **`contract-executor.js` não alterado** ✅
+- **Governança atualizada** ✅
+
+### Próxima ação
+
+**⬜ Aguardando novo contrato da próxima fase**
+
+Sugestões:
+- `CONTRATO_RUNTIME_SKILLS_V1` — implementar Runtime de Skills (Opção A recomendada)
+- `CONTRATO_EXECUCAO_PRODUTO_ENAVIA_V1` — focar em produto/UX (Opção B)
+
+---
+
 ## 2026-05-02 — PR67 — PR-HARDENING — Hardening de Segurança, Custo e Limites
 
 - **Branch:** `copilot/claudepr67-hardening-seguranca-custo-limites`

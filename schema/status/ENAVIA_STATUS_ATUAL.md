@@ -1,18 +1,18 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR67 — Hardening de Segurança, Custo e Limites ✅)
-**Branch ativa:** `copilot/claudepr67-hardening-seguranca-custo-limites`
-**Última tarefa:** PR67 — PR-HARDENING — Hardening documental/governança do Runtime de Skills. Pacote `schema/hardening/` criado com 6 arquivos: INDEX.md, SKILLS_RUNTIME_HARDENING.md, COST_LIMITS.md, BLAST_RADIUS.md, ROLLBACK_POLICY.md, GO_NO_GO_CHECKLIST.md. SECURITY_MODEL, ROLLOUT_PLAN, future-risks (R14–R17), SYSTEM_AWARENESS (seção 10) atualizados. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
+**Data:** 2026-05-02 (atualizado após PR68 — Fechamento do Jarvis Brain v1 ✅)
+**Branch ativa:** `copilot/claudepr68-docs-prova-fechamento-jarvis-brain-v1`
+**Última tarefa:** PR68 — PR-DOCS/PR-PROVA — Fechamento formal do Jarvis Brain v1. Relatório de fechamento e checklist criados. 22 frentes validadas. Artefatos confirmados. Estado final documentado. Contrato Jarvis Brain v1 encerrado. Nenhum runtime alterado. Nenhum endpoint criado.
 
 ## Estado atual do sistema
 
-**Contrato ativo:** `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` — Ativo 🟢 (ampliado para PR31-PR64)
+**Contrato ativo:** ⬜ **Nenhum** — Jarvis Brain v1 encerrado formalmente na PR68. Aguardando novo contrato.
 
-**Objetivo do contrato:** Transformar a Enavia de sistema governado/documental em uma IA operacional viva — LLM Core, Memory Brain, Skill Router, Intent Engine, Self-Audit e resposta LLM-first.
+**Objetivo:** Ciclo Jarvis Brain v1 concluído. Enavia tem base cognitiva/governada completa.
 
 **Frase central:** "A Enavia pensa livremente, lembra com estrutura, sugere com inteligência e executa somente com governança."
 
-**Sistema operacional:** Estável. Runtime não alterado. Loop contratual supervisionado funcional.
+**Sistema operacional:** Estável. Runtime não alterado. Stack cognitiva completa: LLM Core + Brain Loader + Intent Classifier + Skill Router + Intent Retrieval + Self-Audit + Response Policy.
 
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
 
@@ -33,13 +33,10 @@ Detalhes completos em `schema/reports/PR32_CHAT_ENGESSADO_DIAGNOSTICO.md`.
 
 ## Próxima PR autorizada
 
-**PR68 — PR-DOCS/PR-PROVA — Fechamento do Jarvis Brain v1**
+**⬜ Aguardando novo contrato da próxima fase**
 
+> ✅ PR68 (PR-DOCS/PR-PROVA) — concluída. Fechamento formal do Jarvis Brain v1. Relatório de fechamento (`schema/reports/PR68_FECHAMENTO_JARVIS_BRAIN_V1.md`) e checklist de fechamento (`schema/reports/PR68_JARVIS_BRAIN_V1_CHECKLIST.md`) criados. 22 frentes validadas. Artefatos confirmados. Estado final documentado. SYSTEM_AWARENESS seção 11 adicionada. Contrato Jarvis Brain v1 encerrado. Nenhum runtime alterado. Nenhum endpoint criado. `schema/enavia-skill-executor.js` não criado. `/skills/propose` não criado. `/skills/run` não criado.
 > ✅ PR67 (PR-HARDENING) — concluída. Hardening documental/governança. Pacote `schema/hardening/` criado com 6 arquivos. SECURITY_MODEL, ROLLOUT_PLAN, future-risks (R14–R17), SYSTEM_AWARENESS (seção 10) atualizados. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR67_HARDENING_SEGURANCA_CUSTO_LIMITES.md`.
-> ✅ PR66 (PR-DIAG) — concluída. Diagnóstico técnico do Runtime de Skills. 12 perguntas abertas respondidas com evidência do repositório. Decisões: Opção C (módulo interno `schema/enavia-skill-executor.js`), primeiro endpoint `/skills/propose` (não `/skills/run`), zero bindings novos para Fase 2, zero conflitos de rota, `contract-executor.js` como referência não herança, `runEnaviaSelfAudit()` integrável sem breaking change, padrão de pure function para testes. Sequência recomendada PR67-PR73+ documentada. Nenhum runtime alterado. Nenhum endpoint criado. Relatório: `schema/reports/PR66_DIAG_RUNTIME_SKILLS.md`.
-> ✅ PR65 (PR-DOCS) — concluída. Blueprint documental do Runtime de Skills criado. Pasta `schema/skills-runtime/` com 8 arquivos: INDEX.md, ARCHITECTURE.md (fluxo 11 camadas), EXECUTION_CONTRACT.md, APPROVAL_GATES.md, SKILL_CAPABILITY_MATRIX.md, SECURITY_MODEL.md, ROLLOUT_PLAN.md (Fases 0–6), OPEN_QUESTIONS.md (12 perguntas para PR66). SYSTEM_AWARENESS (seção 9), unresolved-technical-gaps (G1/G2 atualizados), future-risks (R10-R13 adicionados), skills/INDEX.md (referência ao blueprint) atualizados. Relatório: `schema/reports/PR65_BLUEPRINT_RUNTIME_SKILLS.md`. Nenhum runtime alterado. Nenhum endpoint criado.
-> ✅ PR64 (PR-DOCS) — concluída. Encerramento formal da frente de atualização supervisionada de memória. Contrato atualizado (seção 12F). G3 on-hold. UPDATE_POLICY modo vigente documentado. future-risks R1 atualizado. SYSTEM_AWARENESS estado pós-PR64 adicionado. Próxima frente: Blueprint do Runtime de Skills. Nenhum runtime alterado. Relatório: `schema/reports/PR64_ENCERRAR_MEMORIA_LIBERAR_SKILLS.md`.
-> ✅ PR63 (PR-DIAG) — concluída. Diagnóstico da frente "Atualização supervisionada de memória". Decisão: Opção B (parcialmente concluída) com absorção do mecanismo manual. PR61 entregou camada documental (M1-M7, PROPOSED_MEMORY_UPDATES, memória consolidada). Mecanismo técnico de escrita supervisionada automática NÃO implementado e NÃO blocking para Runtime de Skills. Fluxo manual via PR é o mecanismo vigente (`UPDATE_POLICY.md` seção 8). G3 on-hold. Implementar `/memory/write` antes de skills gera R1 (docs_over_product). Relatório: `schema/reports/PR63_DIAG_ATUALIZACAO_SUPERVISIONADA_MEMORIA.md`.
 > ✅ PR62 (PR-DOCS) — concluída. Reconciliação documental do contrato Jarvis Brain. Seção 12 adicionada ao contrato com: plano original, execução real, tabela de equivalência, regra de interpretação. Próxima PR: PR63 — PR-DIAG — decidir se atualização supervisionada de memória foi absorvida pela PR61 documental ou precisa de implementação real. Relatório: `schema/reports/PR62_RECONCILIACAO_CONTRATO_JARVIS_BRAIN.md`.
 > ✅ PR59 (PR-IMPL) — concluída. `schema/enavia-response-policy.js` criado com `buildEnaviaResponsePolicy()` (15 regras: secret_exposure, fake_execution, false_capability, runtime_vs_documentation_confusion, unauthorized_action, scope_violation, contract_drift, docs_over_product, frustration, deploy_request, strategy_question, next_pr_request, pr_review, technical_diagnosis, caso limpo). Integrado em `schema/enavia-cognitive-runtime.js` (seção 7e) e `nv-enavia.js` (campo aditivo `response_policy`). Smoke PR59 96/96 ✅. Regressões 1.375/1.375 ✅. Total 1.471/1.471 ✅. Read-only. Não altera reply. Não bloqueia fluxo. Não cria endpoint. Não usa KV/rede/FS. Relatório: `schema/reports/PR59_IMPL_RESPONSE_POLICY_VIVA.md`. Response Policy viva v1 completa e validada.
 > ✅ PR58 (PR-IMPL cirúrgica) — concluída. Regex `\w+` → `[\w-]+` em `_detectMissingSource` (`schema/enavia-self-audit.js` linha 402). PR57 agora passa **99/99 ✅** (antes: 96/99, falha Cenário H). Regressões 1.375/1.375 ✅. Nenhum arquivo proibido alterado. Self-Audit continua read-only. Resposta não alterada automaticamente. Nenhum endpoint criado. Relatório: `schema/reports/PR58_IMPL_CORRECAO_SELF_AUDIT_MISSING_SOURCE.md`. Self-Audit v1 completo e validado. Retorno ao fluxo principal do contrato.
