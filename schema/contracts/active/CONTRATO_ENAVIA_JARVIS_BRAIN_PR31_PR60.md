@@ -907,3 +907,88 @@ A PR33 inseriu a **Frente 2 — Correção conceitual do Chat Runtime** entre o 
 *Contrato criado em: 2026-04-30*
 *Branch de criação: `copilot/claude-pr31-docs-ativar-contrato-jarvis-brain`*
 *Atualizado em: 2026-04-30 (PR33) — Branch: `copilot/claudepr33-docs-ajuste-contrato-jarvis-pos-diagnos`*
+*Atualizado em: 2026-05-02 (PR62) — Reconciliação pós-execução real PR57–PR61 — Branch: `copilot/claudepr62-docs-reconciliar-contrato-jarvis-brain`*
+
+---
+
+## 12. Reconciliação pós-execução real PR57–PR61
+
+> **Adicionado em PR62 — 2026-05-02**
+>
+> Esta seção documenta o desalinhamento entre a numeração original prevista no contrato e a sequência real executada nas PRs recentes. O objetivo não é apagar o histórico nem fingir que o plano original estava errado — é reconciliar honestamente o que foi planejado, o que foi executado e por quê.
+
+---
+
+### A. Plano original previsto (trecho final do contrato — PRs 55–64)
+
+| PR original | Tipo | Objetivo planejado |
+|-------------|------|--------------------|
+| PR55 | PR-IMPL | Response Policy viva |
+| PR56 | PR-PROVA | Teste anti-bot |
+| PR57 | PR-IMPL | Propor atualização de memória (Brain Update supervisionado) |
+| PR58 | PR-PROVA | Teste de atualização supervisionada |
+| PR59 | PR-DOCS | Blueprint do Runtime de Skills |
+| PR60 | PR-DIAG | Diagnóstico técnico para Runtime de Skills |
+| PR61 | PR-PROVA | Teste de jornada completa Jarvis |
+| PR62 | PR-PROVA | Teste "conhece o próprio sistema" |
+| PR63 | PR-HARDENING | Segurança, custo e limites |
+| PR64 | PR-DOCS/PR-PROVA | Fechamento do Jarvis Brain v1 |
+
+---
+
+### B. Execução real
+
+| PR real | Tipo | Objetivo real executado | Motivo de alteração/deslocamento |
+|---------|------|------------------------|----------------------------------|
+| PR55 | PR-DOCS | Self-Audit Framework (estrutura documental) | Frentes 9-10 foram reorganizadas: Self-Audit (PR52-PR55 do plano original) foi implementado antes de Response Policy. O plano original das frentes 9 e 10 foi executado, mas com numeração deslocada pelas PRs corretivas inseridas anteriormente. |
+| PR56 | PR-IMPL | Self-Audit read-only (`schema/enavia-self-audit.js`) | Implementação do Self-Audit — correspondente ao PR53 do plano original. |
+| PR57 | PR-PROVA | Prova do Self-Audit read-only (96/99 — falha parcial, Cenário H) | Conforme protocolo: prova revelou falha real no Self-Audit. Não avançar sem corrigir. |
+| PR58 | PR-IMPL (cirúrgica) | Correção cirúrgica do regex `\w+` → `[\w-]+` no `_detectMissingSource` | Correção obrigatória pós-prova com falha. Protocolo: prova falhou → correção cirúrgica → nova prova. |
+| PR59 | PR-IMPL | Response Policy viva (`schema/enavia-response-policy.js`, 15 regras) | Retorno ao fluxo principal após ciclo corretivo PR57/PR58. Corresponde à frente 10 do plano (PR55 original). |
+| PR60 | PR-PROVA | Prova anti-bot final — stack cognitiva completa (236/236 ✅) | Prova pós-Response Policy. Corresponde ao PR56 original. Passou integralmente. |
+| PR61 | PR-DOCS/IMPL | Proposta documental de atualização de memória — consolidação do ciclo PR31–PR60 | Parcialmente corresponde ao PR57 original (Brain Update supervisionado), mas **apenas documentalmente** — sem implementação de escrita supervisionada real. |
+
+---
+
+### C. Tabela de equivalência
+
+| Frente planejada | PR originalmente prevista | PR real executada | Status |
+|-----------------|--------------------------|-------------------|--------|
+| Self-Audit Framework | PR52 | PR55 | ✅ concluída |
+| Self-Audit read-only | PR53 | PR56 | ✅ concluída |
+| Prova Self-Audit | PR54 | PR57 | ✅ concluída (com falha parcial e correção) |
+| Correção Self-Audit (cirúrgica) | — (inserida) | PR58 | ✅ concluída |
+| Response Policy viva | PR55 | PR59 | ✅ concluída |
+| Teste anti-bot | PR56 | PR60 | ✅ concluída (236/236) |
+| Brain Update supervisionado (proposta documental) | PR57 | PR61 | ✅ concluída (documental) |
+| Teste atualização supervisionada (escrita real) | PR58 | pendente/reavaliar | ⚠️ precisa decisão |
+| Blueprint Runtime de Skills | PR59 | pendente | 🔲 próxima frente candidata (após decisão acima) |
+| Diagnóstico Runtime de Skills | PR60 | pendente | 🔲 após blueprint |
+| Hardening segurança/custo/limites | PR63 | pendente | 🔲 após diagnóstico |
+| Fechamento Jarvis Brain v1 | PR64 | pendente | 🔲 final do ciclo |
+
+---
+
+### D. Regra de interpretação daqui para frente
+
+**A partir desta reconciliação, as seguintes regras se aplicam:**
+
+1. **A numeração original sofreu deslocamento por PRs corretivas legítimas.** Foram inseridas PRs de prova, correção cirúrgica e ciclos de correção conforme o protocolo obrigatório (prova falhou → correção → prova verde → retorno ao fluxo). Isso é comportamento correto — não é desvio.
+
+2. **O contrato não deve ser seguido cegamente pela numeração antiga.** A numeração de PR no contrato (PR55, PR56, PR57...) foi planejada antes da execução. Durante a execução, PRs foram inseridas, o que deslocou todos os números seguintes.
+
+3. **A partir desta reconciliação, seguir a FRENTE, não apenas o número.** O que importa é qual frente funcional está sendo endereçada, não qual número estava no plano original. Antes de abrir qualquer nova PR, verificar esta tabela de equivalência para identificar qual frente ainda está pendente.
+
+4. **Antes de abrir a próxima PR:** consultar `schema/contracts/INDEX.md` (seção "Próxima PR autorizada") e esta seção 12 (tabela de equivalência). A tabela aqui é fonte de verdade do estado das frentes.
+
+5. **Lacuna sobre atualização supervisionada de memória:** A PR61 propôs memória documentalmente mas não implementou escrita supervisionada real. Antes de avançar para Runtime de Skills, deve-se decidir se esta frente ainda é necessária, foi absorvida, ou deve ser formalmente cancelada.
+
+---
+
+### E. Próxima PR recomendada pós-reconciliação
+
+**PR63 — PR-DIAG — Atualização supervisionada de memória: decidir se ainda é necessária**
+
+**Justificativa:** A PR61 foi documental — propôs atualizações de memória mas não implementou escrita supervisionada real. A frente "Teste de atualização supervisionada" (originalmente PR58 no plano) ainda tem lacuna aberta. O operador orientou: não iniciar Runtime de Skills enquanto houver lacuna sobre atualização supervisionada de memória. Portanto, a próxima PR deve ser um diagnóstico honesto sobre essa frente — se foi concluída pela PR61, se foi absorvida, ou se precisa de implementação real ainda.
+
+Somente após essa decisão (via PR63-DIAG) é que Blueprint do Runtime de Skills (PR64) pode ser aberto com segurança.
