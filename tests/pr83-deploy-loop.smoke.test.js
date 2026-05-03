@@ -135,11 +135,7 @@ assert(
 
 assert(
   "8. deploy.yml NÃO faz deploy PROD automático por push main",
-  !deployYml.includes("push:") || (
-    // se contiver push: mas o deploy PROD não depender de push
-    deployYml.includes("push:") &&
-    !deployYml.includes("github.event_name == 'push'")
-  )
+  !deployYml.includes("push:") || !deployYml.includes("github.event_name == 'push'")
 );
 
 assert(
@@ -331,7 +327,7 @@ assert(
 
 const wranglerToml = readFile("wrangler.toml") || "";
 assert(
-  "51. wrangler.toml não contém alterações suspeitas",
+  "51. wrangler.toml contém campos esperados (name e main presentes)",
   wranglerToml.includes("nv-enavia") && wranglerToml.includes("nv-enavia.js")
 );
 

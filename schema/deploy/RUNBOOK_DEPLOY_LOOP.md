@@ -1,6 +1,6 @@
 # RUNBOOK — Deploy Loop Enavia
 
-**Versão:** PR83
+**Versão:** 1.0.0 (2026-05-03)
 **Contrato:** CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85
 **Workflow principal:** `.github/workflows/deploy.yml`
 

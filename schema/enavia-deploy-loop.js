@@ -53,7 +53,7 @@ const VALID_ACTIONS = [
  */
 function createDeployLoopState(input) {
   return {
-    id: (input && input.id) || "deploy-" + Date.now(),
+    id: (input && input.id) || "deploy-" + Date.now() + "-" + Math.floor(Math.random() * 0xffff).toString(16),
     author: (input && input.author) || "unknown",
     description: (input && input.description) || "",
     state: "draft",
