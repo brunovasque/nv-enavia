@@ -4,6 +4,62 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — PR88 — PR-IMPL — Worker ↔ Executor stitch (execution_id/contract_id)
+
+- **Branch:** `codex/pr88-worker-executor-execution-stitch`
+- **Tipo:** PR-IMPL (Worker + Executor bridge + tests + docs mínimo)
+- **Contrato:** sem contrato ativo (`ACTIVE_CONTRACT.md`)
+- **PR anterior validada:** PR87 ✅
+
+### Objetivo
+
+Costurar Worker ↔ Executor após PR87 para preservar `execution_id`, `contract_id`, plano e estado no fluxo real do loop interno.
+
+### Implementação
+
+**Arquivos alterados:**
+- `nv-enavia.js` (patch cirúrgico do bridge)
+
+**Arquivos criados:**
+- `tests/pr88-worker-executor-stitch.smoke.test.js`
+- `schema/reports/PR88_WORKER_EXECUTOR_STITCH.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+
+### Resultado
+
+- `POST /engineer` com ação direta preserva `execution_id`, `contract_id`, `plan`, `mode` e contexto mínimo quando presentes.
+- `handleExecuteNext` envia `execution_id` explícito para `callExecutorBridge` em `audit`, `propose` e `approve:audit`.
+- `executor/src/index.js` mantido intacto, reaproveitando PR87 (`deploy_test`/`finalize`).
+- Passo desconhecido continua protegido por `STEP_TYPE_NOT_IMPLEMENTED`.
+- Nenhum deploy real novo foi introduzido.
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| pr88-worker-executor-stitch.smoke.test.js | ✅ |
+| pr87-deploy-test-finalize-runner.smoke.test.js | ✅ |
+| pr86-deploy-orchestrator-gap.prova.test.js | ✅ |
+| pr14-executor-deploy-real-loop.smoke.test.js | ✅ |
+| pr18-advance-phase-endpoint.smoke.test.js | ✅ |
+| pr19-advance-phase-e2e.smoke.test.js | ✅ |
+| pr20-loop-status-in-progress.smoke.test.js | ✅ |
+| pr21-loop-status-states.smoke.test.js | ✅ |
+| pr85-autoevolucao-operacional.fechamento.test.js | ✅ |
+| executor/tests/executor.contract.test.js | ✅ |
+| executor/tests/cloudflare-credentials.test.js | ✅ |
+
+### Rollback
+
+Reverter o commit da PR88 com `git revert <commit>`.
+
+---
+
 ## 2026-05-03 — PR87 — PR-IMPL — Deploy Test + Finalize Runner
 
 - **Branch:** `codex/pr87-deploy-test-finalize-runner`

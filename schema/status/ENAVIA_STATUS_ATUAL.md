@@ -1,10 +1,25 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR87 — Deploy Test + Finalize Runner ✅)
-**Branch ativa:** `codex/pr87-deploy-test-finalize-runner`
-**Última tarefa:** PR87 — PR-IMPL — Deploy Test + Finalize Runner
+**Data:** 2026-05-03 (atualizado após PR88 — Worker ↔ Executor stitch ✅)
+**Branch ativa:** `codex/pr88-worker-executor-execution-stitch`
+**Última tarefa:** PR88 — PR-IMPL — Costura Worker ↔ Executor para execution_id/contract_id
 
 ## Estado atual do sistema
+
+## Atualização PR88
+
+- `nv-enavia.js` ajustado de forma cirúrgica em dois pontos de bridge:
+  - `POST /engineer` (ação direta) agora preserva `execution_id`, `contract_id`, `plan`, `mode` e contexto mínimo quando presentes.
+  - `handleExecuteNext` agora envia `execution_id` explícito no payload para `callExecutorBridge` em `audit/propose` e no caminho `approve/audit`.
+- `executor/src/index.js` preservado (sem alteração), reaproveitando os handlers PR87 de `deploy_test` e `finalize`.
+- `tests/pr88-worker-executor-stitch.smoke.test.js` criado com 36 cenários de costura + regressões obrigatórias.
+- `schema/reports/PR88_WORKER_EXECUTOR_STITCH.md` criado.
+- Fluxo interno fica costurado sem perder identidade entre Worker/Executor:
+  - `AUDIT → PROPOSE → smart_deploy_plan/SIMULATE → deploy_execute_plan → deploy_test → await_proof → finalize`.
+- Guardrails preservados:
+  - sem deploy real novo;
+  - sem rede real nova nos testes;
+  - sem alteração em `contract-executor.js`, `deploy.yml`, `wrangler.toml`, painel/chat/Skill Factory/SELF_WORKER_AUDITOR.
 
 ## Atualização PR87
 
