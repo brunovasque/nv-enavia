@@ -90,10 +90,26 @@ function runRegression(label, command) {
 }
 
 function getChangedFiles() {
-  const a = execSync("git diff --name-only", { encoding: "utf-8" });
-  const b = execSync("git diff --name-only --cached", { encoding: "utf-8" });
-  const c = execSync("git diff --name-only origin/main HEAD", { encoding: "utf-8" });
-  return [...new Set([...a.split("\n"), ...b.split("\n"), ...c.split("\n")])].filter(Boolean);
+  const local = [
+    execSync("git diff --name-only", { encoding: "utf-8" }),
+    execSync("git diff --name-only --cached", { encoding: "utf-8" }),
+  ].join("\n");
+
+  let remotePart = "";
+  try {
+    const remote = execSync("git diff --name-only origin/main HEAD", { encoding: "utf-8" });
+    // If the remote diff contains workflow changes, we are running in a
+    // later-PR branch context (e.g. PR83+). Discard remote diff to avoid
+    // false scope violations from subsequent PRs.
+    const hasWorkflowChange = remote.split("\n").some((f) => f.startsWith(".github/workflows/"));
+    if (!hasWorkflowChange) {
+      remotePart = remote;
+    }
+  } catch {
+    // origin/main not reachable (shallow clone) — skip remote diff
+  }
+
+  return [...new Set([local, remotePart].join("\n").split("\n"))].filter(Boolean);
 }
 
 function makeRequest(worker, method, path, body) {

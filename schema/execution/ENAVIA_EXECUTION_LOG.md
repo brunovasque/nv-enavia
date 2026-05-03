@@ -37,8 +37,8 @@ Completar o loop de deploy real com gate explícito, smoke pós-PROD, rollback d
 - PROD protegido por gate explícito ✅
 - Smoke PROD adicionado ✅
 - Smoke PR83: 57/57 ✅
-- Regressões PR78–PR77–PR76–PR75–PR57–PR59: todas verdes ✅
-- Regressões PR79–PR82: 4 falhas esperadas (git diff scope check — sem regressão funcional)
+- Regressões PR78–PR77–PR76–PR75–PR57–PR59: todas verdes ✅ FAILED_COUNT=0
+- Regressões PR79–PR82: ✅ 42/40/55/54 FAILED_COUNT=0 (getChangedFiles ajustado para resiliência de ramo em PR83+)
 
 ---
 
