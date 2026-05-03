@@ -1,28 +1,30 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR84 — Corrigir IA engessada ✅)
-**Branch ativa:** `copilot/pr84-fixar-engessamento-ia`
-**Última tarefa:** PR84 — PR-IMPL — Corrigir IA engessada (Chat Vivo)
+**Data:** 2026-05-03 (atualizado após PR85 — Fechamento operacional ponta a ponta ✅)
+**Branch ativa:** `copilot/pr85-implementacao-contrato-ativo`
+**Última tarefa:** PR85 — PR-PROVA — Fechamento operacional ponta a ponta
 
 ## Estado atual do sistema
 
-## Atualização PR84
+## Atualização PR85
 
-- `schema/enavia-llm-core.js` corrigido: bloco "FALSA CAPACIDADE BLOQUEADA" atualizado (remove /skills/run e Skill Router como inexistentes — existem desde PR51/PR80). Bloco "TOM AO BLOQUEAR" adicionado: instrução explícita de como responder de forma humana ao bloquear.
-- `schema/enavia-brain-loader.js` corrigido: snapshot `current-state.md` atualizado para refletir contrato atual (PR82_PR85) e estado pós-PR82/PR83.
-- `schema/enavia-capabilities.js` atualizado: lista `can[]` expandida de 5 para 10 itens refletindo PR49–PR82. Lista `cannot_yet[]` limpa de itens que já existem.
-- `tests/pr84-chat-vivo.smoke.test.js` criado: 52/52 ✅.
-- `schema/reports/PR84_CHAT_VIVO.md` criado.
+- `tests/pr85-autoevolucao-operacional.fechamento.test.js` criado: **45/45 ✅**.
+- `schema/reports/PR85_AUTOEVOLUCAO_OPERACIONAL.md` criado: relatório de fechamento do contrato.
+- Contrato Autoevolução Operacional PR82–PR85 encerrado formalmente.
+- 3 frentes provadas juntas: SELF_WORKER_AUDITOR ✅ + Deploy Loop ✅ + Chat Vivo ✅.
+- Regressão completa verde: PR79–PR84 passando ✅.
+- Governança atualizada: INDEX.md, ACTIVE_CONTRACT.md, status, handoff, execution log.
 
-**Contrato ativo:** `CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` (Ativo — PR82 ✅, PR83 ✅, PR84 ✅, PR85 pendente)
+**Contrato ativo:** Nenhum — aguardando próximo contrato/fase formal.
 
-**Sistema operacional:** Estável. Chat menos engessado. Guardrails preservados. Deploy loop intacto.
+**Sistema operacional:** Estável. Contrato PR82–PR85 encerrado. Sem runtime alterado nesta PR.
 
 ## Próxima PR autorizada
 
-**PR85 — Fechamento operacional ponta a ponta** (PR-PROVA)
+Nenhuma. Aguardando novo contrato.
 
 ---
+
 ## Atualização PR83
 
 - `.github/workflows/deploy.yml` corrigido: push automático para PROD removido.

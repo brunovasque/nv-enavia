@@ -1,10 +1,47 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR84 — PR-IMPL — Corrigir IA engessada (Chat Vivo) ✅
-**Para:** PR85 — Fechamento operacional ponta a ponta
+**De:** PR85 — PR-PROVA — Fechamento operacional ponta a ponta ✅
+**Para:** Próximo contrato (a ser definido)
 
-## Handoff atual (PR84)
+## Handoff atual (PR85)
+
+### O que foi feito
+
+- `tests/pr85-autoevolucao-operacional.fechamento.test.js` criado: **45/45 ✅**.
+  - Cobre as 3 frentes juntas: SELF_WORKER_AUDITOR + Deploy Loop + Chat Vivo.
+  - Inclui regressão de PR79–PR84.
+  - Inclui verificação de governança pós-fechamento (INDEX.md, ACTIVE_CONTRACT.md).
+  - Inclui cenário 45: nenhum arquivo proibido foi alterado.
+- `schema/reports/PR85_AUTOEVOLUCAO_OPERACIONAL.md` criado: relatório completo de fechamento.
+- `schema/contracts/INDEX.md` atualizado: contrato PR82–PR85 marcado como Encerrado ✅.
+- `schema/contracts/ACTIVE_CONTRACT.md` atualizado: sem contrato ativo, aguardando próxima fase.
+- Governança atualizada: status, handoff, execution log.
+
+### O que existe após PR85
+
+- **Skill real:** SELF_WORKER_AUDITOR — read-only, aprovação obrigatória, 10 achados estruturados.
+- **Deploy loop completo:** gate PROD explícito, smoke TEST/PROD, runbook documentado, state machine testável.
+- **Chat menos engessado:** LLM Core com TOM AO BLOQUEAR, capacidades atualizadas, Brain Loader correto.
+- **Guardrails preservados:** Self-Audit, Response Policy, Skill Router, Intent Classifier, LLM Core.
+- **Contrato PR82–PR85 encerrado formalmente.**
+
+### O que NÃO existe após PR85
+
+- Intent Engine completo (classifier existe, engine completo não).
+- Escrita automática de memória entre sessões.
+- Deploy autônomo sem aprovação humana.
+- Telemetria estruturada por request (achado T1 — futuro).
+- Rate limiting aplicacional (achado S1 — futuro).
+- GOVERNANCE_AUDITOR skill (achado G1 — futuro).
+
+### Próxima etapa segura
+
+Aguardando novo contrato/fase formal. Sugestões de frentes futuras em `schema/reports/PR85_AUTOEVOLUCAO_OPERACIONAL.md`.
+
+---
+
+## Handoff anterior (PR84)
 
 ### O que foi feito
 
@@ -20,30 +57,7 @@
 - `schema/reports/PR84_CHAT_VIVO.md` criado.
 - Governança atualizada: status, handoff, execution log, INDEX.md (próxima PR → PR85).
 
-### O que existe após PR84
 
-- Chat menos engessado: LLM recebe instruções corretas de capacidade e tom humano ao bloquear.
-- Brain Loader com estado atual (PR82/PR83 reconhecidos, contrato certo).
-- Capacidades refletindo realidade pós-PR82.
-- Guardrails preservados: Self-Audit, Response Policy, LLM Core, Brain Loader, Skill Router, Intent Classifier.
-- Deploy loop intacto (PR83 preservada).
-
-### O que NÃO existe após PR84
-
-- Intent Engine completo (classifier existe, engine completo não).
-- Escrita automática de memória entre sessões.
-- Deploy autônomo sem aprovação humana.
-- Telemetria estruturada por request.
-- Rate limiting aplicacional.
-
-### Próxima etapa segura
-
-**PR85 — Fechamento operacional ponta a ponta** — PR-PROVA que prova as 3 frentes juntas.
-Criar `tests/pr85-autoevolucao-operacional.fechamento.test.js` e `schema/reports/PR85_AUTOEVOLUCAO_OPERACIONAL.md`.
-
-
-
-## Handoff anterior (PR83)
 
 ### O que foi feito
 

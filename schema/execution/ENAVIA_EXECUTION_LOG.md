@@ -4,6 +4,49 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — PR85 — PR-PROVA — Fechamento operacional ponta a ponta
+
+- **Branch:** `copilot/pr85-implementacao-contrato-ativo`
+- **Tipo:** PR-PROVA (Tests + Docs mínimo)
+- **Contrato:** CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md (Encerrado ✅)
+- **PR anterior validada:** PR84 ✅
+
+### Objetivo
+
+Fechar formalmente o contrato Autoevolução Operacional PR82–PR85, provando as 3 frentes juntas.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr85-autoevolucao-operacional.fechamento.test.js` — 45/45 ✅
+- `schema/reports/PR85_AUTOEVOLUCAO_OPERACIONAL.md`
+
+**Arquivos atualizados:**
+- `schema/contracts/INDEX.md` — contrato PR82–PR85 marcado como Encerrado ✅
+- `schema/contracts/ACTIVE_CONTRACT.md` — sem contrato ativo, aguardando próxima fase
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| pr85-autoevolucao-operacional.fechamento.test.js | ✅ 45/45 |
+| pr84-chat-vivo.smoke.test.js | ✅ 52/52 |
+| pr83-deploy-loop.smoke.test.js | ✅ 57/57 |
+| pr82-self-worker-auditor.smoke.test.js | ✅ 54/54 |
+| pr81-skill-factory-real.fechamento.test.js | ✅ 55/55 |
+| pr80-skill-registry-runner.smoke.test.js | ✅ 40/40 |
+| pr79-skill-factory-core.smoke.test.js | ✅ 42/42 |
+
+### Rollback
+
+Nenhum runtime foi alterado. Apenas arquivos de teste, relatório e governança criados/atualizados.
+Para reverter: `git revert` dos commits desta PR.
+
+---
+
 ## 2026-05-03 — PR84 — PR-IMPL — Corrigir IA engessada (Chat Vivo)
 
 - **Branch:** `copilot/pr84-fixar-engessamento-ia`
