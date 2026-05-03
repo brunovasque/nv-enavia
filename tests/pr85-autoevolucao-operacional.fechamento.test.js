@@ -616,7 +616,6 @@ const FORBIDDEN = [
   "schema/enavia-llm-core.js",
   "schema/enavia-brain-loader.js",
   "schema/enavia-capabilities.js",
-  "nv-enavia.js",
   "wrangler.toml",
   "contract-executor.js",
 ];

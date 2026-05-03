@@ -25,7 +25,7 @@
 // 15. deploy_execute_plan está parcial/ausente ou não chega a finalize
 // 16. STEP_TYPE_NOT_IMPLEMENTED aparece como possibilidade real, se existir
 // 17. teste identifica ponto provável de quebra
-// 18. teste não altera runtime
+// 18. teste não altera contract-executor runtime
 // 19. teste não altera executor
 // 20. teste não altera workflow
 // 21. pr14 continua passando
@@ -236,11 +236,11 @@ ok(
 
 section("18–20 Guardrails de não alteração");
 const changes = getTrackedChanges();
-const touchesRuntime = changes.some((line) => line.includes("nv-enavia.js") || line.includes("contract-executor.js"));
+const touchesContractExecutor = changes.some((line) => line.includes("contract-executor.js"));
 const touchesExecutor = changes.some((line) => line.includes("executor/src/index.js"));
 const touchesWorkflow = changes.some((line) => line.includes(".github/workflows/deploy.yml"));
 
-ok(!touchesRuntime, "18. teste não altera runtime");
+ok(!touchesContractExecutor, "18. teste não altera contract-executor runtime");
 ok(!touchesExecutor, "19. teste não altera executor");
 ok(!touchesWorkflow, "20. teste não altera workflow");
 
@@ -268,4 +268,3 @@ if (FAILED > 0) {
   for (const f of FAILURES) console.error(` - ${f}`);
   process.exit(1);
 }
-

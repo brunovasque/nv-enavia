@@ -1,10 +1,43 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR87 — PR-IMPL — Deploy Test + Finalize Runner ✅
+**De:** PR88 — PR-IMPL — Worker ↔ Executor stitch ✅
 **Para:** próxima PR (se houver novo escopo formal)
 
-## Handoff atual (PR87)
+## Handoff atual (PR88)
+
+### O que foi feito
+
+- Costura mínima Worker ↔ Executor implementada em `nv-enavia.js`:
+  - no `POST /engineer` (ação direta), payload não é mais reduzido só para `{ action }`; agora preserva `mode`, `execution_id`, `contract_id`, `plan` e contexto essencial quando presentes.
+  - no `handleExecuteNext`, payloads de `callExecutorBridge` (`/audit`, `/propose` e `approve:/audit`) passaram a enviar `execution_id` explícito junto do `contract_id`.
+- `executor/src/index.js` não foi alterado (PR87 já cobria `deploy_test`/`finalize` no runner).
+- Teste criado: `tests/pr88-worker-executor-stitch.smoke.test.js` (36 cenários + regressões obrigatórias).
+- Relatório criado: `schema/reports/PR88_WORKER_EXECUTOR_STITCH.md`.
+
+### O que existe após PR88
+
+- Worker consegue encaminhar identidade de execução/contrato sem perda no bridge.
+- Ação direta para executor (`/engineer`) mantém dados necessários para `deploy_execute_plan`.
+- Loop interno PR86/PR87 permanece íntegro com IDs preservados ponta a ponta.
+- Fallback de step desconhecido (`STEP_TYPE_NOT_IMPLEMENTED`) continua ativo.
+
+### O que NÃO foi alterado
+
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- painel/chat/Skill Factory/SELF_WORKER_AUDITOR
+- contratos ativos/históricos (sem novo contrato ativo)
+
+### Próxima etapa segura
+
+- PR89 (hardening): evidência/telemetria da costura e validação dinâmica adicional do loop interno sem abrir escopo lateral.
+
+---
+
+## Handoff anterior (PR87)
 
 ### O que foi feito
 

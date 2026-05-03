@@ -2133,6 +2133,25 @@ if (!body.patch || typeof body.patch !== "string") {
     // These fields are forwarded as-is; the executor decides whether to use them.
     if (body.bridge_id != null) minimalPayload.bridge_id = body.bridge_id;
     if (body.session_id != null) minimalPayload.session_id = body.session_id;
+    // PR88 — mantém identidade/estado do loop interno quando o client usa action direta.
+    const passthroughKeys = [
+      "mode",
+      "executor_action",
+      "execution_id",
+      "executionId",
+      "contract_id",
+      "contractId",
+      "plan",
+      "force_step_id",
+      "forceStepId",
+      "target",
+      "context",
+      "candidate_hash",
+      "candidateHash",
+    ];
+    for (const k of passthroughKeys) {
+      if (body[k] !== undefined) minimalPayload[k] = body[k];
+    }
 
     // 🚀 LOG 2A — payload enviado ao EXECUTOR (ação direta)
     logNV("🚀 [ENGINEER→EXECUTOR] payload (ação direta)", {
@@ -6088,6 +6107,7 @@ async function handleExecuteNext(request, env) {
       ...buildExecutorTargetPayload(auditTargetResolution.workerId),
       context: { require_live_read: true },
       contract_id: contractId, nextAction, operationalAction,
+      execution_id: auditId,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
@@ -6117,6 +6137,7 @@ async function handleExecuteNext(request, env) {
       prompt: `Proposta supervisionada para ação contratual: ${operationalAction.type}`,
       intent: "propose",
       contract_id: contractId, nextAction, operationalAction,
+      execution_id: auditId,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
@@ -6298,6 +6319,7 @@ async function handleExecuteNext(request, env) {
       ...buildExecutorTargetPayload(auditTargetResolution.workerId),
       context: { require_live_read: true },
       contract_id: contractId, nextAction, operationalAction,
+      execution_id: auditId,
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by,
       audit_id: auditId, timestamp: new Date().toISOString(),
