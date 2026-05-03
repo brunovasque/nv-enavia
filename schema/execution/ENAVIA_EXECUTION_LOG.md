@@ -4,6 +4,61 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — PR89 — PR-PROVA — Hardening e prova final do loop interno Worker → Executor
+
+- **Branch:** `codex/pr89-internal-loop-final-proof`
+- **Tipo:** PR-PROVA (Tests + Docs + governança mínima)
+- **Contrato:** sem contrato ativo (`ACTIVE_CONTRACT.md`)
+- **PR anterior validada:** PR88 ✅
+
+### Objetivo
+
+Fechar a sequência PR86–PR89 provando o loop interno sem deploy real:
+`Worker → Executor → smart_deploy_plan → deploy_execute_plan → deploy_test → await_proof → finalize`.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr89-internal-loop-final-proof.smoke.test.js`
+- `schema/reports/PR89_INTERNAL_LOOP_FINAL_PROOF.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+
+### Resultado
+
+- Fluxo interno completo provado por evidência estática + regressões obrigatórias.
+- `deploy_test` e `finalize` fora de `STEP_TYPE_NOT_IMPLEMENTED`.
+- Step desconhecido continua bloqueado por `STEP_TYPE_NOT_IMPLEMENTED`.
+- `execution_id` e `contract_id` preservados no ciclo Worker ↔ Executor.
+- Nenhuma alteração de runtime necessária.
+- Nenhum deploy real ou promote PROD real executado.
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| pr89-internal-loop-final-proof.smoke.test.js | ✅ |
+| pr88-worker-executor-stitch.smoke.test.js | ✅ |
+| pr87-deploy-test-finalize-runner.smoke.test.js | ✅ |
+| pr86-deploy-orchestrator-gap.prova.test.js | ✅ |
+| pr14-executor-deploy-real-loop.smoke.test.js | ✅ |
+| pr18-advance-phase-endpoint.smoke.test.js | ✅ |
+| pr19-advance-phase-e2e.smoke.test.js | ✅ |
+| pr20-loop-status-in-progress.smoke.test.js | ✅ |
+| pr21-loop-status-states.smoke.test.js | ✅ |
+| pr85-autoevolucao-operacional.fechamento.test.js | ✅ |
+| executor/tests/executor.contract.test.js | ✅ |
+| executor/tests/cloudflare-credentials.test.js | ✅ |
+
+### Rollback
+
+Reverter o commit da PR89 com `git revert <commit>`.
+
+---
 ## 2026-05-03 — PR88 — PR-IMPL — Worker ↔ Executor stitch (execution_id/contract_id)
 
 - **Branch:** `codex/pr88-worker-executor-execution-stitch`

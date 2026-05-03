@@ -1,10 +1,27 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR88 — Worker ↔ Executor stitch ✅)
-**Branch ativa:** `codex/pr88-worker-executor-execution-stitch`
-**Última tarefa:** PR88 — PR-IMPL — Costura Worker ↔ Executor para execution_id/contract_id
+**Data:** 2026-05-03 (atualizado após PR89 — prova final do loop interno ✅)
+**Branch ativa:** `codex/pr89-internal-loop-final-proof`
+**Última tarefa:** PR89 — PR-PROVA — Hardening + prova final do loop interno Worker → Executor
 
 ## Estado atual do sistema
+
+## Atualização PR89
+
+- `tests/pr89-internal-loop-final-proof.smoke.test.js` criado com 40 cenários de prova final cobrindo:
+  - existência de `smart_deploy_plan`, `deploy_execute_plan`, `deploy_test`, `await_proof`, `finalize`;
+  - preservação de `execution_id` e `contract_id` no ciclo Worker ↔ Executor;
+  - ausência de `STEP_TYPE_NOT_IMPLEMENTED` em `deploy_test/finalize`;
+  - manutenção do bloqueio para step desconhecido;
+  - regressões PR88/PR87/PR86/PR14/PR18/PR19/PR20/PR21/PR85 + executor tests.
+- `schema/reports/PR89_INTERNAL_LOOP_FINAL_PROOF.md` criado.
+- Nenhuma alteração de runtime foi necessária para fechar o loop interno.
+- Fluxo provado sem deploy real:
+  - `Worker → Executor → smart_deploy_plan → deploy_execute_plan → deploy_test → await_proof → finalize`.
+- Guardrails preservados:
+  - sem deploy real novo;
+  - sem promote PROD real;
+  - sem alteração em `nv-enavia.js`, `executor/src/index.js`, `contract-executor.js`, `deploy.yml`, `wrangler.toml`, painel/chat/Skill Factory/SELF_WORKER_AUDITOR.
 
 ## Atualização PR88
 
@@ -410,6 +427,7 @@ Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 (DOCS) e PR32 (
 
 ## Bloqueios
 - nenhum
+
 
 
 

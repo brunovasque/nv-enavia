@@ -1,9 +1,44 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR88 — PR-IMPL — Worker ↔ Executor stitch ✅
-**Para:** próxima PR (se houver novo escopo formal)
+**De:** PR89 — PR-PROVA — Hardening + prova final do loop interno ✅
+**Para:** próxima PR/fase formal (se houver novo contrato)
 
+## Handoff atual (PR89)
+
+### O que foi feito
+
+- Criado `tests/pr89-internal-loop-final-proof.smoke.test.js` com 40 cenários de prova final do ciclo interno.
+- Criado `schema/reports/PR89_INTERNAL_LOOP_FINAL_PROOF.md`.
+- Atualizada governança mínima (`status`, `handoff`, `execution log`, `contracts/INDEX.md`).
+- Nenhum patch de runtime necessário (`nv-enavia.js` e `executor/src/index.js` preservados).
+
+### O que foi provado
+
+- Fluxo interno completo representável sem deploy real:
+  - `Worker → Executor → smart_deploy_plan → deploy_execute_plan → deploy_test → await_proof → finalize`.
+- `deploy_test` e `finalize` não caem em `STEP_TYPE_NOT_IMPLEMENTED`.
+- Step desconhecido continua bloqueado por `STEP_TYPE_NOT_IMPLEMENTED`.
+- `execution_id` e `contract_id` preservados no ciclo Worker ↔ Executor.
+- `deploy_test` segue supervisionado/simulado; `finalize` segue fechamento lógico.
+- Nenhum deploy real e nenhum promote PROD real foram executados.
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- painel/chat/Skill Factory/SELF_WORKER_AUDITOR
+- secrets/KV novo/banco novo/rotas novas
+
+### Próxima etapa segura
+
+- Manter estado atual como baseline provado PR86–PR89.
+- Só abrir nova frente mediante contrato formal novo.
+
+---
 ## Handoff atual (PR88)
 
 ### O que foi feito
