@@ -1,10 +1,49 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR83 — PR-IMPL — Corrigir loop de deploy ✅
-**Para:** PR84 — Corrigir IA engessada
+**De:** PR84 — PR-IMPL — Corrigir IA engessada (Chat Vivo) ✅
+**Para:** PR85 — Fechamento operacional ponta a ponta
 
-## Handoff atual (PR83)
+## Handoff atual (PR84)
+
+### O que foi feito
+
+- `schema/enavia-llm-core.js` corrigido:
+  - `FALSA CAPACIDADE BLOQUEADA` atualizado: removidos `/skills/run` e `Skill Router runtime ainda NÃO existe` (outdated desde PR51/PR80). Adicionada lista do que JÁ EXISTE.
+  - Bloco `TOM AO BLOQUEAR` adicionado: instrução explícita para responder de forma humana ao bloquear. Proibição de "Modo read-only ativo" e "Conforme o contrato ativo" como frases padrão.
+- `schema/enavia-brain-loader.js` corrigido:
+  - Snapshot `current-state.md` atualizado: contrato ativo correto (PR82_PR85), estado pós-PR82/PR83 descrito corretamente, "o que existe" vs "o que não existe" correto.
+- `schema/enavia-capabilities.js` atualizado:
+  - Lista `can[]`: expandida de 5 para 10 itens (Intent Classifier, Skill Router, /skills/run, Self-Audit, SELF_WORKER_AUDITOR, Response Policy).
+  - Lista `cannot_yet[]`: Skill Router e /skills/run removidos (existem). Mantidos apenas limites reais.
+- `tests/pr84-chat-vivo.smoke.test.js` criado: 52/52 ✅.
+- `schema/reports/PR84_CHAT_VIVO.md` criado.
+- Governança atualizada: status, handoff, execution log, INDEX.md (próxima PR → PR85).
+
+### O que existe após PR84
+
+- Chat menos engessado: LLM recebe instruções corretas de capacidade e tom humano ao bloquear.
+- Brain Loader com estado atual (PR82/PR83 reconhecidos, contrato certo).
+- Capacidades refletindo realidade pós-PR82.
+- Guardrails preservados: Self-Audit, Response Policy, LLM Core, Brain Loader, Skill Router, Intent Classifier.
+- Deploy loop intacto (PR83 preservada).
+
+### O que NÃO existe após PR84
+
+- Intent Engine completo (classifier existe, engine completo não).
+- Escrita automática de memória entre sessões.
+- Deploy autônomo sem aprovação humana.
+- Telemetria estruturada por request.
+- Rate limiting aplicacional.
+
+### Próxima etapa segura
+
+**PR85 — Fechamento operacional ponta a ponta** — PR-PROVA que prova as 3 frentes juntas.
+Criar `tests/pr85-autoevolucao-operacional.fechamento.test.js` e `schema/reports/PR85_AUTOEVOLUCAO_OPERACIONAL.md`.
+
+
+
+## Handoff anterior (PR83)
 
 ### O que foi feito
 
@@ -18,29 +57,6 @@
 - State machine criada: `schema/enavia-deploy-loop.js`.
 - Teste criado: `tests/pr83-deploy-loop.smoke.test.js` — 57/57 ✅.
 - Relatório criado: `schema/reports/PR83_DEPLOY_LOOP.md`.
-
-### O que existe após PR83
-
-- Loop de deploy completo e testável: TEST → smoke → aprovação → PROD + gate → smoke PROD.
-- PROD protegido: exige `confirm_prod=true` e motivo descritivo.
-- Push na main NÃO mais dispara deploy PROD.
-- Runbook com comandos de deploy, smoke e rollback documentados.
-- State machine de prova do fluxo disponível em `schema/enavia-deploy-loop.js`.
-
-### O que NÃO existe após PR83
-
-- Correção do chat engessado (→ PR84).
-- Rota `/promote` no Worker (não criada — opcional conforme contrato).
-- `deployed_at` / build marker no Worker (pendência futura documentada).
-- Deploy automático em produção.
-
-### Próxima etapa segura
-
-**PR84 — Corrigir IA engessada** — ajuste cirúrgico na camada de resposta/policy/chat runtime.
-
-
-
-## Handoff atual (PR80)
 
 ### O que foi feito
 
