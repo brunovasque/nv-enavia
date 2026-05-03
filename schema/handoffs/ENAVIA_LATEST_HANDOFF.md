@@ -11,7 +11,7 @@
 - Módulo criado: `schema/enavia-self-worker-auditor-skill.js` com `buildSelfWorkerAuditorResult()`.
 - SELF_WORKER_AUDITOR registrada em `schema/enavia-skill-registry.js`.
 - Runner atualizado em `schema/enavia-skill-runner.js` com handler para SELF_WORKER_AUDITOR.
-- Teste criado: `tests/pr82-self-worker-auditor.smoke.test.js` (54 cenários, 51 aprovados — 3 pré-existentes).
+- Teste criado: `tests/pr82-self-worker-auditor.smoke.test.js` (54 cenários, 54 aprovados — FAILED_COUNT=0).
 - Relatório criado: `schema/reports/PR82_SELF_WORKER_AUDITOR.md`.
 - Diagnóstico estático gerado: 10 achados em 6 categorias.
 
