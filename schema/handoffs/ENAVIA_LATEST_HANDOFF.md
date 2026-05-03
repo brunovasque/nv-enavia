@@ -1,35 +1,38 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-05-02
-**De:** PR81 — PR-IMPL + PR-PROVA — Fechamento Skill Factory Real ✅
-**Para:** Próximo contrato/fase (recomendado: SELF_WORKER_AUDITOR supervisionada)
+**Data:** 2026-05-03
+**De:** PR82 — PR-IMPL — SELF_WORKER_AUDITOR v1 ✅
+**Para:** PR83 — Corrigir loop de deploy
 
-## Handoff atual (PR81)
+## Handoff atual (PR82)
 
 ### O que foi feito
 
-- Teste final criado: tests/pr81-skill-factory-real.fechamento.test.js cobrindo o fluxo ponta a ponta e os guardrails obrigatórios.
-- Relatório final criado: schema/reports/PR81_SKILL_FACTORY_REAL.md.
-- Governança atualizada: schema/contracts/ACTIVE_CONTRACT.md, schema/contracts/INDEX.md, schema/status/ENAVIA_STATUS_ATUAL.md, schema/handoffs/ENAVIA_LATEST_HANDOFF.md, schema/execution/ENAVIA_EXECUTION_LOG.md.
-- Runtime preservado sem novos side effects.
+- Módulo criado: `schema/enavia-self-worker-auditor-skill.js` com `buildSelfWorkerAuditorResult()`.
+- SELF_WORKER_AUDITOR registrada em `schema/enavia-skill-registry.js`.
+- Runner atualizado em `schema/enavia-skill-runner.js` com handler para SELF_WORKER_AUDITOR.
+- Teste criado: `tests/pr82-self-worker-auditor.smoke.test.js` (54 cenários, 54 aprovados — FAILED_COUNT=0).
+- Relatório criado: `schema/reports/PR82_SELF_WORKER_AUDITOR.md`.
+- Diagnóstico estático gerado: 10 achados em 6 categorias.
 
-### O que existe após PR81
+### O que existe após PR82
 
-- POST /skills/factory/spec gera skill_spec válida e bloqueia pedidos inseguros.
-- POST /skills/factory/create bloqueia sem autorização e gera pacote PR-ready com autorização explícita.
-- POST /skills/run executa somente skill registrada e aprovada.
-- SYSTEM_MAPPER registrada e executável com proposal_status=approved.
+- POST /skills/run executa SELF_WORKER_AUDITOR apenas com proposal_status=approved.
+- Diagnóstico read-only disponível sobre: security, telemetry, deploy_loop, chat_rigidity, tests, governance.
+- SYSTEM_MAPPER e SELF_WORKER_AUDITOR registradas e executáveis.
+- 5 ações prioritárias documentadas: PR83, PR84, e 3 futuras.
 
-### O que NÃO existe após PR81
+### O que NÃO existe após PR82
 
-- Criação automática de skill real em runtime.
-- PR/merge/deploy automáticos.
-- Execução de spec/pacote da factory diretamente no runner.
-- SELF_WORKER_AUDITOR ainda não criada.
+- Correção do deploy loop (→ PR83).
+- Correção do chat engessado (→ PR84).
+- Deploy automático.
+- Escrita em KV/banco.
+- Chamadas de filesystem runtime ou LLM externo.
 
 ### Próxima etapa segura
 
-- Abrir novo contrato para implementação supervisionada da skill SELF_WORKER_AUDITOR.
+**PR83 — Corrigir loop de deploy** — usar achados D1/D2 do SELF_WORKER_AUDITOR como base do diagnóstico.
 
 ## Handoff atual (PR80)
 

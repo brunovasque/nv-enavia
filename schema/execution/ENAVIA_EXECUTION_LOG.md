@@ -4,7 +4,45 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-02 — PR81 — PR-IMPL + PR-PROVA — Fechamento ponta a ponta Skill Factory Real
+## 2026-05-03 — PR82 — PR-IMPL — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes
+
+- **Branch:** `copilot/pr82-implementacao-skill-self-worker-auditor`
+- **Tipo:** PR-IMPL (Worker-only + Tests + Docs mínimo)
+- **Contrato:** CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md (Ativo)
+- **PR anterior validada:** PR81 ✅
+
+### Objetivo
+
+Criar a primeira skill real de autoevolução: SELF_WORKER_AUDITOR.
+Auditar o Worker/repo em modo seguro e gerar diagnóstico objetivo para subsidiar PR83 e PR84.
+
+### Implementação
+
+**Arquivos criados:**
+- schema/enavia-self-worker-auditor-skill.js
+- tests/pr82-self-worker-auditor.smoke.test.js
+- schema/reports/PR82_SELF_WORKER_AUDITOR.md
+
+**Arquivos alterados:**
+- schema/enavia-skill-registry.js — SELF_WORKER_AUDITOR adicionada
+- schema/enavia-skill-runner.js — handler SELF_WORKER_AUDITOR adicionado
+- schema/status/ENAVIA_STATUS_ATUAL.md
+- schema/handoffs/ENAVIA_LATEST_HANDOFF.md
+- schema/execution/ENAVIA_EXECUTION_LOG.md (este arquivo)
+
+### Resultado
+
+- PR82 concluída ✅
+- SELF_WORKER_AUDITOR v1 operacional ✅
+- 10 achados em 6 categorias gerados ✅ (Finding T2 corrigido: substituído falso positivo por achado real de audit trail)
+- 5 ações prioritárias documentadas (PR83, PR84, futuras) ✅
+- Smoke test 54/54 ✅ FAILED_COUNT=0
+- Regressões PR79/PR80/PR81: todas verdes ✅ (corrigido adicionando entradas históricas faltantes no INDEX.md)
+- Regressões obrigatórias PR57/59/75/76/77/78: todas verdes ✅
+- Regras de segurança preservadas ✅
+
+---
+
 
 - **Branch:** codex/pr81-skill-factory-real-fechamento
 - **Tipo:** PR-IMPL + PR-PROVA (Worker-only + Tests + Docs mínimo)
