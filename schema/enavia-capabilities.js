@@ -9,25 +9,29 @@
 // ============================================================================
 
 /**
- * Retorna as capacidades reais que a Enavia possui em runtime na PR1.
+ * Retorna as capacidades reais que a Enavia possui em runtime (atualizado PR84).
  * @returns {{ can: string[], cannot_yet: string[] }}
  */
 export function getEnaviaCapabilities() {
   return {
     can: [
-      "Conversar de forma natural e contextual no chat atual",
-      "Responder com base institucional e identidade canônica da Enavia",
-      "Informar quem ela é e quais são seus limites básicos",
-      "Respeitar guardrails e exigir aprovação humana quando necessário",
-      "Estruturar entendimento inicial e diagnóstico do pedido",
+      "Conversar de forma natural e contextual no chat",
+      "Classificar intenção da mensagem (Intent Classifier v1)",
+      "Rotear para skill documental relevante (Skill Router v1, read-only)",
+      "Executar skills aprovadas via /skills/run com gate de aprovação explícito",
+      "Auditar o próprio Worker/sistema com SELF_WORKER_AUDITOR (read-only)",
+      "Aplicar Response Policy viva para orientar tom e segurança",
+      "Aplicar Self-Audit para detectar falsa capacidade, execução fake e outros riscos",
+      "Identificar próxima PR autorizada pelo contrato ativo",
+      "Diagnosticar, planejar e sugerir com base em evidências reais",
+      "Respeitar guardrails e exigir aprovação humana antes de execução real",
     ],
     cannot_yet: [
-      "Planner completo com tool arbitration (PM4→PM9) como fluxo consolidado",
+      "Intent Engine completo com routing multi-step autônomo",
       "Executar contratos aprovados via executor contratual de forma autônoma",
-      "Operar braço de browser de forma madura",
-      "Operar braço de GitHub/PR de forma madura",
-      "Memória longa persistente entre sessões",
+      "Escrita automática de memória persistente entre sessões",
       "Leitura e consolidação de memórias do KV como fluxo estável",
+      "Deploy autônomo para produção sem aprovação humana explícita",
       "Telemetria avançada e observabilidade completa",
       "Automonitoramento proativo de estado do sistema",
     ],

@@ -1,11 +1,28 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR83 — Corrigir loop de deploy ✅)
-**Branch ativa:** `copilot/pr83-fix-deploy-loop-again`
-**Última tarefa:** PR83 — PR-IMPL — Corrigir loop de deploy
+**Data:** 2026-05-03 (atualizado após PR84 — Corrigir IA engessada ✅)
+**Branch ativa:** `copilot/pr84-fixar-engessamento-ia`
+**Última tarefa:** PR84 — PR-IMPL — Corrigir IA engessada (Chat Vivo)
 
 ## Estado atual do sistema
 
+## Atualização PR84
+
+- `schema/enavia-llm-core.js` corrigido: bloco "FALSA CAPACIDADE BLOQUEADA" atualizado (remove /skills/run e Skill Router como inexistentes — existem desde PR51/PR80). Bloco "TOM AO BLOQUEAR" adicionado: instrução explícita de como responder de forma humana ao bloquear.
+- `schema/enavia-brain-loader.js` corrigido: snapshot `current-state.md` atualizado para refletir contrato atual (PR82_PR85) e estado pós-PR82/PR83.
+- `schema/enavia-capabilities.js` atualizado: lista `can[]` expandida de 5 para 10 itens refletindo PR49–PR82. Lista `cannot_yet[]` limpa de itens que já existem.
+- `tests/pr84-chat-vivo.smoke.test.js` criado: 52/52 ✅.
+- `schema/reports/PR84_CHAT_VIVO.md` criado.
+
+**Contrato ativo:** `CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` (Ativo — PR82 ✅, PR83 ✅, PR84 ✅, PR85 pendente)
+
+**Sistema operacional:** Estável. Chat menos engessado. Guardrails preservados. Deploy loop intacto.
+
+## Próxima PR autorizada
+
+**PR85 — Fechamento operacional ponta a ponta** (PR-PROVA)
+
+---
 ## Atualização PR83
 
 - `.github/workflows/deploy.yml` corrigido: push automático para PROD removido.
@@ -15,17 +32,6 @@
 - `schema/enavia-deploy-loop.js` criado: state machine pura para prova do loop.
 - `tests/pr83-deploy-loop.smoke.test.js` criado: 57/57 ✅.
 - Loop de deploy agora é: TEST → smoke TEST → aprovação → PROD → smoke PROD → rollback ready.
-
-**Contrato ativo:** `CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` (Ativo — PR82 ✅, PR83 ✅, PR84 pendente)
-
-**Sistema operacional:** Estável. Deploy loop corrigido. PROD não pode mais ser disparado por push simples.
-
-## Próxima PR autorizada
-
-**PR84 — Corrigir IA engessada**
-
----
-## Atualização PR82
 
 - SELF_WORKER_AUDITOR v1 criada como primeira skill real de autoevolução da Enavia.
 - Skill read-only, sem side effects, baseada em snapshot estático do repo.

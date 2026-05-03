@@ -10,8 +10,10 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 🟢 **Contrato ativo:** `active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md`
 
 **Status:** Ativo 🟢
-**Próxima PR autorizada:** PR84 — Corrigir IA engessada
+**Próxima PR autorizada:** PR85 — Fechamento operacional ponta a ponta
 ---
+
+**✅ PR84 concluída** — Corrigir IA engessada / Chat Vivo (2026-05-03)
 
 **✅ PR83 concluída** — Corrigir loop de deploy (2026-05-03)
 
@@ -46,8 +48,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**🟢 PR82 — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes**
+**🟢 PR85 — Fechamento operacional ponta a ponta** (próxima)
 
+> ✅ PR84 concluída — Corrigir IA engessada / Chat Vivo (2026-05-03)
 > ✅ PR83 concluída — Corrigir loop de deploy (2026-05-03)
 > ✅ PR82 concluída — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes (2026-05-03)
 > ✅ PR81 — Fechamento ponta a ponta Skill Factory Real concluída.

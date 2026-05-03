@@ -4,7 +4,55 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-03 — PR83 — PR-IMPL — Corrigir loop de deploy
+## 2026-05-03 — PR84 — PR-IMPL — Corrigir IA engessada (Chat Vivo)
+
+- **Branch:** `copilot/pr84-fixar-engessamento-ia`
+- **Tipo:** PR-IMPL (Chat/Cognitive runtime — patch cirúrgico)
+- **Contrato:** CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md (Ativo)
+- **PR anterior validada:** PR83 ✅
+
+### Objetivo
+
+Reduzir engessamento da IA no chat — respostas mais vivas, curtas, operacionais — sem remover guardrails.
+
+### Implementação
+
+**Arquivos alterados:**
+- `schema/enavia-llm-core.js` — FALSA CAPACIDADE BLOQUEADA atualizada + TOM AO BLOQUEAR adicionado
+- `schema/enavia-brain-loader.js` — current-state.md snapshot atualizado (contrato + estado PR82/PR83)
+- `schema/enavia-capabilities.js` — lista can[] e cannot_yet[] atualizadas para PR82 estado atual
+
+**Arquivos criados:**
+- `tests/pr84-chat-vivo.smoke.test.js` — 52/52 ✅
+- `schema/reports/PR84_CHAT_VIVO.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md` (atualizado)
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (atualizado)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md` (atualizado — próxima PR → PR85)
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| pr84-chat-vivo.smoke.test.js | ✅ 52/52 |
+| pr83-deploy-loop.smoke.test.js | ✅ 57/57 |
+| pr82-self-worker-auditor.smoke.test.js | ✅ 54/54 |
+| pr81-skill-factory-real.fechamento.test.js | ✅ 55/55 |
+| pr80-skill-registry-runner.smoke.test.js | ✅ 40/40 |
+| pr79-skill-factory-core.smoke.test.js | ✅ 42/42 |
+| pr59-response-policy-viva.smoke.test.js | ✅ 96/96 |
+| pr57-self-audit-readonly.prova.test.js | ✅ 99/99 |
+| pr77-chat-controlled-skill-integration.smoke.test.js | ✅ 24/24 |
+| pr76-system-mapper.prova.test.js | ✅ 46/46 |
+| pr75-system-mapper-readonly.smoke.test.js | ✅ 24/24 |
+
+### Rollback
+
+Reverter `schema/enavia-llm-core.js`, `schema/enavia-brain-loader.js`, `schema/enavia-capabilities.js` para estado anterior ao PR84.
+
+---
+
+
 
 - **Branch:** `copilot/pr83-fix-deploy-loop-again`
 - **Tipo:** PR-IMPL (Workflows-only + Docs + Tests)
