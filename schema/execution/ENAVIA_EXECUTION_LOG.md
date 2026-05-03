@@ -4,6 +4,60 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — PR87 — PR-IMPL — Deploy Test + Finalize Runner
+
+- **Branch:** `codex/pr87-deploy-test-finalize-runner`
+- **Tipo:** PR-IMPL (Executor-only + tests + docs mínimo)
+- **Contrato:** sem contrato ativo (`ACTIVE_CONTRACT.md`)
+- **PR anterior validada:** PR86 ✅
+
+### Objetivo
+
+Fechar o gap comprovado na PR86 no runner interno do executor, implementando apenas os steps faltantes `deploy_test` e `finalize` em `deploy_execute_plan`.
+
+### Implementação
+
+**Arquivos alterados:**
+- `executor/src/index.js` (patch cirúrgico do runner)
+
+**Arquivos criados:**
+- `tests/pr87-deploy-test-finalize-runner.smoke.test.js`
+- `schema/reports/PR87_DEPLOY_TEST_FINALIZE_RUNNER.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+
+### Resultado
+
+- `deploy_test` reconhecido e executado em modo supervisionado/simulado (sem deploy real).
+- `finalize` reconhecido e executado com fechamento lógico do plano.
+- `execution_id` e `contract_id` preservados quando presentes.
+- Step desconhecido mantido em `STEP_TYPE_NOT_IMPLEMENTED`.
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| pr87-deploy-test-finalize-runner.smoke.test.js | ✅ |
+| pr86-deploy-orchestrator-gap.prova.test.js | ✅ |
+| pr14-executor-deploy-real-loop.smoke.test.js | ✅ |
+| pr18-advance-phase-endpoint.smoke.test.js | ✅ |
+| pr19-advance-phase-e2e.smoke.test.js | ✅ |
+| pr20-loop-status-in-progress.smoke.test.js | ✅ |
+| pr21-loop-status-states.smoke.test.js | ✅ |
+| pr85-autoevolucao-operacional.fechamento.test.js | ✅ |
+| executor/tests/executor.contract.test.js | ✅ |
+| executor/tests/cloudflare-credentials.test.js | ✅ |
+
+### Rollback
+
+Reverter o commit da PR87 com `git revert <commit>`.
+
+---
+
 ## 2026-05-03 — PR86 — PR-PROVA — Deploy Orchestrator Gap Proof
 
 - **Branch:** `main`

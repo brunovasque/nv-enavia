@@ -1,10 +1,45 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR86 — PR-PROVA — Deploy Orchestrator Gap Proof ✅
-**Para:** PR87 (costura mínima do orchestrator interno, sem novo escopo)
+**De:** PR87 — PR-IMPL — Deploy Test + Finalize Runner ✅
+**Para:** próxima PR (se houver novo escopo formal)
 
-## Handoff atual (PR86)
+## Handoff atual (PR87)
+
+### O que foi feito
+
+- `executor/src/index.js` recebeu implementação dos steps faltantes no runner `deploy_execute_plan`:
+  - `deploy_test`
+  - `finalize`
+- `tests/pr87-deploy-test-finalize-runner.smoke.test.js` criado.
+- `schema/reports/PR87_DEPLOY_TEST_FINALIZE_RUNNER.md` criado.
+- Validado que `deploy_test/finalize` não retornam `STEP_TYPE_NOT_IMPLEMENTED`.
+- Validado que ambos preservam `execution_id` e `contract_id` quando presentes.
+- Validado que `deploy_test/finalize` são supervisionados e sem side effects reais.
+
+### O que existe após PR87
+
+- Costura mínima planner↔runner concluída para os passos faltantes.
+- `smart_deploy_plan` + `deploy_execute_plan` alcançam `finalize` sem cair em `STEP_TYPE_NOT_IMPLEMENTED` nesses steps.
+- Passo desconhecido continua protegido por `STEP_TYPE_NOT_IMPLEMENTED`.
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- painel/chat/Skill Factory/SELF_WORKER_AUDITOR
+- contrato ativo (continua sem contrato ativo)
+
+### Próxima etapa segura
+
+- Aguardar nova PR/escopo formal.
+- Se houver continuação da frente de deploy orchestrator, seguir para prova/hardening incremental sem abrir escopo lateral.
+
+---
+
+## Handoff anterior (PR86)
 
 ### O que foi feito
 
