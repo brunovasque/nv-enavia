@@ -1,38 +1,44 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR82 — PR-IMPL — SELF_WORKER_AUDITOR v1 ✅
-**Para:** PR83 — Corrigir loop de deploy
+**De:** PR83 — PR-IMPL — Corrigir loop de deploy ✅
+**Para:** PR84 — Corrigir IA engessada
 
-## Handoff atual (PR82)
+## Handoff atual (PR83)
 
 ### O que foi feito
 
-- Módulo criado: `schema/enavia-self-worker-auditor-skill.js` com `buildSelfWorkerAuditorResult()`.
-- SELF_WORKER_AUDITOR registrada em `schema/enavia-skill-registry.js`.
-- Runner atualizado em `schema/enavia-skill-runner.js` com handler para SELF_WORKER_AUDITOR.
-- Teste criado: `tests/pr82-self-worker-auditor.smoke.test.js` (54 cenários, 54 aprovados — FAILED_COUNT=0).
-- Relatório criado: `schema/reports/PR82_SELF_WORKER_AUDITOR.md`.
-- Diagnóstico estático gerado: 10 achados em 6 categorias.
+- `.github/workflows/deploy.yml` corrigido:
+  - Trigger `push: branches: [main]` removido — PROD não é mais disparado por push automático.
+  - Input `confirm_prod` adicionado (gate explícito, exige `'true'`).
+  - Input `target_env` convertido para `type: choice` (test | prod).
+  - Step "Gate PROD" adicionado — falha se `confirm_prod != 'true'` ou reason for padrão.
+  - Steps "Smoke PROD" adicionados: GET /audit + GET /__internal__/build verificam endpoint prod.
+- Runbook criado: `schema/deploy/RUNBOOK_DEPLOY_LOOP.md`.
+- State machine criada: `schema/enavia-deploy-loop.js`.
+- Teste criado: `tests/pr83-deploy-loop.smoke.test.js` — 57/57 ✅.
+- Relatório criado: `schema/reports/PR83_DEPLOY_LOOP.md`.
 
-### O que existe após PR82
+### O que existe após PR83
 
-- POST /skills/run executa SELF_WORKER_AUDITOR apenas com proposal_status=approved.
-- Diagnóstico read-only disponível sobre: security, telemetry, deploy_loop, chat_rigidity, tests, governance.
-- SYSTEM_MAPPER e SELF_WORKER_AUDITOR registradas e executáveis.
-- 5 ações prioritárias documentadas: PR83, PR84, e 3 futuras.
+- Loop de deploy completo e testável: TEST → smoke → aprovação → PROD + gate → smoke PROD.
+- PROD protegido: exige `confirm_prod=true` e motivo descritivo.
+- Push na main NÃO mais dispara deploy PROD.
+- Runbook com comandos de deploy, smoke e rollback documentados.
+- State machine de prova do fluxo disponível em `schema/enavia-deploy-loop.js`.
 
-### O que NÃO existe após PR82
+### O que NÃO existe após PR83
 
-- Correção do deploy loop (→ PR83).
 - Correção do chat engessado (→ PR84).
-- Deploy automático.
-- Escrita em KV/banco.
-- Chamadas de filesystem runtime ou LLM externo.
+- Rota `/promote` no Worker (não criada — opcional conforme contrato).
+- `deployed_at` / build marker no Worker (pendência futura documentada).
+- Deploy automático em produção.
 
 ### Próxima etapa segura
 
-**PR83 — Corrigir loop de deploy** — usar achados D1/D2 do SELF_WORKER_AUDITOR como base do diagnóstico.
+**PR84 — Corrigir IA engessada** — ajuste cirúrgico na camada de resposta/policy/chat runtime.
+
+
 
 ## Handoff atual (PR80)
 

@@ -1,11 +1,30 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR82 — SELF_WORKER_AUDITOR v1 ✅)
-**Branch ativa:** `copilot/pr82-implementacao-skill-self-worker-auditor`
-**Última tarefa:** PR82 — PR-IMPL — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes
+**Data:** 2026-05-03 (atualizado após PR83 — Corrigir loop de deploy ✅)
+**Branch ativa:** `copilot/pr83-fix-deploy-loop-again`
+**Última tarefa:** PR83 — PR-IMPL — Corrigir loop de deploy
 
 ## Estado atual do sistema
 
+## Atualização PR83
+
+- `.github/workflows/deploy.yml` corrigido: push automático para PROD removido.
+- Gate PROD adicionado: exige `confirm_prod=true` e `confirm_reason` descritivo.
+- Smoke PROD adicionado: GET /audit e GET /__internal__/build verificam endpoint prod pós-deploy.
+- `schema/deploy/RUNBOOK_DEPLOY_LOOP.md` criado: fluxo completo de deploy documentado.
+- `schema/enavia-deploy-loop.js` criado: state machine pura para prova do loop.
+- `tests/pr83-deploy-loop.smoke.test.js` criado: 57/57 ✅.
+- Loop de deploy agora é: TEST → smoke TEST → aprovação → PROD → smoke PROD → rollback ready.
+
+**Contrato ativo:** `CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` (Ativo — PR82 ✅, PR83 ✅, PR84 pendente)
+
+**Sistema operacional:** Estável. Deploy loop corrigido. PROD não pode mais ser disparado por push simples.
+
+## Próxima PR autorizada
+
+**PR84 — Corrigir IA engessada**
+
+---
 ## Atualização PR82
 
 - SELF_WORKER_AUDITOR v1 criada como primeira skill real de autoevolução da Enavia.
@@ -15,15 +34,7 @@
 - SELF_WORKER_AUDITOR registrada no registry e integrada no runner.
 - POST /skills/run executa SELF_WORKER_AUDITOR apenas com proposal_status=approved.
 - Regras preservadas: sem fetch, sem KV, sem filesystem runtime, sem comando externo, sem LLM externo.
-- wrangler.toml não alterado. contract-executor.js não alterado. Sem mudanças em painel/deploy-worker/executor/workflows.
-
-**Contrato ativo:** `CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` (Ativo — PR82 ✅, PR83 pendente)
-
-**Sistema operacional:** Estável. Registry agora lista SYSTEM_MAPPER e SELF_WORKER_AUDITOR. Runner executa ambas com approval válido.
-
-## Próxima PR autorizada
-
-**PR83 — Corrigir loop de deploy** (achados D1/D2 do SELF_WORKER_AUDITOR servem como diagnóstico base)
+- wrangler.toml não alterado. contract-executor.js não alterado. Sem mudanças em painel/deploy-worker/executor/workflows (PR82 only).
 
 ---
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)

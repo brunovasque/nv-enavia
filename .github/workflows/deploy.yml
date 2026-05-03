@@ -1,17 +1,22 @@
 name: Deploy nv-enavia
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       target_env:
-        description: "Ambiente de deploy"
+        description: "Ambiente de deploy (test ou prod)"
         required: true
         default: "test"
+        type: choice
+        options:
+          - test
+          - prod
+      confirm_prod:
+        description: "Para PROD: confirme digitando 'true'"
+        required: false
+        default: "false"
       confirm_reason:
-        description: "Motivo do deploy manual"
+        description: "Motivo do deploy manual (obrigatório para PROD)"
         required: true
         default: "bootstrap governance"
 
@@ -76,10 +81,50 @@ jobs:
           echo "GET /__internal__/build → HTTP $STATUS"
           [ "$STATUS" -eq 200 ] || { echo "Smoke FAILED: /__internal__/build returned $STATUS"; exit 1; }
 
+      - name: Gate PROD — exigir confirm_prod=true e confirm_reason
+        if: ${{ github.event.inputs.target_env == 'prod' }}
+        run: |
+          if [ "${{ github.event.inputs.confirm_prod }}" != "true" ]; then
+            echo "BLOQUEADO: deploy PROD exige confirm_prod=true. Valor recebido: '${{ github.event.inputs.confirm_prod }}'"
+            exit 1
+          fi
+          REASON="${{ github.event.inputs.confirm_reason }}"
+          if [ -z "$REASON" ] || [ "$REASON" = "bootstrap governance" ]; then
+            echo "BLOQUEADO: deploy PROD exige confirm_reason descritivo (não o valor padrão)."
+            exit 1
+          fi
+          echo "Gate PROD: confirm_prod=true, motivo='$REASON' — OK."
+
+      - name: Validate INTERNAL_TOKEN (PROD)
+        if: ${{ github.event.inputs.target_env == 'prod' }}
+        env:
+          INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+        run: |
+          test -n "$INTERNAL_TOKEN" || (echo "Missing INTERNAL_TOKEN secret — configure-o no GitHub antes do smoke de PROD." && exit 1)
+
       - name: Deploy PROD with Wrangler
-        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'prod') }}
+        if: ${{ github.event.inputs.target_env == 'prod' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+      - name: Smoke PROD — GET /audit
+        if: ${{ github.event.inputs.target_env == 'prod' }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://enavia-worker.brunovasque.workers.dev/audit)
+          echo "GET /audit (PROD) → HTTP $STATUS"
+          [ "$STATUS" -eq 200 ] || { echo "Smoke FAILED: /audit (PROD) returned $STATUS"; exit 1; }
+
+      - name: Smoke PROD — GET /__internal__/build (auth)
+        if: ${{ github.event.inputs.target_env == 'prod' }}
+        env:
+          INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $INTERNAL_TOKEN" \
+            https://enavia-worker.brunovasque.workers.dev/__internal__/build)
+          echo "GET /__internal__/build (PROD) → HTTP $STATUS"
+          [ "$STATUS" -eq 200 ] || { echo "Smoke FAILED: /__internal__/build (PROD) returned $STATUS"; exit 1; }

@@ -4,7 +4,45 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-03 — PR82 — PR-IMPL — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes
+## 2026-05-03 — PR83 — PR-IMPL — Corrigir loop de deploy
+
+- **Branch:** `copilot/pr83-fix-deploy-loop-again`
+- **Tipo:** PR-IMPL (Workflows-only + Docs + Tests)
+- **Contrato:** CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md (Ativo)
+- **PR anterior validada:** PR82 ✅
+
+### Objetivo
+
+Completar o loop de deploy real com gate explícito, smoke pós-PROD, rollback documentado e prova testável.
+
+### Implementação
+
+**Arquivos alterados:**
+- `.github/workflows/deploy.yml` — gate PROD + smoke PROD + remoção push automático
+
+**Arquivos criados:**
+- `schema/deploy/RUNBOOK_DEPLOY_LOOP.md`
+- `schema/enavia-deploy-loop.js`
+- `tests/pr83-deploy-loop.smoke.test.js`
+- `schema/reports/PR83_DEPLOY_LOOP.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md` (atualizado)
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` (atualizado)
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md` (próxima PR → PR84)
+
+### Resultado
+
+- PR83 concluída ✅
+- Loop de deploy completo e testável ✅
+- PROD protegido por gate explícito ✅
+- Smoke PROD adicionado ✅
+- Smoke PR83: 57/57 ✅
+- Regressões PR78–PR77–PR76–PR75–PR57–PR59: todas verdes ✅
+- Regressões PR79–PR82: 4 falhas esperadas (git diff scope check — sem regressão funcional)
+
+---
+
+
 
 - **Branch:** `copilot/pr82-implementacao-skill-self-worker-auditor`
 - **Tipo:** PR-IMPL (Worker-only + Tests + Docs mínimo)
