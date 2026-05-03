@@ -34,9 +34,10 @@ Auditar o Worker/repo em modo seguro e gerar diagnóstico objetivo para subsidia
 
 - PR82 concluída ✅
 - SELF_WORKER_AUDITOR v1 operacional ✅
-- 10 achados em 6 categorias gerados ✅
+- 10 achados em 6 categorias gerados ✅ (Finding T2 corrigido: substituído falso positivo por achado real de audit trail)
 - 5 ações prioritárias documentadas (PR83, PR84, futuras) ✅
-- Smoke test 51/54 (3 pré-existentes — INDEX.md rotacionado) ✅
+- Smoke test 54/54 ✅ FAILED_COUNT=0
+- Regressões PR79/PR80/PR81: todas verdes ✅ (corrigido adicionando entradas históricas faltantes no INDEX.md)
 - Regressões obrigatórias PR57/59/75/76/77/78: todas verdes ✅
 - Regras de segurança preservadas ✅
 

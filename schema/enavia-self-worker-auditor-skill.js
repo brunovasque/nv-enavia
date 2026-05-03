@@ -77,11 +77,11 @@ function _buildFindings() {
       id: "T2",
       severity: "medium",
       category: "telemetry",
-      title: "run_id do skill runner não é propagado para a resposta HTTP",
+      title: "Aprovações de skill não possuem audit trail persistido",
       evidence:
-        "schema/enavia-skill-runner.js gera run_id no resultado, mas nv-enavia.js não o inclui no body HTTP de /skills/run de forma padronizada.",
+        "O runner (schema/enavia-skill-runner.js) verifica apenas proposal_status=approved via payload da requisição, sem registrar quem aprovou, quando aprovou e para qual proposal_id. Não é possível auditar retrospectivamente as aprovações de skills, pois a persistência é apenas in-memory-per-instance conforme declarado pelo SYSTEM_MAPPER.",
       recommendation:
-        "Garantir que run_id apareça sempre no body de resposta de /skills/run para rastreabilidade.",
+        "Futuramente persistir audit entries de aprovação (proposal_id, approved_at, approved_by, skill_id) em KV ou log estruturado com aprovação humana explícita.",
     },
     {
       id: "D1",

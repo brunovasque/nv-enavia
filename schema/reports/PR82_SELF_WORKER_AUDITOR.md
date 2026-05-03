@@ -42,13 +42,15 @@ A skill audita o Worker/repo em modo seguro (read-only, snapshot estático) e ge
 | S1 | high | security | Endpoints públicos sem rate limiting explícito |
 | S2 | medium | security | Mensagens de erro podem expor detalhes internos |
 | T1 | high | telemetry | Ausência de telemetria estruturada nos endpoints |
-| T2 | medium | telemetry | run_id do skill runner não propagado para HTTP |
+| T2 | medium | telemetry | Aprovações de skill não possuem audit trail persistido |
 | D1 | high | deploy_loop | Loop de deploy incompleto — falta caminho test→promote→prod |
 | D2 | medium | deploy_loop | Rollback de deploy não documentado como ação ativável |
 | C1 | high | chat_rigidity | Tom do chat excessivamente robótico e formal |
 | C2 | medium | chat_rigidity | Prompt do sistema carregado de regras contratuais |
 | TE1 | medium | tests | Cobertura de /skills/run para novas skills não garantida |
-| G1 | low | governance | Atualização de governança é manual |
+| G1 | low | governance | Atualização de governança (STATUS/HANDOFF/LOG) é manual |
+
+> **Nota T2:** O achado T2 original (v1) declarava incorretamente que run_id não era propagado para a resposta HTTP. O code review identificou que `nv-enavia.js` linha 7043 já retorna `run_id: run.run_id` corretamente. T2 foi substituído por achado real: ausência de audit trail persistido de aprovações.
 
 ### Ações prioritárias (5)
 
@@ -81,15 +83,16 @@ allowed_effects: []
 
 ```
 node tests/pr82-self-worker-auditor.smoke.test.js
-✅ 51 passed, 0 failed reais
-(3 "falhas" de regressão PR79/PR80/PR81 são pré-existentes —
-já falhavam no main antes desta PR devido à rotação do INDEX.md)
+✅ 54 passed, 0 failed
 ```
 
 ### Regressões obrigatórias
 
 | Teste | Resultado |
 |-------|-----------|
+| pr79-skill-factory-core.smoke.test.js | ✅ 42/42 |
+| pr80-skill-registry-runner.smoke.test.js | ✅ 40/40 |
+| pr81-skill-factory-real.fechamento.test.js | ✅ 55/55 |
 | pr78-skills-runtime-fase1.fechamento.test.js | ✅ 42/42 |
 | pr77-chat-controlled-skill-integration.smoke.test.js | ✅ 24/24 |
 | pr76-system-mapper.prova.test.js | ✅ 46/46 |
