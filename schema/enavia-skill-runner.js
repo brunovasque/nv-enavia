@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { buildSystemMapperResult } from "./enavia-system-mapper-skill.js";
+import { buildSelfWorkerAuditorResult } from "./enavia-self-worker-auditor-skill.js";
 import {
   getRegisteredSkill,
   isSkillRegistered,
@@ -119,6 +120,12 @@ export function runRegisteredSkill(input, context = {}) {
   let result;
   if (normalized.skill_id === "SYSTEM_MAPPER") {
     result = buildSystemMapperResult({
+      require_approved_proposal: true,
+      proposal_status: normalized.proposal_status,
+      approval: { status: normalized.proposal_status },
+    });
+  } else if (normalized.skill_id === "SELF_WORKER_AUDITOR") {
+    result = buildSelfWorkerAuditorResult({
       require_approved_proposal: true,
       proposal_status: normalized.proposal_status,
       approval: { status: normalized.proposal_status },

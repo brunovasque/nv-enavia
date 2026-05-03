@@ -30,6 +30,30 @@ export const REGISTERED_SKILLS = Object.freeze({
     executable: true,
     side_effects_allowed: false,
   }),
+  SELF_WORKER_AUDITOR: Object.freeze({
+    skill_id: "SELF_WORKER_AUDITOR",
+    mode: "read_only",
+    risk_level: "medium",
+    allowed_effects: Object.freeze([]),
+    forbidden_effects: Object.freeze([
+      "deploy_automatico",
+      "merge_automatico",
+      "producao_direta",
+      "browser_action",
+      "acesso_credenciais_sensiveis",
+      "execucao_comando_externo",
+      "escrita_kv_ou_banco",
+      "filesystem_runtime",
+      "chamada_llm_externo_novo",
+      "fetch_externo",
+    ]),
+    requires_approval: true,
+    human_review_required: true,
+    module: "schema/enavia-self-worker-auditor-skill.js",
+    source: "buildSelfWorkerAuditorResult",
+    executable: true,
+    side_effects_allowed: false,
+  }),
 });
 
 const _BLOCKED_STATUSES = new Set([

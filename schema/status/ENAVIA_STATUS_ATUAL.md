@@ -1,24 +1,29 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-02 (atualizado após PR81 — Fechamento Skill Factory Real ✅)
-**Branch ativa:** `codex/pr81-skill-factory-real-fechamento`
-**Última tarefa:** PR81 — PR-IMPL + PR-PROVA — Fechamento ponta a ponta Skill Factory Real v1.
+**Data:** 2026-05-03 (atualizado após PR82 — SELF_WORKER_AUDITOR v1 ✅)
+**Branch ativa:** `copilot/pr82-implementacao-skill-self-worker-auditor`
+**Última tarefa:** PR82 — PR-IMPL — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes
 
 ## Estado atual do sistema
 
-## Atualização PR81 (fechamento)
+## Atualização PR82
 
-- Skill Factory Real v1 fechada ponta a ponta com prova do ciclo: pedido humano -> skill_spec -> bloqueio sem autorização -> pacote PR-ready com autorização -> registry/runner -> /skills/run com SYSTEM_MAPPER aprovada.
-- Regras de segurança preservadas: deny-by-default, método POST-only, erro controlado para JSON inválido, bloqueios para secrets/deploy/browser/comando externo/side effects sem allowlist.
-- Confirmado: sem alteração em wrangler.toml, sem alteração em contract-executor.js, sem mudanças em painel/deploy-worker/executor/workflows.
-- Confirmado: SELF_WORKER_AUDITOR ainda não criada nesta PR.
-**Contrato ativo:** `CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` (Concluído ✅)
+- SELF_WORKER_AUDITOR v1 criada como primeira skill real de autoevolução da Enavia.
+- Skill read-only, sem side effects, baseada em snapshot estático do repo.
+- Diagnóstico gerado: 10 achados em 6 categorias (security, telemetry, deploy_loop, chat_rigidity, tests, governance).
+- 5 ações prioritárias recomendadas: PR83 (deploy loop), PR84 (chat engessado), 3 ações futuras.
+- SELF_WORKER_AUDITOR registrada no registry e integrada no runner.
+- POST /skills/run executa SELF_WORKER_AUDITOR apenas com proposal_status=approved.
+- Regras preservadas: sem fetch, sem KV, sem filesystem runtime, sem comando externo, sem LLM externo.
+- wrangler.toml não alterado. contract-executor.js não alterado. Sem mudanças em painel/deploy-worker/executor/workflows.
 
-**Objetivo:** Evoluir Skill Factory Real v1 com execução governada apenas para skill registrada e aprovada.
+**Contrato ativo:** `CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` (Ativo — PR82 ✅, PR83 pendente)
 
-**Sistema operacional:** Estável. PR80 adicionou `schema/enavia-skill-registry.js`, `schema/enavia-skill-runner.js` e endpoint `POST /skills/run` no `nv-enavia.js`, com bloqueio deny-by-default para skill não registrada e requirement de `proposal_status=approved`. `SYSTEM_MAPPER` é a primeira skill executável read-only no runner.
+**Sistema operacional:** Estável. Registry agora lista SYSTEM_MAPPER e SELF_WORKER_AUDITOR. Runner executa ambas com approval válido.
 
-## Próxima PR autorizada`r`n`r`n**Aguardando próximo contrato/fase formal.**
+## Próxima PR autorizada
+
+**PR83 — Corrigir loop de deploy** (achados D1/D2 do SELF_WORKER_AUDITOR servem como diagnóstico base)
 
 ---
 ## Causa raiz do chat engessado (PR32) + ajustes contratuais (PR33)
