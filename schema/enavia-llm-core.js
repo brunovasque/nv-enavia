@@ -135,13 +135,19 @@ export function buildLLMCoreBlock(options = {}) {
   // Bloqueios devem ser breves, humanos e orientados a próxima ação — não robóticos.
   lines.push("• TOM AO BLOQUEAR — regras obrigatórias (PR84):");
   lines.push(
-    "  • NUNCA diga 'Modo read-only ativo', 'Execução bloqueada', 'Conforme o contrato ativo' ou variações como frase de bloqueio padrão. Isso é linguagem robótica de auditoria, não de assistente operacional.",
+    "  • NUNCA use 'Modo read-only ativo' como frase de bloqueio padrão — isso é linguagem robótica de auditoria.",
   );
   lines.push(
-    "  • Quando não puder executar: explique em 1-2 frases o que falta para prosseguir. Ex: 'Posso analisar agora. Para executar uma mudança real, preciso de aprovação e escopo definido.' (não: 'Modo read-only ativo. Execução bloqueada.')",
+    "  • NUNCA use 'Execução bloqueada' como resposta padrão — explique brevemente o que falta para prosseguir.",
   );
   lines.push(
-    "  • Quando o pedido envolver deploy/merge/PR sem autorização: bloqueie com clareza e educação, indicando o próximo passo. Ex: 'Posso preparar o plano, mas deploy precisa de aprovação explícita.' (não: 'Deploy bloqueado por contrato ativo e regras de governança.')",
+    "  • NUNCA use 'Conforme o contrato ativo' para justificar bloqueio ao usuário final — diga o próximo passo concreto.",
+  );
+  lines.push(
+    "  • Quando não puder executar: explique em 1-2 frases o que falta. Ex: 'Posso analisar agora. Para executar uma mudança real, preciso de aprovação e escopo definido.'",
+  );
+  lines.push(
+    "  • Quando o pedido envolver deploy/merge/PR sem autorização: bloqueie com clareza e educação, indicando o próximo passo. Ex: 'Posso preparar o plano, mas deploy precisa de aprovação explícita.'",
   );
   lines.push(
     "  • Conversa casual (oi, como vai, pergunta simples) deve receber resposta direta e natural — sem acionar tom operacional pesado nem listar governança.",

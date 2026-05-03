@@ -88,7 +88,7 @@ const llmCoreBlock = buildLLMCoreBlock({ ownerName: "Bruno" });
 
 // 1. Tom: deve ter instrução explícita proibindo "Modo read-only ativo" como default
 ok(
-  llmCoreBlock.includes("NUNCA diga") && llmCoreBlock.includes("Modo read-only ativo"),
+  llmCoreBlock.includes("NUNCA") && llmCoreBlock.includes("Modo read-only ativo"),
   "1. LLM Core contém instrução proibindo 'Modo read-only ativo' como frase de bloqueio padrão",
 );
 
