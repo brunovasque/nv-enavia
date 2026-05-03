@@ -7,22 +7,17 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **Contrato ativo:** `active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md`
+⏸️ **Sem contrato ativo** — aguardando próximo contrato/fase formal.
 
-**Status:** Ativo 🟢
-**Próxima PR autorizada:** PR85 — Fechamento operacional ponta a ponta
+O contrato Autoevolução Operacional PR82–PR85 foi encerrado formalmente na PR85 (2026-05-03).
+
 ---
-
-**✅ PR84 concluída** — Corrigir IA engessada / Chat Vivo (2026-05-03)
-
-**✅ PR83 concluída** — Corrigir loop de deploy (2026-05-03)
-
-**✅ PR82 concluída** — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes (2026-05-03)
 
 ## Contratos encerrados
 
 | Arquivo | PRs | Estado | Data de encerramento |
 |---------|-----|--------|----------------------|
+| `active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` | PR82–PR85 | Encerrado ✅ | 2026-05-03 |
 | `active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` | PR79–PR81 | Encerrado ✅ | 2026-05-02 |
 | `active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` | PR69–PR78 | Encerrado ✅ | 2026-05-02 |
 | `active/CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` | PR31–PR68 | Encerrado ✅ | 2026-05-02 |
@@ -48,8 +43,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**🟢 PR85 — Fechamento operacional ponta a ponta** (próxima)
+**⏸️ Sem próxima PR autorizada** — Contrato PR82–PR85 encerrado. Aguardando novo contrato/fase formal.
 
+> ✅ PR85 concluída — Fechamento operacional ponta a ponta (2026-05-03)
 > ✅ PR84 concluída — Corrigir IA engessada / Chat Vivo (2026-05-03)
 > ✅ PR83 concluída — Corrigir loop de deploy (2026-05-03)
 > ✅ PR82 concluída — SELF_WORKER_AUDITOR v1 + diagnóstico das 3 frentes (2026-05-03)
