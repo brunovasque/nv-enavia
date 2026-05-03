@@ -7,12 +7,31 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-⏸️ **Sem contrato ativo** — aguardando próximo contrato/fase formal.
+🟢 **CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md** — **Ativo**
 
-O contrato Autoevolução Operacional PR82–PR85 foi encerrado formalmente na PR85 (2026-05-03).
+Arquivo:
+`schema/contracts/active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md`
+
+Status:
+- Ativo
+- Próxima PR autorizada: PR90 — Diagnóstico READ-ONLY do PR Orchestrator
+
+Objetivo macro:
+Transformar o sistema interno da Enavia em um PR Orchestrator supervisionado (estilo Copilot), preparando branch/PR/testes/provas/deploy TEST até aprovação humana de merge/deploy PROD.
+
+Sequência autorizada desta frente:
+- PR90 — Diagnóstico READ-ONLY do PR Orchestrator
+- PR91 — PR Planner
+- PR92 — PR Executor supervisionado
+- PR93 — Ready for Merge + Deploy TEST
+
+Histórico imediato relevante (concluído):
+- PR86 ✅ diagnóstico da lacuna do loop interno.
+- PR87 ✅ `deploy_test` e `finalize` no executor.
+- PR88 ✅ costura Worker ↔ Executor com `execution_id`/`contract_id`.
+- PR89 ✅ prova final do loop interno até `finalize` sem deploy real.
 
 ---
-
 ## Contratos encerrados
 
 | Arquivo | PRs | Estado | Data de encerramento |
@@ -43,8 +62,7 @@ O contrato Autoevolução Operacional PR82–PR85 foi encerrado formalmente na P
 
 ## Próxima PR autorizada
 
-**⏸️ Sem próxima PR autorizada** — Contrato PR82–PR85 encerrado. Aguardando novo contrato/fase formal.
-
+**PR90 — Diagnóstico READ-ONLY do PR Orchestrator**
 
 > ✅ PR89 concluída — Prova final do loop interno Worker → Executor até finalize, sem deploy real (2026-05-03, escopo Tests + docs/governança mínima)
 
@@ -134,6 +152,8 @@ O contrato Autoevolução Operacional PR82–PR85 foi encerrado formalmente na P
 - **PR28** ✅ (PR-DOCS, mergeada — PR #189, commit merge `daefe36`) — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial) + `schema/skills/INDEX.md` atualizado.
 - **PR29** ✅ (PR-DOCS) — `schema/skills/CONTRACT_AUDITOR.md` criado (24 seções, quarta skill oficial supervisionada) + `schema/skills/INDEX.md` atualizado.
 - **PR30** ✅ (PR-DOCS/PR-PROVA) — Fechamento, hardening e handoff final. Contrato encerrado.
+
+
 
 
 

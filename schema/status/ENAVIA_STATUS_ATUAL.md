@@ -1,10 +1,19 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR89 — prova final do loop interno ✅)
-**Branch ativa:** `codex/pr89-internal-loop-final-proof`
-**Última tarefa:** PR89 — PR-PROVA — Hardening + prova final do loop interno Worker → Executor
+**Data:** 2026-05-03 (atualizado após ativação do contrato PR Orchestrator PR90–PR93 ✅)
+**Branch ativa:** `codex/contract-pr-orchestrator-pr90-pr93`
+**Última tarefa:** Governança — ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93
 
 ## Estado atual do sistema
+
+## Atualização do contrato ativo (PR90–PR93)
+
+- Novo contrato ativo criado: schema/contracts/active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md.
+- Frente formal ativada: PR Orchestrator supervisionado estilo Copilot, com aprovação humana obrigatória para merge/deploy PROD.
+- Sequência histórica PR86–PR89 registrada como concluída/base da nova frente.
+- Escopo desta ativação: docs/governança apenas (sem runtime).
+- Próxima PR autorizada: **PR90 — Diagnóstico READ-ONLY do PR Orchestrator**.
+- PR90–PR93 **não implementadas** nesta ativação.
 
 ## Atualização PR89
 
@@ -66,13 +75,13 @@
 - Regressão completa verde: PR79–PR84 passando ✅.
 - Governança atualizada: INDEX.md, ACTIVE_CONTRACT.md, status, handoff, execution log.
 
-**Contrato ativo:** Nenhum — aguardando próximo contrato/fase formal.
+**Contrato ativo:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` — Ativo ✅
 
 **Sistema operacional:** Estável. Contrato PR82–PR85 encerrado. Sem runtime alterado nesta PR.
 
 ## Próxima PR autorizada
 
-Nenhuma. Aguardando novo contrato.
+PR90 — Diagnóstico READ-ONLY do PR Orchestrator
 
 ---
 
@@ -427,6 +436,7 @@ Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 (DOCS) e PR32 (
 
 ## Bloqueios
 - nenhum
+
 
 
 
