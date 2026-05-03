@@ -1,9 +1,36 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR89 — PR-PROVA — Hardening + prova final do loop interno ✅
-**Para:** próxima PR/fase formal (se houver novo contrato)
+**De:** Governança — ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93 ✅
+**Para:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator
 
+## Handoff atual (ativação do contrato PR90–PR93)
+
+### O que foi feito
+
+- Criado o contrato: `schema/contracts/active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md`.
+- Atualizados ponteiros de governança: `ACTIVE_CONTRACT.md`, `INDEX.md`, `status`, `handoff`, `execution log`.
+- Sequência PR86–PR89 consolidada como base histórica concluída para abrir a nova frente supervisionada.
+
+### O que este contrato libera
+
+- Frente PR Orchestrator supervisionado PR90–PR93 para preparar branch/PR/testes/provas/deploy TEST.
+- Regra principal formalizada: Enavia prepara; humano aprova merge e PROD.
+
+### O que permanece bloqueado
+
+- merge automático em main
+- deploy PROD automático
+- alteração de secrets
+- rollback PROD automático sem aprovação
+- operação em outros repos, browser action e escopo Enova
+
+### Próxima etapa segura
+
+- Executar somente **PR90 — Diagnóstico READ-ONLY do PR Orchestrator**.
+- Não implementar PR91/PR92/PR93 antes da conclusão formal da PR90.
+
+---
 ## Handoff atual (PR89)
 
 ### O que foi feito
@@ -346,9 +373,9 @@ Aguardando novo contrato/fase formal. Sugestões de frentes futuras em `schema/r
 - Manter `/skills/run` fora do escopo até contrato explícito de execução real.
 ---
 
-**Data:** 2026-05-02
-**De:** PR81 — PR-IMPL + PR-PROVA — Fechamento Skill Factory Real ✅
-**Para:** Próximo contrato/fase (recomendado: SELF_WORKER_AUDITOR supervisionada)
+**Data:** 2026-05-03
+**De:** Governança — ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93 ✅
+**Para:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator
 
 ## Handoff atual (PR77)
 
@@ -398,9 +425,9 @@ Aguardando novo contrato/fase formal. Sugestões de frentes futuras em `schema/r
 
 ---
 
-**Data:** 2026-05-02
-**De:** PR81 — PR-IMPL + PR-PROVA — Fechamento Skill Factory Real ✅
-**Para:** Próximo contrato/fase (recomendado: SELF_WORKER_AUDITOR supervisionada)
+**Data:** 2026-05-03
+**De:** Governança — ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93 ✅
+**Para:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator
 
 ## O que foi feito nesta sessão
 
@@ -888,6 +915,8 @@ Diagnosticar se a frente "Atualização supervisionada de memória" ainda é nec
 | Brain documental | `schema/brain/` — 20+ arquivos | — |
 | Escrita supervisionada de memória | ❌ Não implementada no runtime — G3 on-hold | Não blocking |
 | Runtime de Skills | ❌ Não existe — aguarda PR64→PR65→PR66→PR67+ | Próxima frente |
+
+
 
 
 

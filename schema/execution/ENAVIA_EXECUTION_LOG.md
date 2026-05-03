@@ -4,6 +4,41 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — Governança — Ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93
+
+- **Branch:** `codex/contract-pr-orchestrator-pr90-pr93`
+- **Tipo:** DOCS-ONLY (contratos/governança)
+- **Contrato:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (Ativo ✅)
+- **Sequência anterior validada:** PR86 ✅ PR87 ✅ PR88 ✅ PR89 ✅
+
+### Objetivo
+
+Formalizar a nova frente PR Orchestrator supervisionado PR90–PR93 para permitir preparação interna de branch/PR/testes/provas/deploy TEST com aprovação humana obrigatória para merge/deploy PROD.
+
+### Implementação
+
+**Arquivo criado:**
+- `schema/contracts/active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md`
+
+**Arquivos atualizados (governança):**
+- `schema/contracts/ACTIVE_CONTRACT.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Resultado
+
+- Contrato PR90–PR93 ativo.
+- Próxima PR autorizada definida: PR90 (Diagnóstico READ-ONLY do PR Orchestrator).
+- PR90–PR93 não implementadas nesta execução (somente formalização contratual).
+- Escopo restrito a docs/governança, sem runtime/worker/executor/deploy.
+
+### Rollback
+
+Reverter este commit com `git revert <commit>`.
+
+---
 ## 2026-05-03 — PR89 — PR-PROVA — Hardening e prova final do loop interno Worker → Executor
 
 - **Branch:** `codex/pr89-internal-loop-final-proof`
@@ -5263,6 +5298,8 @@ Nenhum. Diagnóstico completo. PR18 pode iniciar.
 - **Garantias:** Read-only. Não altera reply. Não bloqueia fluxo automaticamente. Não cria endpoint. Não escreve memória. Não chama LLM externo. Não usa KV/rede/filesystem. Falha com segurança.
 - **Escopo preservado:** `enavia-cognitive-runtime.js`, `enavia-llm-core.js`, `enavia-brain-loader.js`, `enavia-intent-classifier.js`, `enavia-skill-router.js`, `enavia-intent-retrieval.js`, Panel, Executor, Deploy Worker, workflows, wrangler.toml — todos intactos.
 - **Próxima etapa segura:** PR57 — PR-PROVA — Teste do Self-Audit read-only.
+
+
 
 
 
