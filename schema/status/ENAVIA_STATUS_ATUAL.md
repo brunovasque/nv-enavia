@@ -1,10 +1,20 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR86 — Deploy Orchestrator Gap Proof ✅)
-**Branch ativa:** `main`
-**Última tarefa:** PR86 — PR-PROVA — Deploy Orchestrator Gap Proof
+**Data:** 2026-05-03 (atualizado após PR87 — Deploy Test + Finalize Runner ✅)
+**Branch ativa:** `codex/pr87-deploy-test-finalize-runner`
+**Última tarefa:** PR87 — PR-IMPL — Deploy Test + Finalize Runner
 
 ## Estado atual do sistema
+
+## Atualização PR87
+
+- `executor/src/index.js` atualizado com handlers de `deploy_test` e `finalize` no runner `deploy_execute_plan`.
+- `tests/pr87-deploy-test-finalize-runner.smoke.test.js` criado para validar o fechamento do gap provado na PR86.
+- `schema/reports/PR87_DEPLOY_TEST_FINALIZE_RUNNER.md` criado.
+- `deploy_test` e `finalize` não caem mais em `STEP_TYPE_NOT_IMPLEMENTED` quando acionados.
+- `deploy_test` e `finalize` retornam resultado estruturado, preservando `execution_id` e `contract_id` quando presentes.
+- `deploy_test` e `finalize` mantidos sem side effects reais (`real_deploy=false`, sem rede real nesses steps).
+- Fluxos existentes preservados: `audit`, `propose`, `apply_test`, `await_proof`, loop PR14/PR18/PR19/PR20/PR21.
 
 ## Atualização PR86
 

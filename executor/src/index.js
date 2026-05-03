@@ -5965,6 +5965,18 @@ if (highLevelAction === "deploy_execute_plan") {
   const stepId = step.id || `step_${nextIndex}`;
   const stepType =
     (step.type && String(step.type).toLowerCase()) || "unknown";
+  const contractId =
+    raw.contract_id ||
+    raw.contractId ||
+    (raw.contract &&
+      (raw.contract.contract_id || raw.contract.contractId || raw.contract.id)) ||
+    (execDoc.contract &&
+      (execDoc.contract.contract_id ||
+        execDoc.contract.contractId ||
+        execDoc.contract.id)) ||
+    (plan.contract &&
+      (plan.contract.contract_id || plan.contract.contractId || plan.contract.id)) ||
+    null;
 
     let innerResult = null;
 
@@ -6190,6 +6202,53 @@ const url = base + "/apply-test";
       };
     }
   }
+} else if (stepType === "deploy_test") {
+  const target =
+    execDoc.target || plan.target || raw.target || null;
+  const candidateHash =
+    execDoc.candidate_hash ||
+    plan.candidate_hash ||
+    plan.candidateHash ||
+    raw.candidate_hash ||
+    raw.candidateHash ||
+    null;
+
+  innerResult = {
+    ok: true,
+    mode: "deploy_execute_plan",
+    step: "deploy_test",
+    status: "simulated",
+    supervised: true,
+    executed: false,
+    side_effects: false,
+    network_called: false,
+    real_deploy: false,
+    target_env: "test",
+    execution_id: execId,
+    contract_id: contractId,
+    candidate_hash: candidateHash,
+    target: target || null,
+    message: "DEPLOY_TEST simulado com sucesso (sem deploy real).",
+  };
+
+  try {
+    await updateFlowStateKV(env, execId, {
+      stage: "deploy_test",
+      last_step: "deploy_test",
+      ok: true,
+      execution_id: execId,
+      contract_id: contractId,
+      candidate_hash: candidateHash,
+      target: target || null,
+      simulated: true,
+      real_deploy: false,
+      network_called: false,
+      side_effects: false,
+      updated_at: Date.now(),
+    });
+  } catch (_eKV) {
+    // best effort
+  }
 } else if (stepType === "await_proof") {
     const candidateHash =
       (plan && (plan.candidate_hash || plan.candidateHash)) ||
@@ -6279,6 +6338,44 @@ const url = base + "/apply-test";
       } catch (_err) {
         // best effort
       }
+    }
+  } else if (stepType === "finalize") {
+    innerResult = {
+      ok: true,
+      mode: "deploy_execute_plan",
+      step: "finalize",
+      status: "completed",
+      supervised: true,
+      executed: false,
+      side_effects: false,
+      network_called: false,
+      real_deploy: false,
+      logical_closure: true,
+      execution_id: execId,
+      contract_id: contractId,
+      message: "Plano finalizado logicamente (sem side effects reais).",
+    };
+
+    execDoc.finalized = true;
+    execDoc.finalized_at = nowIso();
+    execDoc.final_status = "completed";
+
+    try {
+      await updateFlowStateKV(env, execId, {
+        stage: "finalize",
+        last_step: "finalize",
+        ok: true,
+        execution_id: execId,
+        contract_id: contractId,
+        finalized: true,
+        logical_closure: true,
+        side_effects: false,
+        network_called: false,
+        real_deploy: false,
+        updated_at: Date.now(),
+      });
+    } catch (_eKV) {
+      // best effort
     }
   } else {
     innerResult = {

@@ -45,6 +45,7 @@ O contrato Autoevolução Operacional PR82–PR85 foi encerrado formalmente na P
 
 **⏸️ Sem próxima PR autorizada** — Contrato PR82–PR85 encerrado. Aguardando novo contrato/fase formal.
 
+> ✅ PR87 concluída — Deploy Test + Finalize Runner no executor (2026-05-03, escopo Executor-only)
 > ✅ PR85 concluída — Fechamento operacional ponta a ponta (2026-05-03)
 > ✅ PR84 concluída — Corrigir IA engessada / Chat Vivo (2026-05-03)
 > ✅ PR83 concluída — Corrigir loop de deploy (2026-05-03)
