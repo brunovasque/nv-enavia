@@ -1,10 +1,19 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR85 — Fechamento operacional ponta a ponta ✅)
-**Branch ativa:** `copilot/pr85-implementacao-contrato-ativo`
-**Última tarefa:** PR85 — PR-PROVA — Fechamento operacional ponta a ponta
+**Data:** 2026-05-03 (atualizado após PR86 — Deploy Orchestrator Gap Proof ✅)
+**Branch ativa:** `main`
+**Última tarefa:** PR86 — PR-PROVA — Deploy Orchestrator Gap Proof
 
 ## Estado atual do sistema
+
+## Atualização PR86
+
+- `tests/pr86-deploy-orchestrator-gap.prova.test.js` criado para prova diagnóstica do gap no orquestrador de deploy.
+- `schema/reports/PR86_DEPLOY_ORCHESTRATOR_GAP.md` criado com diagnóstico objetivo do ponto de quebra.
+- Confirmado: contrato ativo permanece vazio (`ACTIVE_CONTRACT.md`) e PR82–PR85 seguem encerradas.
+- Gap comprovado no executor: `smart_deploy_plan` cria passos `deploy_test/finalize`, mas `deploy_execute_plan` não implementa esses step types e pode cair em `STEP_TYPE_NOT_IMPLEMENTED`.
+- Fluxos existentes preservados: `loop-status`, `advance-phase`, `execute-next`, `callExecutorBridge`, `callDeployBridge`.
+- PR86 não altera runtime/deploy workflow; apenas teste + relatório + governança.
 
 ## Atualização PR85
 

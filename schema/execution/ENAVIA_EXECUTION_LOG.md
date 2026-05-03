@@ -4,6 +4,52 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — PR86 — PR-PROVA — Deploy Orchestrator Gap Proof
+
+- **Branch:** `main`
+- **Tipo:** PR-PROVA (Tests + relatório diagnóstico)
+- **Contrato:** sem contrato ativo (`ACTIVE_CONTRACT.md`)
+- **PR anterior validada:** PR85 ✅
+
+### Objetivo
+
+Provar com evidência estática/dinâmica onde o loop interno de deploy/orquestração quebra entre `smart_deploy_plan` e `deploy_execute_plan`, sem alterar comportamento vivo.
+
+### Implementação
+
+**Arquivos criados:**
+- `tests/pr86-deploy-orchestrator-gap.prova.test.js`
+- `schema/reports/PR86_DEPLOY_ORCHESTRATOR_GAP.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Achado principal
+
+- `smart_deploy_plan` cria `plan.steps` com `deploy_test` e `finalize`.
+- `deploy_execute_plan` não implementa handlers para `deploy_test`/`finalize`.
+- Em step não mapeado, o executor retorna `STEP_TYPE_NOT_IMPLEMENTED_*`.
+- Ponto provável de quebra: primeiro step não implementado (`deploy_test`).
+
+### Testes
+
+| Teste | Resultado |
+|-------|-----------|
+| pr86-deploy-orchestrator-gap.prova.test.js | ✅ |
+| pr14-executor-deploy-real-loop.smoke.test.js | ✅ |
+| pr18-advance-phase-endpoint.smoke.test.js | ✅ |
+| pr19-advance-phase-e2e.smoke.test.js | ✅ |
+| pr20-loop-status-in-progress.smoke.test.js | ✅ |
+| pr21-loop-status-states.smoke.test.js | ✅ |
+
+### Rollback
+
+Nenhum runtime foi alterado. Para reverter: `git revert` do commit da PR86.
+
+---
+
 ## 2026-05-03 — PR85 — PR-PROVA — Fechamento operacional ponta a ponta
 
 - **Branch:** `copilot/pr85-implementacao-contrato-ativo`

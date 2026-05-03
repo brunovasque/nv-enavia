@@ -1,10 +1,45 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** PR85 — PR-PROVA — Fechamento operacional ponta a ponta ✅
-**Para:** Próximo contrato (a ser definido)
+**De:** PR86 — PR-PROVA — Deploy Orchestrator Gap Proof ✅
+**Para:** PR87 (costura mínima do orchestrator interno, sem novo escopo)
 
-## Handoff atual (PR85)
+## Handoff atual (PR86)
+
+### O que foi feito
+
+- Criado `tests/pr86-deploy-orchestrator-gap.prova.test.js` com 30 cenários de prova diagnóstica.
+- Criado `schema/reports/PR86_DEPLOY_ORCHESTRATOR_GAP.md`.
+- Confirmado formalmente:
+  - `ACTIVE_CONTRACT.md` sem contrato ativo;
+  - PR82, PR83, PR84 e PR85 encerradas no `INDEX.md`.
+- Gap comprovado no executor:
+  - `smart_deploy_plan` monta passos com `deploy_test` e `finalize`;
+  - `deploy_execute_plan` executa apenas `audit/propose/apply_test/await_proof`;
+  - passo não mapeado cai em `STEP_TYPE_NOT_IMPLEMENTED_*`.
+- Regressões obrigatórias do loop PR14/PR18/PR19/PR20/PR21 executadas e preservadas.
+
+### O que existe após PR86
+
+- Prova objetiva do ponto de quebra entre planejamento e execução do loop interno de deploy.
+- Mapeamento vivo de `advance-phase`, `loop-status`, `execution_id`, `contract_id`, `AUDIT`, `PROPOSE` e `SIMULATE`.
+- Recomendação cirúrgica para PR87 sem alterar contratos/fases paralelas.
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `contract-executor.js`
+- `executor/src/index.js`
+- `.github/workflows/deploy.yml`
+- painel/chat/secrets/deploy
+
+### Próxima etapa segura
+
+Executar PR87 com patch mínimo de costura planner↔runner no executor, sem abrir novo escopo (somente gap do orchestrator interno).
+
+---
+
+## Handoff anterior (PR85)
 
 ### O que foi feito
 
