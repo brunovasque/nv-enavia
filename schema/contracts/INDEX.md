@@ -7,15 +7,16 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — PR99 concluída ✅ — PR100 concluída ✅ — Próxima: PR101.
+⬜ **Sem contrato ativo** — aguardando próximo contrato/fase formal.
 
-Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Encerrado ✅ em 2026-05-04 após PR97 — Prova Final.
+Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — Encerrado ✅ em 2026-05-04 após PR101 — Prova Final (90/90 cenários).
 
 ---
 ## Contratos encerrados
 
 | Arquivo | PRs | Estado | Data de encerramento |
 |---------|-----|--------|----------------------|
+| `active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` | PR98–PR101 | Encerrado ✅ | 2026-05-04 |
 | `active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` | PR94–PR97 | Encerrado ✅ | 2026-05-04 |
 | `active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` | PR90–PR93 | Encerrado ✅ | 2026-05-04 |
 | `active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` | PR82–PR85 | Encerrado ✅ | 2026-05-03 |
@@ -42,9 +43,11 @@ Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERAC
 
 ---
 
-## Próxima PR autorizada
+## Próxima frente recomendada
 
-**PR101 — Prova Final** (PR100 concluída ✅ — PR101 autorizada)
+**GitHub Bridge Real** — aguardando novo contrato formal.
+
+> ✅ PR101 concluída — Prova Final de Observabilidade + Autoproteção (2026-05-04, PR-PROVA; 90/90 cenários provados; contrato PR98–PR101 encerrado; relatório `schema/reports/PR101_OBSERVABILIDADE_AUTOPROTECAO_FINAL.md`; nenhum runtime alterado).
 
 > ✅ PR100 concluída — Safety Guard / Anti-autodestruição (2026-05-04, PR-IMPL; schema/helper puro; sem runtime; `schema/enavia-safety-guard.js` e `schema/enavia-anti-loop.js` criados; 70/70 cenários passando; relatório `schema/reports/PR100_SAFETY_GUARD_ANTI_AUTODESTRUICAO.md`).
 

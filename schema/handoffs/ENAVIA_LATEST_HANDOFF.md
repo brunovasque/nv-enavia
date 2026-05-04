@@ -1,10 +1,53 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR100 — Safety Guard / Anti-autodestruição ✅ CONCLUÍDA
-**Para:** PR101 — Prova Final
+**De:** PR101 — Prova Final de Observabilidade + Autoproteção ✅ CONCLUÍDA
+**Para:** GitHub Bridge Real (aguardando novo contrato formal)
 
-## Handoff atual (PR100 ✅ CONCLUÍDA)
+## Handoff atual (PR101 ✅ CONCLUÍDA — Contrato PR98–PR101 ENCERRADO)
+
+### O que foi feito
+
+- PR-PROVA — Prova Final de Observabilidade + Autoproteção.
+- `tests/pr101-observabilidade-autoprotecao-final.prova.test.js` criado: 90 cenários (A–G) — 90/90 ✅.
+- `schema/reports/PR101_OBSERVABILIDADE_AUTOPROTECAO_FINAL.md` criado.
+- `schema/contracts/INDEX.md` atualizado: contrato PR98–PR101 encerrado ✅ — sem contrato ativo.
+- `schema/contracts/ACTIVE_CONTRACT.md` atualizado: aguardando próximo contrato formal.
+- `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` encerrado: PR98/PR99/PR100/PR101 DONE.
+- Governança mínima atualizada (status, handoff, execution log).
+
+### O que foi provado (PR101)
+
+- **Event Log** (10 cenários): createEnaviaEvent, determinismo de event_id, normalização de severidade/status/subsystem, imutabilidade de appendEnaviaEvent, normalizeEnaviaEvents, filterEnaviaEvents, buildEventLogSnapshot (by_severity/by_status/by_subsystem/latest_event/rollback_hints/contagens).
+- **Health Snapshot** (18 cenários): mode, 9 subsistemas obrigatórios, github_bridge como future/unknown, estado controlado sem eventos, elevação de risco por eventos críticos/failed, requires_human_review, rollback_hints, evidence, next_recommended_action.
+- **Safety Guard** (18 cenários): allow para read/plan/propose em escopo saudável, bloqueio de secret_change, review para deploy_prod/merge/external_integration, bloqueio por health failed, review por event log blocked, gates humanos, blast_radius production/external, buildSafetyReport, isSafeToExecute.
+- **Anti-loop** (7 cenários): clear para eventos normais, detecção de falhas consecutivas, padrão rollback→apply, retries excessivos, getLoopSafetyStatus, shouldPauseForLoopSafety, buildLoopEvidence.
+- **Preservação de runtime** (13 cenários): todos os helpers de frentes anteriores existem; runtime não alterado; helpers PR99/PR100 são puros (sem fetch/child_process/fs).
+- **Regressões** (14 cenários): PR100/99/98/97/96/95/94/93/92/91/90/89/84/59 confirmados passando.
+- **Governança** (10 cenários): relatório, ACTIVE_CONTRACT, INDEX, encerramento do contrato.
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- `panel/**`
+- Todos os helpers de frentes anteriores (PR Orchestrator, Chat Livre, Deploy Loop, Skill Factory, SELF_WORKER_AUDITOR, Gates, Security Supervisor, Autonomy Contract)
+
+### Próxima etapa segura
+
+**GitHub Bridge Real** — implementar `schema/enavia-github-bridge.js` helper puro com:
+- operações read/comment/propose em PRs do GitHub
+- Safety Guard plugado antes de cada operação
+- Event Log gerado por operação
+- Sem deploy automático, sem merge real sem gate humano
+- Novo contrato formal obrigatório antes de iniciar
+
+**BLOQUEIO:** Não iniciar sem contrato formal ativado.
+
+
 
 ### O que foi feito
 

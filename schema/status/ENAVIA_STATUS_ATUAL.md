@@ -1,12 +1,25 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR100 — Safety Guard / Anti-autodestruição ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr100-safety-guard-anti-autodestrucao`
-**Última tarefa:** PR100 — Safety Guard / Anti-autodestruição ✅
+**Data:** 2026-05-04 (atualizado após PR101 — Prova Final de Observabilidade + Autoproteção ✅ CONCLUÍDA)
+**Branch ativa:** `copilot/pr101-final-tests-report-governance`
+**Última tarefa:** PR101 — Prova Final de Observabilidade + Autoproteção ✅
 
 ## Estado atual do sistema
 
-## Atualização PR100
+## Atualização PR101
+
+- PR-PROVA — Prova Final de Observabilidade + Autoproteção.
+- `tests/pr101-observabilidade-autoprotecao-final.prova.test.js` criado: 90/90 cenários passando ✅.
+- `schema/reports/PR101_OBSERVABILIDADE_AUTOPROTECAO_FINAL.md` criado.
+- `schema/contracts/INDEX.md` atualizado: contrato PR98–PR101 encerrado ✅ — sem contrato ativo.
+- `schema/contracts/ACTIVE_CONTRACT.md` atualizado: aguardando próximo contrato formal.
+- `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` encerrado: PR98/PR99/PR100/PR101 DONE.
+- Nenhum runtime alterado (nv-enavia.js, executor/src/index.js, contract-executor.js, deploy.yml, wrangler.toml, panel/** intocados).
+- Safety Guard e Anti-loop **não plugados** no runtime — helpers puros comprovados apenas.
+- **PR101 concluída ✅ — Contrato PR98–PR101 encerrado. Observabilidade + Autoproteção provadas.**
+- Próxima etapa: **GitHub Bridge Real** (aguardando novo contrato formal).
+
+
 
 - PR-IMPL — schema/helper puro — Safety Guard / Anti-autodestruição.
 - `schema/enavia-safety-guard.js` criado: 5 funções puras (evaluateSafetyGuard, isSafeToExecute, buildSafetyReport, classifyActionRisk, buildRequiredHumanGates).

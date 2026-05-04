@@ -1,11 +1,11 @@
 # CONTRATO ENAVIA — OBSERVABILIDADE + AUTOPROTEÇÃO PR98–PR101
 
 **Data de criação:** 2026-05-04  
-**Estado:** 🟢 Ativo  
+**Estado:** 🔴 Encerrado ✅ em 2026-05-04  
 **PR98:** ✅ Concluída (2026-05-04)  
 **PR99:** ✅ Concluída (2026-05-04)  
 **PR100:** ✅ Concluída (2026-05-04)  
-**Próxima:** PR101 — Prova Final  
+**PR101:** ✅ Concluída (2026-05-04) — Prova Final — 90/90 cenários  
 **Contrato anterior encerrado:** `CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` — Encerrado ✅ em 2026-05-04
 
 ---
@@ -175,10 +175,10 @@ O contrato PR98–PR101 está encerrado quando:
 | PR | Tipo | Estado |
 |----|------|--------|
 | PR98 | PR-DIAG | ✅ Concluída |
-| PR99 | PR-IMPL | 🟡 Próxima autorizada |
-| PR100 | PR-IMPL | ⬜ Aguardando PR99 |
-| PR101 | PR-PROVA | ⬜ Aguardando PR100 |
+| PR99 | PR-IMPL | ✅ Concluída |
+| PR100 | PR-IMPL | ✅ Concluída |
+| PR101 | PR-PROVA | ✅ Concluída — 90/90 cenários |
 
 ---
 
-_Contrato criado em 2026-05-04 | Próxima PR autorizada: PR99 após conclusão de PR98_
+_Contrato criado em 2026-05-04 | Encerrado em 2026-05-04 após PR101 — Prova Final_
