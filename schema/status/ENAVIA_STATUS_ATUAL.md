@@ -1,12 +1,25 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR99 — Event Log + Health Snapshot Unificado ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr99-event-log-health-snapshot-unificado`
-**Última tarefa:** PR99 — Event Log + Health Snapshot Unificado ✅
+**Data:** 2026-05-04 (atualizado após PR100 — Safety Guard / Anti-autodestruição ✅ CONCLUÍDA)
+**Branch ativa:** `copilot/pr100-safety-guard-anti-autodestrucao`
+**Última tarefa:** PR100 — Safety Guard / Anti-autodestruição ✅
 
 ## Estado atual do sistema
 
-## Atualização PR99
+## Atualização PR100
+
+- PR-IMPL — schema/helper puro — Safety Guard / Anti-autodestruição.
+- `schema/enavia-safety-guard.js` criado: 5 funções puras (evaluateSafetyGuard, isSafeToExecute, buildSafetyReport, classifyActionRisk, buildRequiredHumanGates).
+- `schema/enavia-anti-loop.js` criado: 4 funções puras (detectDestructiveLoop, getLoopSafetyStatus, buildLoopEvidence, shouldPauseForLoopSafety).
+- `tests/pr100-safety-guard-antiautodestruction.prova.test.js` criado: 70/70 cenários passando ✅.
+- `schema/reports/PR100_SAFETY_GUARD_ANTI_AUTODESTRUICAO.md` criado.
+- `schema/contracts/INDEX.md` atualizado: PR100 concluída ✅ — PR101 autorizada.
+- `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` atualizado: PR100 ✅ — Próxima: PR101.
+- Nenhum runtime alterado (nv-enavia.js, executor/src/index.js, contract-executor.js, deploy.yml, wrangler.toml, panel/** intocados).
+- Safety Guard **não plugado** no runtime — helper puro apenas.
+- **PR100 concluída ✅ — Safety Guard + Anti-loop entregues.**
+- Próxima etapa: **PR101 — Prova Final**.
+
 
 - PR-IMPL — schema/helper puro — Event Log + Health Snapshot Unificado.
 - `schema/enavia-event-log.js` criado: 5 funções puras (createEnaviaEvent, appendEnaviaEvent, normalizeEnaviaEvents, filterEnaviaEvents, buildEventLogSnapshot).
