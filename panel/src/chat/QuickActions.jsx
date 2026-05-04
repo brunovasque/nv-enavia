@@ -10,6 +10,7 @@
 // ============================================================================
 
 export default function QuickActions({
+  onCasual,
   onValidate,
   onGeneratePlan,
   onApprove,
@@ -20,6 +21,14 @@ export default function QuickActions({
   pendingPlan,
 }) {
   const actions = [
+    {
+      id:      "casual",
+      icon:    "💬",
+      label:   "Conversa casual",
+      onClick: onCasual,
+      title:   "Prefill de mensagem neutra para conversa natural",
+      disabled: typeof onCasual !== "function",
+    },
     {
       id:      "validate",
       icon:    "🔍",

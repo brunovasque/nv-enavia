@@ -4,12 +4,13 @@ Contrato ativo atual:
 
 - 🟢 **`schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`**
 - **Frente:** Chat Livre + Cockpit Operacional (PR94–PR97)
-- **PR ativa:** PR95 — Chat Livre Seguro
+- **PR ativa:** PR96 — Cockpit Passivo
 - **Tipo:** PR-IMPL
 
 Status:
 
-- 🟢 Contrato ativo — PR94 concluída ✅ — próxima PR autorizada: **PR95 — Chat Livre Seguro**.
+- 🟢 Contrato ativo — PR95 concluída ✅ — próxima PR autorizada: **PR96 — Cockpit Passivo**.
+- ✅ PR96 implementada neste branch (`codex/pr96-cockpit-passivo-chat-readable`) — próxima etapa do contrato: **PR97 — Prova Final**.
 
 Último contrato encerrado:
 
@@ -22,6 +23,8 @@ O histórico completo permanece em `schema/contracts/INDEX.md`.
 
 Histórico imediato concluído:
 
+- PR96 concluída ✅ (cockpit passivo + chat legível no painel — 2026-05-04).
+- PR95 concluída ✅ (chat livre seguro — runtime/policy — 2026-05-04).
 - PR94 concluída ✅ (diagnóstico read-only — chat livre + cockpit — 2026-05-04).
 - PR90–PR93 concluídas (diagnóstico + PR Planner + PR Executor Supervisionado + Readiness ready_for_merge/deploy_test_ready).
 - `schema/contracts/active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` concluído na PR85.

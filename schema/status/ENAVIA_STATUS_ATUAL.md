@@ -1,11 +1,24 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR95 — Chat Livre Seguro ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr-95-chat-livre-seguro`
-**Última tarefa:** PR95 — Chat Livre Seguro ✅
+**Data:** 2026-05-04 (atualizado após PR96 — Cockpit Passivo + Chat Legível ✅ CONCLUÍDA)
+**Branch ativa:** `codex/pr96-cockpit-passivo-chat-readable`
+**Última tarefa:** PR96 — Cockpit Passivo + Chat Legível ✅
 
 ## Estado atual do sistema
 
+## Atualização PR96
+
+- 5 mudanças cirúrgicas no painel/chat UI (sem runtime cognitivo):
+  - `panel/src/chat/MessageBubble.jsx`: renderização por blocos (parágrafos + listas simples + markdown leve seguro) para evitar blocão.
+  - `panel/src/chat/useChatState.js`: helper local `shouldSendPlannerBrief()` e envio condicional de `planner_brief`.
+  - `panel/src/chat/TargetPanel.jsx`: copy de segurança suavizada + cockpit passivo com metadata visual.
+  - `panel/src/chat/QuickActions.jsx`: opção neutra `Conversa casual` mantendo ações operacionais.
+  - `panel/src/pages/ChatPage.jsx`: metadata passiva (intenção/modo/risco/próxima ação/aprovação) ligada ao painel.
+- Teste criado: `tests/pr96-cockpit-passivo-chat-readable.smoke.test.js`.
+- Relatório criado: `schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md`.
+- Guardrails preservados: aprovação humana, bloqueios de write/patch/deploy no painel, sem alteração em runtime worker/executor.
+- **PR96 concluída ✅ — painel mais passivo e chat mais legível.**
+- Próxima etapa: **PR97 — Prova Final**.
 ## Atualização PR95
 
 - 4 mudanças cirúrgicas na camada de chat runtime/policy:
@@ -543,6 +556,7 @@ Contrato `CONTRATO_ENAVIA_JARVIS_BRAIN_PR31_PR60.md` ativo. PR31 (DOCS) e PR32 (
 
 ## Bloqueios
 - nenhum
+
 
 
 

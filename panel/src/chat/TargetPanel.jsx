@@ -24,7 +24,7 @@ const FIELD_LABELS = {
   mode:        "Modo",
 };
 
-export default function TargetPanel({ target, onUpdate, onReset }) {
+export default function TargetPanel({ target, onUpdate, onReset, cockpit }) {
   const [expanded, setExpanded] = useState(false);
   const inputRefs = useRef({});
 
@@ -37,6 +37,12 @@ export default function TargetPanel({ target, onUpdate, onReset }) {
     target.worker === DEFAULT_TARGET_WORKER &&
     target.branch === DEFAULT_TARGET_BRANCH &&
     target.environment === DEFAULT_TARGET_ENV;
+  const cockpitIntent = cockpit?.suggestedIntent || "—";
+  const cockpitMode = cockpit?.suggestedMode || "—";
+  const cockpitRisk = cockpit?.risk || "—";
+  const cockpitNextAction = cockpit?.nextAction || "—";
+  const cockpitApproval =
+    cockpit?.approvalRequired === true ? "Sim" : cockpit?.approvalRequired === false ? "Não" : "—";
 
   return (
     <div style={styles.wrap}>
@@ -51,11 +57,22 @@ export default function TargetPanel({ target, onUpdate, onReset }) {
         <span style={styles.headerValue}>
           {target.worker}/{target.branch}
           <span style={{ ...styles.modeBadge, ...(target.mode === "read_only" ? styles.modeReadOnly : styles.modeWrite) }}>
-            {target.mode === "read_only" ? "read-only" : target.mode}
+            {target.mode === "read_only" ? "Seguro" : target.mode}
           </span>
         </span>
         <span style={styles.chevron}>{expanded ? "▲" : "▼"}</span>
       </button>
+
+      <div style={styles.cockpitWrap}>
+        <p style={styles.cockpitTitle}>Cockpit passivo</p>
+        <div style={styles.cockpitGrid}>
+          <div style={styles.cockpitItem}><span style={styles.cockpitLabel}>Intenção</span><span style={styles.cockpitValue}>{cockpitIntent}</span></div>
+          <div style={styles.cockpitItem}><span style={styles.cockpitLabel}>Modo</span><span style={styles.cockpitValue}>{cockpitMode}</span></div>
+          <div style={styles.cockpitItem}><span style={styles.cockpitLabel}>Risco</span><span style={styles.cockpitValue}>{cockpitRisk}</span></div>
+          <div style={styles.cockpitItem}><span style={styles.cockpitLabel}>Próxima ação</span><span style={styles.cockpitValue}>{cockpitNextAction}</span></div>
+          <div style={styles.cockpitItem}><span style={styles.cockpitLabel}>Aprovação necessária</span><span style={styles.cockpitValue}>{cockpitApproval}</span></div>
+        </div>
+      </div>
 
       {expanded && (
         <div style={styles.fields}>
@@ -64,7 +81,7 @@ export default function TargetPanel({ target, onUpdate, onReset }) {
               <label style={styles.fieldLabel}>{label}</label>
               {field === "mode" ? (
                 <span style={styles.modeReadOnlyTag} title="Modo write/patch/deploy bloqueado nesta fase">
-                  read_only (fixo)
+                  Seguro · Protegido · Execução exige aprovação
                 </span>
               ) : (
                 <input
@@ -156,12 +173,46 @@ const styles = {
     color: "var(--text-muted)",
     flexShrink: 0,
   },
+  cockpitWrap: {
+    padding: "0 10px 8px",
+    borderTop: "1px solid var(--border)",
+  },
+  cockpitTitle: {
+    margin: "6px 0 4px",
+    fontSize: "10px",
+    letterSpacing: "0.6px",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    fontWeight: 700,
+  },
+  cockpitGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "4px 8px",
+  },
+  cockpitItem: {
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+  },
+  cockpitLabel: {
+    fontSize: "10px",
+    color: "var(--text-muted)",
+    lineHeight: 1.2,
+  },
+  cockpitValue: {
+    fontSize: "11px",
+    color: "var(--text-secondary)",
+    lineHeight: 1.25,
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    overflow: "hidden",
+  },
   fields: {
     padding: "0 10px 8px",
     display: "flex",
     flexDirection: "column",
     gap: "4px",
-    borderTop: "1px solid var(--border)",
   },
   fieldRow: {
     display: "flex",
@@ -191,6 +242,7 @@ const styles = {
     fontSize: "11px",
     color: "#10B981",
     fontStyle: "italic",
+    lineHeight: 1.35,
   },
   resetBtn: {
     alignSelf: "flex-end",

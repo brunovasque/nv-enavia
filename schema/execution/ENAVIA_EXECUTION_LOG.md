@@ -1,6 +1,43 @@
 # ENAVIA — Execution Log
 
-Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
+
+## 2026-05-04 — PR96 — PR-IMPL — Cockpit Passivo + Chat Legível
+
+- **Branch:** `codex/pr96-cockpit-passivo-chat-readable`
+- **Tipo:** PR-IMPL (Panel-only)
+- **Contrato:** `CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` (Ativo 🟢)
+- **PR anterior validada:** PR95 ✅
+
+### Objetivo
+
+Implementar cockpit passivo no painel e melhorar legibilidade do chat sem alterar runtime cognitivo e sem controlar o tom da IA.
+
+### Implementação (5 mudanças cirúrgicas)
+
+**Arquivos alterados (painel/chat UI):**
+- `panel/src/chat/MessageBubble.jsx` — renderização por blocos (parágrafos/listas/markdown leve seguro)
+- `panel/src/chat/useChatState.js` — helper `shouldSendPlannerBrief()` e envio condicional de `planner_brief`
+- `panel/src/chat/TargetPanel.jsx` — copy de segurança suavizada + cockpit passivo visual
+- `panel/src/chat/QuickActions.jsx` — ação neutra `Conversa casual`
+- `panel/src/pages/ChatPage.jsx` — metadata passiva ligada ao TargetPanel
+
+**Arquivos de teste/docs/governança:**
+- `tests/pr96-cockpit-passivo-chat-readable.smoke.test.js`
+- `schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md`
+- `schema/contracts/ACTIVE_CONTRACT.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `tests/pr95-chat-livre-seguro.smoke.test.js` (ajuste para permitir mudança de painel autorizada em PR96+)
+
+### Resultado
+
+- Cockpit passivo exibindo intenção/modo/risco/próxima ação/aprovação.
+- Conversa casual curta deixa de enviar `planner_brief`.
+- Legibilidade do chat melhorada sem alterar conteúdo de backend.
+- Guardrails preservados: read_only, aprovação humana e bloqueios de execução sensível.
+- Próxima PR autorizada: **PR97 — Prova Final**.
 
 ---
 
@@ -5555,6 +5592,7 @@ Nenhum. Diagnóstico completo. PR18 pode iniciar.
 - **Garantias:** Read-only. Não altera reply. Não bloqueia fluxo automaticamente. Não cria endpoint. Não escreve memória. Não chama LLM externo. Não usa KV/rede/filesystem. Falha com segurança.
 - **Escopo preservado:** `enavia-cognitive-runtime.js`, `enavia-llm-core.js`, `enavia-brain-loader.js`, `enavia-intent-classifier.js`, `enavia-skill-router.js`, `enavia-intent-retrieval.js`, Panel, Executor, Deploy Worker, workflows, wrangler.toml — todos intactos.
 - **Próxima etapa segura:** PR57 — PR-PROVA — Teste do Self-Audit read-only.
+
 
 
 

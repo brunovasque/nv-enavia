@@ -83,7 +83,7 @@ Ajustar Response Policy / LLM Core / Brain Loader, se necessário, para conversa
 ### PR96 — Cockpit Passivo
 
 **Tipo:** PR-IMPL  
-**Estado:** 🟢 AUTORIZADA — próxima PR  
+**Estado:** ✅ DONE — 2026-05-04  
 
 **Objetivo:**  
 Ajustar painel para exibir intenção, modo sugerido, risco, próxima ação e approval gates sem controlar o tom da conversa.
@@ -102,7 +102,7 @@ Ajustar painel para exibir intenção, modo sugerido, risco, próxima ação e a
 ### PR97 — Prova Final
 
 **Tipo:** PR-PROVA  
-**Estado:** ⏳ Aguardando PR95 + PR96  
+**Estado:** 🟢 AUTORIZADA — próxima PR  
 
 **Objetivo:**  
 Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloqueios de segurança.
@@ -142,7 +142,7 @@ Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloq
 
 ## Próxima PR autorizada
 
-**PR96** — Cockpit Passivo (PR-IMPL). PR95 concluída ✅.
+**PR97** — Prova Final (PR-PROVA). PR95 e PR96 concluídas ✅.
 
 ---
 
@@ -152,5 +152,5 @@ Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloq
 |----|------|--------|------|------------|
 | PR94 | PR-DIAG | ✅ DONE | 2026-05-04 | Diagnóstico read-only do chat livre + cockpit |
 | PR95 | PR-IMPL | ✅ DONE | 2026-05-04 | Chat livre seguro — 4 mudanças cirúrgicas |
-| PR96 | PR-IMPL | 🟢 AUTORIZADA | — | Cockpit passivo |
-| PR97 | PR-PROVA | ⏳ PENDING | — | Prova final |
+| PR96 | PR-IMPL | ✅ DONE | 2026-05-04 | Cockpit passivo + chat legível (painel) |
+| PR97 | PR-PROVA | 🟢 AUTORIZADA | — | Prova final |

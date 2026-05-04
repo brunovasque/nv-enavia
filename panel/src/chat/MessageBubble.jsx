@@ -5,6 +5,105 @@ function formatTime(date) {
   });
 }
 
+function parseInlineMarkdown(text) {
+  const value = typeof text === "string" ? text : "";
+  const parts = value.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={`md-${idx}`} style={styles.inlineCode}>
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={`md-${idx}`}>
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return <span key={`md-${idx}`}>{part}</span>;
+  });
+}
+
+export function parseReadableBlocks(content) {
+  const text = typeof content === "string" ? content.replace(/\r\n/g, "\n") : "";
+  const lines = text.split("\n");
+  const blocks = [];
+  let paragraph = [];
+  let list = null;
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    blocks.push({ type: "paragraph", text: paragraph.join("\n") });
+    paragraph = [];
+  };
+
+  const flushList = () => {
+    if (!list || list.items.length === 0) return;
+    blocks.push(list);
+    list = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine ?? "";
+    const trimmed = line.trim();
+    const bullet = line.match(/^\s*([-*]|\d+[.)])\s+(.+)$/);
+    if (trimmed.length === 0) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+    if (bullet) {
+      flushParagraph();
+      const ordered = /^\d/.test(bullet[1]);
+      if (!list || list.type !== "list" || list.ordered !== ordered) {
+        flushList();
+        list = { type: "list", ordered, items: [] };
+      }
+      list.items.push(bullet[2]);
+      continue;
+    }
+    flushList();
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks.length > 0 ? blocks : [{ type: "paragraph", text }];
+}
+
+function renderReadableContent(content) {
+  const blocks = parseReadableBlocks(content);
+  return blocks.map((block, idx) => {
+    if (block.type === "list") {
+      const ListTag = block.ordered ? "ol" : "ul";
+      return (
+        <ListTag key={`block-${idx}`} style={block.ordered ? styles.orderedList : styles.unorderedList}>
+          {block.items.map((item, itemIdx) => (
+            <li key={`item-${idx}-${itemIdx}`} style={styles.listItem}>
+              {parseInlineMarkdown(item)}
+            </li>
+          ))}
+        </ListTag>
+      );
+    }
+
+    const rows = block.text.split("\n");
+    return (
+      <p key={`block-${idx}`} style={styles.bubbleText}>
+        {rows.map((row, rowIdx) => (
+          <span key={`row-${idx}-${rowIdx}`}>
+            {parseInlineMarkdown(row)}
+            {rowIdx < rows.length - 1 ? <br /> : null}
+          </span>
+        ))}
+      </p>
+    );
+  });
+}
+
 export default function MessageBubble({ message }) {
   const { role, content, timestamp } = message;
 
@@ -22,7 +121,7 @@ export default function MessageBubble({ message }) {
     return (
       <div style={styles.userWrap}>
         <div style={styles.userBubble}>
-          <p style={styles.bubbleText}>{content}</p>
+          {renderReadableContent(content)}
           <span style={styles.timestamp}>{formatTime(timestamp)}</span>
         </div>
       </div>
@@ -39,7 +138,7 @@ export default function MessageBubble({ message }) {
         ◆
       </div>
       <div style={styles.enaBubble}>
-        <p style={styles.bubbleText}>{content}</p>
+        {renderReadableContent(content)}
         {hasBadges && (
           <div style={styles.badgesWrap}>
             {message.targetSeen === true && (
@@ -134,6 +233,30 @@ const styles = {
     color: "var(--text-primary)",
     lineHeight: 1.6,
     whiteSpace: "pre-wrap",
+    margin: 0,
+    marginBottom: "10px",
+  },
+  unorderedList: {
+    margin: "0 0 10px 18px",
+    padding: 0,
+  },
+  orderedList: {
+    margin: "0 0 10px 22px",
+    padding: 0,
+  },
+  listItem: {
+    fontSize: "14px",
+    color: "var(--text-primary)",
+    lineHeight: 1.6,
+    marginBottom: "4px",
+  },
+  inlineCode: {
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+    fontSize: "12px",
+    background: "var(--bg-sidebar)",
+    border: "1px solid var(--border-light)",
+    borderRadius: "4px",
+    padding: "1px 4px",
   },
   memoryBadge: {
     display: "inline-block",

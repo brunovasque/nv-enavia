@@ -14,6 +14,46 @@ const _CHAT_BRIEF_MIN_CONTENT_LEN = 20;
 // P-BRIEF: content prefixes that identify metadata chat bubbles (planner/approval triggers)
 // rather than user intent messages — excluded from operator_intent derivation.
 const _CHAT_BRIEF_METADATA_PREFIXES = ["📋", "✅"];
+const _CHAT_CASUAL_SHORT_RX = /^(oi|ol[aá]|opa|bom dia|boa tarde|boa noite|tudo bem|blz|beleza|ok|vlw|valeu|obrigad[oa]|obg|show|rs|kkk|haha)[.!? ]*$/i;
+const _CHAT_BRIEF_OPERATIONAL_TERMS = [
+  /\bpr\s*#?\d+\b/i,
+  /\b(pull request|commit|branch|merge|rebase|cherry-pick)\b/i,
+  /\b(deploy|rollback|promover|release)\b/i,
+  /\b(patch|hotfix|corrigir no c[oó]digo)\b/i,
+  /\b(execut(ar|e)|execu[cç][aã]o|rodar|aplicar)\b/i,
+  /\b(plano|planner|aprovar execu[cç][aã]o)\b/i,
+  /\b(skill|contract|contrato)\b/i,
+];
+const _CHAT_BRIEF_TECHNICAL_TERMS = /\b(diagn[oó]stico|erro|bug|falha|stack|trace|runtime|endpoint|api|schema|arquivo|linha|teste|log|exception|undefined|null)\b/i;
+
+export function shouldSendPlannerBrief(message, recentMessages = []) {
+  const text = typeof message === "string" ? message.trim() : "";
+  if (!text) return false;
+
+  if (_CHAT_CASUAL_SHORT_RX.test(text)) return false;
+
+  const hasOperationalSignal = _CHAT_BRIEF_OPERATIONAL_TERMS.some((rx) => rx.test(text));
+  if (hasOperationalSignal) return true;
+
+  if (text.length < _CHAT_BRIEF_MIN_CONTENT_LEN && !_CHAT_BRIEF_TECHNICAL_TERMS.test(text)) {
+    return false;
+  }
+
+  if (_CHAT_BRIEF_TECHNICAL_TERMS.test(text)) {
+    return true;
+  }
+
+  const recentUserMessages = Array.isArray(recentMessages)
+    ? recentMessages
+        .filter((m) => m?.role === "user" && typeof m?.content === "string")
+        .slice(-3)
+        .map((m) => m.content.trim())
+    : [];
+
+  return recentUserMessages.some((msg) =>
+    _CHAT_BRIEF_OPERATIONAL_TERMS.some((rx) => rx.test(msg)) || _CHAT_BRIEF_TECHNICAL_TERMS.test(msg),
+  );
+}
 
 // Seed conversation for validating the "conversation" state without typing from scratch.
 const SEED_MESSAGES = [
@@ -187,27 +227,30 @@ export function useChatState() {
       // operator_intent instead of falling back to the trigger message.
       // Uses recent substantive user messages (>_CHAT_BRIEF_MIN_CONTENT_LEN chars,
       // no metadata prefixes) to derive the operator's real intent.
-      const _chatIntentMsgs = messages
-        .filter(
-          (m) =>
-            m.role === "user" &&
-            typeof m.content === "string" &&
-            m.content.trim().length > _CHAT_BRIEF_MIN_CONTENT_LEN &&
-            !_CHAT_BRIEF_METADATA_PREFIXES.some((p) => m.content.startsWith(p)),
-        )
-        .slice(-4)
-        .map((m) => m.content.trim());
+      const _shouldSendPlannerBrief = shouldSendPlannerBrief(trimmed, messages);
+      const _chatIntentMsgs = _shouldSendPlannerBrief
+        ? messages
+            .filter(
+              (m) =>
+                m.role === "user" &&
+                typeof m.content === "string" &&
+                m.content.trim().length > _CHAT_BRIEF_MIN_CONTENT_LEN &&
+                !_CHAT_BRIEF_METADATA_PREFIXES.some((p) => m.content.startsWith(p)),
+            )
+            .slice(-4)
+            .map((m) => m.content.trim())
+        : [];
       const _chatOperatorIntent = _chatIntentMsgs.join(" | ");
-      const chatContext =
-        context && typeof context === "object"
-          ? {
-              ...context,
-              planner_brief: {
-                trigger_message: trimmed,
-                operator_intent: _chatOperatorIntent.length > 0 ? _chatOperatorIntent : trimmed,
-              },
-            }
-          : context;
+      let chatContext = context;
+      if (context && typeof context === "object" && _shouldSendPlannerBrief) {
+        chatContext = {
+          ...context,
+          planner_brief: {
+            trigger_message: trimmed,
+            operator_intent: _chatOperatorIntent.length > 0 ? _chatOperatorIntent : trimmed,
+          },
+        };
+      }
 
       const userMsg = makeMsg("user", trimmed);
       setMessages((prev) => [...prev, userMsg]);

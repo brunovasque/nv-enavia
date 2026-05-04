@@ -1,8 +1,39 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR95 — Chat Livre Seguro ✅ CONCLUÍDA
-**Para:** PR96 — Cockpit Passivo
+**De:** PR96 — Cockpit Passivo + Chat Legível ✅ CONCLUÍDA
+**Para:** PR97 — Prova Final
+
+## Handoff atual (PR96 ✅ CONCLUÍDA → PR97)
+
+### O que foi feito
+
+- Painel ajustado para cockpit passivo sem controlar tom da IA.
+- `MessageBubble.jsx` agora renderiza respostas em blocos legíveis (parágrafos/listas) sem `dangerouslySetInnerHTML`.
+- `useChatState.js` envia `planner_brief` apenas quando há intenção operacional/técnica real (`shouldSendPlannerBrief`).
+- `TargetPanel.jsx` suaviza visual de read-only e explicita `Execução exige aprovação`.
+- `TargetPanel` exibe metadata passiva: intenção sugerida, modo sugerido, risco, próxima ação e aprovação necessária.
+- `QuickActions.jsx` adiciona ação neutra `Conversa casual` mantendo botões operacionais.
+- Teste PR96 criado: `tests/pr96-cockpit-passivo-chat-readable.smoke.test.js`.
+- Relatório PR96 criado: `schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md`.
+
+### O que NÃO foi alterado
+
+- `schema/enavia-response-policy.js`
+- `schema/enavia-llm-core.js`
+- `schema/enavia-cognitive-runtime.js`
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+
+### Próxima PR: PR97 — Prova Final
+
+- Rodar prova integrada final do contrato PR94–PR97.
+- Validar conversa casual, diagnóstico técnico, fluxo operacional supervisionado e preservação de guardrails.
+
+---
 
 ## Handoff atual (PR95 ✅ CONCLUÍDA → PR96)
 
@@ -1136,6 +1167,7 @@ Diagnosticar se a frente "Atualização supervisionada de memória" ainda é nec
 | Brain documental | `schema/brain/` — 20+ arquivos | — |
 | Escrita supervisionada de memória | ❌ Não implementada no runtime — G3 on-hold | Não blocking |
 | Runtime de Skills | ❌ Não existe — aguarda PR64→PR65→PR66→PR67+ | Próxima frente |
+
 
 
 
