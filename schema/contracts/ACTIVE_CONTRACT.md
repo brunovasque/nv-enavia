@@ -1,14 +1,18 @@
 # ACTIVE CONTRACT — NV-ENAVIA
 
+Contrato ativo:
+
+- 🟢 **`schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 em execução.
+
 Contrato anterior encerrado:
 
 - 🔴 **`schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — **Encerrado ✅ em 2026-05-04** após PR97 — Prova Final.
 
 Status:
 
-- 🟡 **Aguardando próximo contrato/fase formal.**
-- Contrato PR94–PR97 encerrado ✅ após PR97 — Prova Final (2026-05-04).
-- Chat Livre + Cockpit Operacional: provado e encerrado.
+- 🟢 **Contrato OBSERVABILIDADE + AUTOPROTEÇÃO PR98–PR101 ativo.**
+- PR98 (PR-DIAG read-only) em execução — 2026-05-04.
+- Próxima PR autorizada após PR98: **PR99 — Event Log + Health Snapshot Unificado**.
 
 Contratos anteriores encerrados (referência histórica):
 

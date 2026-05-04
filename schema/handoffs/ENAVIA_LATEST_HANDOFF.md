@@ -1,10 +1,71 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR97 — Prova Final ✅ CONCLUÍDA — Contrato PR94–PR97 ENCERRADO
-**Para:** Aguardando próximo contrato/fase formal
+**De:** PR98 — Diagnóstico READ-ONLY Observabilidade + Autoproteção ✅ CONCLUÍDA
+**Para:** PR99 — Event Log + Health Snapshot Unificado
 
-## Handoff atual (PR97 ✅ CONCLUÍDA — Contrato encerrado)
+## Handoff atual (PR98 ✅ CONCLUÍDA)
+
+### O que foi feito
+
+- PR-DIAG read-only do contrato PR98–PR101: diagnóstico completo de observabilidade e autoproteção.
+- Novo contrato criado: `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`.
+- Relatório criado: `schema/reports/PR98_OBSERVABILIDADE_AUTOPROTECAO_DIAGNOSTICO.md`.
+- Teste de prova criado: `tests/pr98-observabilidade-autoprotecao-diagnostico.prova.test.js`.
+- `ACTIVE_CONTRACT.md` atualizado: aponta contrato PR98–PR101.
+- `INDEX.md` atualizado: contrato PR98–PR101 ativo, PR94–PR97 na tabela de encerrados.
+- Governança mínima atualizada (status, handoff, execution log).
+
+### O que foi diagnosticado
+
+#### O que existe (código real):
+- Logs: `logNV()` em nv-enavia.js (172 calls), não estruturado
+- Health: `GET /health` em nv-enavia.js e executor (separados, baseados em exec_event)
+- Execution Log: `task_execution_log` no contract-executor.js (KV-persisted por task)
+- Audit Log: `GET /audit-log` no executor
+- Self Audit: `runEnaviaSelfAudit()` — campo aditivo por request (10 categorias)
+- Security Supervisor: `evaluateSensitiveAction()` — ALLOW/BLOCK/NEEDS_HUMAN_REVIEW
+- PROHIBITED_ACTIONS (9) e REQUIRED_GATES (6) no autonomy-contract
+- Deploy loop: estados `rollback_ready` e `rolled_back`
+- Operational Awareness: `buildOperationalAwareness()` — snapshot browser/executor/mode
+
+#### O que está ausente (lacunas):
+- Event Log unificado (sem correlação cross-componente)
+- Health Snapshot consolidado (Worker + Executor + Chat + Skill + PR Orchestrator)
+- Rate limiting aplicacional
+- Loop guard / anti-autodestruição
+- Rollback hints para operações de chat
+- Custo/latência agregado
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- `panel/**`
+- Qualquer arquivo de runtime cognitivo
+
+### Próxima etapa: PR99
+
+**PR99 — Event Log + Health Snapshot Unificado**
+
+**5 mudanças máximas (schema/helper puro — Opção A):**
+1. `schema/enavia-event-log.js` — helper puro: appendEvent, getEvents, buildEventLogSnapshot
+2. `schema/enavia-health-snapshot.js` — helper puro: buildHealthSnapshot consolidando subsistemas
+3. `tests/pr99-event-log-health-snapshot.prova.test.js` — prova formal
+4. `schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md` — relatório
+5. Governança mínima (status, handoff, execution log, INDEX)
+
+**Restrições:**
+- Sem binding novo, sem endpoint novo
+- Sem alteração em nv-enavia.js, executor, contract-executor, painel
+- Schema/helper puro testável sem deploy
+
+---
+
+## Handoff anterior (PR97 ✅ CONCLUÍDA — Contrato encerrado)
 
 ### O que foi feito
 
