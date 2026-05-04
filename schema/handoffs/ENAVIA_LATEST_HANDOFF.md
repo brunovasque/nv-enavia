@@ -1,10 +1,35 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit ✅ CONCLUÍDA
-**Para:** PR95 — Chat Livre Seguro
+**De:** PR95 — Chat Livre Seguro ✅ CONCLUÍDA
+**Para:** PR96 — Cockpit Passivo
 
-## Handoff atual (PR94 ✅ CONCLUÍDA → PR95)
+## Handoff atual (PR95 ✅ CONCLUÍDA → PR96)
+
+### O que foi feito
+
+- 4 mudanças cirúrgicas na camada de chat runtime/policy (sem painel, sem nv-enavia.js).
+- `schema/enavia-response-policy.js`: `technical_diagnosis`, `system_state`, `memory_request`, `skill_request`, `contract_request` → CONVERSATIONAL em caso limpo.
+- `schema/enavia-llm-core.js`: TOM AO BLOQUEAR reduzido de 8 para 3 bullets. Strings obrigatórias PR84 preservadas.
+- `schema/enavia-cognitive-runtime.js` (2 mudanças): MODO OPERACIONAL ATIVO e nota `read_only` agora só aparecem em contexto operacional real.
+- Relatório criado: `schema/reports/PR95_CHAT_LIVRE_SEGURO.md`.
+- Smoke test criado: `tests/pr95-chat-livre-seguro.smoke.test.js` (51/51 ✅).
+- **PR95 concluída ✅ — Chat livre seguro entregue.**
+
+### Próxima PR: PR96 — Cockpit Passivo
+
+**5 mudanças cirúrgicas recomendadas:**
+1. `panel/src/chat/QuickActions.jsx`: adicionar opção/modo casual (botão neutro)
+2. `panel/src/chat/useChatState.js`: condicionar `planner_brief` — omitir em mensagens casuais
+3. `panel/src/chat/TargetPanel.jsx` (ou novo componente): exibir cockpit passivo com estado sugerido
+4. Exibir intenção detectada, modo sugerido, risco e próxima ação no painel
+5. Preservar gate de aprovação humana visível e badges de contexto
+
+**Restrições:**
+- Painel deve observar/sugerir/exibir — não controlar tom da IA
+- Nenhum runtime vivo deve ser alterado (nv-enavia.js, executor, contract-executor, deploy.yml, wrangler.toml)
+- Máximo 5 mudanças cirúrgicas
+- PR97 (Prova Final) deve ser executada após PR96
 
 ### O que foi feito
 

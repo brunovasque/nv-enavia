@@ -7,11 +7,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Ativo — PR95 é a próxima PR autorizada (2026-05-04)
+🟢 **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Ativo — PR96 é a próxima PR autorizada (2026-05-04)
 
 Frente: Chat Livre + Cockpit Operacional  
-PR concluída: PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit ✅  
-Próxima PR autorizada: **PR95 — Chat Livre Seguro** (PR-IMPL)
+PR concluída: PR95 — Chat Livre Seguro ✅  
+Próxima PR autorizada: **PR96 — Cockpit Passivo** (PR-IMPL)
 
 ---
 ## Contratos encerrados
@@ -45,7 +45,9 @@ Próxima PR autorizada: **PR95 — Chat Livre Seguro** (PR-IMPL)
 
 ## Próxima PR autorizada
 
-**PR95 — Chat Livre Seguro** (PENDING — aguardando merge da PR94)
+**PR96 — Cockpit Passivo** (aguardando merge da PR95)
+
+> ✅ PR95 concluída — Chat Livre Seguro (2026-05-04, escopo chat runtime/policy; 4 mudanças cirúrgicas em enavia-response-policy.js, enavia-llm-core.js, enavia-cognitive-runtime.js; relatório `schema/reports/PR95_CHAT_LIVRE_SEGURO.md`; 51/51 smoke tests passando).
 
 > ✅ PR94 concluída — Diagnóstico READ-ONLY do Chat Livre + Cockpit (2026-05-04, escopo Tests + Docs/governança mínima; sem runtime; relatório `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`; contrato `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` criado e ativado).
 

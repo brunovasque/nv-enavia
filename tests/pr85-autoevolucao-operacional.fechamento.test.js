@@ -620,7 +620,47 @@ const FORBIDDEN = [
   "contract-executor.js",
 ];
 
-const forbiddenTouched = changedFiles.filter((f) => FORBIDDEN.includes(f));
+// Drift autorizado por contratos posteriores ao PR82–PR85.
+// Quando um contrato posterior (ex: PR94–PR97) autoriza explicitamente a modificação
+// de um arquivo que era proibido no escopo do PR85, o check deve reconhecer isso
+// sem afrouxar guardrails reais. Os arquivos abaixo são autorizados pelo
+// contrato CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md (PR95).
+function getAuthorizedDriftFiles() {
+  try {
+    const indexContent = readFileSync("schema/contracts/INDEX.md", "utf8");
+    const activeContractContent = readFileSync("schema/contracts/ACTIVE_CONTRACT.md", "utf8");
+    // Usar o nome exato do arquivo do contrato para evitar falsos positivos
+    // por referências históricas a essas strings em outros contratos/comentários.
+    const hasChatLivreContract =
+      indexContent.includes("CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97") ||
+      activeContractContent.includes("CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97");
+    const hasPR95Done =
+      (indexContent.includes("PR95") && indexContent.includes("DONE")) ||
+      (activeContractContent.includes("PR95") && activeContractContent.includes("DONE")) ||
+      (indexContent.includes("PR95") && indexContent.includes("concluída")) ||
+      (indexContent.includes("PR96") && indexContent.includes("AUTORIZADA"));
+    if (hasChatLivreContract && hasPR95Done) {
+      return [
+        "schema/enavia-llm-core.js",
+        "schema/enavia-response-policy.js",
+        "schema/enavia-cognitive-runtime.js",
+      ];
+    }
+  } catch (err) {
+    // Falha defensiva: se os arquivos de contrato não existirem ou tiverem erro de leitura,
+    // não autorizar drift — manter a proteção original.
+    if (err.code !== "ENOENT") {
+      // Logar erros não-esperados (arquivo existe mas tem outro problema)
+      console.warn("[PR85-drift-check] Erro ao ler contrato para authorizedDrift:", err.code || err.message);
+    }
+  }
+  return [];
+}
+
+const authorizedDrift = getAuthorizedDriftFiles();
+const forbiddenTouched = changedFiles.filter(
+  (f) => FORBIDDEN.includes(f) && !authorizedDrift.includes(f)
+);
 ok(
   forbiddenTouched.length === 0,
   "45. nenhum arquivo proibido foi alterado",

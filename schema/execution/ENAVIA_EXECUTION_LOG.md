@@ -4,6 +4,50 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-04 — PR95 — PR-IMPL — Chat Livre Seguro
+
+- **Branch:** `copilot/pr-95-chat-livre-seguro`
+- **Tipo:** PR-IMPL
+- **Contrato:** `CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` (Ativo 🟢)
+- **PR anterior validada:** PR94 ✅ (Diagnóstico READ-ONLY do Chat Livre + Cockpit)
+
+### Objetivo
+
+Corrigir a causa raiz do engessamento do chat da Enavia: conversa casual e diagnóstico leve devem ser naturais, sem perder segurança operacional.
+
+### Implementação (4 mudanças cirúrgicas)
+
+**Arquivos alterados (runtime):**
+- `schema/enavia-response-policy.js` — `technical_diagnosis`, `system_state`, `memory_request`, `skill_request`, `contract_request` → CONVERSATIONAL em caso limpo
+- `schema/enavia-llm-core.js` — TOM AO BLOQUEAR reduzido de 8 para 3 bullets (guardrails preservados)
+- `schema/enavia-cognitive-runtime.js` — MODO OPERACIONAL ATIVO só para intenção operacional real (guarda por `response_policy.response_style`)
+- `schema/enavia-cognitive-runtime.js` — nota `read_only` só em contexto operacional real
+
+**Arquivos criados:**
+- `schema/reports/PR95_CHAT_LIVRE_SEGURO.md`
+- `tests/pr95-chat-livre-seguro.smoke.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Resultado
+
+- Smoke test PR95: 51/51 ✅
+- PR94 (regressão): 55/55 ✅
+- PR84 (regressão): 52/52 ✅
+- PR59 (regressão): 96/96 ✅
+- PR90 (regressão): 30/30 ✅
+- PR91/PR92/PR93: cascade conhecida de PR85 (forbidden-list de PR85 lista enavia-llm-core.js; PR95 modifica com autorização do contrato PR94–PR97)
+- Painel intocado. nv-enavia.js, executor, contract-executor, deploy.yml, wrangler.toml preservados.
+- **PR95 concluída ✅ — Chat livre seguro entregue.**
+- Próxima PR autorizada: **PR96 — Cockpit Passivo** (PR-IMPL).
+
+---
+
 ## 2026-05-04 — PR94 — PR-DIAG — Diagnóstico READ-ONLY do Chat Livre + Cockpit
 
 - **Branch:** `copilot/pr94-diagnostico-chat-livre-cockpit`
