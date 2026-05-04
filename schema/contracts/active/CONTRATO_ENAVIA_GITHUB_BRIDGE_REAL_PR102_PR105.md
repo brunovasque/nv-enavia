@@ -3,8 +3,8 @@
 **Data de criação:** 2026-05-04  
 **Estado:** 🟢 Ativo  
 **PR102:** ✅ Concluída (2026-05-04)  
-**PR103:** ⏳ Próxima autorizada  
-**PR104:** ⬜ Pendente  
+**PR103:** ✅ Concluída (2026-05-04)
+**PR104:** ⏳ Próxima autorizada
 **PR105:** ⬜ Pendente  
 **Contrato anterior encerrado:** `CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` — Encerrado ✅ em 2026-05-04
 

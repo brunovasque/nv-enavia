@@ -11,8 +11,8 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 Estado atual da frente:
 - PR102 (PR-DIAG): ✅ Concluída em 2026-05-04
-- PR103 (PR-IMPL): ⏳ Próxima autorizada
-- PR104 (PR-IMPL): ⬜ Pendente
+- PR103 (PR-IMPL): ✅ Concluída em 2026-05-04
+- PR104 (PR-IMPL): ⏳ Próxima autorizada
 - PR105 (PR-PROVA): ⬜ Pendente
 
 ---
