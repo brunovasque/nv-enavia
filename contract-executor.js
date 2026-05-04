@@ -41,9 +41,26 @@ import {
 // 🌉 PR104 — GitHub Bridge Runtime supervisionado
 // CJS interop via esbuild/wrangler — schema/enavia-github-bridge.js usa module.exports
 import _githubBridgeNs from "./schema/enavia-github-bridge.js";
+// Fallback seguro caso o módulo não seja carregado pelo bundler
+function _githubBridgeFallback() {
+  return {
+    ok: false,
+    mode: "github_bridge_plan",
+    error: "bridge_not_loaded",
+    operations: [],
+    blocked_operations: [],
+    safety_summary: {},
+    event_summary: {},
+    requires_human_review: true,
+    github_execution: false,
+    side_effects: false,
+    ready_for_real_execution: false,
+    next_recommended_action: "Bridge module não disponível",
+  };
+}
 const _buildGithubBridgePlan = _githubBridgeNs && _githubBridgeNs.buildGithubBridgePlan
   ? _githubBridgeNs.buildGithubBridgePlan
-  : (input, ctx) => ({ ok: false, mode: "github_bridge_plan", error: "bridge_not_loaded", operations: [], blocked_operations: [], safety_summary: {}, event_summary: {}, requires_human_review: true, github_execution: false, side_effects: false, ready_for_real_execution: false, next_recommended_action: "Bridge module não disponível" });
+  : _githubBridgeFallback;
 
 // ---------------------------------------------------------------------------
 // 🛡️ P26-PR2 — _runSupervisorGate(context)

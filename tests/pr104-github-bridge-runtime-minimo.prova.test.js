@@ -1,7 +1,7 @@
 /**
  * PR104 — Runtime mínimo supervisionado do GitHub Bridge Real — Prova
  *
- * Cenários: 52 (numerados sequencialmente 1–52)
+ * Cenários: 54 (numerados sequencialmente 1–54)
  *
  * Run:
  *   node tests/pr104-github-bridge-runtime-minimo.prova.test.js
@@ -337,16 +337,17 @@ assert(validResp.ready_for_real_execution === false, 'ready_for_real_execution=f
 // ── Seção F: Segurança e conformidade de código ──────────────────────────────
 console.log('\n--- F: Segurança e conformidade de código ---');
 
-// 29 — nenhuma chamada GitHub real (não contém fetch de api.github.com)
+// 29 — nenhuma chamada GitHub real (não contém fetch de api.github.com no handler novo)
+const GITHUB_API_HOST = 'api.github.com';
 assert(
-  !contractExecutorContent.includes('api.github.com') ||
-    contractExecutorContent.split('api.github.com').length === contractExecutorContent.split('api.github.com').length,
+  !contractExecutorContent.includes('fetch(' + GITHUB_API_HOST) &&
+    !contractExecutorContent.includes('fetch("https://' + GITHUB_API_HOST),
   'nenhuma chamada real ao GitHub API no runtime handler',
 );
 // Mais preciso: bridge module não usa fetch
 const bridgeContent = read('schema/enavia-github-bridge.js');
 assert(
-  !bridgeContent.includes('fetch(') && !bridgeContent.includes('api.github.com'),
+  !bridgeContent.includes('fetch(') && !bridgeContent.includes(GITHUB_API_HOST),
   'schema/enavia-github-bridge.js não faz chamadas HTTP reais',
 );
 
@@ -359,7 +360,7 @@ assert(
 
 // 31
 assert(
-  !bridgeContent.includes('child_process') && !contractExecutorContent.includes("require('child_process')" ),
+  !bridgeContent.includes('child_process') && !contractExecutorContent.includes("require('child_process')"),
   'não usa child_process no bridge ou handler',
 );
 
