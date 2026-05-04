@@ -14,7 +14,7 @@ Arquivo:
 
 Status:
 - Ativo
-- Próxima PR autorizada: PR90 — Diagnóstico READ-ONLY do PR Orchestrator
+- Próxima PR autorizada: PR91 — PR Planner
 
 Objetivo macro:
 Transformar o sistema interno da Enavia em um PR Orchestrator supervisionado (estilo Copilot), preparando branch/PR/testes/provas/deploy TEST até aprovação humana de merge/deploy PROD.
@@ -26,6 +26,7 @@ Sequência autorizada desta frente:
 - PR93 — Ready for Merge + Deploy TEST
 
 Histórico imediato relevante (concluído):
+- PR90 ✅ diagnóstico read-only do PR Orchestrator (mapa real + prova PR90).
 - PR86 ✅ diagnóstico da lacuna do loop interno.
 - PR87 ✅ `deploy_test` e `finalize` no executor.
 - PR88 ✅ costura Worker ↔ Executor com `execution_id`/`contract_id`.
@@ -62,7 +63,9 @@ Histórico imediato relevante (concluído):
 
 ## Próxima PR autorizada
 
-**PR90 — Diagnóstico READ-ONLY do PR Orchestrator**
+**PR91 — PR Planner**
+
+> ✅ PR90 concluída — Diagnóstico READ-ONLY do PR Orchestrator (2026-05-03, escopo Tests + docs/governança mínima; sem runtime; relatório `schema/reports/PR90_PR_ORCHESTRATOR_DIAGNOSTICO.md`)
 
 > ✅ PR89 concluída — Prova final do loop interno Worker → Executor até finalize, sem deploy real (2026-05-03, escopo Tests + docs/governança mínima)
 

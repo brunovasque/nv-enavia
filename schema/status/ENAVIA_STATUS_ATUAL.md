@@ -1,10 +1,25 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após ativação do contrato PR Orchestrator PR90–PR93 ✅)
-**Branch ativa:** `codex/contract-pr-orchestrator-pr90-pr93`
-**Última tarefa:** Governança — ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93
+**Data:** 2026-05-03 (atualizado após PR90 — Diagnóstico READ-ONLY do PR Orchestrator ✅)
+**Branch ativa:** `codex/pr90-diagnostico-pr-orchestrator`
+**Última tarefa:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator
 
 ## Estado atual do sistema
+
+## Atualização PR90
+
+- Criado relatório: `schema/reports/PR90_PR_ORCHESTRATOR_DIAGNOSTICO.md`.
+- Criado teste/prova read-only: `tests/pr90-pr-orchestrator-diagnostico.prova.test.js`.
+- Confirmado em código real:
+  - Worker, Executor, contract-executor e workflows de deploy existem.
+  - loop interno até `finalize` já está provado por PR89.
+  - `execution_id` e `contract_id` já estão costurados no fluxo Worker ↔ Executor.
+  - `ready_for_merge`, `deploy_test_ready` e `prod_blocked_until_human_approval` ainda são docs-only no contrato PR90–PR93.
+  - superfície `/github-pr/*` existe como enforcement/gate, sem integração GitHub API real nova.
+- Guardrails preservados:
+  - sem alteração de runtime/worker/executor/deploy workflow/wrangler/contract-executor/painel;
+  - sem deploy real, sem merge, sem secrets.
+- Próxima PR autorizada: **PR91 — PR Planner**.
 
 ## Atualização do contrato ativo (PR90–PR93)
 

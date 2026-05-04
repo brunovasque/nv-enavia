@@ -4,6 +4,45 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-03 — PR90 — PR-DIAG — Diagnóstico READ-ONLY do PR Orchestrator
+
+- **Branch:** `codex/pr90-diagnostico-pr-orchestrator`
+- **Tipo:** PR-DIAG (Tests + Docs + governança mínima)
+- **Contrato:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (Ativo ✅)
+- **PR anterior validada:** PR89 ✅
+
+### Objetivo
+
+Mapear com evidência o que já existe no repo para PR Orchestrator supervisionado (branch/PR/testes/provas/deploy TEST) sem implementar PR Planner/PR Executor e sem alterar runtime.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/reports/PR90_PR_ORCHESTRATOR_DIAGNOSTICO.md`
+- `tests/pr90-pr-orchestrator-diagnostico.prova.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+
+### Resultado
+
+- Contrato PR90–PR93 confirmado ativo; PR90 concluída como diagnóstico read-only.
+- PR86–PR89 confirmadas como base histórica concluída.
+- Worker/Executor/contract-executor/workflows de deploy confirmados vivos.
+- Superfície `/github-pr/*` confirmada (enforcement/gates), sem integração GitHub API real nova.
+- `ready_for_merge`, `deploy_test_ready`, `prod_blocked_until_human_approval` confirmados como docs-only nesta fase.
+- Próxima PR autorizada atualizada para PR91 (PR Planner).
+- Nenhum arquivo de runtime foi alterado.
+
+### Rollback
+
+Reverter o commit da PR90 com `git revert <commit>`.
+
+---
+
 ## 2026-05-03 — Governança — Ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93
 
 - **Branch:** `codex/contract-pr-orchestrator-pr90-pr93`

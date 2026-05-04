@@ -1,8 +1,42 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-03
-**De:** Governança — ativação do CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93 ✅
-**Para:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator
+**De:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator ✅
+**Para:** PR91 — PR Planner
+
+## Handoff atual (PR90)
+
+### O que foi feito
+
+- Diagnóstico READ-ONLY concluído do PR Orchestrator.
+- Relatório criado: `schema/reports/PR90_PR_ORCHESTRATOR_DIAGNOSTICO.md`.
+- Prova criada: `tests/pr90-pr-orchestrator-diagnostico.prova.test.js`.
+- Governança mínima atualizada (`status`, `handoff`, `execution log`, `contracts/INDEX.md`).
+
+### O que foi confirmado no código real
+
+- Loop interno Worker ↔ Executor já fecha em `finalize` (base PR86–PR89).
+- `callExecutorBridge`, `callDeployBridge`, `handleExecuteNext`, `transitionStatusGlobal`, `resolveNextAction`, `deploy_execute_plan`, `deploy_test`, `finalize` estão vivos e devem ser preservados.
+- Deploy TEST é supervisionado; PROD tem gate humano explícito.
+- `/github-pr/*` existe para enforcement/gates, sem bridge GitHub API real nova.
+- `ready_for_merge`, `deploy_test_ready`, `prod_blocked_until_human_approval` estão no contrato ativo (docs-only), ainda não no runtime.
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `.github/workflows/deploy-executor.yml`
+- `wrangler.toml`
+- painel
+- secrets
+
+### Próxima etapa segura
+
+- Executar **PR91 — PR Planner** com patch mínimo: schema/modelo + helper puro + testes, sem execução GitHub real e sem alterar runtime do loop vivo.
+
+---
 
 ## Handoff atual (ativação do contrato PR90–PR93)
 
