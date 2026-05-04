@@ -4,8 +4,8 @@
 **Estado:** 🟢 Ativo  
 **PR102:** ✅ Concluída (2026-05-04)  
 **PR103:** ✅ Concluída (2026-05-04)
-**PR104:** ⏳ Próxima autorizada
-**PR105:** ⬜ Pendente  
+**PR104:** ✅ Concluída (2026-05-04)
+**PR105:** ⏳ Próxima autorizada  
 **Contrato anterior encerrado:** `CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` — Encerrado ✅ em 2026-05-04
 
 ---
@@ -127,9 +127,9 @@ Não refatorar nesta frente:
 | PR | Tipo | Estado |
 |----|------|--------|
 | PR102 | PR-DIAG | ✅ Concluída |
-| PR103 | PR-IMPL | ⏳ Próxima |
-| PR104 | PR-IMPL | ⬜ Pendente |
-| PR105 | PR-PROVA | ⬜ Pendente |
+| PR103 | PR-IMPL | ✅ Concluída |
+| PR104 | PR-IMPL | ✅ Concluída |
+| PR105 | PR-PROVA | ⏳ Próxima |
 
 ---
 

@@ -12,8 +12,8 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 Estado atual da frente:
 - PR102 (PR-DIAG): ✅ Concluída em 2026-05-04
 - PR103 (PR-IMPL): ✅ Concluída em 2026-05-04
-- PR104 (PR-IMPL): ⏳ Próxima autorizada
-- PR105 (PR-PROVA): ⬜ Pendente
+- PR104 (PR-IMPL): ✅ Concluída em 2026-05-04
+- PR105 (PR-PROVA): ⏳ Próxima autorizada
 
 ---
 ## Contratos encerrados
@@ -50,6 +50,10 @@ Estado atual da frente:
 ## Próxima frente recomendada
 
 **GitHub Bridge Real** — contrato formal ativo PR102–PR105.
+
+> ✅ PR104 concluída — Runtime mínimo supervisionado (2026-05-04, PR-IMPL; integração mínima de `schema/enavia-github-bridge.js` em `contract-executor.js` via modo `github_bridge_runtime`; 52/52 cenários passando; `github_execution=false`, `side_effects=false`, `ready_for_real_execution=false`; rota `/github-pr/action` reaproveitada; deploy.yml/wrangler.toml/panel/** intocados; relatório `schema/reports/PR104_GITHUB_BRIDGE_RUNTIME_MINIMO.md`).
+
+> ✅ PR103 concluída — GitHub Bridge helper real supervisionado (2026-05-04, PR-IMPL; schema/helper puro; sem runtime; `schema/enavia-github-bridge.js` criado; 69/69 cenários passando; relatório `schema/reports/PR103_GITHUB_BRIDGE_HELPER_SUPERVISIONADO.md`).
 
 > ✅ PR101 concluída — Prova Final de Observabilidade + Autoproteção (2026-05-04, PR-PROVA; 90/90 cenários provados; contrato PR98–PR101 encerrado; relatório `schema/reports/PR101_OBSERVABILIDADE_AUTOPROTECAO_FINAL.md`; nenhum runtime alterado).
 
