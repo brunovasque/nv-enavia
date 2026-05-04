@@ -14,7 +14,7 @@ Arquivo:
 
 Status:
 - Ativo
-- Próxima PR autorizada: PR92 — PR Executor supervisionado
+- Próxima PR autorizada: PR93 — Ready for Merge + Deploy TEST
 
 Objetivo macro:
 Transformar o sistema interno da Enavia em um PR Orchestrator supervisionado (estilo Copilot), preparando branch/PR/testes/provas/deploy TEST até aprovação humana de merge/deploy PROD.
@@ -63,7 +63,9 @@ Histórico imediato relevante (concluído):
 
 ## Próxima PR autorizada
 
-**PR92 — PR Executor supervisionado**
+**PR93 — Ready for Merge + Deploy TEST**
+
+> ✅ PR92 concluída — PR Executor supervisionado (2026-05-04, escopo schema/helper puro supervisionado + testes + docs/governança mínima; sem runtime vivo; relatório `schema/reports/PR92_PR_EXECUTOR_SUPERVISIONADO.md`)
 
 > ✅ PR91 concluída — PR Planner (2026-05-04, escopo schema/modelo + helper puro + testes + docs/governança mínima; sem runtime vivo; relatório `schema/reports/PR91_PR_PLANNER.md`)
 

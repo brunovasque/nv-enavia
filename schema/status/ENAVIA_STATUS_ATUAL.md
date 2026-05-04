@@ -1,10 +1,30 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR91 — PR Planner ✅)
-**Branch ativa:** `codex/pr91-pr-planner`
-**Última tarefa:** PR91 — PR Planner
+**Data:** 2026-05-04 (atualizado após PR92 — PR Executor supervisionado ✅)
+**Branch ativa:** `copilot/pr92-implementacao-executor-supervisionado`
+**Última tarefa:** PR92 — PR Executor supervisionado
 
 ## Estado atual do sistema
+
+## Atualização PR92
+
+- Helper puro criado: `schema/enavia-pr-executor-supervised.js`.
+- Teste de prova criado: `tests/pr92-pr-executor-supervisionado-mock.prova.test.js` (66 cenários, 66 passando).
+- Relatório criado: `schema/reports/PR92_PR_EXECUTOR_SUPERVISIONADO.md`.
+- Executor supervisionado consome pacote PR-ready da PR91 e produz plano de execução supervisionado.
+- execution_steps determinísticos sem side effects (7 steps: validate_package, prepare_branch_plan, prepare_patch_plan, prepare_tests_plan, prepare_pr_metadata, prepare_rollback_plan, await_human_review).
+- Guardrails confirmados:
+  - `ready_for_merge=false` sempre;
+  - `awaiting_human_approval=true` sempre;
+  - `merge_allowed=false` sempre;
+  - `prod_deploy_allowed=false` sempre;
+  - `github_execution=false` sempre;
+  - `side_effects=false` sempre.
+- Não houve alteração de runtime vivo:
+  - `nv-enavia.js` preservado;
+  - `executor/src/index.js` preservado;
+  - `contract-executor.js` preservado.
+- Próxima PR autorizada: **PR93 — Ready for Merge + Deploy TEST**.
 
 ## Atualização PR91
 
@@ -21,7 +41,6 @@
   - `nv-enavia.js` preservado;
   - `executor/src/index.js` preservado;
   - `contract-executor.js` preservado.
-- Próxima PR autorizada: **PR92 — PR Executor supervisionado**.
 
 ## Atualização PR90
 

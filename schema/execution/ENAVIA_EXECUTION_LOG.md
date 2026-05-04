@@ -4,6 +4,60 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-04 — PR92 — PR-IMPL — PR Executor Supervisionado (helper puro + testes + docs)
+
+- **Branch:** `copilot/pr92-implementacao-executor-supervisionado`
+- **Tipo:** PR-IMPL (Schema + Tests + Docs + governança mínima)
+- **Contrato:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (Ativo ✅)
+- **PR anterior validada:** PR91 ✅
+
+### Objetivo
+
+Implementar o executor supervisionado do PR Orchestrator consumindo o pacote PR-ready criado na PR91, sem GitHub real, sem merge, sem deploy PROD e sem side effects reais.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-pr-executor-supervised.js`
+- `tests/pr92-pr-executor-supervisionado-mock.prova.test.js`
+- `schema/reports/PR92_PR_EXECUTOR_SUPERVISIONADO.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+
+**Arquivos atualizados (compatibilidade de teste):**
+- `tests/pr91-pr-planner-schema.prova.test.js` (test 52: regex agora aceita PR92 como próxima ou concluída)
+
+### Resultado
+
+- Executor supervisionado criado com 5 funções puras: `buildSupervisedPrExecutionPlan`, `validateSupervisedPrExecutionPlan`, `simulatePrExecutionStep`, `buildPrExecutionEvidence`, `assertPrExecutionGuards`.
+- 7 execution_steps determinísticos sem side effects reais.
+- 66 cenários de teste passando (66/66).
+- Nenhum runtime vivo alterado (`nv-enavia.js`, `executor/src/index.js`, `contract-executor.js` preservados).
+- Próxima PR autorizada avançada para PR93 — Ready for Merge + Deploy TEST.
+
+### Rollback
+
+- Reverter commit da PR92 com `git revert <commit>`.
+- Reexecutar regressão PR86-PR91.
+
+### Smoke tests executados
+
+- `node tests/pr92-pr-executor-supervisionado-mock.prova.test.js` → 66 passed, 0 failed ✅
+- `node tests/pr91-pr-planner-schema.prova.test.js` → 52 passed, 0 failed ✅
+- `node tests/pr90-pr-orchestrator-diagnostico.prova.test.js` → 30 passed, 0 failed ✅
+- `node tests/pr89-internal-loop-final-proof.smoke.test.js` → ✅
+- `node tests/pr88-worker-executor-stitch.smoke.test.js` → ✅
+- `node tests/pr87-deploy-test-finalize-runner.smoke.test.js` → ✅
+- `node tests/pr86-deploy-orchestrator-gap.prova.test.js` → ✅
+- `node executor/tests/executor.contract.test.js` → ✅
+- `node executor/tests/cloudflare-credentials.test.js` → ✅
+
+---
+
 ## 2026-05-04 — PR91 — PR-IMPL — PR Planner (schema/modelo + helper puro)
 
 - **Branch:** `codex/pr91-pr-planner`
