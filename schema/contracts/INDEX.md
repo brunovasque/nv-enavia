@@ -7,7 +7,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — Próxima: PR99.
+🟢 **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — PR99 concluída ✅ — Próxima: PR100.
 
 Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Encerrado ✅ em 2026-05-04 após PR97 — Prova Final.
 
@@ -44,7 +44,9 @@ Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERAC
 
 ## Próxima PR autorizada
 
-**PR99 — Event Log + Health Snapshot Unificado** (PR98 concluída ✅ — PR99 autorizada)
+**PR100 — Safety Guard / Anti-autodestruição** (PR99 concluída ✅ — PR100 autorizada)
+
+> ✅ PR99 concluída — Event Log + Health Snapshot Unificado (2026-05-04, PR-IMPL; schema/helper puro; sem runtime; `schema/enavia-event-log.js` e `schema/enavia-health-snapshot.js` criados; 88/88 cenários passando; relatório `schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md`).
 
 > ✅ PR98 concluída — Diagnóstico READ-ONLY de Observabilidade + Autoproteção (2026-05-04, escopo Docs-only + Tests; sem runtime; contrato `CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` criado e ativado; relatório `schema/reports/PR98_OBSERVABILIDADE_AUTOPROTECAO_DIAGNOSTICO.md`; 56/56 testes passando).
 

@@ -4,17 +4,57 @@
 **De:** PR98 — Diagnóstico READ-ONLY Observabilidade + Autoproteção ✅ CONCLUÍDA
 **Para:** PR99 — Event Log + Health Snapshot Unificado
 
-## Handoff atual (PR98 ✅ CONCLUÍDA)
+## Handoff atual (PR99 ✅ CONCLUÍDA)
 
 ### O que foi feito
 
-- PR-DIAG read-only do contrato PR98–PR101: diagnóstico completo de observabilidade e autoproteção.
-- Novo contrato criado: `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`.
-- Relatório criado: `schema/reports/PR98_OBSERVABILIDADE_AUTOPROTECAO_DIAGNOSTICO.md`.
-- Teste de prova criado: `tests/pr98-observabilidade-autoprotecao-diagnostico.prova.test.js`.
-- `ACTIVE_CONTRACT.md` atualizado: aponta contrato PR98–PR101.
-- `INDEX.md` atualizado: contrato PR98–PR101 ativo, PR94–PR97 na tabela de encerrados.
+- PR-IMPL — Event Log + Health Snapshot Unificado.
+- `schema/enavia-event-log.js` criado: helper puro com 5 funções exportadas (createEnaviaEvent, appendEnaviaEvent, normalizeEnaviaEvents, filterEnaviaEvents, buildEventLogSnapshot).
+- `schema/enavia-health-snapshot.js` criado: helper puro com 5 funções exportadas (buildHealthSnapshot, evaluateSubsystemHealth, deriveOverallHealth, buildRollbackHints, buildHealthEvidence).
+- Teste de prova criado: `tests/pr99-event-log-health-snapshot.prova.test.js` (88 cenários — 88/88 ✅).
+- Relatório criado: `schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md`.
+- `INDEX.md` atualizado: PR99 concluída ✅ — PR100 autorizada.
+- `ACTIVE_CONTRACT.md` não precisa de atualização (contrato PR98–PR101 continua ativo).
 - Governança mínima atualizada (status, handoff, execution log).
+
+### O que foi implementado
+
+#### enavia-event-log.js
+- `createEnaviaEvent(input)` — cria evento normalizado; severity/status/subsystem inválidos são normalizados com fallback controlado; event_id determinístico
+- `appendEnaviaEvent(events, event)` — imutável (usa spread)
+- `normalizeEnaviaEvents(events)` — normaliza lista completa
+- `filterEnaviaEvents(events, filters)` — filtra por subsystem/severity/status/type/source/requires_human_review
+- `buildEventLogSnapshot(events, options)` — snapshot com by_severity/by_status/by_subsystem/critical_count/failed_count/blocked_count/requires_human_review_count/rollback_hints
+
+#### enavia-health-snapshot.js
+- `buildHealthSnapshot(input, options)` — snapshot completo: 9 subsistemas obrigatórios + github_bridge como future/unknown
+- `evaluateSubsystemHealth(subsystem, events)` — avalia subsistema individual com status/risk_level/counts
+- `deriveOverallHealth(subsystems)` — overall_status/risk_level/degraded/failed/blocked
+- `buildRollbackHints(events, subsystems)` — consolida hints únicos
+- `buildHealthEvidence(snapshot)` — evidência objetiva do snapshot
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- `panel/**`
+- Nenhum endpoint criado
+- Nenhum binding adicionado
+- Nenhuma rede chamada
+
+### Próxima etapa: PR100
+
+**PR100 — Safety Guard / Anti-autodestruição**
+
+**5 mudanças máximas (schema/helper puro):**
+1. `schema/enavia-safety-guard.js` — helper puro: detectar operações perigosas, loops destrutivos, rate limiting interno, auto-proteção
+2. `tests/pr100-safety-guard.prova.test.js` — prova formal
+3. `schema/reports/PR100_SAFETY_GUARD.md` — relatório
+4. Governança mínima (status, handoff, execution log, INDEX)
+
 
 ### O que foi diagnosticado
 
