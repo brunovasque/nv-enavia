@@ -2,6 +2,7 @@
 
 **Data de criação:** 2026-05-04  
 **Estado:** 🔴 Encerrado ✅ (2026-05-04, após PR97 — Prova Final)  
+**Frente:** Chat Livre + Cockpit Ativo (PR94–PR97) — encerrada  
 **Contrato anterior encerrado:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (encerrado em 2026-05-04)
 
 ---

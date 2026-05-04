@@ -10,7 +10,13 @@ Status:
 - Contrato PR94–PR97 encerrado ✅ após PR97 — Prova Final (2026-05-04).
 - Chat Livre + Cockpit Operacional: provado e encerrado.
 
-Observação:
+Contratos anteriores encerrados (referência histórica):
+
+- `schema/contracts/active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` — **Encerrado ✅ em 2026-05-04** após PR93 — Ready for Merge + Deploy TEST.
+- `schema/contracts/active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` — **Encerrado ✅** após PR85.
+- `schema/contracts/active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` — **Encerrado ✅** após PR81.
+
+
 
 Este arquivo é um ponteiro operacional curto para facilitar execução por Codex local/agents.
 O histórico completo permanece em `schema/contracts/INDEX.md`.

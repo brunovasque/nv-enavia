@@ -46,7 +46,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 **Aguardando próximo contrato/fase formal.**
 
-> ✅ PR97 concluída — Prova Final do contrato PR94–PR97 (2026-05-04, PR-PROVA; 60 cenários provados; contrato Chat Livre + Cockpit encerrado; relatório schema/reports/PR97_CHAT_LIVRE_COCKPIT_FINAL.md; nenhum runtime alterado).
+> ✅ PR97 — Prova Final — concluída (2026-05-04, PR-PROVA; 60 cenários provados; contrato Chat Livre + Cockpit encerrado; relatório schema/reports/PR97_CHAT_LIVRE_COCKPIT_FINAL.md; nenhum runtime alterado).
 
 > ✅ PR96 concluída — Cockpit Passivo + Chat Legível (2026-05-04, escopo Panel-only; 5 mudanças cirúrgicas em MessageBubble/useChatState/TargetPanel/QuickActions/ChatPage; relatório schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md; smoke PR96 criado e bateria obrigatória executada).
 
