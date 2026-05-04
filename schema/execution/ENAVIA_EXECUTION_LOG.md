@@ -4,7 +4,41 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
-## 2026-05-04 — PR92 — PR-IMPL — PR Executor Supervisionado (helper puro + testes + docs)
+## 2026-05-04 — PR93 — PR-PROVA/PR-HARDENING — Ready for Merge + Deploy TEST
+
+- **Branch:** `copilot/pr93-implementacao-contrato-ativo`
+- **Tipo:** PR-PROVA / PR-HARDENING (helper puro + testes + relatório + governança mínima)
+- **Contrato:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (Encerrado ✅)
+- **PR anterior validada:** PR92 ✅
+
+### Objetivo
+
+Fechar o contrato PR90–PR93 com helper puro de readiness, 60 cenários de prova, evidências e marcadores finais de readiness supervisionada (`ready_for_merge=true`, `deploy_test_ready=true`, `awaiting_human_approval=true`, `prod_blocked_until_human_approval=true`).
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-pr-readiness.js`
+- `tests/pr93-ready-for-merge-deploy-test-ready.prova.test.js`
+- `schema/reports/PR93_READY_FOR_MERGE_DEPLOY_TEST.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+- `schema/contracts/ACTIVE_CONTRACT.md`
+
+### Resultado
+
+- Readiness helper criado com 4 funções puras: `buildPrReadinessState`, `validatePrReadinessState`, `buildReadinessEvidence`, `assertReadinessGuards`.
+- 60 cenários de teste passando (60/60).
+- Nenhum runtime vivo alterado (`nv-enavia.js`, `executor/src/index.js`, `contract-executor.js` preservados).
+- **Contrato PR90–PR93 encerrado. Aguardando próximo contrato/fase formal.**
+
+---
+
+
 
 - **Branch:** `copilot/pr92-implementacao-executor-supervisionado`
 - **Tipo:** PR-IMPL (Schema + Tests + Docs + governança mínima)

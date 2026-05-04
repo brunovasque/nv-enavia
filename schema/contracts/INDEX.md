@@ -7,36 +7,19 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md** — **Ativo**
+⏳ **Aguardando próximo contrato/fase formal.**
 
-Arquivo:
-`schema/contracts/active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md`
+Nenhum contrato ativo no momento.
+O contrato PR90–PR93 foi encerrado com sucesso após PR93 — Ready for Merge + Deploy TEST.
 
-Status:
-- Ativo
-- Próxima PR autorizada: PR93 — Ready for Merge + Deploy TEST
-
-Objetivo macro:
-Transformar o sistema interno da Enavia em um PR Orchestrator supervisionado (estilo Copilot), preparando branch/PR/testes/provas/deploy TEST até aprovação humana de merge/deploy PROD.
-
-Sequência autorizada desta frente:
-- PR90 — Diagnóstico READ-ONLY do PR Orchestrator
-- PR91 — PR Planner
-- PR92 — PR Executor supervisionado
-- PR93 — Ready for Merge + Deploy TEST
-
-Histórico imediato relevante (concluído):
-- PR90 ✅ diagnóstico read-only do PR Orchestrator (mapa real + prova PR90).
-- PR86 ✅ diagnóstico da lacuna do loop interno.
-- PR87 ✅ `deploy_test` e `finalize` no executor.
-- PR88 ✅ costura Worker ↔ Executor com `execution_id`/`contract_id`.
-- PR89 ✅ prova final do loop interno até `finalize` sem deploy real.
+Próxima ativação: definir novo contrato para a próxima frente da Enavia.
 
 ---
 ## Contratos encerrados
 
 | Arquivo | PRs | Estado | Data de encerramento |
 |---------|-----|--------|----------------------|
+| `active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` | PR90–PR93 | Encerrado ✅ | 2026-05-04 |
 | `active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` | PR82–PR85 | Encerrado ✅ | 2026-05-03 |
 | `active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` | PR79–PR81 | Encerrado ✅ | 2026-05-02 |
 | `active/CONTRATO_ENAVIA_SKILLS_RUNTIME_PR69_PR78.md` | PR69–PR78 | Encerrado ✅ | 2026-05-02 |
@@ -63,7 +46,9 @@ Histórico imediato relevante (concluído):
 
 ## Próxima PR autorizada
 
-**PR93 — Ready for Merge + Deploy TEST**
+**Aguardando próximo contrato/fase formal.**
+
+> ✅ PR93 concluída — Ready for Merge + Deploy TEST (2026-05-04, escopo helper puro + testes + relatório + governança; sem runtime vivo; relatório `schema/reports/PR93_READY_FOR_MERGE_DEPLOY_TEST.md`). **Contrato PR90–PR93 encerrado.**
 
 > ✅ PR92 concluída — PR Executor supervisionado (2026-05-04, escopo schema/helper puro supervisionado + testes + docs/governança mínima; sem runtime vivo; relatório `schema/reports/PR92_PR_EXECUTOR_SUPERVISIONADO.md`)
 
@@ -71,10 +56,11 @@ Histórico imediato relevante (concluído):
 
 > ✅ PR90 concluída — Diagnóstico READ-ONLY do PR Orchestrator (2026-05-03, escopo Tests + docs/governança mínima; sem runtime; relatório `schema/reports/PR90_PR_ORCHESTRATOR_DIAGNOSTICO.md`)
 
-> ✅ PR89 concluída — Prova final do loop interno Worker → Executor até finalize, sem deploy real (2026-05-03, escopo Tests + docs/governança mínima)
+> ✅ PR89 ✅ Prova final do loop interno Worker → Executor até finalize, sem deploy real (2026-05-03, escopo Tests + docs/governança mínima)
 
-> ✅ PR88 concluída — Costura Worker ↔ Executor para execution_id/contract_id (2026-05-03, escopo Worker + bridge + tests/docs mínimos)
-> ✅ PR87 concluída — Deploy Test + Finalize Runner no executor (2026-05-03, escopo Executor-only)
+> ✅ PR88 ✅ Costura Worker ↔ Executor para execution_id/contract_id (2026-05-03, escopo Worker + bridge + tests/docs mínimos)
+> ✅ PR87 ✅ Deploy Test + Finalize Runner no executor (2026-05-03, escopo Executor-only)
+> ✅ PR86 ✅ diagnóstico da lacuna do loop interno (2026-05-03, escopo Worker-only, PR-DIAG)
 > ✅ PR85 concluída — Fechamento operacional ponta a ponta (2026-05-03)
 > ✅ PR84 concluída — Corrigir IA engessada / Chat Vivo (2026-05-03)
 > ✅ PR83 concluída — Corrigir loop de deploy (2026-05-03)

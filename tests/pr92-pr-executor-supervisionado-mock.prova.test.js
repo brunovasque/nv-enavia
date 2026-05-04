@@ -187,8 +187,9 @@ ok(/o que foi implementado/i.test(reportText), "62. relatorio PR92 declara o que
 ok(/o que nao foi mexido/i.test(reportText), "63. relatorio PR92 declara o que nao foi mexido");
 ok(/o que fica para PR93/i.test(reportText), "64. relatorio PR92 declara o que fica para PR93");
 ok(
-  /pr[oó]xima PR autorizada:\s*PR93\s*—\s*Ready for Merge/i.test(indexText),
-  "65. INDEX.md avanca proxima PR para PR93 — Ready for Merge + Deploy TEST",
+  /pr[oó]xima PR autorizada:\s*PR93\s*—\s*Ready for Merge/i.test(indexText) ||
+  /PR93.*conclu[ií]da/i.test(indexText),
+  "65. INDEX.md avanca proxima PR para PR93 — Ready for Merge + Deploy TEST (ou ja concluida)",
   "Texto INDEX.md nao contem a marcacao esperada"
 );
 

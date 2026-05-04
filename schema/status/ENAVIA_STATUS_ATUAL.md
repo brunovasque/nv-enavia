@@ -1,10 +1,35 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR92 — PR Executor supervisionado ✅)
-**Branch ativa:** `copilot/pr92-implementacao-executor-supervisionado`
-**Última tarefa:** PR92 — PR Executor supervisionado
+**Data:** 2026-05-04 (atualizado após PR93 — Ready for Merge + Deploy TEST ✅)
+**Branch ativa:** `copilot/pr93-implementacao-contrato-ativo`
+**Última tarefa:** PR93 — Ready for Merge + Deploy TEST
 
 ## Estado atual do sistema
+
+## Atualização PR93
+
+- Helper puro criado: `schema/enavia-pr-readiness.js`.
+- Teste de prova criado: `tests/pr93-ready-for-merge-deploy-test-ready.prova.test.js` (60 cenários, 60 passando).
+- Relatório criado: `schema/reports/PR93_READY_FOR_MERGE_DEPLOY_TEST.md`.
+- Readiness helper consome plano de execução supervisionado da PR92 e produz estado de readiness final.
+- Estado de readiness com campos obrigatórios:
+  - `ready_for_merge=true` para plano válido da PR92;
+  - `deploy_test_ready=true` para plano válido da PR92;
+  - `awaiting_human_approval=true` sempre;
+  - `prod_blocked_until_human_approval=true` sempre;
+  - `merge_allowed=false` sempre;
+  - `prod_deploy_allowed=false` sempre;
+  - `github_execution=false` sempre;
+  - `side_effects=false` sempre;
+  - `final_status="awaiting_human_merge_approval"` sempre.
+- Guardrails confirmados via `assertReadinessGuards`.
+- Evidence contém: origem PR91, origem PR92, tests_to_run, rollback_plan, bloqueio_merge_automatico, bloqueio_prod_automatico.
+- Não houve alteração de runtime vivo:
+  - `nv-enavia.js` preservado;
+  - `executor/src/index.js` preservado;
+  - `contract-executor.js` preservado.
+- **Contrato PR90–PR93 encerrado com sucesso.**
+- Próxima etapa: aguardando próximo contrato/fase formal.
 
 ## Atualização PR92
 
