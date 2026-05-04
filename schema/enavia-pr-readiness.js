@@ -188,7 +188,7 @@ function buildPrReadinessState(prExecutionPlan, options) {
       branch_name: asString(src.branch_name),
       pr_title: asString(src.pr_title),
       tests_to_run: Array.isArray(src.tests_to_run) ? src.tests_to_run.slice() : [],
-      rollback_plan: Array.isArray(src.rollback_plan) ? src.rollback_plan.slice() : (src.rollback_plan || []),
+      rollback_plan: Array.isArray(src.rollback_plan) ? src.rollback_plan.slice() : (typeof src.rollback_plan === "string" ? src.rollback_plan : []),
       acceptance_criteria: Array.isArray(src.acceptance_criteria) ? src.acceptance_criteria.slice() : [],
       evidence: null,
       ready_for_merge: false,

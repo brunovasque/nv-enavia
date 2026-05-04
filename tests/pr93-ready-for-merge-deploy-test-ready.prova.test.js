@@ -122,7 +122,8 @@ ok(asArray(state.human_actions_required).includes("approve_merge"), "25. human_a
 ok(asArray(state.human_actions_required).includes("approve_prod_deploy"), "26. human_actions_required contém approve_prod_deploy");
 
 section("27-32 evidence");
-const ev = state.evidence || {};
+ok(state.evidence !== null && state.evidence !== undefined && typeof state.evidence === "object", "evidence existe e é objeto");
+const ev = state.evidence;
 ok(
   typeof ev.origem_pr91 === "string" && ev.origem_pr91.includes("PR91"),
   "27. evidence contém origem PR91",
