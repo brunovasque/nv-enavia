@@ -1,7 +1,45 @@
 # ENAVIA — Execution Log
 
 
-## 2026-05-04 — PR98 — PR-DIAG — Diagnóstico Observabilidade + Autoproteção
+## 2026-05-04 — PR99 — PR-IMPL — Event Log + Health Snapshot Unificado
+
+- **Branch:** `copilot/pr99-event-log-health-snapshot-unificado`
+- **Tipo:** PR-IMPL (schema/helper puro — sem runtime)
+- **Contrato:** `CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` (Ativo 🟢)
+- **PR anterior validada:** PR98 ✅
+
+### Objetivo
+
+Criar base pura e testável para a Enavia consolidar eventos e estado de saúde operacional, sem alterar runtime, sem endpoint novo e sem dependência de rede real.
+
+### Implementação (PR-IMPL — schema/helper puro)
+
+**Arquivos criados:**
+- `schema/enavia-event-log.js` — helper puro: createEnaviaEvent, appendEnaviaEvent, normalizeEnaviaEvents, filterEnaviaEvents, buildEventLogSnapshot
+- `schema/enavia-health-snapshot.js` — helper puro: buildHealthSnapshot, evaluateSubsystemHealth, deriveOverallHealth, buildRollbackHints, buildHealthEvidence
+- `tests/pr99-event-log-health-snapshot.prova.test.js` — 88 cenários
+- `schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md`
+
+**Arquivos de governança atualizados:**
+- `schema/contracts/INDEX.md` (PR99 concluída ✅ — PR100 autorizada)
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+**Compatibilidade histórica:**
+- `tests/pr98-observabilidade-autoprotecao-diagnostico.prova.test.js` — cenário 30 corrigido: "Event Log NÃO criado em PR98 (se existir agora, foi criado em PR99 como planejado)" — 56/56 ✅
+
+### Resultado
+
+- Event Log helper puro criado e validado.
+- Health Snapshot helper puro criado e validado.
+- 88/88 cenários passando na prova PR99.
+- Nenhum runtime alterado (nv-enavia.js, executor, contract-executor, deploy.yml, wrangler.toml, panel intocados).
+- Próxima PR autorizada: **PR100 — Safety Guard / Anti-autodestruição** (schema/helper puro).
+
+---
+
+
 
 - **Branch:** `copilot/pr98-diagnostico-read-only`
 - **Tipo:** PR-DIAG (Docs-only + Tests — sem runtime)

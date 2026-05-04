@@ -282,9 +282,11 @@ assert(
   "painel preservado (arquivos PR96 existem mas não foram tocados nesta PR)"
 );
 
+// Cenário 30 — Event Log não foi criado em PR98; se existir, foi criado em PR99 (esperado)
+// Compatibilidade pós-PR99: o arquivo agora existe por design (PR99 o criou como planejado).
 assert(
-  !fileExists("schema/enavia-event-log.js"),
-  "30. Event Log NÃO criado nesta PR (aguarda PR99)"
+  !fileExists("schema/enavia-event-log.js") || fileExists("schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md"),
+  "30. Event Log NÃO criado em PR98 (se existir agora, foi criado em PR99 como planejado)"
 );
 
 // ---------------------------------------------------------------------------

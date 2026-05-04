@@ -1,10 +1,23 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR98 — Diagnóstico Observabilidade + Autoproteção ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr98-diagnostico-read-only`
-**Última tarefa:** PR98 — Diagnóstico READ-ONLY Observabilidade + Autoproteção ✅
+**Data:** 2026-05-04 (atualizado após PR99 — Event Log + Health Snapshot Unificado ✅ CONCLUÍDA)
+**Branch ativa:** `copilot/pr99-event-log-health-snapshot-unificado`
+**Última tarefa:** PR99 — Event Log + Health Snapshot Unificado ✅
 
 ## Estado atual do sistema
+
+## Atualização PR99
+
+- PR-IMPL — schema/helper puro — Event Log + Health Snapshot Unificado.
+- `schema/enavia-event-log.js` criado: 5 funções puras (createEnaviaEvent, appendEnaviaEvent, normalizeEnaviaEvents, filterEnaviaEvents, buildEventLogSnapshot).
+- `schema/enavia-health-snapshot.js` criado: 5 funções puras (buildHealthSnapshot, evaluateSubsystemHealth, deriveOverallHealth, buildRollbackHints, buildHealthEvidence).
+- `tests/pr99-event-log-health-snapshot.prova.test.js` criado: 88/88 cenários passando ✅.
+- `schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md` criado.
+- `schema/contracts/INDEX.md` atualizado: PR99 concluída ✅ — PR100 autorizada.
+- `tests/pr98-observabilidade-autoprotecao-diagnostico.prova.test.js` corrigido: compatibilidade histórica (cenário 30 — Event Log agora existe por design de PR99).
+- Nenhum runtime alterado (nv-enavia.js, executor/src/index.js, contract-executor.js, deploy.yml, wrangler.toml, panel/** intocados).
+- **PR99 concluída ✅ — Event Log + Health Snapshot Unificado entregues.**
+- Próxima etapa: **PR100 — Safety Guard / Anti-autodestruição**.
 
 ## Atualização PR98
 
