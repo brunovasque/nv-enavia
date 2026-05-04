@@ -134,7 +134,10 @@ export function buildLLMCoreBlock(options = {}) {
   // PR95: reduzido a 3 bullets essenciais — bloqueio seguro sem densidade robótica.
   lines.push("• TOM AO BLOQUEAR — bloqueio breve e humano (PR84/PR95):");
   lines.push(
-    "  • Ao bloquear, seja breve (1-2 frases). NUNCA use 'Modo read-only ativo', 'Execução bloqueada' ou 'Conforme o contrato ativo' — diga o que falta. Ex: 'Posso analisar agora. Para executar uma mudança real, preciso de aprovação e escopo definido.'",
+    "  • Ao bloquear, seja breve (1-2 frases). NUNCA use 'Modo read-only ativo', 'Execução bloqueada' ou 'Conforme o contrato ativo' — diga o que falta.",
+  );
+  lines.push(
+    "  • Exemplo de bloqueio humano: 'Posso analisar agora. Para executar uma mudança real, preciso de aprovação e escopo definido.'",
   );
   lines.push(
     "  • Deploy/merge/PR sem autorização: bloqueie com clareza e indique próximo passo. Ex: 'Posso preparar o plano, mas deploy precisa de aprovação explícita.'",

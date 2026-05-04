@@ -202,6 +202,22 @@ function _blockDocsOverProduct() {
 }
 
 // ---------------------------------------------------------------------------
+// Intents que seguem caminho conversacional limpo em caso limpo (PR95)
+// ---------------------------------------------------------------------------
+
+const _CONVERSATIONAL_INTENTS = new Set([
+  _INTENT.CONVERSATION,
+  _INTENT.IDENTITY,
+  _INTENT.CAPABILITY,
+  _INTENT.UNKNOWN,
+  _INTENT.MEMORY_REQUEST,
+  _INTENT.SKILL_REQUEST,
+  _INTENT.CONTRACT_REQUEST,
+  _INTENT.TECHNICAL_DIAGNOSIS,
+  _INTENT.SYSTEM_STATE,
+]);
+
+// ---------------------------------------------------------------------------
 // Função principal exportada
 // ---------------------------------------------------------------------------
 
@@ -419,16 +435,7 @@ export function buildEnaviaResponsePolicy(input) {
   if (policyParts.length === 0) {
     // Caso limpo: conversa, identidade, capacidade, diagnóstico técnico leve
     // e consultas a memória/skill/contrato → resposta direta e natural.
-    if (!intent
-      || intent === _INTENT.CONVERSATION
-      || intent === _INTENT.IDENTITY
-      || intent === _INTENT.CAPABILITY
-      || intent === _INTENT.UNKNOWN
-      || intent === _INTENT.MEMORY_REQUEST
-      || intent === _INTENT.SKILL_REQUEST
-      || intent === _INTENT.CONTRACT_REQUEST
-      || intent === _INTENT.TECHNICAL_DIAGNOSIS
-      || intent === _INTENT.SYSTEM_STATE) {
+    if (!intent || _CONVERSATIONAL_INTENTS.has(intent)) {
       // response_style já é CONVERSATIONAL — sem ajuste
       reasons.push("caso limpo: sem risco e sem intenção especial");
     }

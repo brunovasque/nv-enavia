@@ -400,9 +400,10 @@ ok(
 {
   const tomStart = llmCore.indexOf("TOM AO BLOQUEAR");
   const tomBlock = tomStart >= 0 ? llmCore.slice(tomStart, tomStart + 2000) : "";
-  // Contar bullets dentro do bloco TOM AO BLOQUEAR (antes da próxima seção)
-  const nextSection = tomBlock.indexOf("\n•", 20);
-  const tomBody = nextSection > 0 ? tomBlock.slice(0, nextSection) : tomBlock;
+  // Contar sub-bullets do bloco TOM AO BLOQUEAR (linhas com "  •" — dois espaços antes do bullet)
+  // Busca pelo início da próxima seção de nível superior (linha que começa com "•" sem espaço)
+  const nextTopLevel = tomBlock.search(/\n• [^T]/); // próxima linha "• " que não é "• TOM"
+  const tomBody = nextTopLevel > 0 ? tomBlock.slice(0, nextTopLevel) : tomBlock;
   const bulletCount = (tomBody.match(/  •/g) || []).length;
   ok(
     bulletCount <= 4,
@@ -553,9 +554,10 @@ ok(fileExists("schema/enavia-self-worker-auditor-skill.js"), "36. schema/enavia-
     try {
       const remote = execSync("git diff --name-only origin/main..HEAD", { encoding: "utf-8", cwd: ROOT });
       return remote.split(/\r?\n/).filter(Boolean);
-    } catch { return []; }
+    } catch { return null; }
   })();
-  const panelAltered = changedFiles.some(f => f.startsWith("panel/"));
+  // Se git falhou (changedFiles=null), skip com pass conservador (não podemos confirmar)
+  const panelAltered = changedFiles !== null && changedFiles.some(f => f.startsWith("panel/"));
   ok(!panelAltered, "37. painel não alterado (nenhum arquivo de panel/ modificado)");
 }
 
