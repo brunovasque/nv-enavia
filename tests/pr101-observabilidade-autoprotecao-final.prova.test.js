@@ -846,8 +846,11 @@ test(86, 'ACTIVE_CONTRACT fica aguardando próximo contrato', () => {
   const activePath = path.join(repoRoot, 'schema', 'contracts', 'ACTIVE_CONTRACT.md');
   const content = fs.readFileSync(activePath, 'utf8');
   assert(
-    content.toLowerCase().includes('aguardando') || content.toLowerCase().includes('próximo contrato') || content.toLowerCase().includes('sem contrato ativo'),
-    'ACTIVE_CONTRACT deve indicar ausência de contrato ativo ou aguardar próximo'
+    content.toLowerCase().includes('aguardando') ||
+      content.toLowerCase().includes('próximo contrato') ||
+      content.toLowerCase().includes('sem contrato ativo') ||
+      content.includes('CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105'),
+    'ACTIVE_CONTRACT deve indicar ausência de contrato ativo, aguardar próximo ou contrato mais recente ativado'
   );
 });
 

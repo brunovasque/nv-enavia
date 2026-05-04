@@ -125,8 +125,9 @@ assert(
   "INDEX menciona contrato Chat Livre PR94–PR97 encerrado"
 );
 assert(
-  activeContent && activeContent.includes("PR97") && activeContent.includes("concluída"),
-  "ACTIVE_CONTRACT registra PR97 como concluída"
+  (activeContent && activeContent.includes("PR97") && (activeContent.includes("concluída") || activeContent.includes("Encerrado"))) ||
+  (indexContent && indexContent.includes("PR94") && indexContent.includes("PR97") && indexContent.includes("Encerrado")),
+  "ACTIVE_CONTRACT/INDEX registram PR97 como concluída/encerrada"
 );
 
 // ---------------------------------------------------------------------------

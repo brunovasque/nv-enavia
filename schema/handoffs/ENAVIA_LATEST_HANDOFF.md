@@ -1,10 +1,47 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR101 — Prova Final de Observabilidade + Autoproteção ✅ CONCLUÍDA
-**Para:** GitHub Bridge Real (aguardando novo contrato formal)
+**De:** PR102 — Diagnóstico READ-ONLY do GitHub Bridge Real ✅ CONCLUÍDA
+**Para:** PR103 — GitHub Bridge helper real supervisionado
 
-## Handoff atual (PR101 ✅ CONCLUÍDA — Contrato PR98–PR101 ENCERRADO)
+## Handoff atual (PR102 ✅ CONCLUÍDA — Contrato PR102–PR105 ATIVO)
+
+### O que foi feito
+
+- Contrato criado e ativado: `schema/contracts/active/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md`.
+- `schema/contracts/ACTIVE_CONTRACT.md` atualizado para o novo contrato ativo.
+- `schema/contracts/INDEX.md` atualizado com PR102 concluída e PR103 como próxima.
+- Relatório criado: `schema/reports/PR102_GITHUB_BRIDGE_REAL_DIAGNOSTICO.md`.
+- Prova criada: `tests/pr102-github-bridge-real-diagnostico.prova.test.js`.
+- Governança mínima atualizada (status, handoff, execution log).
+
+### O que foi diagnosticado
+
+- Existe superfície lógica P24 para GitHub/PR (`/github-pr/*`) com enforcement e gate de merge.
+- Existe cobertura de testes P24 para enforcement e aprovação formal de merge.
+- Não existe adapter GitHub API real (branch/open_pr/update_pr/comment com autenticação real).
+- Não há uso ativo de `api.github.com`, `octokit` ou token GitHub no runtime desse fluxo.
+- Safety Guard/Event Log/Health Snapshot/Anti-loop estão prontos para proteger a integração real.
+- Merge automático segue proibido.
+- Deploy PROD automático segue proibido.
+- Nenhum runtime foi alterado nesta PR.
+
+### Próxima etapa segura (PR103)
+
+- Criar helper `schema/enavia-github-bridge.js` supervisionado com:
+  - `plan_create_branch`
+  - `plan_open_pr`
+  - `plan_update_pr`
+  - `plan_comment_pr`
+  - `build_github_operation_event`
+  - `validate_github_operation`
+- Sem plugar runtime ainda se não for seguro.
+- Sem usar token real na PR103.
+- Sem merge automático e sem deploy PROD automático.
+
+---
+
+## Handoff anterior (PR101 ✅ CONCLUÍDA — Contrato PR98–PR101 ENCERRADO)
 
 ### O que foi feito
 
