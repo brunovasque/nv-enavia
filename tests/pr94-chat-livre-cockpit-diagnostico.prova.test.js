@@ -404,7 +404,7 @@ console.log("\n─────────────────────�
 console.log(`\n🏁 Resultado PR94: ${passed} passando / ${failed} falhando\n`);
 
 if (failed === 0) {
-  console.log("✅ Todos os provas da PR94 passaram.");
+  console.log("✅ Todas as provas da PR94 passaram.");
   console.log("   Diagnóstico read-only concluído.");
   console.log("   Nenhum runtime alterado.");
   console.log("   Próxima PR autorizada: PR95 — Chat Livre Seguro.");
