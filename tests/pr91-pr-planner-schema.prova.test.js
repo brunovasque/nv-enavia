@@ -155,7 +155,11 @@ const indexText = fs.readFileSync("schema/contracts/INDEX.md", "utf8");
 ok(/o que foi implementado/i.test(reportText), "49. relatorio PR91 declara o que foi implementado");
 ok(/o que nao foi mexido/i.test(reportText), "50. relatorio PR91 declara o que nao foi mexido");
 ok(/o que fica para PR92/i.test(reportText), "51. relatorio PR91 declara o que fica para PR92");
-ok(/pr[oó]xima PR autorizada:\s*PR92\s*—\s*PR Executor supervisionado/i.test(indexText), "52. INDEX.md avanca proxima PR para PR92 — PR Executor supervisionado");
+ok(
+  /pr[oó]xima PR autorizada:\s*PR92\s*—\s*PR Executor supervisionado/i.test(indexText) ||
+  /PR92.*conclu[ií]da/i.test(indexText),
+  "52. INDEX.md registra PR92 (como proxima ou como concluida apos avanco)"
+);
 
 console.log(`\nRESULTADO PR91: ${PASSED} passed, ${FAILED} failed`);
 if (FAILED > 0) process.exit(1);

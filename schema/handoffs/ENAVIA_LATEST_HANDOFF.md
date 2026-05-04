@@ -1,29 +1,32 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR91 — PR Planner ✅
-**Para:** PR92 — PR Executor supervisionado
+**De:** PR92 — PR Executor supervisionado ✅
+**Para:** PR93 — Ready for Merge + Deploy TEST
 
-## Handoff atual (PR91)
+## Handoff atual (PR92)
 
 ### O que foi feito
 
-- Helper puro criado: `schema/enavia-pr-planner.js`.
-- Prova criada: `tests/pr91-pr-planner-schema.prova.test.js`.
-- Relatório criado: `schema/reports/PR91_PR_PLANNER.md`.
+- Helper puro criado: `schema/enavia-pr-executor-supervised.js`.
+- Prova criada: `tests/pr92-pr-executor-supervisionado-mock.prova.test.js` (66 cenários, 66 passando).
+- Relatório criado: `schema/reports/PR92_PR_EXECUTOR_SUPERVISIONADO.md`.
 - Governança mínima atualizada (`status`, `handoff`, `execution log`, `contracts/INDEX.md`).
+- PR91 teste atualizado para compatibilidade com avanço de INDEX.md (test 52: aceita PR92 como próxima ou concluída).
 
 ### O que foi confirmado no código real
 
-- Pacote PR-ready supervisionado é gerável e validável sem side effects.
-- `branch_name` é seguro e determinístico para o mesmo input.
-- Guardrails de bloqueio para merge automático, deploy PROD automático, secrets, outro repo, Enova, browser action e alteração direta de main estão ativos.
-- Flags de segurança do pacote permanecem fixas:
+- Executor supervisionado consome pacote PR-ready da PR91 e produz plano de execução supervisionado.
+- execution_steps determinísticos criados (7 steps, sem side effects reais).
+- Guardrails de segurança do plano permanecem fixos:
+  - `ready_for_merge=false`
   - `awaiting_human_approval=true`
   - `merge_allowed=false`
   - `prod_deploy_allowed=false`
   - `github_execution=false`
   - `side_effects=false`
+- Pacotes bloqueados pela PR91 continuam bloqueados no executor.
+- Nenhum step executa GitHub real, shell, escrita em disco ou rede.
 
 ### O que NÃO foi alterado
 
@@ -37,7 +40,11 @@
 
 ### Próxima etapa segura
 
-- Executar **PR92 — PR Executor supervisionado** usando o pacote PR-ready da PR91, sem merge automático e sem deploy PROD automático.
+- Executar **PR93 — Ready for Merge + Deploy TEST** para rodar testes/provas, anexar evidências e marcar:
+  - `ready_for_merge=true` (nos marcadores de estado, não em runtime)
+  - `awaiting_human_approval=true`
+  - `deploy_test_ready=true`
+  - `prod_blocked_until_human_approval=true`
 
 ---
 
