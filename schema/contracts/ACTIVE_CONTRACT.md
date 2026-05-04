@@ -2,11 +2,14 @@
 
 Contrato ativo atual:
 
-- Nenhum contrato ativo no momento.
+- 🟢 **`schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`**
+- **Frente:** Chat Livre + Cockpit Operacional (PR94–PR97)
+- **PR ativa:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit
+- **Tipo:** PR-DIAG
 
 Status:
 
-- ⏳ Aguardando próximo contrato/fase formal.
+- 🟢 Contrato ativo — PR94 em execução.
 
 Último contrato encerrado:
 

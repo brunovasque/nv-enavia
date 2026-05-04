@@ -1,10 +1,77 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR93 — Ready for Merge + Deploy TEST ✅
-**Para:** Aguardando próximo contrato/fase formal
+**De:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit 🟢
+**Para:** PR95 — Chat Livre Seguro
 
-## Handoff atual (PR93)
+## Handoff atual (PR94)
+
+### O que foi feito
+
+- Novo contrato ativado: `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`.
+- Diagnóstico read-only completo do chat/painel/runtime.
+- Relatório criado: `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`.
+- Teste de prova criado: `tests/pr94-chat-livre-cockpit-diagnostico.prova.test.js`.
+- Governança mínima atualizada (status, handoff, execution log, INDEX.md, ACTIVE_CONTRACT.md).
+
+### O que foi confirmado no diagnóstico
+
+**Pontos de engessamento identificados:**
+
+1. **Envelope JSON obrigatório** (`schema/enavia-cognitive-runtime.js` L350-355): `{"reply":"...","use_planner":...}` em toda resposta — estrutural, não remover, mas pode induzir mecânica.
+2. **Bloco MODO OPERACIONAL ATIVO** (L219-250): 15+ linhas de regras rígidas injetadas quando `is_operational_context=true`. Risco de falso positivo para diagnóstico técnico casual.
+3. **`target.mode=read_only` sempre** (L212-214): injetado em toda conversa com target ativo — correto como fato, mas sinaliza "modo restrito" em conversa casual.
+4. **Response Policy: `technical_diagnosis` → OPERATIONAL** (`schema/enavia-response-policy.js` L424-428): perguntas técnicas casuais ativam estilo operacional desnecessariamente.
+5. **QuickActions sem modo casual** (`panel/src/chat/QuickActions.jsx`): todos os 5 botões são operacionais — sem modo casual.
+6. **`planner_brief` sempre montado** (`panel/src/chat/useChatState.js` L186-209): todo envio inclui contexto de planner, inclusive "oi" ou conversa casual.
+
+**Onde o painel ajuda:**
+- Exibe target (contexto técnico real)
+- Bloqueia mode write/patch/deploy
+- Gate de aprovação humana visível
+- Badges de alvo ativo e memória aplicada
+- Histórico de conversa para continuidade
+
+**Onde o painel atrapalha:**
+- `mode=read_only` fixo envia sinal de modo restrito em TODA conversa
+- Apenas ações operacionais nos QuickActions — sem modo casual
+- `planner_brief` sempre montado induz intenção operacional implícita
+
+### Próxima PR: PR95 — Chat Livre Seguro
+
+**Recomendação do relatório PR94:** Opção E — combinação mínima response_policy + llm_core.
+
+**5 mudanças cirúrgicas:**
+1. `schema/enavia-response-policy.js`: `technical_diagnosis` → `CONVERSATIONAL` quando sem self_audit bloqueante
+2. `schema/enavia-llm-core.js`: reduzir densidade bloco "TOM AO BLOQUEAR" (8 linhas → 3 linhas)
+3. `schema/enavia-cognitive-runtime.js`: MODO OPERACIONAL ATIVO só para `execution_request` / `deploy_request`
+4. `schema/enavia-cognitive-runtime.js`: remover nota `read_only` do target em conversa casual
+5. `schema/enavia-response-policy.js`: caso limpo para `memory_request`, `skill_request`, `contract_request` → `CONVERSATIONAL`
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- painel/chat
+- `schema/enavia-response-policy.js`
+- `schema/enavia-llm-core.js`
+- PR Orchestrator PR90–PR93
+- Deploy loop PR86–PR89
+- Skill Factory
+- SELF_WORKER_AUDITOR
+
+### Próxima etapa segura
+
+- PR95 — Chat Livre Seguro (PR-IMPL, escopo Worker-only, máximo 5 mudanças cirúrgicas).
+- Usar relatório PR94 como diagnóstico base.
+- Tipo: PR-IMPL — requer este PR-DIAG como predecessora.
+
+---
+
+## Handoff anterior (PR93)
 
 ### O que foi feito
 
