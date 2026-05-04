@@ -1,12 +1,24 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR96 — Cockpit Passivo + Chat Legível ✅ CONCLUÍDA)
-**Branch ativa:** `codex/pr96-cockpit-passivo-chat-readable`
-**Última tarefa:** PR96 — Cockpit Passivo + Chat Legível ✅
+**Data:** 2026-05-04 (atualizado após PR97 — Prova Final ✅ CONCLUÍDA — Contrato PR94–PR97 ENCERRADO)
+**Branch ativa:** `copilot/pr97-chat-livre-cockpit-final`
+**Última tarefa:** PR97 — Prova Final ✅ — Contrato Chat Livre + Cockpit Encerrado ✅
 
 ## Estado atual do sistema
 
-## Atualização PR96
+## Atualização PR97
+
+- PR-PROVA final do contrato PR94–PR97 — Chat Livre + Cockpit Operacional.
+- Teste criado: `tests/pr97-chat-livre-cockpit-final.prova.test.js` (60 cenários).
+- Relatório criado: `schema/reports/PR97_CHAT_LIVRE_COCKPIT_FINAL.md`.
+- Contrato `CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` encerrado ✅.
+- ACTIVE_CONTRACT.md atualizado: aguardando próximo contrato/fase formal.
+- INDEX.md atualizado: PR94–PR97 encerrado, lista de contratos encerrados atualizada.
+- Nenhum runtime cognitivo alterado (enavia-response-policy.js, enavia-llm-core.js, enavia-cognitive-runtime.js, nv-enavia.js intocados).
+- Nenhum painel alterado.
+- **PR97 concluída ✅ — contrato PR94–PR97 encerrado.**
+- Próxima etapa: **Aguardando próximo contrato/fase formal.**
+
 
 - 5 mudanças cirúrgicas no painel/chat UI (sem runtime cognitivo):
   - `panel/src/chat/MessageBubble.jsx`: renderização por blocos (parágrafos + listas simples + markdown leve seguro) para evitar blocão.

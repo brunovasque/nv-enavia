@@ -1,21 +1,37 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR96 — Cockpit Passivo + Chat Legível ✅ CONCLUÍDA
-**Para:** PR97 — Prova Final
+**De:** PR97 — Prova Final ✅ CONCLUÍDA — Contrato PR94–PR97 ENCERRADO
+**Para:** Aguardando próximo contrato/fase formal
 
-## Handoff atual (PR96 ✅ CONCLUÍDA → PR97)
+## Handoff atual (PR97 ✅ CONCLUÍDA — Contrato encerrado)
 
 ### O que foi feito
 
-- Painel ajustado para cockpit passivo sem controlar tom da IA.
-- `MessageBubble.jsx` agora renderiza respostas em blocos legíveis (parágrafos/listas) sem `dangerouslySetInnerHTML`.
-- `useChatState.js` envia `planner_brief` apenas quando há intenção operacional/técnica real (`shouldSendPlannerBrief`).
-- `TargetPanel.jsx` suaviza visual de read-only e explicita `Execução exige aprovação`.
-- `TargetPanel` exibe metadata passiva: intenção sugerida, modo sugerido, risco, próxima ação e aprovação necessária.
-- `QuickActions.jsx` adiciona ação neutra `Conversa casual` mantendo botões operacionais.
-- Teste PR96 criado: `tests/pr96-cockpit-passivo-chat-readable.smoke.test.js`.
-- Relatório PR96 criado: `schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md`.
+- PR-PROVA final do contrato PR94–PR97: 60 cenários de prova integrada criados e executados.
+- Teste criado: `tests/pr97-chat-livre-cockpit-final.prova.test.js`.
+- Relatório criado: `schema/reports/PR97_CHAT_LIVRE_COCKPIT_FINAL.md`.
+- Contrato `CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` marcado como encerrado ✅.
+- `ACTIVE_CONTRACT.md` atualizado: aguardando próximo contrato/fase formal.
+- `INDEX.md` atualizado: PR94–PR97 encerrado na tabela de contratos encerrados.
+- Governança mínima atualizada (status, handoff, execution log).
+
+### O que foi provado
+
+- Conversa casual curta limpa: sem MODO OPERACIONAL ATIVO, sem nota read_only.
+- Intents leves (technical_diagnosis, system_state, memory_request, skill_request, contract_request) → CONVERSATIONAL.
+- Guardrails operacionais intactos (execution_request, deploy_request → OPERATIONAL/should_warn).
+- unauthorized_action e secret_exposure continuam bloqueados.
+- MessageBubble renderiza parágrafos/listas sem dangerouslySetInnerHTML.
+- shouldSendPlannerBrief omite casual curta e preserva operacional/técnico.
+- TargetPanel mostra linguagem segura/protegida.
+- Cockpit passivo mostra intenção/modo/risco/próxima ação/aprovação.
+- QuickActions mantém ações operacionais e ação casual.
+- PR Orchestrator PR90–PR93 preservado.
+- Deploy loop PR86–PR89 preservado.
+- Skill Factory/Runner preservados.
+- SELF_WORKER_AUDITOR preservado.
+- Gates humanos, PROD, merge e secrets preservados.
 
 ### O que NÃO foi alterado
 
@@ -27,11 +43,13 @@
 - `contract-executor.js`
 - `.github/workflows/deploy.yml`
 - `wrangler.toml`
+- `panel/**`
 
-### Próxima PR: PR97 — Prova Final
+### Próxima etapa
 
-- Rodar prova integrada final do contrato PR94–PR97.
-- Validar conversa casual, diagnóstico técnico, fluxo operacional supervisionado e preservação de guardrails.
+**Aguardando próximo contrato/fase formal.**
+
+O contrato PR94–PR97 (Chat Livre + Cockpit Operacional) está encerrado com sucesso.
 
 ---
 

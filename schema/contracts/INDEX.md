@@ -7,17 +7,16 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Ativo — PR97 é a próxima PR autorizada (2026-05-04)
+🟡 **Aguardando próximo contrato/fase formal.**
 
-Frente: Chat Livre + Cockpit Operacional  
-PR concluída: PR96 — Cockpit Passivo + Chat Legível ✅  
-Próxima PR autorizada: **PR97 — Prova Final** (PR-PROVA)
+Último contrato encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Encerrado ✅ em 2026-05-04 após PR97 — Prova Final.
 
 ---
 ## Contratos encerrados
 
 | Arquivo | PRs | Estado | Data de encerramento |
 |---------|-----|--------|----------------------|
+| `active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` | PR94–PR97 | Encerrado ✅ | 2026-05-04 |
 | `active/CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` | PR90–PR93 | Encerrado ✅ | 2026-05-04 |
 | `active/CONTRATO_ENAVIA_AUTOEVOLUCAO_OPERACIONAL_PR82_PR85.md` | PR82–PR85 | Encerrado ✅ | 2026-05-03 |
 | `active/CONTRATO_ENAVIA_SKILL_FACTORY_REAL_PR79_PR81.md` | PR79–PR81 | Encerrado ✅ | 2026-05-02 |
@@ -45,7 +44,9 @@ Próxima PR autorizada: **PR97 — Prova Final** (PR-PROVA)
 
 ## Próxima PR autorizada
 
-**PR97 — Prova Final** (após PR96 concluída)
+**Aguardando próximo contrato/fase formal.**
+
+> ✅ PR97 — Prova Final — concluída (2026-05-04, PR-PROVA; 60 cenários provados; contrato Chat Livre + Cockpit encerrado; relatório schema/reports/PR97_CHAT_LIVRE_COCKPIT_FINAL.md; nenhum runtime alterado).
 
 > ✅ PR96 concluída — Cockpit Passivo + Chat Legível (2026-05-04, escopo Panel-only; 5 mudanças cirúrgicas em MessageBubble/useChatState/TargetPanel/QuickActions/ChatPage; relatório schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md; smoke PR96 criado e bateria obrigatória executada).
 
