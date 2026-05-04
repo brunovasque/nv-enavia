@@ -4,6 +4,44 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-04 — PR91 — PR-IMPL — PR Planner (schema/modelo + helper puro)
+
+- **Branch:** `codex/pr91-pr-planner`
+- **Tipo:** PR-IMPL (Schema + Tests + Docs + governança mínima)
+- **Contrato:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (Ativo ✅)
+- **PR anterior validada:** PR90 ✅
+
+### Objetivo
+
+Implementar o PR Planner supervisionado da Enavia sem endpoint novo, sem executor e sem integração GitHub real.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/enavia-pr-planner.js`
+- `tests/pr91-pr-planner-schema.prova.test.js`
+- `schema/reports/PR91_PR_PLANNER.md`
+
+**Arquivos atualizados (governança):**
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+- `schema/contracts/INDEX.md`
+
+### Resultado
+
+- Pacote PR-ready supervisionado agora pode ser gerado/validado por helper puro.
+- Campos obrigatórios e flags de segurança foram padronizados.
+- Bloqueios de pedidos perigosos implementados (merge auto, PROD auto, secrets, outro repo, Enova, browser action, alteração direta de main).
+- Nenhum runtime vivo alterado (`nv-enavia.js`, `executor/src/index.js`, `contract-executor.js` preservados).
+- Próxima PR autorizada avançada para PR92 — PR Executor supervisionado.
+
+### Rollback
+
+Reverter o commit da PR91 com `git revert <commit>`.
+
+---
+
 ## 2026-05-03 — PR90 — PR-DIAG — Diagnóstico READ-ONLY do PR Orchestrator
 
 - **Branch:** `codex/pr90-diagnostico-pr-orchestrator`

@@ -1,8 +1,45 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-05-03
-**De:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator ✅
-**Para:** PR91 — PR Planner
+**Data:** 2026-05-04
+**De:** PR91 — PR Planner ✅
+**Para:** PR92 — PR Executor supervisionado
+
+## Handoff atual (PR91)
+
+### O que foi feito
+
+- Helper puro criado: `schema/enavia-pr-planner.js`.
+- Prova criada: `tests/pr91-pr-planner-schema.prova.test.js`.
+- Relatório criado: `schema/reports/PR91_PR_PLANNER.md`.
+- Governança mínima atualizada (`status`, `handoff`, `execution log`, `contracts/INDEX.md`).
+
+### O que foi confirmado no código real
+
+- Pacote PR-ready supervisionado é gerável e validável sem side effects.
+- `branch_name` é seguro e determinístico para o mesmo input.
+- Guardrails de bloqueio para merge automático, deploy PROD automático, secrets, outro repo, Enova, browser action e alteração direta de main estão ativos.
+- Flags de segurança do pacote permanecem fixas:
+  - `awaiting_human_approval=true`
+  - `merge_allowed=false`
+  - `prod_deploy_allowed=false`
+  - `github_execution=false`
+  - `side_effects=false`
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- painel/chat
+- integração GitHub real
+
+### Próxima etapa segura
+
+- Executar **PR92 — PR Executor supervisionado** usando o pacote PR-ready da PR91, sem merge automático e sem deploy PROD automático.
+
+---
 
 ## Handoff atual (PR90)
 

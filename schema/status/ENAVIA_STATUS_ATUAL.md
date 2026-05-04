@@ -1,10 +1,27 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-03 (atualizado após PR90 — Diagnóstico READ-ONLY do PR Orchestrator ✅)
-**Branch ativa:** `codex/pr90-diagnostico-pr-orchestrator`
-**Última tarefa:** PR90 — Diagnóstico READ-ONLY do PR Orchestrator
+**Data:** 2026-05-04 (atualizado após PR91 — PR Planner ✅)
+**Branch ativa:** `codex/pr91-pr-planner`
+**Última tarefa:** PR91 — PR Planner
 
 ## Estado atual do sistema
+
+## Atualização PR91
+
+- Helper puro criado: `schema/enavia-pr-planner.js`.
+- Teste de prova criado: `tests/pr91-pr-planner-schema.prova.test.js`.
+- Relatório criado: `schema/reports/PR91_PR_PLANNER.md`.
+- Pacote PR-ready supervisionado agora pode ser gerado e validado sem side effects.
+- Guardrails confirmados:
+  - merge automático bloqueado;
+  - deploy PROD automático bloqueado;
+  - secrets, outro repo, Enova, browser action e alteração direta de main bloqueados;
+  - `awaiting_human_approval=true`, `merge_allowed=false`, `prod_deploy_allowed=false`, `github_execution=false`.
+- Não houve alteração de runtime vivo:
+  - `nv-enavia.js` preservado;
+  - `executor/src/index.js` preservado;
+  - `contract-executor.js` preservado.
+- Próxima PR autorizada: **PR92 — PR Executor supervisionado**.
 
 ## Atualização PR90
 
@@ -96,7 +113,7 @@
 
 ## Próxima PR autorizada
 
-PR90 — Diagnóstico READ-ONLY do PR Orchestrator
+PR92 — PR Executor supervisionado
 
 ---
 
