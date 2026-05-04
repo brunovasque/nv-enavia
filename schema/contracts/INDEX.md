@@ -7,7 +7,7 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — PR99 concluída ✅ — Próxima: PR100.
+🟢 **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — PR99 concluída ✅ — PR100 concluída ✅ — Próxima: PR101.
 
 Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Encerrado ✅ em 2026-05-04 após PR97 — Prova Final.
 
@@ -44,7 +44,9 @@ Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERAC
 
 ## Próxima PR autorizada
 
-**PR100 — Safety Guard / Anti-autodestruição** (PR99 concluída ✅ — PR100 autorizada)
+**PR101 — Prova Final** (PR100 concluída ✅ — PR101 autorizada)
+
+> ✅ PR100 concluída — Safety Guard / Anti-autodestruição (2026-05-04, PR-IMPL; schema/helper puro; sem runtime; `schema/enavia-safety-guard.js` e `schema/enavia-anti-loop.js` criados; 70/70 cenários passando; relatório `schema/reports/PR100_SAFETY_GUARD_ANTI_AUTODESTRUICAO.md`).
 
 > ✅ PR99 concluída — Event Log + Health Snapshot Unificado (2026-05-04, PR-IMPL; schema/helper puro; sem runtime; `schema/enavia-event-log.js` e `schema/enavia-health-snapshot.js` criados; 88/88 cenários passando; relatório `schema/reports/PR99_EVENT_LOG_HEALTH_SNAPSHOT.md`).
 
