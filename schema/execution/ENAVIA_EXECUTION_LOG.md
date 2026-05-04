@@ -1,7 +1,41 @@
 # ENAVIA — Execution Log
 
 
-## 2026-05-04 — PR97 — PR-PROVA — Prova Final Chat Livre + Cockpit
+## 2026-05-04 — PR98 — PR-DIAG — Diagnóstico Observabilidade + Autoproteção
+
+- **Branch:** `copilot/pr98-diagnostico-read-only`
+- **Tipo:** PR-DIAG (Docs-only + Tests — sem runtime)
+- **Contrato:** `CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` (Ativo 🟢)
+- **PR anterior validada:** PR97 ✅
+
+### Objetivo
+
+Diagnóstico read-only completo de observabilidade e autoproteção. Criar contrato PR98–PR101. Mapear o que existe, o que é parcial e o que está ausente para logs, health, status, execution, evidências, rollback, safety guards e detecção de risco.
+
+### Implementação (PR-DIAG — sem runtime)
+
+**Arquivos de teste/docs/governança:**
+- `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` (novo contrato)
+- `schema/reports/PR98_OBSERVABILIDADE_AUTOPROTECAO_DIAGNOSTICO.md`
+- `tests/pr98-observabilidade-autoprotecao-diagnostico.prova.test.js`
+- `schema/contracts/ACTIVE_CONTRACT.md` (atualizado)
+- `schema/contracts/INDEX.md` (atualizado)
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Resultado
+
+- Novo contrato PR98–PR101 criado e ativado.
+- Diagnóstico read-only completo: logs, health, execution log, audit log, self_audit, security supervisor, rollback, safety guards mapeados.
+- Lacunas identificadas: event log unificado, health snapshot consolidado, rate limiting, loop guard, rollback hints para chat.
+- Nenhum runtime alterado (nv-enavia.js, executor, contract-executor, deploy.yml, wrangler.toml, panel intocados).
+- Próxima PR autorizada: PR99 — Event Log + Health Snapshot Unificado (schema/helper puro).
+
+---
+
+
+
 
 - **Branch:** `copilot/pr97-chat-livre-cockpit-final`
 - **Tipo:** PR-PROVA (Tests + Docs/governança — sem runtime)

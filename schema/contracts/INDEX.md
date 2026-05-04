@@ -7,9 +7,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟡 **Aguardando próximo contrato/fase formal.**
+🟢 **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — Próxima: PR99.
 
-Último contrato encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Encerrado ✅ em 2026-05-04 após PR97 — Prova Final.
+Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Encerrado ✅ em 2026-05-04 após PR97 — Prova Final.
 
 ---
 ## Contratos encerrados
@@ -44,7 +44,9 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Próxima PR autorizada
 
-**Aguardando próximo contrato/fase formal.**
+**PR99 — Event Log + Health Snapshot Unificado** (PR98 concluída ✅ — PR99 autorizada)
+
+> ✅ PR98 concluída — Diagnóstico READ-ONLY de Observabilidade + Autoproteção (2026-05-04, escopo Docs-only + Tests; sem runtime; contrato `CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md` criado e ativado; relatório `schema/reports/PR98_OBSERVABILIDADE_AUTOPROTECAO_DIAGNOSTICO.md`; 56/56 testes passando).
 
 > ✅ PR97 — Prova Final — concluída (2026-05-04, PR-PROVA; 60 cenários provados; contrato Chat Livre + Cockpit encerrado; relatório schema/reports/PR97_CHAT_LIVRE_COCKPIT_FINAL.md; nenhum runtime alterado).
 

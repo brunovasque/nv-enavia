@@ -1,10 +1,31 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR97 — Prova Final ✅ CONCLUÍDA — Contrato PR94–PR97 ENCERRADO)
-**Branch ativa:** `copilot/pr97-chat-livre-cockpit-final`
-**Última tarefa:** PR97 — Prova Final ✅ — Contrato Chat Livre + Cockpit Encerrado ✅
+**Data:** 2026-05-04 (atualizado após PR98 — Diagnóstico Observabilidade + Autoproteção ✅ CONCLUÍDA)
+**Branch ativa:** `copilot/pr98-diagnostico-read-only`
+**Última tarefa:** PR98 — Diagnóstico READ-ONLY Observabilidade + Autoproteção ✅
 
 ## Estado atual do sistema
+
+## Atualização PR98
+
+- PR-DIAG read-only do contrato PR98–PR101 — Observabilidade + Autoproteção.
+- Novo contrato ativado: `schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`.
+- ACTIVE_CONTRACT.md atualizado: aponta PR98–PR101.
+- INDEX.md atualizado: contrato PR98–PR101 ativo, PR94–PR97 na tabela de encerrados.
+- Relatório criado: `schema/reports/PR98_OBSERVABILIDADE_AUTOPROTECAO_DIAGNOSTICO.md`.
+- Teste de prova criado: `tests/pr98-observabilidade-autoprotecao-diagnostico.prova.test.js`.
+- Diagnóstico read-only completo:
+  - Mapeados: logs (logNV), health (GET /health), execution log (task_execution_log), audit log (GET /audit-log).
+  - Mapeados: self_audit aditivo (10 categorias), operational awareness, security supervisor.
+  - Mapeados: rollback_ready no deploy loop, safety_notes na skill factory.
+  - Mapeados: PROHIBITED_ACTIONS (9) e REQUIRED_GATES (6) no autonomy-contract.
+  - Identificados: ausência de event log unificado, health snapshot consolidado, rate limiting, loop guard.
+  - Preservados: PR Orchestrator PR90–PR93, Chat Livre PR94–PR97, deploy loop PR86–PR89, Skill Factory, SELF_WORKER_AUDITOR.
+  - Recomendação PR99: schema/helper puro — Event Log + Health Snapshot (Opção A).
+  - Recomendação PR100: schema/helper puro — Safety Guard + Anti-loop.
+- Nenhum runtime alterado (nv-enavia.js, executor/src/index.js, contract-executor.js, deploy.yml, wrangler.toml, panel/** intocados).
+- **PR98 concluída ✅ — Diagnóstico read-only entregue.**
+- Próxima etapa: **PR99 — Event Log + Health Snapshot Unificado**.
 
 ## Atualização PR97
 
