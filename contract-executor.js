@@ -38,6 +38,12 @@ import {
   DECISION as SUPERVISOR_DECISION,
   REASON_CODE as SUPERVISOR_REASON_CODE,
 } from "./schema/security-supervisor.js";
+// 🌉 PR104 — GitHub Bridge Runtime supervisionado
+// CJS interop via esbuild/wrangler — schema/enavia-github-bridge.js usa module.exports
+import _githubBridgeNs from "./schema/enavia-github-bridge.js";
+const _buildGithubBridgePlan = _githubBridgeNs && _githubBridgeNs.buildGithubBridgePlan
+  ? _githubBridgeNs.buildGithubBridgePlan
+  : (input, ctx) => ({ ok: false, mode: "github_bridge_plan", error: "bridge_not_loaded", operations: [], blocked_operations: [], safety_summary: {}, event_summary: {}, requires_human_review: true, github_execution: false, side_effects: false, ready_for_real_execution: false, next_recommended_action: "Bridge module não disponível" });
 
 // ---------------------------------------------------------------------------
 // 🛡️ P26-PR2 — _runSupervisorGate(context)
@@ -4263,11 +4269,104 @@ function approveMerge({
 }
 
 // ---------------------------------------------------------------------------
+// _handleGithubBridgeRuntime(body) — PR104 — Runtime mínimo supervisionado
+//
+// Handler interno para modo github_bridge_runtime no endpoint /github-pr/action.
+// Normaliza o payload, chama buildGithubBridgePlan do schema/enavia-github-bridge.js
+// e retorna plano supervisionado com safety_summary, event_summary e bloqueios duros.
+//
+// Invariantes obrigatórias desta PR:
+//   - github_execution = false sempre
+//   - side_effects = false sempre
+//   - ready_for_real_execution = false sempre (sem aprovação humana explícita)
+//   - merge / deploy_prod / secret_change sempre bloqueados (via Bridge)
+//   - main direta bloqueada ou exige review (via Bridge)
+//   - nenhuma chamada real ao GitHub API
+//   - nenhum uso de gh CLI ou child_process
+//   - sem secrets expostos
+// ---------------------------------------------------------------------------
+function _handleGithubBridgeRuntime(body) {
+  // Validação de payload
+  if (!body || typeof body !== "object") {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "INVALID_PAYLOAD",
+        message: "Payload inválido para modo github_bridge_runtime.",
+        mode: "github_bridge_runtime",
+        github_execution: false,
+        side_effects: false,
+        ready_for_real_execution: false,
+      },
+    };
+  }
+
+  // Normalizar operações: aceita body.operations (array) ou body.operation (objeto único)
+  const rawOps = Array.isArray(body.operations)
+    ? body.operations
+    : body.operation && typeof body.operation === "object"
+      ? [body.operation]
+      : [];
+
+  if (rawOps.length === 0) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "NO_OPERATIONS",
+        message: "Nenhuma operação válida fornecida para o GitHub Bridge.",
+        mode: "github_bridge_runtime",
+        github_execution: false,
+        side_effects: false,
+        ready_for_real_execution: false,
+      },
+    };
+  }
+
+  // Contexto de execução (opcional)
+  const context = body.context && typeof body.context === "object" ? body.context : {};
+
+  // Construir plano supervisionado via GitHub Bridge helper (PR103)
+  const bridgePlan = _buildGithubBridgePlan({ operations: rawOps }, context);
+
+  const requires_human_review =
+    bridgePlan.requires_human_review ||
+    (bridgePlan.safety_summary && bridgePlan.safety_summary.any_review) ||
+    false;
+  const blocked_operations = Array.isArray(bridgePlan.blocked_operations)
+    ? bridgePlan.blocked_operations
+    : [];
+
+  return {
+    status: 200,
+    body: {
+      ok: bridgePlan.ok === true,
+      mode: "github_bridge_runtime",
+      bridge_plan: bridgePlan,
+      safety_summary: bridgePlan.safety_summary || {},
+      event_summary: bridgePlan.event_summary || {},
+      requires_human_review,
+      blocked_operations,
+      github_execution: false,
+      side_effects: false,
+      ready_for_real_execution: false,
+      next_recommended_action:
+        bridgePlan.next_recommended_action ||
+        "Aguardar aprovação humana antes de qualquer execução real no GitHub.",
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // handleGitHubPrAction(request, env) — POST /github-pr/action
 //
 // Route handler for GitHub/PR arm actions.
 // Reads { action, scope_approved, gates_context, drift_detected, regression_detected }
 // from request body and dispatches to executeGitHubPrAction().
+//
+// PR104 extension: if body.mode === "github_bridge_runtime", dispatches to
+// _handleGithubBridgeRuntime() instead (GitHub Bridge supervised planning).
 // ---------------------------------------------------------------------------
 async function handleGitHubPrAction(request) {
   let body;
@@ -4278,6 +4377,11 @@ async function handleGitHubPrAction(request) {
       status: 400,
       body: { ok: false, error: "INVALID_JSON", message: "Request body must be valid JSON." },
     };
+  }
+
+  // PR104 — GitHub Bridge Runtime supervisionado
+  if (body && body.mode === "github_bridge_runtime") {
+    return _handleGithubBridgeRuntime(body);
   }
 
   if (!body || typeof body.action !== "string") {

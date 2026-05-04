@@ -1,46 +1,45 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR103 — GitHub Bridge helper real supervisionado ✅ CONCLUÍDA
-**Para:** PR104 — Runtime mínimo supervisionado
+**De:** PR104 — Runtime mínimo supervisionado ✅ CONCLUÍDA
+**Para:** PR105 — Prova real supervisionada
 
-## Handoff atual (PR103 ✅ CONCLUÍDA — Contrato PR102–PR105 ATIVO)
+## Handoff atual (PR104 ✅ CONCLUÍDA — Contrato PR102–PR105 ATIVO)
 
 ### O que foi feito
 
-- `schema/enavia-github-bridge.js` criado com 7 funções puras supervisionadas.
-- `tests/pr103-github-bridge-helper-supervisionado.prova.test.js` criado: 69/69 ✅.
-- `schema/reports/PR103_GITHUB_BRIDGE_HELPER_SUPERVISIONADO.md` criado.
-- Contrato atualizado: PR103 ✅ — PR104 próxima autorizada.
-- INDEX atualizado: PR103 concluída, PR104 ⏳.
+- `contract-executor.js` atualizado: import de `schema/enavia-github-bridge.js` (CJS interop via esbuild) + `_handleGithubBridgeRuntime` + extensão de `handleGitHubPrAction` para `mode: "github_bridge_runtime"`.
+- `tests/pr104-github-bridge-runtime-minimo.prova.test.js` criado: 52/52 ✅.
+- `schema/reports/PR104_GITHUB_BRIDGE_RUNTIME_MINIMO.md` criado.
+- Contrato atualizado: PR104 ✅ — PR105 próxima autorizada.
+- INDEX atualizado: PR104 concluída, PR105 ⏳.
 - Governança mínima atualizada (status, handoff, execution log).
 
 ### O que foi implementado
 
-- `planCreateBranch` — planejamento de branch supervisionado
-- `planOpenPullRequest` — planejamento de abertura de PR supervisionado
-- `planUpdatePullRequest` — planejamento de atualização de PR supervisionado
-- `planCommentPullRequest` — planejamento de comentário em PR supervisionado
-- `validateGithubOperation` — validação com Safety Guard + regras de contrato
-- `buildGithubOperationEvent` — geração de evento Enavia via Event Log
-- `buildGithubBridgePlan` — agregação de múltiplas operações em plano supervisionado
+- `_handleGithubBridgeRuntime(body)` — handler interno que chama `buildGithubBridgePlan` do PR103
+- Modo `github_bridge_runtime` detectado em `handleGitHubPrAction` antes da lógica P24
+- Normalização de payload: aceita `operations` (array) ou `operation` (objeto único)
+- Resposta padronizada: `mode`, `bridge_plan`, `safety_summary`, `event_summary`, `blocked_operations`, `requires_human_review`, `github_execution=false`, `side_effects=false`, `ready_for_real_execution=false`
+- Rota `/github-pr/action` reaproveitada — nenhum endpoint novo criado
 
 ### O que foi protegido
 
-- `merge`, `deploy_prod`, `secret_change` — sempre bloqueados
-- Ausência de `repo`, `base_branch`, `head_branch` — erro controlado
-- Repo fora de `allowed_repos` — exige revisão humana
-- Health failed — bloqueia operações mutáveis
+- `merge`, `deploy_prod`, `secret_change` — sempre bloqueados (via GitHub Bridge PR103)
+- Repo sem allowlist — exige revisão humana
+- Health snapshot `failed` — bloqueia operações mutáveis
 - Event log blocked — exige revisão humana
-- Safety Guard integrado em toda validação
+- Safety Guard integrado em toda operação
+- Sem chamada real ao GitHub API, sem token, sem gh CLI, sem child_process
 
-### Próxima etapa segura (PR104)
+### Próxima etapa segura (PR105)
 
-- Plugar `schema/enavia-github-bridge.js` no runtime de forma supervisionada.
-- Adicionar handler que chame funções de planejamento do GitHub Bridge.
-- Integrar com Safety Guard + Event Log no fluxo runtime.
-- Ainda sem token real, sem chamada GitHub API efetiva.
-- Validar propagação de `blocked`, `requires_human_review`, `github_execution=false` no response.
+- Prova de operação real mínima no GitHub (create_branch ou comment)
+- Token GitHub supervisionado (via KV seguro ou env allowlistado)
+- Safety Guard validado em operação real
+- Event Log gerado com evidência real
+- Trava antes de merge/deploy_prod mantida
+- Relatório de prova com evidência real
 
 ---
 

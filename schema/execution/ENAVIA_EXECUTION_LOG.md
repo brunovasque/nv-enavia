@@ -1,7 +1,47 @@
 # ENAVIA — Execution Log
 
 
-## 2026-05-04 — PR103 — PR-IMPL — GitHub Bridge Helper Supervisionado
+## 2026-05-04 — PR104 — PR-IMPL — Runtime mínimo supervisionado do GitHub Bridge Real
+
+- **Branch:** `copilot/pr-104-runtime-minimo-supervisionado`
+- **Tipo:** PR-IMPL (integração mínima controlada)
+- **Contrato:** `CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md` (Ativo 🟢)
+- **PR anterior validada:** PR103 ✅
+
+### Objetivo
+
+Criar ponto mínimo controlado no runtime para usar o GitHub Bridge supervisionado (PR103), preservando Safety Guard, Event Log, Health Snapshot e bloqueios humanos.
+
+### Implementação
+
+**Arquivos modificados:**
+- `contract-executor.js` — import de `schema/enavia-github-bridge.js` + `_handleGithubBridgeRuntime` + extensão de `handleGitHubPrAction`
+
+**Arquivos criados:**
+- `tests/pr104-github-bridge-runtime-minimo.prova.test.js` (52 cenários)
+- `schema/reports/PR104_GITHUB_BRIDGE_RUNTIME_MINIMO.md`
+
+**Arquivos de governança atualizados:**
+- `schema/contracts/active/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+**Arquivos NÃO alterados (confirmados):**
+- `nv-enavia.js`, `schema/enavia-github-bridge.js`, `deploy.yml`, `wrangler.toml`, `panel/**`, `executor/src/index.js`
+
+### Resultado
+
+- 52/52 cenários passando no PR104 test
+- `github_execution=false`, `side_effects=false`, `ready_for_real_execution=false` em toda resposta
+- Rota `/github-pr/action` reaproveitada — sem endpoint novo
+- Nenhuma chamada real ao GitHub API
+- Próxima PR: PR105 — Prova real supervisionada ⏳
+
+---
+
+
 
 - **Branch:** `copilot/pr-103-github-bridge-helper`
 - **Tipo:** PR-IMPL (schema/helper puro — sem runtime)
