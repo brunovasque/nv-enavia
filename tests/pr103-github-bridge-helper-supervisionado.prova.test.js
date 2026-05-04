@@ -1,7 +1,7 @@
 /**
  * PR103 — GitHub Bridge helper real supervisionado — Prova
  *
- * Cenários: 76 (numerados 1–76)
+ * Cenários: 69 (numerados sequencialmente 1–69)
  *
  * Run:
  *   node tests/pr103-github-bridge-helper-supervisionado.prova.test.js
@@ -388,17 +388,14 @@ assert(panelFiles.length > 0, 'não alterou panel/** (diretório permanece váli
 // ── Seção M: Relatório PR103 ─────────────────────────────────────────────────
 console.log('\n--- M: Relatório PR103 ---');
 
-// 73
 assert(
   reportContent.length > 500 && reportContent.includes('PR103'),
   'relatório PR103 declara o que foi implementado',
 );
-// 74
 assert(
   reportContent.includes('não alterado') || reportContent.includes('intocado') || reportContent.includes('proibido'),
   'relatório PR103 declara o que não foi mexido',
 );
-// 75
 assert(
   reportContent.includes('PR104'),
   'relatório PR103 declara o que fica para PR104',
@@ -407,7 +404,6 @@ assert(
 // ── Seção N: INDEX avança para PR104 ────────────────────────────────────────
 console.log('\n--- N: INDEX avança para PR104 ---');
 
-// 76
 assert(
   indexContent.includes('PR104') &&
     (indexContent.includes('Runtime') || indexContent.includes('Pendente') || indexContent.includes('⬜')),
