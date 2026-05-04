@@ -25,7 +25,7 @@ import { getEnaviaConstitution } from "./enavia-constitution.js";
 import { renderOperationalAwarenessBlock } from "./operational-awareness.js";
 import { getEnaviaBrainContext } from "./enavia-brain-loader.js";
 import { buildLLMCoreBlock } from "./enavia-llm-core.js";
-import { buildResponsePolicyPromptBlock } from "./enavia-response-policy.js";
+import { buildResponsePolicyPromptBlock, RESPONSE_STYLES } from "./enavia-response-policy.js";
 
 /**
  * Monta o contexto cognitivo completo da Enavia em runtime.
@@ -207,16 +207,23 @@ export function buildChatSystemPrompt(opts = {}) {
     if (target.target_type) targetLines.push(`tipo: ${target.target_type}`);
     sections.push("", targetLines.join("\n"));
 
-    // PR36/PR38: read_only é nota factual de gate de execução, não regra de tom.
-    // Aparece sempre que há target com mode=read_only, independente do contexto operacional.
-    if (target.mode === "read_only") {
+    // PR36/PR38: read_only é nota factual de gate de execução.
+    // PR95: só injetada em contexto operacional real para não sinalizar "modo restrito"
+    // em conversa casual/diagnóstico leve onde essa nota seria desnecessária.
+    if (target.mode === "read_only" && is_operational_context) {
       sections.push("• Modo atual: read_only. Ações com efeito colateral (deploy, patch, merge, escrita) estão bloqueadas sem aprovação/contrato. Conversar, raciocinar, explicar, diagnosticar e planejar continuam livres.");
     }
   }
 
-  // Bloco comportamental operacional pesado: SOMENTE quando is_operational_context === true.
-  // hasActiveTarget sozinho não é suficiente — exige intenção operacional real detectada.
-  if (is_operational_context) {
+  // Bloco comportamental operacional pesado: SOMENTE quando is_operational_context === true
+  // E a response_policy não indica CONVERSATIONAL (i.e., a intenção é realmente operacional).
+  // PR95: diagnóstico técnico casual ou consulta simples com response_policy=CONVERSATIONAL
+  // não deve receber este bloco pesado, mesmo que is_operational_context seja verdadeiro.
+  const _hasRealOperationalIntent = is_operational_context && (
+    !response_policy
+    || response_policy.response_style !== RESPONSE_STYLES.CONVERSATIONAL
+  );
+  if (_hasRealOperationalIntent) {
     sections.push(
       "",
       "MODO OPERACIONAL ATIVO — REGRAS DE COMPORTAMENTO:",

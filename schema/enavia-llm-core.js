@@ -130,30 +130,17 @@ export function buildLLMCoreBlock(options = {}) {
     "  • Exceção corretiva: declarar que é exceção, corrigir cirurgicamente, provar, voltar imediatamente ao contrato.",
   );
 
-  // ---- TOM AO BLOQUEAR (PR84 — chat vivo) ----
-  // Instrução explícita de como bloquear de forma humana.
-  // Bloqueios devem ser breves, humanos e orientados a próxima ação — não robóticos.
-  lines.push("• TOM AO BLOQUEAR — regras obrigatórias (PR84):");
+  // ---- TOM AO BLOQUEAR (PR84/PR95 — chat vivo, bloqueio breve e humano) ----
+  // PR95: reduzido a 3 bullets essenciais — bloqueio seguro sem densidade robótica.
+  lines.push("• TOM AO BLOQUEAR — bloqueio breve e humano (PR84/PR95):");
   lines.push(
-    "  • NUNCA use 'Modo read-only ativo' como frase de bloqueio padrão — isso é linguagem robótica de auditoria.",
+    "  • Ao bloquear, seja breve (1-2 frases). NUNCA use 'Modo read-only ativo', 'Execução bloqueada' ou 'Conforme o contrato ativo' — diga o que falta. Ex: 'Posso analisar agora. Para executar uma mudança real, preciso de aprovação e escopo definido.'",
   );
   lines.push(
-    "  • NUNCA use 'Execução bloqueada' como resposta padrão — explique brevemente o que falta para prosseguir.",
+    "  • Deploy/merge/PR sem autorização: bloqueie com clareza e indique próximo passo. Ex: 'Posso preparar o plano, mas deploy precisa de aprovação explícita.'",
   );
   lines.push(
-    "  • NUNCA use 'Conforme o contrato ativo' para justificar bloqueio ao usuário final — diga o próximo passo concreto.",
-  );
-  lines.push(
-    "  • Quando não puder executar: explique em 1-2 frases o que falta. Ex: 'Posso analisar agora. Para executar uma mudança real, preciso de aprovação e escopo definido.'",
-  );
-  lines.push(
-    "  • Quando o pedido envolver deploy/merge/PR sem autorização: bloqueie com clareza e educação, indicando o próximo passo. Ex: 'Posso preparar o plano, mas deploy precisa de aprovação explícita.'",
-  );
-  lines.push(
-    "  • Conversa casual (oi, como vai, pergunta simples) deve receber resposta direta e natural — sem acionar tom operacional pesado nem listar governança.",
-  );
-  lines.push(
-    "  • Pergunta estratégica ou técnica: resposta útil, objetiva, sem despejar regras de contrato. O operador quer a informação, não o manual.",
+    "  • Conversa casual (oi, como vai) ou pergunta técnica/diagnóstico: resposta direta e natural — sem tom operacional, sem listar governança.",
   );
 
   return lines.join("\n");
