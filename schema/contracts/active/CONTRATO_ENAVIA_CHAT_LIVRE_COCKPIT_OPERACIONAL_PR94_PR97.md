@@ -1,7 +1,7 @@
 # CONTRATO ENAVIA — CHAT LIVRE + COCKPIT OPERACIONAL PR94–PR97
 
 **Data de criação:** 2026-05-04  
-**Estado:** 🟢 Ativo  
+**Estado:** 🔴 Encerrado ✅ (2026-05-04, após PR97 — Prova Final)  
 **Contrato anterior encerrado:** `CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93.md` (encerrado em 2026-05-04)
 
 ---
@@ -102,7 +102,7 @@ Ajustar painel para exibir intenção, modo sugerido, risco, próxima ação e a
 ### PR97 — Prova Final
 
 **Tipo:** PR-PROVA  
-**Estado:** 🟢 AUTORIZADA — próxima PR  
+**Estado:** ✅ DONE — 2026-05-04  
 
 **Objetivo:**  
 Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloqueios de segurança.
@@ -142,7 +142,7 @@ Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloq
 
 ## Próxima PR autorizada
 
-**PR97** — Prova Final (PR-PROVA). PR95 e PR96 concluídas ✅.
+**Contrato encerrado ✅** — PR97 concluída em 2026-05-04. Aguardando próximo contrato/fase formal.
 
 ---
 
@@ -153,4 +153,4 @@ Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloq
 | PR94 | PR-DIAG | ✅ DONE | 2026-05-04 | Diagnóstico read-only do chat livre + cockpit |
 | PR95 | PR-IMPL | ✅ DONE | 2026-05-04 | Chat livre seguro — 4 mudanças cirúrgicas |
 | PR96 | PR-IMPL | ✅ DONE | 2026-05-04 | Cockpit passivo + chat legível (painel) |
-| PR97 | PR-PROVA | 🟢 AUTORIZADA | — | Prova final |
+| PR97 | PR-PROVA | ✅ DONE | 2026-05-04 | Prova final — contrato encerrado ✅ |
