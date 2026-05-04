@@ -278,7 +278,7 @@ const panelFiles = [
 ];
 // Panel files devem existir (PR96) mas não foram alterados nesta PR
 assert(
-  panelFiles.every(f => fileExists(f)),
+  panelFiles.every(filePath => fileExists(filePath)),
   "painel preservado (arquivos PR96 existem mas não foram tocados nesta PR)"
 );
 
