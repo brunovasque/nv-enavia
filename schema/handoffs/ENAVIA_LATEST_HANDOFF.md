@@ -1,47 +1,50 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR102 — Diagnóstico READ-ONLY do GitHub Bridge Real ✅ CONCLUÍDA
-**Para:** PR103 — GitHub Bridge helper real supervisionado
+**De:** PR103 — GitHub Bridge helper real supervisionado ✅ CONCLUÍDA
+**Para:** PR104 — Runtime mínimo supervisionado
 
-## Handoff atual (PR102 ✅ CONCLUÍDA — Contrato PR102–PR105 ATIVO)
+## Handoff atual (PR103 ✅ CONCLUÍDA — Contrato PR102–PR105 ATIVO)
 
 ### O que foi feito
 
-- Contrato criado e ativado: `schema/contracts/active/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md`.
-- `schema/contracts/ACTIVE_CONTRACT.md` atualizado para o novo contrato ativo.
-- `schema/contracts/INDEX.md` atualizado com PR102 concluída e PR103 como próxima.
-- Relatório criado: `schema/reports/PR102_GITHUB_BRIDGE_REAL_DIAGNOSTICO.md`.
-- Prova criada: `tests/pr102-github-bridge-real-diagnostico.prova.test.js`.
+- `schema/enavia-github-bridge.js` criado com 7 funções puras supervisionadas.
+- `tests/pr103-github-bridge-helper-supervisionado.prova.test.js` criado: 69/69 ✅.
+- `schema/reports/PR103_GITHUB_BRIDGE_HELPER_SUPERVISIONADO.md` criado.
+- Contrato atualizado: PR103 ✅ — PR104 próxima autorizada.
+- INDEX atualizado: PR103 concluída, PR104 ⏳.
 - Governança mínima atualizada (status, handoff, execution log).
 
-### O que foi diagnosticado
+### O que foi implementado
 
-- Existe superfície lógica P24 para GitHub/PR (`/github-pr/*`) com enforcement e gate de merge.
-- Existe cobertura de testes P24 para enforcement e aprovação formal de merge.
-- Não existe adapter GitHub API real (branch/open_pr/update_pr/comment com autenticação real).
-- Não há uso ativo de `api.github.com`, `octokit` ou token GitHub no runtime desse fluxo.
-- Safety Guard/Event Log/Health Snapshot/Anti-loop estão prontos para proteger a integração real.
-- Merge automático segue proibido.
-- Deploy PROD automático segue proibido.
-- Nenhum runtime foi alterado nesta PR.
+- `planCreateBranch` — planejamento de branch supervisionado
+- `planOpenPullRequest` — planejamento de abertura de PR supervisionado
+- `planUpdatePullRequest` — planejamento de atualização de PR supervisionado
+- `planCommentPullRequest` — planejamento de comentário em PR supervisionado
+- `validateGithubOperation` — validação com Safety Guard + regras de contrato
+- `buildGithubOperationEvent` — geração de evento Enavia via Event Log
+- `buildGithubBridgePlan` — agregação de múltiplas operações em plano supervisionado
 
-### Próxima etapa segura (PR103)
+### O que foi protegido
 
-- Criar helper `schema/enavia-github-bridge.js` supervisionado com:
-  - `plan_create_branch`
-  - `plan_open_pr`
-  - `plan_update_pr`
-  - `plan_comment_pr`
-  - `build_github_operation_event`
-  - `validate_github_operation`
-- Sem plugar runtime ainda se não for seguro.
-- Sem usar token real na PR103.
-- Sem merge automático e sem deploy PROD automático.
+- `merge`, `deploy_prod`, `secret_change` — sempre bloqueados
+- Ausência de `repo`, `base_branch`, `head_branch` — erro controlado
+- Repo fora de `allowed_repos` — exige revisão humana
+- Health failed — bloqueia operações mutáveis
+- Event log blocked — exige revisão humana
+- Safety Guard integrado em toda validação
+
+### Próxima etapa segura (PR104)
+
+- Plugar `schema/enavia-github-bridge.js` no runtime de forma supervisionada.
+- Adicionar handler que chame funções de planejamento do GitHub Bridge.
+- Integrar com Safety Guard + Event Log no fluxo runtime.
+- Ainda sem token real, sem chamada GitHub API efetiva.
+- Validar propagação de `blocked`, `requires_human_review`, `github_execution=false` no response.
 
 ---
 
-## Handoff anterior (PR101 ✅ CONCLUÍDA — Contrato PR98–PR101 ENCERRADO)
+## Handoff anterior (PR102 ✅ CONCLUÍDA — Contrato PR102–PR105 ATIVO)
 
 ### O que foi feito
 
