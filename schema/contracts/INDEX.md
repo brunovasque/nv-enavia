@@ -7,9 +7,13 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-⬜ **Sem contrato ativo** — aguardando próximo contrato/fase formal.
+🟢 **`active/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md`** — Ativo (criado em 2026-05-04).
 
-Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — Encerrado ✅ em 2026-05-04 após PR101 — Prova Final (90/90 cenários).
+Estado atual da frente:
+- PR102 (PR-DIAG): ✅ Concluída em 2026-05-04
+- PR103 (PR-IMPL): ⏳ Próxima autorizada
+- PR104 (PR-IMPL): ⬜ Pendente
+- PR105 (PR-PROVA): ⬜ Pendente
 
 ---
 ## Contratos encerrados
@@ -45,7 +49,7 @@ Contrato anterior encerrado: **`active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTE
 
 ## Próxima frente recomendada
 
-**GitHub Bridge Real** — aguardando novo contrato formal.
+**GitHub Bridge Real** — contrato formal ativo PR102–PR105.
 
 > ✅ PR101 concluída — Prova Final de Observabilidade + Autoproteção (2026-05-04, PR-PROVA; 90/90 cenários provados; contrato PR98–PR101 encerrado; relatório `schema/reports/PR101_OBSERVABILIDADE_AUTOPROTECAO_FINAL.md`; nenhum runtime alterado).
 
