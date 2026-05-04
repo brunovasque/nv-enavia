@@ -7,12 +7,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-⏳ **Aguardando próximo contrato/fase formal.**
+🟢 **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Ativo — PR95 é a próxima PR autorizada (2026-05-04)
 
-Nenhum contrato ativo no momento.
-O contrato PR90–PR93 foi encerrado com sucesso após PR93 — Ready for Merge + Deploy TEST.
-
-Próxima ativação: definir novo contrato para a próxima frente da Enavia.
+Frente: Chat Livre + Cockpit Operacional  
+PR concluída: PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit ✅  
+Próxima PR autorizada: **PR95 — Chat Livre Seguro** (PR-IMPL)
 
 ---
 ## Contratos encerrados
@@ -46,7 +45,9 @@ Próxima ativação: definir novo contrato para a próxima frente da Enavia.
 
 ## Próxima PR autorizada
 
-**Aguardando próximo contrato/fase formal.**
+**PR95 — Chat Livre Seguro** (PENDING — aguardando merge da PR94)
+
+> ✅ PR94 concluída — Diagnóstico READ-ONLY do Chat Livre + Cockpit (2026-05-04, escopo Tests + Docs/governança mínima; sem runtime; relatório `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`; contrato `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` criado e ativado).
 
 > ✅ PR93 concluída — Ready for Merge + Deploy TEST (2026-05-04, escopo helper puro + testes + relatório + governança; sem runtime vivo; relatório `schema/reports/PR93_READY_FOR_MERGE_DEPLOY_TEST.md`). **Contrato PR90–PR93 encerrado.**
 

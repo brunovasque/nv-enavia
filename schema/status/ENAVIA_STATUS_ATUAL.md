@@ -1,10 +1,34 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR93 — Ready for Merge + Deploy TEST ✅)
-**Branch ativa:** `copilot/pr93-implementacao-contrato-ativo`
-**Última tarefa:** PR93 — Ready for Merge + Deploy TEST
+**Data:** 2026-05-04 (atualizado após PR94 — Diagnóstico Chat Livre + Cockpit ✅ CONCLUÍDA)
+**Branch ativa:** `copilot/pr94-diagnostico-chat-livre-cockpit`
+**Última tarefa:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit ✅
 
 ## Estado atual do sistema
+
+## Atualização PR94
+
+- Novo contrato ativado: `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`.
+- ACTIVE_CONTRACT.md atualizado: aponta PR94–PR97.
+- INDEX.md atualizado: contrato PR94–PR97 ativo, PR90–PR93 encerrado.
+- Relatório criado: `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`.
+- Teste de prova criado: `tests/pr94-chat-livre-cockpit-diagnostico.prova.test.js`.
+- Diagnóstico read-only completo:
+  - Mapeados: painel, chat, response policy, llm core, brain loader, intent classifier.
+  - Identificados: 6 pontos de engessamento (JSON envelope, modo operacional pesado, target read_only sempre, QuickActions sem modo casual, planner_brief sempre montado, fallback do KV).
+  - Preservados: PR Orchestrator PR90–PR93, deploy loop PR86–PR89, Skill Factory, SELF_WORKER_AUDITOR, guardrails de segurança.
+  - Recomendação PR95: Opção E — combinação mínima response_policy + llm_core (5 mudanças cirúrgicas).
+  - Recomendação PR96: Cockpit passivo — 5 mudanças no painel.
+- Não houve alteração de runtime vivo:
+  - `nv-enavia.js` preservado;
+  - `executor/src/index.js` preservado;
+  - `contract-executor.js` preservado;
+  - `schema/enavia-response-policy.js` preservado;
+  - `schema/enavia-llm-core.js` preservado;
+  - painel preservado.
+- Contrato PR94–PR97 ativo.
+- **PR94 concluída ✅ — Diagnóstico read-only entregue.**
+- Próxima etapa: **PR95 — Chat Livre Seguro** (PR-IMPL, autorizada).
 
 ## Atualização PR93
 

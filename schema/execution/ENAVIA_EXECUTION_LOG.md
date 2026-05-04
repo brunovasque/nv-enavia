@@ -4,6 +4,54 @@ Histórico cronológico de execuções de tarefas/PRs sob o contrato ativo.
 
 ---
 
+## 2026-05-04 — PR94 — PR-DIAG — Diagnóstico READ-ONLY do Chat Livre + Cockpit
+
+- **Branch:** `copilot/pr94-diagnostico-chat-livre-cockpit`
+- **Tipo:** PR-DIAG (READ-ONLY)
+- **Contrato:** `CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` (Ativo 🟢)
+- **PR anterior validada:** PR93 ✅ (contrato PR90–PR93 encerrado)
+
+### Objetivo
+
+Inaugurar o novo contrato Chat Livre + Cockpit Operacional (PR94–PR97), diagnosticando sem alterar runtime onde o painel/chat força JSON, checklist, read-only, headings, passos, tom de relatório ou governança em conversa comum.
+
+### Implementação
+
+**Arquivos criados:**
+- `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`
+- `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`
+- `tests/pr94-chat-livre-cockpit-diagnostico.prova.test.js`
+
+**Arquivos atualizados (governança):**
+- `schema/contracts/ACTIVE_CONTRACT.md`
+- `schema/contracts/INDEX.md`
+- `schema/status/ENAVIA_STATUS_ATUAL.md`
+- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
+- `schema/execution/ENAVIA_EXECUTION_LOG.md` (este arquivo)
+
+### Diagnóstico realizado (read-only)
+
+6 pontos de engessamento identificados:
+1. Envelope JSON obrigatório em toda resposta (estrutural — não remover, mas induz mecânica)
+2. Bloco MODO OPERACIONAL ATIVO (15+ linhas) com risco de falso positivo
+3. `target.mode=read_only` injetado em toda conversa com target ativo
+4. Response Policy: `technical_diagnosis` → OPERATIONAL desnecessariamente
+5. QuickActions sem modo casual (só ações operacionais)
+6. `planner_brief` sempre montado, inclusive em conversa casual
+
+### Resultado
+
+- Contrato PR94–PR97 criado e ativado.
+- ACTIVE_CONTRACT e INDEX atualizados.
+- Relatório PR94 com diagnóstico completo (10 seções).
+- Teste de prova: 55 asserts.
+- Nenhum runtime vivo alterado.
+- **PR94 concluída ✅ — diagnóstico entregue.**
+- Próxima PR autorizada: **PR95 — Chat Livre Seguro** (PR-IMPL).
+- Smoke tests confirmados: PR93 ✅, PR92 ✅, PR91 ✅, PR90 ✅, PR84 ✅, PR59 ✅.
+
+---
+
 ## 2026-05-04 — PR93 — PR-PROVA/PR-HARDENING — Ready for Merge + Deploy TEST
 
 - **Branch:** `copilot/pr93-implementacao-contrato-ativo`
