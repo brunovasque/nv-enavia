@@ -223,8 +223,8 @@ describe('Grupo 6 — Normalização de valores inválidos');
     ? createEnaviaEvent({ source: 'x', type: 'y', severity: 'super_critical', status: 'ok', message: 'm' })
     : null;
   assert(
-    r && r.ok && (r.event.severity === 'warning' || r.event.severity === 'info' || r.error),
-    'severity inválida vira warning/info ou erro controlado'
+    r && r.ok && (r.event.severity === 'warning' || r.error),
+    'severity inválida vira warning ou erro controlado'
   );
 }
 

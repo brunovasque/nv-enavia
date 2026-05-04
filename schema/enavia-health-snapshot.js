@@ -103,7 +103,7 @@ function evaluateSubsystemHealth(subsystem, events, options) {
   if (critical_count > 0 || failed_count > 0) {
     status = 'failed';
   } else if (blocked_count > 0) {
-    status = blocked_count > 0 && requires_human_review ? 'blocked' : 'degraded';
+    status = requires_human_review ? 'blocked' : 'degraded';
   } else if (error_count > 0) {
     status = 'degraded';
   }
