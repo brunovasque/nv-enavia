@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useChatState } from "../chat/useChatState";
+import { useChatState, shouldSendPlannerBrief } from "../chat/useChatState";
 import { useTargetState } from "../chat/useTargetState";
 import { useAttachments } from "../chat/useAttachments";
 import { usePlannerStore } from "../store/plannerStore";
@@ -9,6 +9,50 @@ import ChatComposer from "../chat/ChatComposer";
 import TargetPanel from "../chat/TargetPanel";
 import AttachmentBar from "../chat/AttachmentBar";
 import QuickActions from "../chat/QuickActions";
+
+const REQUEST_TYPE_LABELS = {
+  tactical_plan: "Plano tático",
+  technical_diagnosis: "Diagnóstico técnico",
+  execution_request: "Execução",
+  deploy_request: "Deploy",
+  skill_request: "Skill",
+  contract_request: "Contrato",
+  conversation: "Conversa",
+};
+
+function inferSuggestedIntent(messages, plannerSnapshot) {
+  const requestType = plannerSnapshot?.classification?.request_type;
+  if (typeof requestType === "string" && requestType.length > 0) {
+    return REQUEST_TYPE_LABELS[requestType] || requestType;
+  }
+
+  const lastUser = [...messages].reverse().find((m) => m.role === "user" && typeof m.content === "string");
+  if (!lastUser) return "—";
+  return shouldSendPlannerBrief(lastUser.content, messages) ? "Operacional sugerida" : "Conversa sugerida";
+}
+
+function buildPassiveCockpit(messages, plannerSnapshot) {
+  const suggestedIntent = inferSuggestedIntent(messages, plannerSnapshot);
+  const isOperational = suggestedIntent !== "—" && suggestedIntent !== "Conversa" && suggestedIntent !== "Conversa sugerida";
+  const suggestedMode = isOperational ? "Protegido" : "Seguro";
+  const risk = plannerSnapshot?.classification?.risk_level || "não avaliado";
+  const firstStep = plannerSnapshot?.canonicalPlan?.steps?.[0];
+  const nextAction = plannerSnapshot?.canonicalPlan?.next_action
+    || (typeof firstStep === "string" ? firstStep : firstStep?.label || firstStep?.action)
+    || "aguardando contexto";
+  const gate = plannerSnapshot?.gate;
+  const approvalRequired = typeof gate?.needs_human_approval === "boolean"
+    ? gate.needs_human_approval
+    : true;
+
+  return {
+    suggestedIntent,
+    suggestedMode,
+    risk,
+    nextAction: typeof nextAction === "string" ? nextAction : "aguardando contexto",
+    approvalRequired,
+  };
+}
 
 // ── Empty State — cara forte de produto ────────────────────────────
 function EmptyState({ onSend, onInputChange, onSeed }) {
@@ -179,6 +223,7 @@ export default function ChatPage() {
 
   const { plannerSnapshot } = usePlannerStore();
   const hasPendingPlan = !!plannerSnapshot;
+  const cockpit = buildPassiveCockpit(messages, plannerSnapshot);
 
   // Memory is only available in real mode (endpoint /memory/manual requires backend)
   const memoryAvailable = getApiConfig().mode === "real";
@@ -265,6 +310,9 @@ export default function ChatPage() {
           disabled={thinking}
           pendingPlan={hasPendingPlan}
           memoryAvailable={memoryAvailable}
+          onCasual={() => {
+            if (!inputValue.trim()) setInputValue("Oi");
+          }}
           onValidate={() => validateSystem(buildContext())}
           onGeneratePlan={() => {
             // Fix 1: use the actual user instruction; clear the input after capturing it.
@@ -283,6 +331,7 @@ export default function ChatPage() {
           target={target}
           onUpdate={updateTarget}
           onReset={resetTarget}
+          cockpit={cockpit}
         />
 
         {/* Attachment bar */}

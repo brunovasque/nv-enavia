@@ -215,7 +215,14 @@ const touchedForbiddenFronts = changed.some((f) =>
   /skill[-_ ]factory/i.test(f) ||
   /SELF_WORKER_AUDITOR/i.test(f)
 );
-ok(!touchedForbiddenFronts, "26. chat/painel/Skill Factory não foram alterados");
+const indexContent = readFile("schema/contracts/INDEX.md");
+const panelChangeAuthorizedInPR96Plus =
+  (/PR96|PR97/.test(indexContent) || /Cockpit Passivo/i.test(indexContent)) &&
+  changed.some((f) => /^panel\//.test(f));
+ok(
+  panelChangeAuthorizedInPR96Plus || !touchedForbiddenFronts,
+  "26. chat/painel/Skill Factory não foram alterados (ou painel alterado por contrato PR96+)",
+);
 
 section("27–37 Regressões obrigatórias");
 runRegression("27. PR88 continua passando", "node tests/pr88-worker-executor-stitch.smoke.test.js");

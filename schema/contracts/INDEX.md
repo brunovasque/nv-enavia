@@ -7,11 +7,11 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Ativo — PR96 é a próxima PR autorizada (2026-05-04)
+🟢 **`active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`** — Ativo — PR97 é a próxima PR autorizada (2026-05-04)
 
 Frente: Chat Livre + Cockpit Operacional  
-PR concluída: PR95 — Chat Livre Seguro ✅  
-Próxima PR autorizada: **PR96 — Cockpit Passivo** (PR-IMPL)
+PR concluída: PR96 — Cockpit Passivo + Chat Legível ✅  
+Próxima PR autorizada: **PR97 — Prova Final** (PR-PROVA)
 
 ---
 ## Contratos encerrados
@@ -45,9 +45,11 @@ Próxima PR autorizada: **PR96 — Cockpit Passivo** (PR-IMPL)
 
 ## Próxima PR autorizada
 
-**PR96 — Cockpit Passivo** (aguardando merge da PR95)
+**PR97 — Prova Final** (após PR96 concluída)
 
-> ✅ PR95 concluída — Chat Livre Seguro (2026-05-04, escopo chat runtime/policy; 4 mudanças cirúrgicas em enavia-response-policy.js, enavia-llm-core.js, enavia-cognitive-runtime.js; relatório `schema/reports/PR95_CHAT_LIVRE_SEGURO.md`; 51/51 smoke tests passando).
+> ✅ PR96 concluída — Cockpit Passivo + Chat Legível (2026-05-04, escopo Panel-only; 5 mudanças cirúrgicas em MessageBubble/useChatState/TargetPanel/QuickActions/ChatPage; relatório schema/reports/PR96_COCKPIT_PASSIVO_CHAT_READABLE.md; smoke PR96 criado e bateria obrigatória executada).
+
+> ✅ PR95 concluída — Chat Livre Seguro (2026-05-04, escopo chat runtime/policy; 4 mudanças cirúrgicas em enavia-response-policy.js, enavia-llm-core.js, enavia-cognitive-runtime.js; relatório schema/reports/PR95_CHAT_LIVRE_SEGURO.md; 51/51 smoke tests passando).
 
 > ✅ PR94 concluída — Diagnóstico READ-ONLY do Chat Livre + Cockpit (2026-05-04, escopo Tests + Docs/governança mínima; sem runtime; relatório `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`; contrato `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md` criado e ativado).
 
@@ -148,6 +150,7 @@ Próxima PR autorizada: **PR96 — Cockpit Passivo** (PR-IMPL)
 - **PR28** ✅ (PR-DOCS, mergeada — PR #189, commit merge `daefe36`) — `schema/skills/SYSTEM_MAPPER.md` criado (23 seções, terceira skill oficial) + `schema/skills/INDEX.md` atualizado.
 - **PR29** ✅ (PR-DOCS) — `schema/skills/CONTRACT_AUDITOR.md` criado (24 seções, quarta skill oficial supervisionada) + `schema/skills/INDEX.md` atualizado.
 - **PR30** ✅ (PR-DOCS/PR-PROVA) — Fechamento, hardening e handoff final. Contrato encerrado.
+
 
 
 
