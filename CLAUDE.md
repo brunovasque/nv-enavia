@@ -1,5 +1,12 @@
 # CLAUDE.md — Regras operacionais do repo nv-enavia
 
+## Permissões
+Todas as operações são pré-aprovadas neste repo:
+- Leitura e escrita de arquivos
+- Execução de comandos bash/shell
+- Operações git (commit, branch, push)
+- Sem necessidade de confirmação para operações locais
+
 ## 1. Regra obrigatória inicial
 
 Antes de qualquer ação, leia este arquivo inteiro.
