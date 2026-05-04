@@ -170,8 +170,8 @@ O contrato PR98–PR101 está encerrado quando:
 
 | PR | Tipo | Estado |
 |----|------|--------|
-| PR98 | PR-DIAG | 🟡 Em execução |
-| PR99 | PR-IMPL | ⬜ Aguardando PR98 |
+| PR98 | PR-DIAG | ✅ Concluída |
+| PR99 | PR-IMPL | 🟡 Próxima autorizada |
 | PR100 | PR-IMPL | ⬜ Aguardando PR99 |
 | PR101 | PR-PROVA | ⬜ Aguardando PR100 |
 

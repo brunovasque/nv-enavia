@@ -2,7 +2,7 @@
 
 Contrato ativo:
 
-- 🟢 **`schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 em execução.
+- 🟢 **`schema/contracts/active/CONTRATO_ENAVIA_OBSERVABILIDADE_AUTOPROTECAO_PR98_PR101.md`** — **Ativo ✅ desde 2026-05-04** — PR98 concluída ✅ — Próxima: PR99.
 
 Contrato anterior encerrado:
 
@@ -11,8 +11,8 @@ Contrato anterior encerrado:
 Status:
 
 - 🟢 **Contrato OBSERVABILIDADE + AUTOPROTEÇÃO PR98–PR101 ativo.**
-- PR98 (PR-DIAG read-only) em execução — 2026-05-04.
-- Próxima PR autorizada após PR98: **PR99 — Event Log + Health Snapshot Unificado**.
+- PR98 (PR-DIAG read-only) concluída ✅ — 2026-05-04.
+- Próxima PR autorizada: **PR99 — Event Log + Health Snapshot Unificado**.
 
 Contratos anteriores encerrados (referência histórica):
 
@@ -27,7 +27,7 @@ O histórico completo permanece em `schema/contracts/INDEX.md`.
 
 Histórico imediato concluído:
 
-- PR97 concluída ✅ (prova final — contrato PR94–PR97 encerrado — 2026-05-04).
+- PR98 concluída ✅ (diagnóstico read-only — 2026-05-04).
 - PR96 concluída ✅ (cockpit passivo + chat legível no painel — 2026-05-04).
 - PR95 concluída ✅ (chat livre seguro — runtime/policy — 2026-05-04).
 - PR94 concluída ✅ (diagnóstico read-only — chat livre + cockpit — 2026-05-04).

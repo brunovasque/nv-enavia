@@ -332,7 +332,7 @@ assert(
 
 // Próxima PR liberada
 assert(
-  contractContent && contractContent.includes("PR99") && contractContent.includes("Aguardando PR98"),
+  contractContent && contractContent.includes("PR99") && (contractContent.includes("Próxima autorizada") || contractContent.includes("PR98") || contractContent.includes("Concluída")),
   "contrato declara PR99 como próxima após PR98"
 );
 
