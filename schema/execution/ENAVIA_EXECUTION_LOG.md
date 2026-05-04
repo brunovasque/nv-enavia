@@ -44,10 +44,11 @@ Inaugurar o novo contrato Chat Livre + Cockpit Operacional (PR94–PR97), diagno
 - Contrato PR94–PR97 criado e ativado.
 - ACTIVE_CONTRACT e INDEX atualizados.
 - Relatório PR94 com diagnóstico completo (10 seções).
-- Teste de prova: 54 asserts.
+- Teste de prova: 55 asserts.
 - Nenhum runtime vivo alterado.
-- Próxima PR autorizada: **PR95 — Chat Livre Seguro**.
-- Smoke tests anteriores confirmados: PR93 ✅, PR92 ✅, PR91 ✅, PR90 ✅, PR84 ✅, PR59 ✅.
+- **PR94 concluída ✅ — diagnóstico entregue.**
+- Próxima PR autorizada: **PR95 — Chat Livre Seguro** (PR-IMPL).
+- Smoke tests confirmados: PR93 ✅, PR92 ✅, PR91 ✅, PR90 ✅, PR84 ✅, PR59 ✅.
 
 ---
 

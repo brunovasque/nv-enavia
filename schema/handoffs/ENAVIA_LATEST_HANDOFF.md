@@ -1,18 +1,19 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit 🟢
+**De:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit ✅ CONCLUÍDA
 **Para:** PR95 — Chat Livre Seguro
 
-## Handoff atual (PR94)
+## Handoff atual (PR94 ✅ CONCLUÍDA → PR95)
 
 ### O que foi feito
 
 - Novo contrato ativado: `schema/contracts/active/CONTRATO_ENAVIA_CHAT_LIVRE_COCKPIT_OPERACIONAL_PR94_PR97.md`.
 - Diagnóstico read-only completo do chat/painel/runtime.
 - Relatório criado: `schema/reports/PR94_CHAT_LIVRE_COCKPIT_DIAGNOSTICO.md`.
-- Teste de prova criado: `tests/pr94-chat-livre-cockpit-diagnostico.prova.test.js`.
+- Teste de prova criado: `tests/pr94-chat-livre-cockpit-diagnostico.prova.test.js` (55/55 ✅).
 - Governança mínima atualizada (status, handoff, execution log, INDEX.md, ACTIVE_CONTRACT.md).
+- **PR94 concluída ✅ — próxima PR autorizada: PR95 — Chat Livre Seguro.**
 
 ### O que foi confirmado no diagnóstico
 

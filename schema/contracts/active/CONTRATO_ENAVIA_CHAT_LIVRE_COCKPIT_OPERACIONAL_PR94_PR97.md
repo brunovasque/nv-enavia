@@ -33,7 +33,7 @@ A Enavia já comprovou dentro do próprio chat que:
 ### PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit
 
 **Tipo:** PR-DIAG  
-**Estado:** 🟢 Ativo / IN_PROGRESS  
+**Estado:** ✅ DONE — 2026-05-04  
 
 **Objetivo:**  
 Mapear onde o painel/chat força JSON, checklist, read-only, headings, passos, tom de relatório ou governança em conversa comum.
@@ -63,7 +63,7 @@ Mapear onde o painel/chat força JSON, checklist, read-only, headings, passos, t
 ### PR95 — Chat Livre Seguro
 
 **Tipo:** PR-IMPL  
-**Estado:** ⏳ Aguardando PR94  
+**Estado:** 🟢 AUTORIZADA — próxima PR  
 
 **Objetivo:**  
 Ajustar Response Policy / LLM Core / Brain Loader, se necessário, para conversa natural por padrão, mantendo bloqueios de ação real.
@@ -142,7 +142,7 @@ Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloq
 
 ## Próxima PR autorizada
 
-**PR94** — Diagnóstico READ-ONLY (este PR, em execução).
+**PR95** — Chat Livre Seguro (PR-IMPL). PR94 concluída ✅.
 
 ---
 
@@ -150,7 +150,7 @@ Testar conversa casual, diagnóstico, pedido operacional, PR Orchestrator e bloq
 
 | PR | Tipo | Estado | Data | Observação |
 |----|------|--------|------|------------|
-| PR94 | PR-DIAG | 🟢 IN_PROGRESS | 2026-05-04 | Diagnóstico read-only do chat livre + cockpit |
-| PR95 | PR-IMPL | ⏳ PENDING | — | Chat livre seguro |
+| PR94 | PR-DIAG | ✅ DONE | 2026-05-04 | Diagnóstico read-only do chat livre + cockpit |
+| PR95 | PR-IMPL | 🟢 AUTORIZADA | — | Chat livre seguro — próxima PR |
 | PR96 | PR-IMPL | ⏳ PENDING | — | Cockpit passivo |
 | PR97 | PR-PROVA | ⏳ PENDING | — | Prova final |

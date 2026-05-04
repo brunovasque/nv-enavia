@@ -1,8 +1,8 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR94 — Diagnóstico Chat Livre + Cockpit 🟢 IN_PROGRESS)
+**Data:** 2026-05-04 (atualizado após PR94 — Diagnóstico Chat Livre + Cockpit ✅ CONCLUÍDA)
 **Branch ativa:** `copilot/pr94-diagnostico-chat-livre-cockpit`
-**Última tarefa:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit
+**Última tarefa:** PR94 — Diagnóstico READ-ONLY do Chat Livre + Cockpit ✅
 
 ## Estado atual do sistema
 
@@ -27,7 +27,8 @@
   - `schema/enavia-llm-core.js` preservado;
   - painel preservado.
 - Contrato PR94–PR97 ativo.
-- Próxima etapa: PR95 — Chat Livre Seguro.
+- **PR94 concluída ✅ — Diagnóstico read-only entregue.**
+- Próxima etapa: **PR95 — Chat Livre Seguro** (PR-IMPL, autorizada).
 
 ## Atualização PR93
 
