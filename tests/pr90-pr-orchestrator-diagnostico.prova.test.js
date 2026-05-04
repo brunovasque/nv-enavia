@@ -67,9 +67,14 @@ ok(
   "1. contrato PR90–PR93 ativo"
 );
 ok(
-  /PR90\s*—\s*Diagnóstico READ-ONLY do PR Orchestrator/i.test(text.activeContract) &&
-    /PR90\s*—\s*Diagnóstico READ-ONLY do PR Orchestrator/i.test(text.index),
-  "2. PR90 é a próxima PR autorizada"
+  (
+    /PR90\s*—\s*Diagnóstico READ-ONLY do PR Orchestrator/i.test(text.activeContract) &&
+    /PR90\s*—\s*Diagnóstico READ-ONLY do PR Orchestrator/i.test(text.index)
+  ) || (
+    /CONTRATO_ENAVIA_PR_ORCHESTRATOR_SUPERVISIONADO_PR90_PR93/i.test(text.activeContract) &&
+    /PR90.*conclu[ií]da/i.test(text.index)
+  ),
+  "2. PR90 é a próxima PR autorizada (ou já concluída)"
 );
 ok(
   /PR86\s*✅/i.test(text.index) && /PR87\s*✅/i.test(text.index) && /PR88\s*✅/i.test(text.index) && /PR89\s*✅/i.test(text.index),

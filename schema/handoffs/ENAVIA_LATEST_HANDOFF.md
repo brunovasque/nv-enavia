@@ -1,8 +1,58 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR92 — PR Executor supervisionado ✅
-**Para:** PR93 — Ready for Merge + Deploy TEST
+**De:** PR93 — Ready for Merge + Deploy TEST ✅
+**Para:** Aguardando próximo contrato/fase formal
+
+## Handoff atual (PR93)
+
+### O que foi feito
+
+- Helper puro criado: `schema/enavia-pr-readiness.js`.
+- Prova criada: `tests/pr93-ready-for-merge-deploy-test-ready.prova.test.js` (60 cenários, 60 passando).
+- Relatório criado: `schema/reports/PR93_READY_FOR_MERGE_DEPLOY_TEST.md`.
+- Governança mínima atualizada (`status`, `handoff`, `execution log`, `contracts/INDEX.md`, `contracts/ACTIVE_CONTRACT.md`).
+
+### O que foi confirmado no código real
+
+- Readiness helper consome plano de execução supervisionado da PR92 e produz estado de readiness final.
+- Pipeline lógico completo: PR91 (Planner) → PR92 (Executor Supervisionado) → PR93 (Readiness).
+- Guardrails de segurança do estado de readiness permanecem fixos:
+  - `ready_for_merge=true` somente para plano válido da PR92
+  - `deploy_test_ready=true` somente para plano válido da PR92
+  - `awaiting_human_approval=true` sempre
+  - `prod_blocked_until_human_approval=true` sempre
+  - `merge_allowed=false` sempre
+  - `prod_deploy_allowed=false` sempre
+  - `github_execution=false` sempre
+  - `side_effects=false` sempre
+  - `final_status="awaiting_human_merge_approval"` sempre
+- Evidence contém origens PR91, PR92, tests_to_run, rollback_plan, bloqueios de merge e PROD.
+- Nenhuma execução real — sem GitHub, sem shell, sem escrita em disco, sem rede.
+
+### O que NÃO foi alterado
+
+- `nv-enavia.js`
+- `executor/src/index.js`
+- `contract-executor.js`
+- `.github/workflows/deploy.yml`
+- `wrangler.toml`
+- painel/chat
+- integração GitHub real
+
+### Contrato PR90–PR93 encerrado
+
+- PR90 ✅ diagnóstico read-only do PR Orchestrator
+- PR91 ✅ PR Planner
+- PR92 ✅ PR Executor Supervisionado
+- PR93 ✅ Ready for Merge + Deploy TEST
+
+### Próxima etapa segura
+
+- Aguardando próximo contrato/fase formal.
+- Nenhuma PR autorizada no momento — definir novo contrato antes de prosseguir.
+
+---
 
 ## Handoff atual (PR92)
 
