@@ -7299,9 +7299,16 @@ if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
         });
       }
     } else if (codexResult && !codexResult.ok) {
-      const reason = codexResult.reason || "unknown";
-      result.warnings.push(`CODEX_ENGINE_NO_PATCH:${reason}`);
-      result.steps.push("codex_engine_no_patch");
+      // PR109 B2: quando todos patches Codex não têm search, ok=false mas skipped_no_search está populado
+      // Emitir warning informativo em vez do genérico CODEX_ENGINE_NO_PATCH:unknown
+      if (Array.isArray(codexResult.skipped_no_search) && codexResult.skipped_no_search.length > 0) {
+        result.warnings.push(`CODEX_PATCHES_SKIPPED_NO_SEARCH:${codexResult.skipped_no_search.join(",")}`);
+        result.steps.push("codex_patches_skipped_no_search");
+      } else {
+        const reason = codexResult.reason || "unknown";
+        result.warnings.push(`CODEX_ENGINE_NO_PATCH:${reason}`);
+        result.steps.push("codex_engine_no_patch");
+      }
 
       // debug leve pra gente enxergar o que o modelo mandou
       if (codexResult.raw) {
