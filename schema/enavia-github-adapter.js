@@ -462,6 +462,99 @@ async function _executeCreateCommit(operation, token) {
 }
 
 // ---------------------------------------------------------------------------
+// _executeOpenPr — abre PR real no GitHub
+//
+// Payload obrigatório: { title, head, base }
+// Payload opcional: { body }
+// Retorna: { pr_number, html_url, pr_state, merge_allowed: false }
+//
+// Invariante: merge_allowed é sempre false — gate humano obrigatório antes do merge.
+// ---------------------------------------------------------------------------
+
+async function _executeOpenPr(operation, token) {
+  const repo = typeof operation.repo === 'string' ? operation.repo.trim() : '';
+  const title = typeof operation.title === 'string' ? operation.title.trim() : '';
+  const body = typeof operation.body === 'string' ? operation.body : '';
+  const head = typeof operation.head === 'string' ? operation.head.trim() : '';
+  const base = typeof operation.base === 'string' ? operation.base.trim() : '';
+
+  const parts = repo.split('/');
+  const owner = parts[0] || '';
+  const repoName = parts[1] || '';
+
+  if (!owner || !repoName) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'repo deve ter formato owner/repo', evidence: [] };
+  }
+  if (!title) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'title ausente', evidence: [] };
+  }
+  if (!head) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'head ausente (branch de origem)', evidence: [] };
+  }
+  if (!base) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'base ausente (branch de destino)', evidence: [] };
+  }
+
+  const url = `https://api.github.com/repos/${owner}/${repoName}/pulls`;
+  let response, responseData;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify({ title, body, head, base }),
+    });
+    responseData = await response.json().catch(() => ({}));
+  } catch (err) {
+    return {
+      ok: false,
+      executed: false,
+      github_execution: false,
+      operation_type: 'open_pr',
+      error: `Falha de rede ao abrir PR: ${String(err)}`,
+      evidence: [],
+    };
+  }
+
+  const ok = response.status === 201;
+  const pr_number = ok ? (responseData.number || null) : null;
+  const html_url = ok ? (responseData.html_url || null) : null;
+  const pr_state = ok ? (responseData.state || null) : null;
+
+  const evidence = ok
+    ? [
+        `PR aberta: "${title}" (${head} → ${base}) no repo ${repo}`,
+        pr_number ? `PR #${pr_number}` : null,
+        html_url ? `url=${html_url}` : null,
+        `merge_allowed=false — gate humano obrigatório`,
+      ].filter(Boolean)
+    : [`Falha ao abrir PR no repo ${repo}: HTTP ${response.status}`];
+
+  return {
+    ok,
+    executed: true,
+    github_execution: true,
+    operation_type: 'open_pr',
+    repo,
+    head,
+    base,
+    response_status: response.status,
+    pr_number,
+    html_url,
+    pr_state,
+    merge_allowed: false,
+    evidence,
+    error: ok ? null : `GitHub API retornou HTTP ${response.status}`,
+    source_pr: SOURCE_PR_106,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // executeGithubOperation — adapter HTTP puro (sem Safety Guard aqui)
 //
 // Responsabilidade única: traduzir operation → chamada HTTP GitHub API → resultado.
