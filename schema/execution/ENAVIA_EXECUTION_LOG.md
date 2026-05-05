@@ -1,6 +1,53 @@
 # ENAVIA — Execution Log
 
 
+## 2026-05-04 — PR105 — PR-IMPL+PROVA — GitHub Bridge Real Unificado
+
+- **Branch:** `copilot/pr105-github-bridge-real-unificado`
+- **Tipo:** PR-IMPL+PROVA (unificado — adapter + plugação + prova)
+- **Contrato:** `CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md` (CONCLUÍDO ✅)
+- **PR anterior validada:** PR104 ✅
+
+### Objetivo
+
+Entregar o primeiro braço executor real da Enavia: execução de operações GitHub supervisionadas
+diretamente do Worker Cloudflare, com Safety Guard ativo, Event Log persistido e aprovação
+humana obrigatória antes de qualquer operação de escrita.
+
+### Commits atômicos
+
+| # | Hash | Escopo |
+|---|------|--------|
+| 1 | e8351ff | `schema/enavia-github-adapter.js` — adapter HTTP real GitHub |
+| 2 | cbae6f2 | `tests/pr105-cjs-esm-interop.test.js` — interop CJS/ESM validado |
+| 3 | f893c99 | `nv-enavia.js` — endpoint `/github-bridge/execute` + fixes testes históricos |
+| 4 | 4abac53 | `wrangler.toml` — GITHUB_TOKEN secret binding documentado |
+| 5 | a08e599 | `tests/pr105-github-bridge-prova-real.prova.test.js` — prova real |
+
+### Testes
+
+- `pr105-cjs-esm-interop.test.js`: 32/32 ✅
+- `pr105-github-bridge-prova-real.prova.test.js`: 16/16 ✅ (sem token)
+- `pr103-github-bridge-helper-supervisionado.prova.test.js`: 70/70 ✅
+- `pr102-github-bridge-real-diagnostico.prova.test.js`: todos ✅
+- PR99–PR104: todos passando ✅
+
+### Invariantes mantidos
+
+- merge/deploy_prod/secret_change: ALWAYS_BLOCKED sem exceção ✅
+- GITHUB_TOKEN via env.GITHUB_TOKEN — nunca hardcoded ✅
+- Safety Guard antes de toda execução real ✅
+- Event Log registra tentativa + resultado ✅
+- Token nunca em logs/response/Event Log ✅
+
+### Rollback
+
+- Reverter commits PR105 em ordem inversa (a08e599 → e8351ff)
+- Remover `schema/enavia-github-adapter.js`
+- Reverter `nv-enavia.js` para estado pré-PR105
+
+---
+
 ## 2026-05-04 — PR104 — PR-IMPL — Runtime mínimo supervisionado do GitHub Bridge Real
 
 - **Branch:** `copilot/pr-104-runtime-minimo-supervisionado`

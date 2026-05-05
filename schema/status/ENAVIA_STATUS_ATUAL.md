@@ -1,25 +1,32 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR104 — Runtime mínimo supervisionado ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr-104-runtime-minimo-supervisionado`
-**Última tarefa:** PR104 — Runtime mínimo supervisionado ✅
+**Data:** 2026-05-04 (atualizado após PR105 — GitHub Bridge Real Unificado ✅ CONCLUÍDA)
+**Branch ativa:** `copilot/pr105-github-bridge-real-unificado`
+**Última tarefa:** PR105 — GitHub Bridge Real (Adapter + Plugação + Prova Real) ✅
 
 ## Estado atual do sistema
 
-## Atualização PR104
+## Atualização PR105 — GitHub Bridge Real Unificado ✅
+
+- PR-IMPL+PROVA — Tipo unificado — Adapter real + plugação no Worker + prova supervisionada.
+- `schema/enavia-github-adapter.js` criado: adapter HTTP real com `executeGithubOperation` (fetch real) e `executeGithubBridgeRequest` (pipeline completo Safety Guard + Event Log).
+- `tests/pr105-cjs-esm-interop.test.js` criado: 32/32 ✅ — interop CJS/ESM validado.
+- `nv-enavia.js` atualizado: import do adapter + `handleGithubBridgeExecute` + rota `POST /github-bridge/execute`.
+- `wrangler.toml` atualizado: documentação de `GITHUB_TOKEN` como secret Cloudflare.
+- `tests/pr105-github-bridge-prova-real.prova.test.js` criado: 16/16 ✅ sem token (Grupo 4 opt-in com token real).
+- merge, deploy_prod, secret_change: bloqueio duro em todos os caminhos.
+- GITHUB_TOKEN via `env.GITHUB_TOKEN` — nunca hardcoded, nunca em logs/response.
+- Safety Guard (PR100) e Event Log (PR99) ativos em toda execução.
+- **Contrato CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105 CONCLUÍDO ✅.**
+- **PR105 concluída ✅ — Primeiro braço executor real da Enavia entregue.**
+- Próxima etapa: **PR106 — Commit + Branch + PR real supervisionados.**
+
+## Histórico (PR104)
 
 - PR-IMPL — integração mínima controlada — GitHub Bridge runtime supervisionado.
-- `contract-executor.js` atualizado: import de `schema/enavia-github-bridge.js` + `_handleGithubBridgeRuntime` + extensão de `handleGitHubPrAction` para modo `github_bridge_runtime`.
-- `tests/pr104-github-bridge-runtime-minimo.prova.test.js` criado: 52/52 cenários passando ✅.
-- `schema/reports/PR104_GITHUB_BRIDGE_RUNTIME_MINIMO.md` criado.
-- `schema/contracts/active/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md` atualizado: PR104 ✅.
-- `schema/contracts/INDEX.md` atualizado: PR104 concluída ✅ — PR105 próxima autorizada.
-- Rota `/github-pr/action` reaproveitada — nenhum endpoint novo criado.
-- `github_execution: false`, `side_effects: false`, `ready_for_real_execution: false` em toda resposta runtime.
-- `nv-enavia.js`, `executor/src/index.js`, `deploy.yml`, `wrangler.toml`, `panel/**` intocados.
-- GitHub Bridge agora **plugado no runtime** de forma supervisionada — planejamento apenas, sem execução real.
-- **PR104 concluída ✅ — Runtime mínimo supervisionado entregue.**
-- Próxima etapa: **PR105 — Prova real supervisionada.**
+- `contract-executor.js` atualizado: import de `schema/enavia-github-bridge.js` + `_handleGithubBridgeRuntime`.
+- GitHub Bridge plugado no runtime de forma supervisionada — planejamento apenas, sem execução real.
+- **PR104 concluída ✅.**
 
 
 
