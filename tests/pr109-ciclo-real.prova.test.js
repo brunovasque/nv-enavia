@@ -398,23 +398,24 @@ async function runGrupo3() {
   // Payload de prova: adicionar comentário de versão no topo do nv-enavia.js
   // Usa hardcoded patches (search/replace) para garantir aplicação mesmo se Codex não estiver disponível
   const proofPayload = {
-    mode: 'contract_execute_next',
+    mode: 'engineer', // único modo implementado no Executor que aceita live read + patches
     intent: 'adiciona um comentário de versão no topo do arquivo — prova PR109',
     target: { workerId: 'nv-enavia' },
     github_token_available: true,
-    use_codex: false, // usa hardcoded patches para prova determinística
+    use_codex: false, // usa hardcoded patches para prova determinística (não depende de OPENAI_API_KEY)
     context: {
       require_live_read: true,
     },
-    // Patch hardcoded de prova: busca o marcador de início do arquivo
+    // Patch hardcoded de prova: insere comentário antes do bloco ENAVIA_BUILD
+    // O worker deployed de nv-enavia é um bundle — usa var em vez de const.
     patch: {
       mode: 'patch_text',
       patchText: [
         {
           title: 'Comentário de versão PR109',
-          anchor: { match: 'ACORN' },
-          search: '// ============================================================\n// 🔍 ACORN — real JS parser (pure JS, no eval, Workers-compatible)',
-          replace: '// PR109-PROVA: ciclo de autoevolução verificado — ' + new Date().toISOString().slice(0, 10) + '\n// ============================================================\n// 🔍 ACORN — real JS parser (pure JS, no eval, Workers-compatible)',
+          anchor: { match: 'ENAVIA_BUILD' },
+          search: 'var ENAVIA_BUILD = {\n  id: "ENAVIA_PR4_2026-04",\n  deployed_at: "2026-04-26T00:00:00Z",\n  source: "deploy-worker"\n};',
+          replace: '// PR109-PROVA: ciclo de autoevolução verificado — ' + new Date().toISOString().slice(0, 10) + '\nvar ENAVIA_BUILD = {\n  id: "ENAVIA_PR4_2026-04",\n  deployed_at: "2026-04-26T00:00:00Z",\n  source: "deploy-worker"\n};',
           reason: 'Prova do ciclo end-to-end PR109 — será revertida após verificação',
         },
       ],

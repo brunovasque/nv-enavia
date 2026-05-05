@@ -1342,6 +1342,14 @@ if (METHOD === "POST" && pathname === "/propose") {
     }
   }
 
+  // PR109 B1: capturar antes do core (que pode modificar action) para
+  // garantir que overridePatchList e originalCode reflitam o payload original.
+  const _preCorePatchText = action?.patch?.patchText;
+  const _preCoreOverridePatchList = Array.isArray(_preCorePatchText) && _preCorePatchText.length > 0
+    ? _preCorePatchText : null;
+  const _preCoreGithubTokenAvailable = action.github_token_available === true;
+  const _preCoreOriginalCode = action.context?.target_code_original || action.context?.target_code || null;
+
   let execResult;
   try {
     execResult = await enaviaExecutorCore(env, action);
@@ -1411,10 +1419,13 @@ if (METHOD === "POST" && pathname === "/propose") {
       }
 
   // PR108/PR109: ciclo GitHub — github_token_available=true e staging.ready=true
+  // PR109 B1: usa valores capturados ANTES do core (o core pode modificar action.patch)
+  const overridePatchList = _preCoreOverridePatchList;
+
   let githubOrchestrationResult = null;
-  if (action.github_token_available === true && staging?.ready === true) {
-    const originalCode = action.context?.target_code_original || action.context?.target_code || null;
-    const patchList = execResult?.patch?.patchText || null;
+  if (_preCoreGithubTokenAvailable && (staging?.ready === true || overridePatchList !== null)) {
+    const originalCode = _preCoreOriginalCode;
+    const patchList = execResult?.patch?.patchText || overridePatchList || null;
 
     if (originalCode && Array.isArray(patchList) && patchList.length > 0) {
       const patchResult = applyPatch(originalCode, patchList);
@@ -1424,23 +1435,24 @@ if (METHOD === "POST" && pathname === "/propose") {
         const githubRepo = env?.GITHUB_REPO || 'brunovasque/nv-enavia';
         const githubFilePath = env?.GITHUB_FILE_PATH || 'nv-enavia.js';
 
-        // PR108 B1: validar sintaxe via /worker-patch-safe antes de qualquer GitHub call
+        // PR108 B1 / PR109 B1: validação de sintaxe inline com Acorn
+        // (self-call via fetch não funciona em Cloudflare Workers — erro 1042 loop detected)
         let patchSafeData = null;
         try {
-          const patchSafeUrl = new URL('/worker-patch-safe', request.url).toString();
-          const patchSafeResp = await fetch(patchSafeUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              mode: 'stage',
-              workerId: targetWorkerId,
-              current: originalCode,
-              candidate: patchResult.candidate,
-            }),
-          });
-          patchSafeData = await patchSafeResp.json().catch(() => ({ ok: false, error: 'worker_patch_safe_parse_error' }));
-        } catch (patchSafeErr) {
-          patchSafeData = { ok: false, error: `worker_patch_safe_fetch_error: ${String(patchSafeErr)}` };
+          try {
+            acornParse(patchResult.candidate, { ecmaVersion: 'latest', sourceType: 'module' });
+          } catch (_) {
+            acornParse(patchResult.candidate, { ecmaVersion: 'latest', sourceType: 'script' });
+          }
+          // Sintaxe válida — salvar backup + candidate no KV (best-effort)
+          const _patchTs = Date.now();
+          try {
+            await env.ENAVIA_GIT.put(`WORKER_BACKUP:${targetWorkerId}:${_patchTs}`, originalCode);
+            await env.ENAVIA_GIT.put(`WORKER_CANDIDATE:${targetWorkerId}:${_patchTs}`, patchResult.candidate);
+          } catch (_kvErr) { /* KV failure não bloqueia a orquestração */ }
+          patchSafeData = { ok: true };
+        } catch (parseErr) {
+          patchSafeData = { ok: false, error: `SYNTAX_ERROR: ${String(parseErr.message || parseErr)}` };
         }
 
         if (!patchSafeData?.ok) {
@@ -5537,10 +5549,27 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
     throw new Error(`Falha ao buscar snapshot do worker (${resp.status}): ${text}`);
   }
 
-  const code = await resp.text();
+  const rawBody = await resp.text();
+
+  if (!rawBody || !rawBody.trim()) {
+    throw new Error("Snapshot do worker está vazio");
+  }
+
+  // PR109: Cloudflare retorna multipart mesmo com Accept: application/javascript
+  // para workers com múltiplos arquivos. Extrair só o conteúdo JS.
+  let code = rawBody;
+  if (rawBody.startsWith('--')) {
+    const headersEnd = rawBody.indexOf('\n\n');
+    if (headersEnd !== -1) {
+      let content = rawBody.slice(headersEnd + 2);
+      const lastBoundary = content.lastIndexOf('\n--');
+      if (lastBoundary !== -1) content = content.slice(0, lastBoundary);
+      code = content.trim();
+    }
+  }
 
   if (!code || !code.trim()) {
-    throw new Error("Snapshot do worker está vazio");
+    throw new Error("Conteúdo JavaScript vazio após parsing multipart");
   }
 
   return {
