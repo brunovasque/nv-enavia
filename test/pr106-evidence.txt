@@ -1,0 +1,7 @@
+PR106 — Prova real supervisionada
+Repo: brunovasque/nv-enavia
+Branch: test/pr106-prova-1777946218829
+Timestamp: 2026-05-05T01:57:00.057Z
+Ciclo: branch → commit → PR
+merge_allowed: false
+gate_humano: obrigatório
