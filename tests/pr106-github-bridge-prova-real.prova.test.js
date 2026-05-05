@@ -268,8 +268,7 @@ async function runGroup4() {
     );
     assert.strictEqual(result.ok, false);
     assert.strictEqual(result.github_execution, false);
-    // Pode ser bloqueado pelo validate (que usa bridge PR103) ou pelo adapter diretamente
-    assert.ok(result.blocked === true || result.executed === false, 'deve ser bloqueado ou não executado');
+    assert.strictEqual(result.executed, false, 'create_commit em main não deve ser executado');
   });
 
   await test('4.2 attempt_event registrado mesmo para bloqueio em main', async () => {

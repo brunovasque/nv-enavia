@@ -770,6 +770,15 @@ async function executeGithubBridgeRequest(operation, token) {
     ...(execResult.comment_id !== undefined ? { comment_id: execResult.comment_id } : {}),
     ...(execResult.html_url !== undefined ? { html_url: execResult.html_url } : {}),
     ...(execResult.sha_used !== undefined ? { sha_used: execResult.sha_used } : {}),
+    ...(execResult.commit_sha !== undefined ? { commit_sha: execResult.commit_sha } : {}),
+    ...(execResult.branch !== undefined ? { branch: execResult.branch } : {}),
+    ...(execResult.file_path !== undefined ? { file_path: execResult.file_path } : {}),
+    ...(execResult.operation_kind !== undefined ? { operation_kind: execResult.operation_kind } : {}),
+    ...(execResult.pr_number !== undefined ? { pr_number: execResult.pr_number } : {}),
+    ...(execResult.pr_state !== undefined ? { pr_state: execResult.pr_state } : {}),
+    ...(execResult.merge_allowed !== undefined ? { merge_allowed: execResult.merge_allowed } : {}),
+    ...(execResult.head !== undefined ? { head: execResult.head } : {}),
+    ...(execResult.base !== undefined ? { base: execResult.base } : {}),
   };
 }
 
