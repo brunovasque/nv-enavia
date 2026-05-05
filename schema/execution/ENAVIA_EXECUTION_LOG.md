@@ -1,5 +1,52 @@
 # ENAVIA — Execution Log
 
+## 2026-05-05 — PR108 — PR-IMPL — Motor de Patch + Orquestrador Self-Patch
+
+- **Branch:** `copilot/pr108-motor-patch-orquestrador`
+- **Tipo:** PR-IMPL (fundação do ciclo de autoevolução)
+- **Contrato:** `docs/CONTRATO_ENAVIA_MOTOR_PATCH_PR108.md` ✅
+- **PR anterior validada:** PR107 ✅ (mergeada como PR #274)
+- **PR GitHub aberta:** [#275](https://github.com/brunovasque/nv-enavia/pull/275)
+
+### Objetivo
+
+Implementar a fundação do ciclo de autoevolução: motor de patch cirúrgico, chunking para arquivos grandes, encadeamento audit→propose e orquestrador GitHub que conecta propose ao GitHub Bridge automaticamente.
+
+### 6 Commits atômicos
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | ab64d5f | `executor/src/patch-engine.js` | `applyPatch` — 6 invariantes de segurança (EMPTY_ORIGINAL, NO_PATCHES, ANCHOR_NOT_FOUND, AMBIGUOUS_MATCH, EMPTY_CANDIDATE, CANDIDATE_TOO_SMALL) |
+| 2 | 26fd384 | `executor/src/code-chunker.js` | `extractRelevantChunk` — âncoras por rota/camelCase/UPPER_CASE/palavras longas |
+| 3 | c492b83 | `nv-enavia.js` | `_proposePayload` — audit_verdict, audit_findings, require_live_read, use_codex |
+| 4 | c9e3ff9 | `executor/src/github-orchestrator.js` | `orchestrateGithubPR` — ciclo branch→commit→PR via proxy, merge_allowed=false always |
+| 5 | 4d2af1b | `executor/src/index.js` | Imports + chunking + auditFindings + orquestração pós-staging |
+| 6 | 2290372 | `tests/pr108-*.test.js` | 91 testes: 32 (patch-engine) + 25 (chunker) + 34 (integração) |
+
+### Testes executados
+
+- `pr108-patch-engine.test.js`: 32/32 ✅
+- `pr108-code-chunker.test.js`: 25/25 ✅
+- `pr108-integration.test.js`: 34/34 ✅
+- `pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅ (regressão)
+- `pr105-cjs-esm-interop.test.js`: 32/32 ✅ (regressão)
+
+### Invariantes mantidos
+
+- merge_allowed=false, ALWAYS_BLOCKED ✅
+- GITHUB_TOKEN: nunca sai do Worker — Executor usa proxy ✅
+- Candidato vazio = bloqueio antes de qualquer GitHub call ✅
+- Candidato < 50% do original = bloqueio (patch destrutivo) ✅
+- Orquestrador só acionado se staging.ready = true ✅
+- Erro em qualquer etapa = para e retorna erro com etapa ✅
+
+### Resultado
+
+- 15/16 critérios de conclusão do contrato ✅ (falta aprovação humana)
+- PR #275 aberta para revisão de Bruno
+
+---
+
 ## 2026-05-05 — PR107 — PR-REORGANIZAÇÃO — Integração do Ecossistema
 
 - **Branch:** `copilot/pr107-integracao-ecossistema`
