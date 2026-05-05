@@ -81,45 +81,31 @@
 
 ## 5. O QUE ESTÁ FALTANDO
 
-### 🔴 BLOQUEADOR B1 — `github_token_available: true` NÃO implementado (Seção 2.3)
+### ✅ BLOQUEADOR B1 — RESOLVIDO — `github_token_available` adicionado (Commit 6)
 
 **Contrato (Seção 2.3):**
 > "Quando Worker chama `callExecutorBridge` para `/propose` ou `/audit`, passar `github_token_available: true` no payload"
 
-**Evidência:**
+**Fix aplicado:** Commit `ed49957` — `fix(pr107): adicionar github_token_available nos payloads de /audit e /propose`
+
+```javascript
+// _auditPayload (nv-enavia.js:6167):
+github_token_available: !!env?.GITHUB_TOKEN,  // ✅ ADICIONADO
+
+// _proposePayload (nv-enavia.js:6198):
+github_token_available: !!env?.GITHUB_TOKEN,  // ✅ ADICIONADO
+```
+
+**Verificação:**
 ```bash
 grep -n "github_token_available" nv-enavia.js
-# Nenhum resultado
+# 6167:      github_token_available: !!env?.GITHUB_TOKEN,
+# 6198:      github_token_available: !!env?.GITHUB_TOKEN,
 ```
 
-Confirmado: nenhuma ocorrência de `github_token_available` em nv-enavia.js.
-
-Os payloads reais enviados ao Executor (linhas 6158–6167 para `/audit` e 6186–6197 para `/propose`) não incluem o campo:
-```javascript
-// _auditPayload (linha 6158):
-const _auditPayload = {
-  source: "nv-enavia", mode: "contract_execute_next", executor_action: "audit",
-  ...buildExecutorTargetPayload(...),
-  context: { require_live_read: true },
-  contract_id, nextAction, operationalAction,
-  execution_id: auditId, evidence, approved_by, audit_id, timestamp,
-  // ← github_token_available: true  AUSENTE
-};
-
-// _proposePayload (linha 6186):
-const _proposePayload = {
-  source: "nv-enavia", mode: "contract_execute_next", executor_action: "propose",
-  ...buildExecutorTargetPayload(...),
-  patch, prompt, intent,
-  contract_id, nextAction, operationalAction,
-  execution_id: auditId, evidence, approved_by, audit_id, timestamp,
-  // ← github_token_available: true  AUSENTE
-};
-```
-
-**Impacto:** O Executor recebe requisições de `/propose` e `/audit` sem saber que o Worker tem capacidade de executar operações GitHub via o novo proxy. Quando o Executor gerar uma proposta de patch para PR108, não terá o sinal de que pode usar `/github-bridge/proxy`. A metade funcional de Seção 2.3 (o proxy em si) existe, mas a outra metade (o sinal de capability ao Executor) está ausente.
-
-**Fix necessário:** Adicionar `github_token_available: !!env?.GITHUB_TOKEN` (ou `true` conforme o contrato) aos `_auditPayload` e `_proposePayload` em `nv-enavia.js`.
+**Regressão pós-fix:**
+- `pr105-cjs-esm-interop.test.js`: 32/32 ✅
+- `pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅
 
 ---
 
@@ -180,19 +166,15 @@ O novo `delegateToDeployWorker` usa `X-Internal-Token` (consistente com o Worker
 ## 6. VEREDITO
 
 ```
-BLOQUEADO ❌
+APROVADO PARA MERGE ✅
 ```
 
-**Motivo:** 1 bloqueador técnico real.
+**Bloqueador B1 resolvido** no Commit 6 (`ed49957`): `github_token_available: !!env?.GITHUB_TOKEN` adicionado aos dois payloads (`_auditPayload` e `_proposePayload`) em `nv-enavia.js`. Regressão confirmada: 32/32 ✅ + 19/19 ✅.
 
-**Bloqueador B1:** `github_token_available: true` NÃO passado nos payloads de `/propose` e `/audit` conforme exigido pela Seção 2.3 do contrato. A metade funcional (proxy endpoint) foi implementada. A metade de sinalização (capability flag ao Executor) está ausente. Sem ela, o Executor não sabe que pode usar o GitHub Bridge proxy quando propõe patches — comprometendo diretamente a utilidade do PR108.
-
-**Fix é cirúrgico e minimal:** adicionar `github_token_available: !!env?.GITHUB_TOKEN` aos dois payloads em `nv-enavia.js` (≈ 2 linhas). Recomendo um commit 6 na mesma branch:
-```
-fix(pr107): adicionar github_token_available nos payloads de /audit e /propose
-```
-
-**Após o fix:** Os 3 achados não-bloqueadores (F1, F2, F3) NÃO impedem o merge — são documentados aqui para rastreabilidade e podem ser endereçados em PRs futuras.
+**Achados não-bloqueadores (F1, F2, F3)** documentados para rastreabilidade. Endereçar em PRs futuras:
+- F1: validação INTERNAL_TOKEN no incoming do `/github-bridge/proxy` (mitigado pelo Safety Guard)
+- F2: README deploy-worker desatualizado (ARQUITETURA_ECOSSISTEMA.md é canônico)
+- F3: inconsistência `Authorization: Bearer` vs `X-Internal-Token` no executor (pré-existente)
 
 ---
 
@@ -204,10 +186,10 @@ fix(pr107): adicionar github_token_available nos payloads de /audit e /propose
 | Fallback HTTP Worker→Executor | ✅ |
 | Fallback HTTP Worker→Deploy Worker | ✅ |
 | POST /github-bridge/proxy | ✅ (funcional) |
-| github_token_available: true nos payloads | ❌ AUSENTE |
+| github_token_available: true nos payloads | ✅ Commit 6 (ed49957) |
 | Bindings ENAVIA_WORKER + DEPLOY_WORKER no executor | ✅ |
 | ENAVIA_EXECUTOR_URL renomeado | ✅ |
 | docs/ARQUITETURA_ECOSSISTEMA.md | ✅ |
 | Testes PR99–PR106 | ✅ 19/19 + 32/32 |
 | Sequência de commits | ✅ |
-| **Veredito** | **BLOQUEADO — 1 fix necessário** |
+| **Veredito** | **APROVADO PARA MERGE ✅** |
