@@ -1,5 +1,6 @@
 # PR105 — Review Canônico
 **Data:** 2026-05-04  
+**Atualizado:** 2026-05-05 (bloqueadores corrigidos — prova real executada)  
 **Branch:** `copilot/pr105-github-bridge-real-unificado`  
 **Contrato:** `docs/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR105.md`  
 **PR GitHub:** #271  
@@ -114,37 +115,30 @@ Evidência:
 
 ### 2.7 Teste de prova real passa com operação `comment_pr` real executada
 
-**STATUS: ❌ NÃO ATENDIDO — BLOQUEADOR**
+**STATUS: ✅ ATENDIDO** *(corrigido em cb9a75e)*
 
-Evidência de código (`pr105-github-bridge-prova-real.prova.test.js`, linhas 224–229):
-```js
-async function runGroup4() {
-  if (!GITHUB_TOKEN) {
-    console.log('\n[4] Prova real com GITHUB_TOKEN — PULADO (GITHUB_TOKEN não configurado)');
-    return;  // ← Grupo 4 retorna sem executar nenhum teste
-  }
-  ...
+**Fix aplicado:** linha 272 corrigida de `result.safety` para `result.safety_decision`.
+
+**Prova real executada com `GITHUB_TOKEN` real:**
+```
+[4] Prova real com GITHUB_TOKEN — repo: brunovasque/nv-enavia, PR: #270
+    ATENÇÃO: executará operação real no GitHub
+  ✅ 4.1 comment_pr real executa com github_execution=true
+  ✅ 4.2 resultado contém evidência real da execução
+  ✅ 4.3 Safety Guard foi chamado antes da execução
+  ✅ 4.4 attempt_event.subsystem=github_bridge na execução real
+  ✅ 4.5 merge ainda bloqueado mesmo com token real
+
+✅ PR105 prova real: 21/21 testes passando
 ```
 
-O Grupo 4 (`comment_pr real`) é **sempre pulado** quando `GITHUB_TOKEN` não está no env. O teste reporta `16/16 ✅` mas os únicos 16 testes que rodam são dos Grupos 1–3 (bloqueios sem fetch, Safety Guard/Event Log sem execução real, invariantes do adapter). Nenhuma chamada HTTP real ao GitHub foi feita.
-
-O contrato exige (seção 2.5):
-> "Executa comment_pr real em PR de teste controlada do repo brunovasque/nv-enavia"
-> "Verifica: Safety Guard ativo, Event Log gerado, github_execution: true, evidência retornada"
-
-E o critério 5:
-> "Teste de prova real passa com operação comment_pr real executada"
-
-**Nenhuma chamada real ao GitHub foi executada durante o desenvolvimento desta PR.**
-
-**AGRAVANTE:** Mesmo que o `GITHUB_TOKEN` seja fornecido agora e o Grupo 4 seja executado, há um bug no teste:
-
-```js
-// test 4.3 — linha 272:
-assert.ok(result.safety !== undefined, 'campo safety deve estar presente (Safety Guard executado)');
-```
-
-O `executeGithubBridgeRequest` retorna `safety_decision` (não `safety`). O campo `safety` não existe na resposta. `result.safety` seria `undefined`, portanto `result.safety !== undefined` seria `false` — **o teste 4.3 falharia** com um token real.
+Confirmado:
+- `github_execution: true` retornado na resposta ✅
+- `attempt_event` e `result_event` gerados ✅
+- Safety Guard chamado (campo `safety_decision` presente) ✅
+- Token não aparece em nenhum campo da resposta ✅
+- `merge` bloqueado mesmo com token real válido ✅
+- Comentário real criado na PR #270 do repo `brunovasque/nv-enavia` ✅
 
 ---
 
@@ -218,38 +212,17 @@ A sequência 1→2→3→4→5 foi respeitada. ✅
 
 ---
 
-## 5. O QUE ESTÁ FALTANDO — IMPEDE O MERGE
+## 5. O QUE ESTAVA FALTANDO — CORRIGIDO
 
-### 5.1 BUG NO TESTE 4.3 — campo `safety` vs `safety_decision`
+### 5.1 ~~BUG NO TESTE 4.3~~ — CORRIGIDO em cb9a75e
 
-**Arquivo:** `tests/pr105-github-bridge-prova-real.prova.test.js`, linha 272
-
-**Código atual:**
-```js
-assert.ok(result.safety !== undefined, 'campo safety deve estar presente (Safety Guard executado)');
-```
-
-**Problema:** `executeGithubBridgeRequest` retorna o campo `safety_decision`, não `safety`. `result.safety` é sempre `undefined`. Se o Grupo 4 for executado com um token real, o teste 4.3 **falha**.
-
-**Correção necessária:**
-```js
-assert.ok(result.safety_decision !== undefined, 'campo safety_decision deve estar presente (Safety Guard executado)');
-```
+**Fix:** `result.safety` → `result.safety_decision` (linha 272)
 
 ---
 
-### 5.2 PROVA REAL NÃO EXECUTADA — comment_pr com GitHub API
+### 5.2 ~~PROVA REAL NÃO EXECUTADA~~ — EXECUTADA em cb9a75e
 
-**Critério do contrato (seção 5):**
-> "Teste de prova real passa com operação comment_pr real executada"
-
-**Realidade:** O Grupo 4 do teste é pulado sempre que `GITHUB_TOKEN` não está no env. Os 16/16 testes que passam são todos de Grupos 1–3 (mock/local, sem fetch real). Nenhuma chamada HTTP ao GitHub foi feita.
-
-**O que é necessário:**
-1. Corrigir o bug do teste 4.3 (item 5.1 acima)
-2. Configurar `GITHUB_TOKEN` com escopo `repo`
-3. Executar `GITHUB_TOKEN=ghp_... node tests/pr105-github-bridge-prova-real.prova.test.js`
-4. Confirmar que Grupo 4 (5 testes) passa: `github_execution: true`, `attempt_event`, `result_event`, evidência real, token não exposto
+**Resultado:** 21/21 ✅ incluindo Grupo 4 com chamada HTTP real ao GitHub.
 
 ---
 
@@ -262,38 +235,38 @@ O bloco `[secrets]` está comentado. A declaração ativa seria:
 secrets = ["GITHUB_TOKEN"]
 ```
 
-Isso é documentação, não código de runtime — não impede o funcionamento. Mas para wrangler v3, a declaração ativa melhora a experiência de `wrangler dev` e CI. Este item é menor e não bloqueia o merge isoladamente.
+Não impede o funcionamento em runtime. Item menor, não bloqueia o merge.
 
 ---
 
-### 5.4 MENOR — Grupo 4 executa múltiplos comment_pr reais (4 chamadas)
+### 5.4 MENOR — Grupo 4 criou 4 comentários reais na PR #270
 
-Os testes 4.1, 4.2, 4.3, 4.4 cada um cria um comentário real (operação separada). No total, 4 comentários serão criados na PR #270. Isso deixa "lixo" no repo (4 comentários de teste). O contrato menciona "Usar PR de teste dedicada e controlada — limpar após prova". Este comportamento está previsto, mas vale registrar para limpeza pós-prova.
+Os testes 4.1, 4.2, 4.3, 4.4 criaram comentários reais. Total: 4 comentários na PR #270 (`brunovasque/nv-enavia`). Limpar após prova conforme contrato (seção 6).
 
 ---
 
-## 6. VEREDITO
+## 6. VEREDITO FINAL
 
 ```
-BLOQUEADO — 2 problemas concretos impedem o merge:
+✅ APROVADO PARA MERGE
 
-BLOQUEADOR 1 (código): Bug em test 4.3
-  Arquivo: tests/pr105-github-bridge-prova-real.prova.test.js, linha 272
-  Problema: assert.ok(result.safety !== undefined) mas o campo é safety_decision
-  Impacto: test 4.3 falharia ao executar Grupo 4 com token real
-  Correção: 1 linha — mudar 'safety' para 'safety_decision'
+Todos os critérios de conclusão do contrato estão atendidos:
 
-BLOQUEADOR 2 (critério de conclusão): Prova real não executada
-  Critério contrato seção 5: "Teste de prova real passa com operação comment_pr real executada"
-  Realidade: Grupo 4 sempre pulado sem GITHUB_TOKEN. 0 chamadas reais ao GitHub executadas.
-  Para desbloquear: corrigir 5.1 + configurar GITHUB_TOKEN + rodar o teste + confirmar 21/21 ✅
+  ✅ schema/enavia-github-adapter.js existe e exporta executeGithubOperation
+  ✅ POST /github-bridge/execute existe em nv-enavia.js
+  ✅ Safety Guard chamado antes de todo executeGithubOperation
+  ✅ Event Log registra tentativa e resultado em toda operação
+  ✅ GITHUB_TOKEN via env.GITHUB_TOKEN — nunca hardcoded
+  ✅ Interop CJS/ESM validado: 32/32 testes passando
+  ✅ Prova real: 21/21 testes passando incluindo Grupo 4
+     - comment_pr real executado na PR #270 do repo brunovasque/nv-enavia
+     - github_execution: true confirmado
+     - attempt_event + result_event gerados
+     - Safety Guard ativo (safety_decision presente)
+     - Token não exposto em nenhum campo da resposta
+  ✅ Bloqueio de merge e deploy_prod provado sem fetch
+  ✅ Testes anteriores PR99–PR104 passando
+  ⏳ Aprovação humana de Bruno (único critério pendente)
 
-O CÓDIGO ESTÁ CORRETO. O adapter, o endpoint, o Safety Guard, o Event Log, os bloqueios
-duros — tudo implementado corretamente conforme o contrato. A implementação está pronta
-para produção assim que a prova real for executada.
-
-APROVADO PARA MERGE após:
-  1. Corrigir linha 272 do pr105-github-bridge-prova-real.prova.test.js
-  2. Executar com GITHUB_TOKEN real e confirmar Grupo 4 passando (5 testes adicionais)
-  3. Commit do fix + evidência de output do teste com token real
+Commit do fix + prova real: cb9a75e
 ```
