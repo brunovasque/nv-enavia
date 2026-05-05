@@ -1423,20 +1423,48 @@ if (METHOD === "POST" && pathname === "/propose") {
         const githubRepo = env?.GITHUB_REPO || 'brunovasque/nv-enavia';
         const githubFilePath = env?.GITHUB_FILE_PATH || 'nv-enavia.js';
 
-        const orchestratorResult = await orchestrateGithubPR(env, {
-          workerId: targetWorkerId,
-          candidate: patchResult.candidate,
-          filePath: githubFilePath,
-          repo: githubRepo,
-          patchTitle: execResult?.message || 'Patch automático supervisionado',
-          patchDescription: typeof execResult?.plan === 'string' ? execResult.plan : null,
-          baseBranch: 'main',
-        });
-
-        if (execIdForPropose) {
-          await updateFlowStateKV(env, execIdForPropose, {
-            github_orchestration: orchestratorResult,
+        // PR108 B1: validar sintaxe via /worker-patch-safe antes de qualquer GitHub call
+        let patchSafeData = null;
+        try {
+          const patchSafeUrl = new URL('/worker-patch-safe', request.url).toString();
+          const patchSafeResp = await fetch(patchSafeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mode: 'stage',
+              workerId: targetWorkerId,
+              current: originalCode,
+              candidate: patchResult.candidate,
+            }),
           });
+          patchSafeData = await patchSafeResp.json().catch(() => ({ ok: false, error: 'worker_patch_safe_parse_error' }));
+        } catch (patchSafeErr) {
+          patchSafeData = { ok: false, error: `worker_patch_safe_fetch_error: ${String(patchSafeErr)}` };
+        }
+
+        if (!patchSafeData?.ok) {
+          if (execIdForPropose) {
+            await updateFlowStateKV(env, execIdForPropose, {
+              github_orchestration: { ok: false, step: 'worker_patch_safe', error: patchSafeData?.error || 'STAGING_FAILED', detail: patchSafeData },
+            });
+          }
+          // candidato invalido ou staging falhou — nao acionar GitHub
+        } else {
+          const orchestratorResult = await orchestrateGithubPR(env, {
+            workerId: targetWorkerId,
+            candidate: patchResult.candidate,
+            filePath: githubFilePath,
+            repo: githubRepo,
+            patchTitle: execResult?.message || 'Patch automatico supervisionado',
+            patchDescription: typeof execResult?.plan === 'string' ? execResult.plan : null,
+            baseBranch: 'main',
+          });
+
+          if (execIdForPropose) {
+            await updateFlowStateKV(env, execIdForPropose, {
+              github_orchestration: orchestratorResult,
+            });
+          }
         }
       }
     }

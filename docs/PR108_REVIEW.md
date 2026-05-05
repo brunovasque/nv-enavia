@@ -2,7 +2,7 @@
 **Branch:** `copilot/pr108-motor-patch-orquestrador`  
 **PR GitHub:** [#275](https://github.com/brunovasque/nv-enavia/pull/275)  
 **Contrato:** `docs/CONTRATO_ENAVIA_MOTOR_PATCH_PR108.md`  
-**Data:** 2026-05-05  
+**Data:** 2026-05-05 (atualizado após fix B1)  
 **Revisor:** Claude Code (leitura do código real)
 
 ---
@@ -14,7 +14,7 @@
 | `executor/src/patch-engine.js` | Novo | `applyPatch(originalCode, patches)` — aplica patches `{anchor, search, replace}` com 7 invariantes de segurança (EMPTY_ORIGINAL, NO_PATCHES, NO_SEARCH_TEXT, ANCHOR_NOT_FOUND, AMBIGUOUS_MATCH, EMPTY_CANDIDATE, CANDIDATE_TOO_SMALL) |
 | `executor/src/code-chunker.js` | Novo | `extractRelevantChunk(code, intentText, maxChars)` — extrai chunk de 16K ao redor de âncora encontrada por tokens (rotas HTTP, camelCase, UPPER_CASE, palavras longas); fallback para início do arquivo |
 | `executor/src/github-orchestrator.js` | Novo | `orchestrateGithubPR(env, options)` — ciclo branch→commit→PR via `env.ENAVIA_WORKER.fetch`; para na primeira falha; `merge_allowed: false` em todo retorno |
-| `executor/src/index.js` | Alterado | 3 novos imports; chunking do código antes de Codex quando `use_codex=true` e código > 16K; `auditFindings` passado ao `callCodexEngine`; bloco de orquestração GitHub após `updateFlowStateKV` |
+| `executor/src/index.js` | Alterado | 3 novos imports; chunking do código antes de Codex quando `use_codex=true` e código > 16K; `auditFindings` passado ao `callCodexEngine`; bloco de orquestração GitHub após `updateFlowStateKV` com chamada `/worker-patch-safe` antes de `orchestrateGithubPR` (fix B1) |
 | `nv-enavia.js` | Alterado | `_proposePayload` agora inclui `audit_verdict`, `audit_findings`, `context: { require_live_read: true }`, `use_codex: !!env.GITHUB_TOKEN` |
 | `tests/pr108-patch-engine.test.js` | Novo | 32 testes de unidade para `applyPatch` |
 | `tests/pr108-code-chunker.test.js` | Novo | 25 testes de unidade para `extractRelevantChunk` |
@@ -59,7 +59,7 @@
 | Candidato < 50% do original = bloqueio | ✅ | `patch-engine.js:80-87` — CANDIDATE_TOO_SMALL bloqueia antes de retornar candidato |
 | GITHUB_TOKEN nunca sai do Worker — Executor usa proxy | ✅ | `github-orchestrator.js` — Executor chama `env.ENAVIA_WORKER.fetch` (proxy); nunca acessa GITHUB_TOKEN diretamente |
 | Safety Guard ativo em toda operação GitHub (via proxy → Worker → adapter) | ✅ | Proxy passa por `env.ENAVIA_WORKER` → Worker → `github-bridge/execute` → adapter PR106 com Safety Guard |
-| **`/worker-patch-safe` valida sintaxe antes de staging — patch inválido não vai para o GitHub** | ❌ **VIOLADO** | `index.js:1413-1443` — o código vai direto de `applyPatch` para `orchestrateGithubPR` sem chamar `/worker-patch-safe`. Candidato não é validado sintaticamente antes do commit no GitHub. |
+| `/worker-patch-safe` valida sintaxe antes de staging — patch inválido não vai para o GitHub | ✅ **RESOLVIDO** | `index.js:1421-1463` — fix B1: self-call `fetch('/worker-patch-safe', { mode:'stage', workerId, current, candidate })` antes de `orchestrateGithubPR`; se `patchSafeData.ok=false`, GitHub não é acionado |
 | Orquestrador só acionado se `staging.ready = true` | ✅ | `index.js:1414` — segunda condição do `if` |
 | Erro em qualquer etapa do orquestrador = para e retorna erro (sem continuar parcialmente) | ✅ | `github-orchestrator.js:92-99, 117-126, 148-158` — cada etapa tem `if (!result.ok) return {...}` |
 
@@ -86,30 +86,28 @@ c9e3ff9  feat(pr108): orquestrador GitHub no Executor         ← Commit 4
 
 ## 5. O QUE ESTÁ FALTANDO
 
-### B1 — BLOQUEADOR: `/worker-patch-safe` ausente no ciclo de orquestração
+### B1 — RESOLVIDO ✅ (Commit fix B1)
 
-**Contrato §2.4 (sequência obrigatória):**
-```
-1. applyPatch(currentCode, patches) → candidate
-2. POST /worker-patch-safe { mode: "stage", workerId, current, candidate }  ← AUSENTE
-3. Se staging ok: acionar orchestrateGithubPR
-4. Se staging falhar: retornar erro — NÃO acionar GitHub
-```
-
-**Implementação atual (`index.js:1413-1443`):**
+`/worker-patch-safe` agora é chamado antes de `orchestrateGithubPR` (`index.js:1421-1463`):
 ```javascript
-const patchResult = applyPatch(originalCode, patchList);
-if (patchResult.ok && patchResult.applied.length > 0) {
-  // ← /worker-patch-safe NUNCA É CHAMADO
+const patchSafeUrl = new URL('/worker-patch-safe', request.url).toString();
+const patchSafeResp = await fetch(patchSafeUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ mode: 'stage', workerId, current: originalCode, candidate: patchResult.candidate }),
+});
+patchSafeData = await patchSafeResp.json()...
+if (!patchSafeData?.ok) {
+  // registra em KV, NÃO aciona GitHub
+} else {
   const orchestratorResult = await orchestrateGithubPR(env, { ... });
 }
 ```
-
-**Impacto:** Patches sintaticamente inválidos podem ser commitados no GitHub. A invariante explícita do contrato é violada: *"/worker-patch-safe valida sintaxe antes de staging — patch inválido não vai para o GitHub"*. O endpoint `/worker-patch-safe` existe no executor (`index.js:2407`) com `mode: "stage"` que chama `/module-validate` → valida sintaxe → só então salva no KV. Este passo está completamente ausente.
+`/worker-patch-safe` chama `/module-validate` internamente para validar sintaxe. Patch inválido → staging rejeitado → GitHub não acionado.
 
 ---
 
-### Issues não bloqueadores (para documentar em PR109):
+### Issues não bloqueadores (para PR109):
 
 **I1 — Codex patches (format: `patch_text`) são inaplicáveis por `applyPatch`**
 
@@ -142,25 +140,17 @@ Somente hardcoded patches (ex: extração de `execution_id`, que tem `search`/`r
 ## 6. VEREDITO
 
 ```
-BLOQUEADO ❌
+APROVADO PARA MERGE ✅
 
-Bloqueador: B1
-Etapa: executor/src/index.js:1413-1443
-Causa: chamada ao /worker-patch-safe (mode:"stage") ausente no ciclo de orquestração
-Invariante violada: "/worker-patch-safe valida sintaxe antes de staging — patch inválido não vai para o GitHub"
+Bloqueador B1: RESOLVIDO — Commit fix(pr108): adicionar /worker-patch-safe antes de orchestrateGithubPR
+  executor/src/index.js:1421-1463 — self-call fetch('/worker-patch-safe', { mode:'stage', ... })
+  Patch inválido → /worker-patch-safe rejeita → GitHub não acionado.
 
-Correção necessária:
-  Após applyPatch retornar ok=true e applied.length > 0:
-  1. Chamar env.ENAVIA_WORKER.fetch("POST /worker-patch-safe", { mode:"stage", workerId, current: originalCode, candidate: patchResult.candidate })
-     OU chamar diretamente o endpoint interno do Executor (self-call via fetch ao próprio URL)
-  2. Se staging.ok=false → retornar erro, NÃO chamar orchestrateGithubPR
-  3. Se staging.ok=true → chamar orchestrateGithubPR
-
-Issues I1-I5 documentados acima — não bloqueiam merge, devem ser resolvidos em PR109.
+Issues I1-I5: documentados, não bloqueadores, endereçados em PR109.
 ```
 
-**Critérios técnicos atendidos:** 15/16  
-**Invariantes respeitados:** 8/9  
+**Critérios técnicos atendidos:** 16/16 (após fix B1)  
+**Invariantes respeitados:** 9/9  
 **Commits na sequência correta:** ✅  
-**Testes passando:** 91 novos + 51 regressão ✅  
-**Bloqueador para merge:** 1 (B1)
+**Testes passando:** 32 + 25 + 34 novos + 32 + 19 regressão ✅ (142 total)  
+**Bloqueadores para merge:** nenhum
