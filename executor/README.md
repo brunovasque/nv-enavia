@@ -89,6 +89,22 @@ executor/
     executor.contract.test.js   — smoke test mínimo de contrato/health
 ```
 
+## Configuração obrigatória de secrets (PR109)
+
+Os dois secrets abaixo devem ser configurados no Cloudflare para o ciclo de autoevolução funcionar.
+**Sem eles, o Codex e o GitHub são silenciosamente pulados sem erro visível.**
+
+```bash
+# Chave OpenAI — necessária para callCodexEngine gerar patches
+wrangler secret put OPENAI_API_KEY
+
+# Token GitHub — necessária para orchestrateGithubPR criar branches e PRs
+wrangler secret put GITHUB_TOKEN
+```
+
+- `OPENAI_API_KEY`: Personal API Key da OpenAI. O modelo é configurável via `OPENAI_CODE_MODEL` em `wrangler.toml` (default: `gpt-5.2`).
+- `GITHUB_TOKEN`: Personal Access Token com escopos `contents:write` e `pull-requests:write` no repo `brunovasque/nv-enavia`.
+
 ## Secrets e bindings necessários (para deploy a partir desta pasta)
 
 > Não commite valores reais. Configure via Cloudflare Dashboard ou `wrangler secret put`.
@@ -99,7 +115,8 @@ executor/
 | `ENAVIA_GIT` | KV binding | KV de integração Git |
 | `GIT_KV` | KV binding | KV auxiliar Git |
 | `CF_API_TOKEN` | Secret | Token de API Cloudflare |
-| `OPENAI_API_KEY` | Secret | Chave OpenAI |
+| `OPENAI_API_KEY` | Secret | Chave OpenAI — necessária para callCodexEngine |
+| `GITHUB_TOKEN` | Secret | Token GitHub — necessário para orchestrateGithubPR |
 | `DEPLOY_WORKER_URL` | Var | URL do deploy-worker |
 | `CF_ACCOUNT_ID` | Var | ID da conta Cloudflare |
 | `TARGET_WORKER_NAME` | Var | Nome do worker-alvo (`nv-enavia`) |
