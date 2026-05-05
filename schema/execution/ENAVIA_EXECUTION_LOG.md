@@ -22,10 +22,13 @@ criar branch → commitar arquivo → abrir PR → com gate humano obrigatório 
 | 3 | 34fa4e2 | `schema/enavia-github-adapter.js` — open_pr (POST pulls, pr_number, html_url, merge_allowed=false) |
 | 4 | 015753f | `nv-enavia.js` — dispatcher + invariante main/master + comentário operações PR106 |
 | 5 | 7e9e7f7 | `tests/pr106-github-bridge-prova-real.prova.test.js` — prova real 19/19 ✅ |
+| 6 | 84becac | governança (status + handoff + execution log + INDEX.md) |
+| 7 | 1a3e34d | **fix bloqueador 1** — propaga commit_sha, pr_number, merge_allowed + asserção 4.1 |
+| 8 | 3d36322 | review PR106 atualizado — Bloqueador 1 e Achado C resolvidos |
 
 ### Testes
 
-- `pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅ (Grupo 5 opt-in com GITHUB_TOKEN real)
+- `pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅ (Grupo 5 opt-in — pendente GITHUB_TOKEN real)
 - `pr105-github-bridge-prova-real.prova.test.js`: 16/16 ✅ (regressão)
 - `pr105-cjs-esm-interop.test.js`: 32/32 ✅ (regressão)
 
@@ -39,9 +42,14 @@ criar branch → commitar arquivo → abrir PR → com gate humano obrigatório 
 - Event Log registra tentativa + resultado ✅
 - Token nunca em logs/response/Event Log ✅
 
+### Bloqueios e fixes
+
+- **Bloqueador 1 (RESOLVIDO — commit 1a3e34d):** `executeGithubBridgeRequest` não propagava `commit_sha`, `pr_number`, `pr_state`, `merge_allowed` e outros campos do adapter. Fix: 9 spreads condicionais adicionados.
+- **Bloqueador 2 (PENDENTE):** Grupo 5 aguarda GITHUB_TOKEN real para provar ciclo completo. Meta: 24/24 ✅.
+
 ### Rollback
 
-- Reverter commits PR106 em ordem inversa (7e9e7f7 → bb29dd0)
+- Reverter commits PR106 em ordem inversa (3d36322 → bb29dd0)
 - Reverter `schema/enavia-github-adapter.js` para estado pré-PR106
 - Reverter `nv-enavia.js` para estado pré-PR106
 
