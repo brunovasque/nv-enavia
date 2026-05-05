@@ -25,7 +25,7 @@ criar branch → commitar arquivo → abrir PR → com gate humano obrigatório 
 | 6 | 84becac | governança (status + handoff + execution log + INDEX.md) |
 | 7 | 1a3e34d | **fix bloqueador 1** — propaga commit_sha, pr_number, merge_allowed + asserção 4.1 |
 | 8 | 3d36322 | review PR106 atualizado — Bloqueador 1 e Achado C resolvidos |
-| 9 | (pendente) | fix open_pr head_branch/base_branch + prova real 24/24 ✅ + docs finais |
+| 9 | 7660b8e | fix open_pr head_branch/base_branch + prova real 24/24 ✅ + docs finais |
 
 ### Testes
 
