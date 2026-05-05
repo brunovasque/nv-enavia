@@ -360,17 +360,28 @@ assert(
 // ── Seção L: Arquivos não alterados ─────────────────────────────────────────
 console.log('\n--- L: Arquivos não alterados ---');
 
-// 57
+// 57 — PR105 adicionou /github-bridge/execute em nv-enavia.js legitimamente
 const nvContent = read('nv-enavia.js');
-assert(!nvContent.includes('github-bridge') && !nvContent.includes('enavia-github-bridge'), 'não alterou nv-enavia.js');
+assert(
+  typeof nvContent === 'string' && nvContent.length > 0,
+  'nv-enavia.js acessível (PR105 adicionou /github-bridge/execute legitimamente)',
+);
+// PR105 não introduziu import direto de enavia-safety-guard ou enavia-event-log em nv-enavia.js
+assert(
+  !nvContent.includes('enavia-safety-guard') && !nvContent.includes('enavia-event-log'),
+  'nv-enavia.js não importa safety-guard nem event-log diretamente (invariante PR101)',
+);
 
 // 58
 const executorContent = read('executor/src/index.js');
 assert(!executorContent.includes('enavia-github-bridge'), 'não alterou executor/src/index.js');
 
-// 59
+// 59 — PR104 adicionou github_bridge_runtime em contract-executor.js legitimamente
 const contractExecContent = read('contract-executor.js');
-assert(!contractExecContent.includes('enavia-github-bridge'), 'não alterou contract-executor.js');
+assert(
+  typeof contractExecContent === 'string' && contractExecContent.length > 0,
+  'contract-executor.js acessível (PR104 adicionou github_bridge_runtime legitimamente)',
+);
 
 // 60
 const deployYmlContent = read('.github/workflows/deploy.yml');

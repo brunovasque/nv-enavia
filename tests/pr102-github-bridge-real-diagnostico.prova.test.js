@@ -150,8 +150,10 @@ assert(gitDiffIsEmpty("panel"), "não alterou panel/**");
 
 // 32–34 garantias de execução
 assert(/Nenhum endpoint novo|sem endpoint novo/i.test(content.report), "não criou endpoint");
-const hasRealGithubAdapter = /api\.github\.com|octokit|Authorization:\s*token|GITHUB_TOKEN/i.test(content.nv + "\n" + content.contractExecutor + "\n" + content.executor);
-assert(!hasRealGithubAdapter, "não chamou GitHub real");
+// PR105 adicionou GITHUB_TOKEN como referência de env var em nv-enavia.js (não é chamada HTTP direta)
+// Verificamos apenas padrões de chamada HTTP real: api.github.com, octokit, Authorization: token
+const hasRealGithubAdapter = /api\.github\.com|octokit|Authorization:\s*token/i.test(content.nv + "\n" + content.contractExecutor + "\n" + content.executor);
+assert(!hasRealGithubAdapter, "não chamou GitHub real (api.github.com/octokit ausentes nos arquivos core)");
 assert(/Nenhum merge\/deploy executado|Nenhuma chamada GitHub real executada|Nenhum deploy/i.test(content.report), "não fez deploy");
 
 // 35–43 regressões obrigatórias

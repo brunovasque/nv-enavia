@@ -24,6 +24,14 @@ binding = "ENAVIA_BRAIN"
 id = "722835b730dd44c79f6ff1f0cdc314a9"
 preview_id = "235fd25ad3b44217975f6ce0d77615d0"
 
+# PR105 — GitHub Bridge Real
+# GITHUB_TOKEN é um secret Cloudflare (não vai em [vars] — nunca em texto claro).
+# Configurar com escopo mínimo (repo: leitura/escrita de PRs e branches):
+#   wrangler secret put GITHUB_TOKEN
+# O binding expõe env.GITHUB_TOKEN no Worker — nunca logado, nunca retornado em response.
+# [secrets]
+# GITHUB_TOKEN
+
 [[services]]
 binding = "EXECUTOR"
 service = "enavia-executor"

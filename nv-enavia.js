@@ -55,6 +55,12 @@ import { buildSkillSpec, validateSkillSpec, buildSkillCreationPackage } from "./
 import { runRegisteredSkill } from "./schema/enavia-skill-runner.js";
 import { registerLearningCandidate, listLearningCandidates, getLearningCandidateById, approveLearningCandidate, rejectLearningCandidate } from "./schema/learning-candidates.js";
 import { listAuditEvents } from "./schema/memory-audit-log.js";
+// PR105 — GitHub Bridge Real adapter (CJS interop via esbuild/wrangler)
+import _githubAdapterNs from "./schema/enavia-github-adapter.js";
+const _executeGithubBridgeRequest =
+  _githubAdapterNs && typeof _githubAdapterNs.executeGithubBridgeRequest === "function"
+    ? _githubAdapterNs.executeGithubBridgeRequest
+    : null;
 
 // ============================================================================
 // 🚀 ENAVIA — Worker Principal (Versão PRO ENGINEER)
@@ -7200,6 +7206,110 @@ async function handleSkillFactoryCreate(request) {
   );
 }
 
+// ============================================================================
+// 🌉 PR105 — POST /github-bridge/execute
+//
+// Endpoint de execução real do GitHub Bridge supervisionado.
+// Fluxo obrigatório:
+//   1. Parse do body (operation obrigatória)
+//   2. Token via env.GITHUB_TOKEN — não hardcoded
+//   3. Delega para executeGithubBridgeRequest (adapter PR105):
+//      a. validateGithubOperation (PR103)
+//      b. evaluateSafetyGuard (PR100)
+//      c. Event Log tentativa (PR99)
+//      d. executeGithubOperation (fetch real GitHub API)
+//      e. Event Log resultado (PR99)
+//   4. Retorna estado completo com github_execution: true/false
+//
+// merge / deploy_prod / secret_change: bloqueio duro sem exceção.
+// GITHUB_TOKEN ausente: erro claro, sem execução silenciosa.
+// ============================================================================
+async function handleGithubBridgeExecute(request, env) {
+  // Fallback seguro se o adapter não carregou
+  if (!_executeGithubBridgeRequest) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "ADAPTER_NOT_AVAILABLE",
+        message: "GitHub Bridge adapter não disponível — verifique o bundle.",
+        github_execution: false,
+        side_effects: false,
+        ready_for_real_execution: false,
+      },
+      503,
+    );
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "INVALID_JSON",
+        message: "Request body must be valid JSON.",
+        github_execution: false,
+        side_effects: false,
+      },
+      400,
+    );
+  }
+
+  if (!body || typeof body !== "object") {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "INVALID_PAYLOAD",
+        message: "Payload inválido para /github-bridge/execute.",
+        github_execution: false,
+        side_effects: false,
+      },
+      400,
+    );
+  }
+
+  // Normaliza: aceita body.operation (objeto) ou body direto como operação
+  const operation =
+    body.operation && typeof body.operation === "object" ? body.operation : body;
+
+  // Token obrigatório via env — nunca hardcoded
+  const token = (env && env.GITHUB_TOKEN) || null;
+
+  if (!token) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "GITHUB_TOKEN_NOT_CONFIGURED",
+        message:
+          "GITHUB_TOKEN não configurado. Configure via: wrangler secret put GITHUB_TOKEN",
+        github_execution: false,
+        side_effects: false,
+        ready_for_real_execution: false,
+        hint: "Escopo mínimo do token: repo (leitura/escrita de PRs e branches)",
+      },
+      503,
+    );
+  }
+
+  try {
+    const result = await _executeGithubBridgeRequest(operation, token);
+    const httpStatus = result.ok ? 200 : result.blocked ? 403 : 500;
+    return jsonResponse(result, httpStatus);
+  } catch (err) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "INTERNAL_ERROR",
+        message: String(err),
+        github_execution: false,
+        side_effects: false,
+      },
+      500,
+    );
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
 
@@ -9131,6 +9241,18 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       if (method === "POST" && path === "/contracts/close-final") {
         const result = await handleCloseFinalContract(request, env);
         return jsonResponse(result.body, result.status);
+      }
+
+      // ============================================================
+      // 🌉 PR105 — GitHub Bridge Real
+      // Execução supervisionada real no GitHub: comment_pr, create_branch.
+      // Safety Guard + Event Log obrigatórios. merge/deploy_prod/secret_change bloqueados.
+      // GITHUB_TOKEN via env secret — nunca hardcoded.
+      // ============================================================
+
+      // POST /github-bridge/execute → Execução real supervisionada no GitHub
+      if (method === "POST" && path === "/github-bridge/execute") {
+        return handleGithubBridgeExecute(request, env);
       }
 
       // ============================================================

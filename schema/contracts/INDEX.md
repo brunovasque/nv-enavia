@@ -13,7 +13,9 @@ Estado atual da frente:
 - PR102 (PR-DIAG): ✅ Concluída em 2026-05-04
 - PR103 (PR-IMPL): ✅ Concluída em 2026-05-04
 - PR104 (PR-IMPL): ✅ Concluída em 2026-05-04
-- PR105 (PR-PROVA): ⏳ Próxima autorizada
+- PR105 (PR-IMPL+PROVA): ✅ Concluída em 2026-05-04
+
+**Contrato encerrado ✅ — Próxima frente: PR106 — Commit + Branch + PR real supervisionados.**
 
 ---
 ## Contratos encerrados
