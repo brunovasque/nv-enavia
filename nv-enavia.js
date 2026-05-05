@@ -2379,7 +2379,7 @@ async function handleEngineerStatus(request, env) {
     ok: true,
     route: "GET /engineer",
     description: "Rota de debug — mostra informações da rota POST /engineer.",
-    executor_url: env.ENAVIA_EXECUTOR_URL || "não configurado",
+    executor_url: env.ENAVIA_EXECUTOR_URL_FALLBACK || "não configurado",
     instructions: {
       metodo: "POST",
       endpoint: "/engineer",
@@ -5572,11 +5572,11 @@ function buildExecutorPathInfo(env, opType) {
 // ============================================================================
 async function callExecutorBridge(env, route, payload) {
   const useBinding = typeof env?.EXECUTOR?.fetch === "function";
-  const fallbackUrl = typeof env?.ENAVIA_EXECUTOR_URL === "string" ? env.ENAVIA_EXECUTOR_URL.trim() : "";
+  const fallbackUrl = typeof env?.ENAVIA_EXECUTOR_URL_FALLBACK === "string" ? env.ENAVIA_EXECUTOR_URL_FALLBACK.trim() : "";
   if (!useBinding && !fallbackUrl) {
     return {
       ok: false, route, status: "blocked",
-      reason: "env.EXECUTOR (service binding) e ENAVIA_EXECUTOR_URL (fallback HTTP) não disponíveis.",
+      reason: "env.EXECUTOR (service binding) e ENAVIA_EXECUTOR_URL_FALLBACK (fallback HTTP) não disponíveis.",
       data: null,
     };
   }
