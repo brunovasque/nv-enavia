@@ -32,6 +32,12 @@ id = "REPLACE_WITH_REAL_ID"
 binding = "GIT_KV"
 id = "REPLACE_WITH_REAL_ID"
 
+# PR107 — service binding de volta ao Worker principal (para /github-bridge/proxy)
+# Executor usa ENAVIA_WORKER para repassar operações GitHub ao Worker sem guardar token.
+[[services]]
+binding = "ENAVIA_WORKER"
+service = "nv-enavia"
+
 [vars]
 CF_ACCOUNT_ID = "REPLACE_WITH_REAL_VALUE"
 CF_WORKER_NAME_NV_ENAVIA = "nv-enavia"
