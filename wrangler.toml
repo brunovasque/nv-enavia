@@ -12,7 +12,12 @@ BROWSER_EXECUTOR_URL = "https://run.nv-imoveis.com/browser/run"
 SUPABASE_URL = "https://jsqvhmnjsbmtfyyukwsr.supabase.co"
 SUPABASE_BUCKET = "enavia-brain"
 OPENAI_MODEL = "gpt-5.2"
-ENAVIA_EXECUTOR_URL = "https://enavia-executor.brunovasque.workers.dev"
+# PR107: ENAVIA_EXECUTOR_URL_FALLBACK — usado SOMENTE quando service binding EXECUTOR ausente.
+# Primário: env.EXECUTOR (service binding, ver [[services]]).
+ENAVIA_EXECUTOR_URL_FALLBACK = "https://enavia-executor.brunovasque.workers.dev"
+# PR107: ENAVIA_DEPLOY_WORKER_URL — fallback HTTP quando service binding DEPLOY_WORKER ausente.
+# Primário: env.DEPLOY_WORKER (service binding, ver [[services]]).
+ENAVIA_DEPLOY_WORKER_URL = "https://deploy-worker.brunovasque.workers.dev"
 DIRECTOR_COGNITIVE_URL = "https://nv-director-cognitive.brunovasque.workers.dev/director/cognitive"
 VERCEL_EXECUTOR_URL = "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch"
 ENAVIA_VERSION = "v2"
@@ -49,7 +54,8 @@ BROWSER_EXECUTOR_URL = ""
 SUPABASE_URL = "https://jsqvhmnjsbmtfyyukwsr.supabase.co"
 SUPABASE_BUCKET = "enavia-brain-test"
 OPENAI_MODEL = "gpt-5.2"
-ENAVIA_EXECUTOR_URL = "https://enavia-executor.brunovasque.workers.dev"
+ENAVIA_EXECUTOR_URL_FALLBACK = "https://enavia-executor.brunovasque.workers.dev"
+ENAVIA_DEPLOY_WORKER_URL = "https://deploy-worker.brunovasque.workers.dev"
 DIRECTOR_COGNITIVE_URL = "https://nv-director-cognitive.brunovasque.workers.dev/director/cognitive"
 VERCEL_EXECUTOR_URL = "https://nv-vercel-executor.brunovasque.workers.dev/vercel/patch"
 ENAVIA_VERSION = "v2"

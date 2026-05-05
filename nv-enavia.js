@@ -2379,7 +2379,7 @@ async function handleEngineerStatus(request, env) {
     ok: true,
     route: "GET /engineer",
     description: "Rota de debug — mostra informações da rota POST /engineer.",
-    executor_url: env.ENAVIA_EXECUTOR_URL || "não configurado",
+    executor_url: env.ENAVIA_EXECUTOR_URL_FALLBACK || "não configurado",
     instructions: {
       metodo: "POST",
       endpoint: "/engineer",
@@ -5571,19 +5571,41 @@ function buildExecutorPathInfo(env, opType) {
 //   - Qualquer exceção → failed.
 // ============================================================================
 async function callExecutorBridge(env, route, payload) {
-  if (typeof env?.EXECUTOR?.fetch !== "function") {
+  const useBinding = typeof env?.EXECUTOR?.fetch === "function";
+  const fallbackUrl = typeof env?.ENAVIA_EXECUTOR_URL_FALLBACK === "string" ? env.ENAVIA_EXECUTOR_URL_FALLBACK.trim() : "";
+  if (!useBinding && !fallbackUrl) {
     return {
       ok: false, route, status: "blocked",
-      reason: "env.EXECUTOR não disponível. Service Binding 'EXECUTOR' não configurado.",
+      reason: "env.EXECUTOR (service binding) e ENAVIA_EXECUTOR_URL_FALLBACK (fallback HTTP) não disponíveis.",
       data: null,
     };
   }
   try {
-    const res = await env.EXECUTOR.fetch("https://enavia-executor.internal" + route, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    let res;
+    if (useBinding) {
+      res = await env.EXECUTOR.fetch("https://enavia-executor.internal" + route, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      const internalToken = typeof env?.INTERNAL_TOKEN === "string" ? env.INTERNAL_TOKEN : "";
+      if (!internalToken) {
+        return {
+          ok: false, route, status: "blocked",
+          reason: "Fallback HTTP para Executor requer INTERNAL_TOKEN configurado.",
+          data: null,
+        };
+      }
+      res = await fetch(fallbackUrl + route, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Token": internalToken,
+        },
+        body: JSON.stringify(payload),
+      });
+    }
     let data = null;
     let rawText = "";
     try {
@@ -5709,11 +5731,33 @@ function validateExecutorAuditForReceipt(executorAudit) {
 }
 
 async function callDeployWorkerJson(env, path, payload) {
-  const res = await env.DEPLOY_WORKER.fetch(`https://deploy-worker.internal${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const useBinding = typeof env?.DEPLOY_WORKER?.fetch === "function";
+  let res;
+  if (useBinding) {
+    res = await env.DEPLOY_WORKER.fetch(`https://deploy-worker.internal${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } else {
+    const fallbackUrl = typeof env?.ENAVIA_DEPLOY_WORKER_URL === "string" ? env.ENAVIA_DEPLOY_WORKER_URL.trim() : "";
+    const internalToken = typeof env?.INTERNAL_TOKEN === "string" ? env.INTERNAL_TOKEN : "";
+    if (!fallbackUrl || !internalToken) {
+      return {
+        ok: false, route: path, status: "blocked",
+        reason: "env.DEPLOY_WORKER (binding) e fallback HTTP (ENAVIA_DEPLOY_WORKER_URL + INTERNAL_TOKEN) não disponíveis.",
+        data: null,
+      };
+    }
+    res = await fetch(fallbackUrl + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Token": internalToken,
+      },
+      body: JSON.stringify(payload),
+    });
+  }
   let data = null;
   let rawText = "";
   try {
@@ -5783,10 +5827,13 @@ async function callDeployBridge(env, action, payload) {
       data: null,
     };
   }
-  if (typeof env?.DEPLOY_WORKER?.fetch !== "function") {
+  const hasDeployBinding = typeof env?.DEPLOY_WORKER?.fetch === "function";
+  const hasFallbackUrl = typeof env?.ENAVIA_DEPLOY_WORKER_URL === "string" && env.ENAVIA_DEPLOY_WORKER_URL.trim().length > 0;
+  const hasFallbackToken = typeof env?.INTERNAL_TOKEN === "string" && env.INTERNAL_TOKEN.length > 0;
+  if (!hasDeployBinding && (!hasFallbackUrl || !hasFallbackToken)) {
     return {
       ok: false, action: "blocked", route: null, status: "blocked",
-      reason: "env.DEPLOY_WORKER não disponível. Service Binding 'DEPLOY_WORKER' não configurado. Deploy bloqueado por segurança.",
+      reason: "env.DEPLOY_WORKER (binding) e fallback HTTP (ENAVIA_DEPLOY_WORKER_URL + INTERNAL_TOKEN) não disponíveis. Deploy bloqueado por segurança.",
       data: null,
     };
   }
@@ -6117,6 +6164,7 @@ async function handleExecuteNext(request, env) {
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
+      github_token_available: !!env?.GITHUB_TOKEN,
     };
     const executorAuditResult = await callExecutorBridge(env, "/audit", _auditPayload);
     if (!executorAuditResult.ok) {
@@ -6147,6 +6195,7 @@ async function handleExecuteNext(request, env) {
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
+      github_token_available: !!env?.GITHUB_TOKEN,
     };
     const executorProposeResult = await callExecutorBridge(env, "/propose", _proposePayload);
     if (!executorProposeResult.ok) {

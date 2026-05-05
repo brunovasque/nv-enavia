@@ -1,10 +1,47 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após prova real PR106 — 24/24 ✅ APROVADO PARA MERGE)
-**Branch ativa:** `copilot/pr106-github-bridge-branch-commit-pr`
-**Última tarefa:** PR106 — GitHub Bridge Branch + Commit + PR Real Supervisionados ✅ PROVA COMPLETA
+**Data:** 2026-05-05 (atualizado após PR107 — Integração do Ecossistema ✅ PR ABERTA)
+**Branch ativa:** `copilot/pr107-integracao-ecossistema`
+**Última tarefa:** PR107 — Integração do Ecossistema (Deploy Worker no repo, fallbacks HTTP, proxy GitHub Bridge) ✅
 
 ## Estado atual do sistema
+
+## Atualização PR107 — Integração do Ecossistema ✅ — 2026-05-05
+
+- Branch: `copilot/pr107-integracao-ecossistema`
+- PR GitHub: [#274](https://github.com/brunovasque/nv-enavia/pull/274) — aguarda revisão e aprovação de Bruno
+- Tipo: PR-REORGANIZAÇÃO (integração e consolidação — sem nova feature)
+- Contrato: `docs/CONTRATO_ENAVIA_ECOSSISTEMA_PR107.md` ✅
+- PR anterior validada: PR106 ✅ (24/24 testes reais, PR #273, mergeada)
+
+### 5 commits atômicos executados
+
+| # | Hash | Entrega |
+|---|------|---------|
+| 1 | 1759b89 | `deploy-worker/` — cópia fiel de brunovasque/deploy-worker (1929 linhas) |
+| 2 | a05b5d9 | `nv-enavia.js` — fallback HTTP callExecutorBridge + callDeployBridge |
+| 3 | 89d411d | `executor/src/index.js` — POST /github-bridge/proxy + ENAVIA_WORKER binding |
+| 4 | 87c5e5a | `executor/wrangler.toml` — DEPLOY_WORKER binding + delegateToDeployWorker binding-first |
+| 5 | 54c2c65 | `wrangler.toml` — ENAVIA_EXECUTOR_URL_FALLBACK + ENAVIA_DEPLOY_WORKER_URL + ARQUITETURA_ECOSSISTEMA.md |
+
+### Critérios de conclusão do contrato: 11/12 ✅ (1 pendente — aprovação humana)
+
+- [x] deploy-worker/src/index.js no repo
+- [x] deploy-worker/wrangler.toml no repo
+- [x] deploy-worker/README.md com credenciais
+- [x] callExecutorBridge com fallback HTTP
+- [x] callDeployBridge com fallback HTTP
+- [x] POST /github-bridge/proxy no Executor
+- [x] ENAVIA_WORKER binding em executor/wrangler.toml
+- [x] DEPLOY_WORKER binding em executor/wrangler.toml
+- [x] ENAVIA_EXECUTOR_URL renomeado para ENAVIA_EXECUTOR_URL_FALLBACK
+- [x] docs/ARQUITETURA_ECOSSISTEMA.md criado
+- [x] Testes PR99–PR106: todos passando (19/19 ✅, 32/32 ✅)
+- [ ] PR revisada e aprovada por Bruno → **PENDENTE**
+
+- Próxima etapa: Bruno revisa e aprova a PR #274, merge em main, PR108 (self-patch supervisionado) pode iniciar
+
+
 
 ## Atualização PR106 — GitHub Bridge Branch + Commit + PR ✅ PROVA REAL COMPLETA
 

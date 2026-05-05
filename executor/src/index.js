@@ -289,25 +289,36 @@ const WORKER_SCRIPT_MAP = {
 
     // ============================================================
     // 🔀 DEPLOY-WORKER DELEGATION HELPER
-    // Encaminha request para deploy-worker quando DEPLOY_WORKER_URL
-    // está configurado. Retorna null se deploy-worker não disponível.
+    // Service binding (env.DEPLOY_WORKER) tem prioridade.
+    // Fallback HTTP via DEPLOY_WORKER_URL quando binding ausente.
+    // Retorna null se nenhum dos dois disponível.
     // ============================================================
     const DEPLOY_WORKER_BASE = (env.DEPLOY_WORKER_URL || "").replace(/\/$/, "");
 
     async function delegateToDeployWorker(path, body) {
-      if (!DEPLOY_WORKER_BASE) return null;
+      const useBinding = typeof env?.DEPLOY_WORKER?.fetch === "function";
+      if (!useBinding && !DEPLOY_WORKER_BASE) return null;
       try {
-        const url = DEPLOY_WORKER_BASE + path;
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(env.INTERNAL_TOKEN
-              ? { Authorization: `Bearer ${String(env.INTERNAL_TOKEN)}` }
-              : {}),
-          },
-          body: JSON.stringify(body),
-        });
+        let resp;
+        if (useBinding) {
+          resp = await env.DEPLOY_WORKER.fetch(`https://deploy-worker.internal${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        } else {
+          const url = DEPLOY_WORKER_BASE + path;
+          resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(env.INTERNAL_TOKEN
+                ? { "X-Internal-Token": String(env.INTERNAL_TOKEN) }
+                : {}),
+            },
+            body: JSON.stringify(body),
+          });
+        }
         let data = null;
         try {
           data = await resp.json();
@@ -319,7 +330,7 @@ const WORKER_SCRIPT_MAP = {
           ok: resp.ok && data.ok !== false,
           delegated: true,
           delegated_to: "deploy-worker",
-          deploy_worker_url: url,
+          deploy_worker_channel: useBinding ? "service-binding" : "http-fallback",
           response: data,
           http_status: resp.status,
         };
@@ -3289,6 +3300,74 @@ if (method === "POST" && pathname === "/worker-deploy") {
     }
 
     // ============================================================
+    // 🌉 POST /github-bridge/proxy
+    // Proxy GitHub Bridge: repassa operação para o Worker (env.ENAVIA_WORKER)
+    // que detém o GITHUB_TOKEN. Executor nunca guarda nem recebe o token.
+    // Safety Guard e Event Log são aplicados pelo Worker no pipeline real.
+    // ============================================================
+    if (METHOD === "POST" && pathname === "/github-bridge/proxy") {
+      if (typeof env?.ENAVIA_WORKER?.fetch !== "function") {
+        return withCORS(jsonResponse({
+          ok: false,
+          error: "ENAVIA_WORKER_BINDING_ABSENT",
+          reason: "Service binding ENAVIA_WORKER não disponível. Executor não pode repassar para o GitHub Bridge sem binding do Worker.",
+          proxy: false,
+        }, 503));
+      }
+
+      let body;
+      try {
+        body = await request.json();
+      } catch (_) {
+        return withCORS(errorResponse("JSON inválido em /github-bridge/proxy.", 400));
+      }
+
+      let workerResp;
+      try {
+        workerResp = await env.ENAVIA_WORKER.fetch(
+          "https://nv-enavia.internal/github-bridge/execute",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        );
+      } catch (err) {
+        return withCORS(jsonResponse({
+          ok: false,
+          error: "PROXY_FETCH_FAILED",
+          reason: `Falha ao chamar Worker via ENAVIA_WORKER: ${String(err)}`,
+          proxy: false,
+        }, 502));
+      }
+
+      let workerData = null;
+      let rawText = "";
+      try {
+        rawText = await workerResp.text();
+        workerData = JSON.parse(rawText);
+      } catch (_) {
+        return withCORS(jsonResponse({
+          ok: false,
+          error: "PROXY_RESPONSE_INVALID",
+          reason: "Resposta do Worker não é JSON válido.",
+          raw: rawText.slice(0, 500),
+          proxy: true,
+          status: workerResp.status,
+        }, 502));
+      }
+
+      return withCORS(new Response(JSON.stringify({
+        ...workerData,
+        proxy: true,
+        proxy_source: "enavia-executor",
+      }), {
+        status: workerResp.status,
+        headers: { "Content-Type": "application/json" },
+      }));
+    }
+
+    // ============================================================
     // 🔒 FALLBACK — QUALQUER OUTRO POST RETORNA 404 EXPLÍCITO
     // Antes (legado): roteava silenciosamente para enaviaExecutorCore.
     // Agora: rejeita com erro explícito. Rotas válidas são nomeadas.
@@ -3312,6 +3391,7 @@ if (method === "POST" && pathname === "/worker-deploy") {
             "/apply-exec",
             "/validate-code",
             "/engineer",
+            "/github-bridge/proxy",
           ],
         },
       ));

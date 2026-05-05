@@ -1,5 +1,47 @@
 # ENAVIA — Execution Log
 
+## 2026-05-05 — PR107 — PR-REORGANIZAÇÃO — Integração do Ecossistema
+
+- **Branch:** `copilot/pr107-integracao-ecossistema`
+- **Tipo:** PR-REORGANIZAÇÃO (integração e consolidação — sem nova feature)
+- **Contrato:** `docs/CONTRATO_ENAVIA_ECOSSISTEMA_PR107.md` ✅
+- **PR anterior validada:** PR106 ✅ (mergeada como PR #272, 24/24 testes reais)
+- **PR GitHub aberta:** [#274](https://github.com/brunovasque/nv-enavia/pull/274)
+
+### Objetivo
+
+Conectar os 3 sistemas do ecossistema Enavia (Worker, Executor, Deploy Worker) em arquitetura coesa e auditável. Sem nova feature — apenas integração e consolidação como base para PR108 (self-patch).
+
+### 5 Commits atômicos
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 1759b89 | `deploy-worker/` | Deploy Worker internalizado (1929 linhas — cópia fiel sha 48916b6) |
+| 2 | a05b5d9 | `nv-enavia.js` | Fallback HTTP callExecutorBridge + callDeployBridge (INTERNAL_TOKEN) |
+| 3 | 89d411d | `executor/src/index.js` + `executor/wrangler.toml` | POST /github-bridge/proxy + ENAVIA_WORKER binding |
+| 4 | 87c5e5a | `executor/src/index.js` + `executor/wrangler.toml` | delegateToDeployWorker binding-first + DEPLOY_WORKER binding |
+| 5 | 54c2c65 | `wrangler.toml` + `nv-enavia.js` + `docs/` | ENAVIA_EXECUTOR_URL_FALLBACK + ENAVIA_DEPLOY_WORKER_URL + ARQUITETURA_ECOSSISTEMA.md |
+
+### Testes executados
+
+- `pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅ (após cada commit)
+- `pr105-cjs-esm-interop.test.js`: 32/32 ✅ (após cada commit)
+
+### Invariantes mantidos
+
+- merge_allowed=false, ALWAYS_BLOCKED, PROTECTED_BRANCHES ✅
+- GITHUB_TOKEN: nunca no Executor, nunca logado ✅
+- INTERNAL_TOKEN: obrigatório em toda chamada HTTP inter-worker ✅
+- Safety Guard + Event Log: ativos em toda execução GitHub ✅
+- performDeploy() no Executor: STUB permanente ✅
+
+### Resultado
+
+- 11/12 critérios de conclusão do contrato ✅
+- 1 pendente: aprovação humana de Bruno na PR #274
+- PR108 desbloqueada após merge
+
+---
 
 ## 2026-05-04 — PR106 — PR-IMPL+PROVA — GitHub Bridge Branch + Commit + PR Real Supervisionados
 
