@@ -1410,7 +1410,8 @@ if (METHOD === "POST" && pathname === "/propose") {
         });
       }
 
-  // PR108: se github_token_available=true e staging.ready=true, acionar ciclo GitHub
+  // PR108/PR109: ciclo GitHub — github_token_available=true e staging.ready=true
+  let githubOrchestrationResult = null;
   if (action.github_token_available === true && staging?.ready === true) {
     const originalCode = action.context?.target_code_original || action.context?.target_code || null;
     const patchList = execResult?.patch?.patchText || null;
@@ -1443,12 +1444,13 @@ if (METHOD === "POST" && pathname === "/propose") {
         }
 
         if (!patchSafeData?.ok) {
+          // PR109: capturar resultado de staging falho para surfaçar na response
+          githubOrchestrationResult = { ok: false, step: 'worker_patch_safe', error: patchSafeData?.error || 'STAGING_FAILED' };
           if (execIdForPropose) {
             await updateFlowStateKV(env, execIdForPropose, {
-              github_orchestration: { ok: false, step: 'worker_patch_safe', error: patchSafeData?.error || 'STAGING_FAILED', detail: patchSafeData },
+              github_orchestration: githubOrchestrationResult,
             });
           }
-          // candidato invalido ou staging falhou — nao acionar GitHub
         } else {
           const orchestratorResult = await orchestrateGithubPR(env, {
             workerId: targetWorkerId,
@@ -1460,6 +1462,8 @@ if (METHOD === "POST" && pathname === "/propose") {
             baseBranch: 'main',
           });
 
+          // PR109: capturar resultado da orquestração para surfaçar na response
+          githubOrchestrationResult = orchestratorResult;
           if (execIdForPropose) {
             await updateFlowStateKV(env, execIdForPropose, {
               github_orchestration: orchestratorResult,
@@ -1481,6 +1485,8 @@ if (METHOD === "POST" && pathname === "/propose") {
         ...(canonicalMap ? { map: canonicalMap } : {}),
       },
       ...(pipeline ? { pipeline } : {}),
+      // PR109: surfaçar resultado da orquestração GitHub quando ocorreu
+      ...(githubOrchestrationResult !== null ? { github_orchestration: githubOrchestrationResult } : {}),
     })
   );
 }
