@@ -1,5 +1,5 @@
 /**
- * enavia-github-adapter.js — PR105 — GitHub Bridge Real
+ * enavia-github-adapter.js — PR105 (base) + PR106 (create_branch validado, create_commit, open_pr)
  *
  * Adapter HTTP real para operações GitHub supervisionadas.
  * Responsabilidades:
@@ -7,15 +7,24 @@
  *   - executeGithubBridgeRequest(operation, token) — pipeline completo:
  *       validateGithubOperation → evaluateSafetyGuard → Event Log → executeGithubOperation → Event Log
  *
+ * Operações suportadas (PR105 + PR106):
+ *   - comment_pr   — comenta em PR existente
+ *   - create_branch — cria branch com SHA base dinâmico (GET ref → POST git/refs)
+ *   - create_commit — cria ou atualiza arquivo em branch (GET contents → PUT contents)
+ *   - open_pr       — abre PR real (POST pulls), sem merge automático
+ *
  * Invariantes obrigatórias:
  *   - merge / deploy_prod / secret_change: sempre bloqueados — sem exceção
+ *   - commit direto em main/master: sempre bloqueado
+ *   - merge de PR: sempre bloqueado (gate humano obrigatório)
  *   - Token nunca exposto em evidence, event ou response
  *   - Safety Guard sempre antes de executeGithubOperation
  *   - Event Log sempre registra tentativa e resultado
  *   - Operação sem token: erro claro, sem execução silenciosa
+ *   - content vazio em create_commit: erro imediato
  *
- * Contrato: CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md
- * PR: PR105 — GitHub Bridge Real — Adapter + Plugação + Prova Real Unificados
+ * Contratos: CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md (base)
+ *            CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106.md (extensão)
  */
 
 'use strict';
@@ -30,11 +39,16 @@ const { createEnaviaEvent } = require('./enavia-event-log');
 
 const ALWAYS_BLOCKED = ['merge', 'deploy_prod', 'secret_change'];
 
-const SUPPORTED_OPERATIONS = ['comment_pr', 'create_branch'];
+// Branches protegidas — commit direto proibido
+const PROTECTED_BRANCHES = ['main', 'master'];
+
+const SUPPORTED_OPERATIONS = ['comment_pr', 'create_branch', 'create_commit', 'open_pr'];
 
 const SOURCE_PR = 'PR105';
+const SOURCE_PR_106 = 'PR106';
 const CONTRACT_ID = 'CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105';
-const USER_AGENT = 'enavia-github-bridge/PR105';
+const CONTRACT_ID_106 = 'CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106';
+const USER_AGENT = 'enavia-github-bridge/PR106';
 
 // ---------------------------------------------------------------------------
 // _executeCommentPr — executa comentário real em PR do GitHub
@@ -254,6 +268,7 @@ async function _executeCreateBranch(operation, token) {
   }
 
   const ok = createResponse.status === 201;
+  const alreadyExists = createResponse.status === 422;
   const created_ref = ok ? (createData && createData.ref ? createData.ref : null) : null;
 
   const evidence = ok
@@ -262,7 +277,9 @@ async function _executeCreateBranch(operation, token) {
         `SHA base: ${sha.slice(0, 7)}`,
         created_ref ? `ref=${created_ref}` : null,
       ].filter(Boolean)
-    : [`Falha ao criar branch ${head_branch} no repo ${repo}: HTTP ${createResponse.status}`];
+    : alreadyExists
+      ? [`Branch ${head_branch} já existe no repo ${repo} (HTTP 422)`]
+      : [`Falha ao criar branch ${head_branch} no repo ${repo}: HTTP ${createResponse.status}`];
 
   return {
     ok,
@@ -274,9 +291,270 @@ async function _executeCreateBranch(operation, token) {
     head_branch,
     sha_used: ok ? sha : null,
     response_status: createResponse.status,
+    already_exists: alreadyExists,
     evidence,
-    error: ok ? null : `GitHub API retornou HTTP ${createResponse.status}`,
-    source_pr: SOURCE_PR,
+    error: ok ? null : alreadyExists
+      ? `Branch ${head_branch} já existe no repo ${repo}`
+      : `GitHub API retornou HTTP ${createResponse.status}`,
+    source_pr: SOURCE_PR_106,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// _toBase64 — encode UTF-8 string para base64 (compatível com Workers e Node.js)
+// ---------------------------------------------------------------------------
+
+function _toBase64(str) {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str, 'utf-8').toString('base64');
+  }
+  // Workers/browser fallback: encode UTF-8 chars corretamente
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/gi, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16)),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// _executeCreateCommit — cria ou atualiza arquivo em branch real do GitHub
+//
+// Sequência obrigatória (contrato PR106 seção 2.1):
+//   1. GET /repos/{owner}/{repo}/contents/{path}?ref={branch} — obter SHA se arquivo existir
+//   2. PUT /repos/{owner}/{repo}/contents/{path} — criar ou atualizar arquivo
+//
+// Invariantes:
+//   - content nunca pode ser vazio
+//   - branch de destino nunca pode ser "main" ou "master"
+//   - commit em branch protegida = bloqueio duro
+// ---------------------------------------------------------------------------
+
+async function _executeCreateCommit(operation, token) {
+  const repo = typeof operation.repo === 'string' ? operation.repo.trim() : '';
+  const branch = typeof operation.branch === 'string' ? operation.branch.trim() : '';
+  const file_path = typeof operation.file_path === 'string' ? operation.file_path.trim() : '';
+  const content = typeof operation.content === 'string' ? operation.content : '';
+  const commit_message = typeof operation.commit_message === 'string' ? operation.commit_message.trim() : '';
+
+  const parts = repo.split('/');
+  const owner = parts[0] || '';
+  const repoName = parts[1] || '';
+
+  if (!owner || !repoName) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'repo deve ter formato owner/repo', evidence: [] };
+  }
+
+  // Invariante: branch protegida = bloqueio duro
+  if (!branch) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'branch de destino ausente', evidence: [] };
+  }
+  if (PROTECTED_BRANCHES.includes(branch)) {
+    return {
+      ok: false,
+      executed: false,
+      github_execution: false,
+      operation_type: 'create_commit',
+      blocked: true,
+      error: `Commit direto em "${branch}" é proibido pelo GitHub Bridge — use uma branch de feature`,
+      evidence: [],
+      source_pr: SOURCE_PR_106,
+    };
+  }
+
+  // Invariante: content nunca pode ser vazio
+  if (!content) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'content não pode ser vazio', evidence: [] };
+  }
+
+  if (!file_path) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'file_path ausente', evidence: [] };
+  }
+
+  if (!commit_message) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'commit_message ausente', evidence: [] };
+  }
+
+  // Passo 1: GET SHA do arquivo se existir (para update)
+  const contentsUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${file_path}`;
+  let existingSha = null;
+  try {
+    const getResponse = await fetch(`${contentsUrl}?ref=${encodeURIComponent(branch)}`, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': USER_AGENT,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (getResponse.status === 200) {
+      const getData = await getResponse.json().catch(() => ({}));
+      existingSha = getData.sha || null;
+    }
+    // 404 = arquivo não existe — ok para create
+  } catch (_) {
+    // Falha de rede ao checar existência — prossegue sem sha (create)
+  }
+
+  // Passo 2: PUT para criar ou atualizar arquivo
+  const contentBase64 = _toBase64(content);
+  const putBody = {
+    message: commit_message,
+    content: contentBase64,
+    branch,
+    ...(existingSha ? { sha: existingSha } : {}),
+  };
+
+  let putResponse, putData;
+  try {
+    putResponse = await fetch(contentsUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify(putBody),
+    });
+    putData = await putResponse.json().catch(() => ({}));
+  } catch (err) {
+    return {
+      ok: false,
+      executed: false,
+      github_execution: false,
+      operation_type: 'create_commit',
+      error: `Falha de rede ao criar commit em ${file_path}: ${String(err)}`,
+      evidence: [],
+    };
+  }
+
+  const ok = putResponse.status === 200 || putResponse.status === 201;
+  const operation_kind = existingSha ? 'update' : 'create';
+  const commit_sha = ok && putData.commit ? (putData.commit.sha || null) : null;
+  const html_url = ok && putData.content ? (putData.content.html_url || null) : null;
+
+  const evidence = ok
+    ? [
+        `Arquivo ${file_path} ${operation_kind === 'update' ? 'atualizado' : 'criado'} na branch ${branch} do repo ${repo}`,
+        commit_sha ? `commit_sha=${commit_sha.slice(0, 7)}` : null,
+        html_url ? `url=${html_url}` : null,
+        `operation_kind=${operation_kind}`,
+      ].filter(Boolean)
+    : [`Falha ao criar commit em ${file_path} na branch ${branch} do repo ${repo}: HTTP ${putResponse.status}`];
+
+  return {
+    ok,
+    executed: true,
+    github_execution: true,
+    operation_type: 'create_commit',
+    repo,
+    branch,
+    file_path,
+    operation_kind,
+    response_status: putResponse.status,
+    commit_sha,
+    html_url,
+    evidence,
+    error: ok ? null : `GitHub API retornou HTTP ${putResponse.status}`,
+    source_pr: SOURCE_PR_106,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// _executeOpenPr — abre PR real no GitHub
+//
+// Payload obrigatório: { title, head, base }
+// Payload opcional: { body }
+// Retorna: { pr_number, html_url, pr_state, merge_allowed: false }
+//
+// Invariante: merge_allowed é sempre false — gate humano obrigatório antes do merge.
+// ---------------------------------------------------------------------------
+
+async function _executeOpenPr(operation, token) {
+  const repo = typeof operation.repo === 'string' ? operation.repo.trim() : '';
+  const title = typeof operation.title === 'string' ? operation.title.trim() : '';
+  const body = typeof operation.body === 'string' ? operation.body : '';
+  // Aceita head_branch (validator PR103) ou head (alias direto)
+  const head = (typeof operation.head_branch === 'string' ? operation.head_branch.trim() : '')
+    || (typeof operation.head === 'string' ? operation.head.trim() : '');
+  // Aceita base_branch (validator PR103) ou base (alias direto)
+  const base = (typeof operation.base_branch === 'string' ? operation.base_branch.trim() : '')
+    || (typeof operation.base === 'string' ? operation.base.trim() : '');
+
+  const parts = repo.split('/');
+  const owner = parts[0] || '';
+  const repoName = parts[1] || '';
+
+  if (!owner || !repoName) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'repo deve ter formato owner/repo', evidence: [] };
+  }
+  if (!title) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'title ausente', evidence: [] };
+  }
+  if (!head) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'head ausente (branch de origem)', evidence: [] };
+  }
+  if (!base) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'open_pr', error: 'base ausente (branch de destino)', evidence: [] };
+  }
+
+  const url = `https://api.github.com/repos/${owner}/${repoName}/pulls`;
+  let response, responseData;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify({ title, body, head, base }),
+    });
+    responseData = await response.json().catch(() => ({}));
+  } catch (err) {
+    return {
+      ok: false,
+      executed: false,
+      github_execution: false,
+      operation_type: 'open_pr',
+      error: `Falha de rede ao abrir PR: ${String(err)}`,
+      evidence: [],
+    };
+  }
+
+  const ok = response.status === 201;
+  const pr_number = ok ? (responseData.number || null) : null;
+  const html_url = ok ? (responseData.html_url || null) : null;
+  const pr_state = ok ? (responseData.state || null) : null;
+
+  const evidence = ok
+    ? [
+        `PR aberta: "${title}" (${head} → ${base}) no repo ${repo}`,
+        pr_number ? `PR #${pr_number}` : null,
+        html_url ? `url=${html_url}` : null,
+        `merge_allowed=false — gate humano obrigatório`,
+      ].filter(Boolean)
+    : [`Falha ao abrir PR no repo ${repo}: HTTP ${response.status}`];
+
+  return {
+    ok,
+    executed: true,
+    github_execution: true,
+    operation_type: 'open_pr',
+    repo,
+    head,
+    base,
+    response_status: response.status,
+    pr_number,
+    html_url,
+    pr_state,
+    merge_allowed: false,
+    evidence,
+    error: ok ? null : `GitHub API retornou HTTP ${response.status}`,
+    source_pr: SOURCE_PR_106,
   };
 }
 
@@ -326,6 +604,8 @@ async function executeGithubOperation(operation, token) {
   // Roteamento para operações suportadas
   if (opType === 'comment_pr') return _executeCommentPr(safeOp, token);
   if (opType === 'create_branch') return _executeCreateBranch(safeOp, token);
+  if (opType === 'create_commit') return _executeCreateCommit(safeOp, token);
+  if (opType === 'open_pr') return _executeOpenPr(safeOp, token);
 
   return {
     ok: false,
@@ -335,7 +615,7 @@ async function executeGithubOperation(operation, token) {
     blocked: false,
     error: `Operação "${opType}" não suportada pelo adapter atual (suportadas: ${SUPPORTED_OPERATIONS.join(', ')})`,
     evidence: [],
-    source_pr: SOURCE_PR,
+    source_pr: SOURCE_PR_106,
   };
 }
 
@@ -494,6 +774,15 @@ async function executeGithubBridgeRequest(operation, token) {
     ...(execResult.comment_id !== undefined ? { comment_id: execResult.comment_id } : {}),
     ...(execResult.html_url !== undefined ? { html_url: execResult.html_url } : {}),
     ...(execResult.sha_used !== undefined ? { sha_used: execResult.sha_used } : {}),
+    ...(execResult.commit_sha !== undefined ? { commit_sha: execResult.commit_sha } : {}),
+    ...(execResult.branch !== undefined ? { branch: execResult.branch } : {}),
+    ...(execResult.file_path !== undefined ? { file_path: execResult.file_path } : {}),
+    ...(execResult.operation_kind !== undefined ? { operation_kind: execResult.operation_kind } : {}),
+    ...(execResult.pr_number !== undefined ? { pr_number: execResult.pr_number } : {}),
+    ...(execResult.pr_state !== undefined ? { pr_state: execResult.pr_state } : {}),
+    ...(execResult.merge_allowed !== undefined ? { merge_allowed: execResult.merge_allowed } : {}),
+    ...(execResult.head !== undefined ? { head: execResult.head } : {}),
+    ...(execResult.base !== undefined ? { base: execResult.base } : {}),
   };
 }
 

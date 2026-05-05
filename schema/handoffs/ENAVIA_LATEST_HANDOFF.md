@@ -1,8 +1,59 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR105 — GitHub Bridge Real Unificado ✅ CONCLUÍDA
-**Para:** PR106 — Commit + Branch + PR real supervisionados
+**De:** PR106 — GitHub Bridge Branch + Commit + PR Real Supervisionados 🔄 EM EXECUÇÃO
+**Para:** PR107 — Self-patch supervisionado (após merge da PR106)
+
+## Handoff atual (PR106 — 5 commits atômicos entregues, PR aberta)
+
+### O que foi feito
+
+- `schema/enavia-github-adapter.js` expandido com 3 novas operações reais (PR106):
+  - `create_branch`: validado + tratamento de 422 (branch já existente)
+  - `create_commit`: GET/PUT /contents/{path}, base64, bloqueio main/master
+  - `open_pr`: POST /pulls, merge_allowed=false sempre
+- `nv-enavia.js`: dispatcher atualizado — invariante de bloqueio main/master em create_commit
+- `tests/pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅ (Grupo 5 opt-in com GITHUB_TOKEN real)
+- SUPPORTED_OPERATIONS: ['comment_pr', 'create_branch', 'create_commit', 'open_pr']
+- Regressão PR105 16/16 ✅ | Interop 32/32 ✅
+
+### Commits atômicos (5/5)
+
+| # | Hash | Entrega |
+|---|------|---------|
+| 1 | bb29dd0 | create_branch validado + PROTECTED_BRANCHES + constants PR106 |
+| 2 | de1267d | create_commit (GET+PUT, base64, bloqueio main/master) |
+| 3 | 34fa4e2 | open_pr (POST pulls, pr_number, html_url, merge_allowed=false) |
+| 4 | 015753f | dispatcher nv-enavia.js + invariante main/master |
+| 5 | 7e9e7f7 | prova real 19/19 ✅ (Grupo 5 opt-in) |
+
+### O que foi protegido
+
+- `merge`, `deploy_prod`, `secret_change`: ALWAYS_BLOCKED sem exceção
+- Commit em main/master: bloqueio duro duplo (adapter + dispatcher)
+- merge_allowed=false sempre em open_pr
+- Token nunca em logs, response, Event Log
+- Safety Guard + Event Log em toda operação real
+
+### Para executar prova real completa com token
+
+```bash
+GITHUB_TOKEN=ghp_... node tests/pr106-github-bridge-prova-real.prova.test.js
+```
+
+Ciclo: cria branch test/pr106-prova-{timestamp} → commit test/pr106-evidence.txt → abre PR → confirma sem merge → limpa (fecha PR + deleta branch).
+
+### Próxima etapa
+
+**PR107 — Self-patch supervisionado** (após merge da PR106 aprovado por Bruno):
+- Enavia lê o próprio código
+- Propõe patch via executor
+- Abre PR com o patch
+- Aguarda aprovação humana para merge
+
+---
+
+## Handoff anterior (PR105 ✅ CONCLUÍDA — Contrato PR102–PR105 ENCERRADO ✅)
 
 ## Handoff atual (PR105 ✅ CONCLUÍDA — Contrato PR102–PR105 ENCERRADO ✅)
 

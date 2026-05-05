@@ -1,10 +1,26 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR105 — GitHub Bridge Real Unificado ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr105-github-bridge-real-unificado`
-**Última tarefa:** PR105 — GitHub Bridge Real (Adapter + Plugação + Prova Real) ✅
+**Data:** 2026-05-04 (atualizado após prova real PR106 — 24/24 ✅ APROVADO PARA MERGE)
+**Branch ativa:** `copilot/pr106-github-bridge-branch-commit-pr`
+**Última tarefa:** PR106 — GitHub Bridge Branch + Commit + PR Real Supervisionados ✅ PROVA COMPLETA
 
 ## Estado atual do sistema
+
+## Atualização PR106 — GitHub Bridge Branch + Commit + PR ✅ PROVA REAL COMPLETA
+
+- PR-IMPL+PROVA — prova real executada com GITHUB_TOKEN em 2026-05-04.
+- `schema/enavia-github-adapter.js` expandido:
+  - `create_branch` validado + tratamento 422 (branch já existente) + `PROTECTED_BRANCHES`
+  - `create_commit` novo: GET+PUT /contents/{path}, encode base64, invariante main/master bloqueado
+  - `open_pr` novo: POST /pulls, aceita `head_branch`/`base_branch` ou `head`/`base`, retorna pr_number + html_url + merge_allowed=false
+  - `SUPPORTED_OPERATIONS` atualizado para 4 operações (comment_pr, create_branch, create_commit, open_pr)
+  - `executeGithubBridgeRequest` propaga todos os campos críticos (commit_sha, pr_number, merge_allowed, etc.)
+- `nv-enavia.js` atualizado: dispatcher com invariante de bloqueio de commit em main/master (camada dupla)
+- `tests/pr106-github-bridge-prova-real.prova.test.js`: **24/24 ✅** (incluindo Grupo 5 — ciclo real)
+- Evidências reais: branch `test/pr106-prova-1777946218829` criada, commit, PR #273 aberta, PR fechada, branch deletada
+- Regressão PR105: 16/16 ✅ | Interop: 32/32 ✅
+- **VEREDITO: APROVADO PARA MERGE — aguarda aprovação humana de Bruno na PR #272.**
+- Próxima etapa: **PR107 — Self-patch supervisionado** (após merge da PR106).
 
 ## Atualização PR105 — GitHub Bridge Real Unificado ✅
 

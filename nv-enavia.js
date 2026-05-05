@@ -7207,22 +7207,30 @@ async function handleSkillFactoryCreate(request) {
 }
 
 // ============================================================================
-// 🌉 PR105 — POST /github-bridge/execute
+// 🌉 PR105+PR106 — POST /github-bridge/execute
 //
 // Endpoint de execução real do GitHub Bridge supervisionado.
+// Operações suportadas (PR106):
+//   - comment_pr    — comentar em PR existente
+//   - create_branch — criar branch com SHA base dinâmico
+//   - create_commit — criar/atualizar arquivo em branch (base64, GET+PUT)
+//   - open_pr       — abrir PR real (sem merge automático)
+//
 // Fluxo obrigatório:
 //   1. Parse do body (operation obrigatória)
-//   2. Token via env.GITHUB_TOKEN — não hardcoded
-//   3. Delega para executeGithubBridgeRequest (adapter PR105):
+//   2. Invariantes de dispatcher: commit em main/master bloqueado antes do adapter
+//   3. Token via env.GITHUB_TOKEN — não hardcoded
+//   4. Delega para executeGithubBridgeRequest (adapter PR105+PR106):
 //      a. validateGithubOperation (PR103)
 //      b. evaluateSafetyGuard (PR100)
 //      c. Event Log tentativa (PR99)
 //      d. executeGithubOperation (fetch real GitHub API)
 //      e. Event Log resultado (PR99)
-//   4. Retorna estado completo com github_execution: true/false
+//   5. Retorna estado completo com github_execution: true/false
 //
-// merge / deploy_prod / secret_change: bloqueio duro sem exceção.
+// Invariantes (merge / deploy_prod / secret_change / commit em main|master): bloqueio duro.
 // GITHUB_TOKEN ausente: erro claro, sem execução silenciosa.
+// merge_allowed=false sempre — gate humano obrigatório.
 // ============================================================================
 async function handleGithubBridgeExecute(request, env) {
   // Fallback seguro se o adapter não carregou
@@ -7272,6 +7280,29 @@ async function handleGithubBridgeExecute(request, env) {
   // Normaliza: aceita body.operation (objeto) ou body direto como operação
   const operation =
     body.operation && typeof body.operation === "object" ? body.operation : body;
+
+  // --- PR106 Invariantes de dispatcher ---
+  // Bloqueio duro: commit direto em main/master proibido
+  const _opType = operation && typeof operation.type === "string"
+    ? operation.type.toLowerCase().trim()
+    : "";
+  const _destBranch = (operation && typeof operation.branch === "string"
+    ? operation.branch.trim()
+    : "");
+  if (_opType === "create_commit" && (_destBranch === "main" || _destBranch === "master")) {
+    return jsonResponse(
+      {
+        ok: false,
+        blocked: true,
+        error: "COMMIT_TO_PROTECTED_BRANCH",
+        message: `Commit direto em "${_destBranch}" é proibido pelo GitHub Bridge — use uma branch de feature.`,
+        github_execution: false,
+        side_effects: false,
+        merge_allowed: false,
+      },
+      403,
+    );
+  }
 
   // Token obrigatório via env — nunca hardcoded
   const token = (env && env.GITHUB_TOKEN) || null;
@@ -9244,9 +9275,10 @@ console.log("FETCH HIT:", request.method, new URL(request.url).pathname);
       }
 
       // ============================================================
-      // 🌉 PR105 — GitHub Bridge Real
-      // Execução supervisionada real no GitHub: comment_pr, create_branch.
+      // 🌉 PR105+PR106 — GitHub Bridge Real
+      // Operações: comment_pr, create_branch, create_commit, open_pr.
       // Safety Guard + Event Log obrigatórios. merge/deploy_prod/secret_change bloqueados.
+      // Commit em main/master bloqueado. merge_allowed=false sempre.
       // GITHUB_TOKEN via env secret — nunca hardcoded.
       // ============================================================
 

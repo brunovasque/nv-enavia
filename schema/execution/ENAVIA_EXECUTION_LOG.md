@@ -1,6 +1,62 @@
 # ENAVIA — Execution Log
 
 
+## 2026-05-04 — PR106 — PR-IMPL+PROVA — GitHub Bridge Branch + Commit + PR Real Supervisionados
+
+- **Branch:** `copilot/pr106-github-bridge-branch-commit-pr`
+- **Tipo:** PR-IMPL+PROVA (unificado — 5 commits atômicos)
+- **Contrato:** `docs/CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106.md` (ATIVO 🔄)
+- **PR anterior validada:** PR105 ✅
+
+### Objetivo
+
+Expandir o GitHub Bridge real para suportar o ciclo completo de criação de código supervisionado:
+criar branch → commitar arquivo → abrir PR → com gate humano obrigatório antes do merge.
+
+### Commits atômicos
+
+| # | Hash | Escopo |
+|---|------|--------|
+| 1 | bb29dd0 | `schema/enavia-github-adapter.js` — create_branch validado + PROTECTED_BRANCHES + constants PR106 |
+| 2 | de1267d | `schema/enavia-github-adapter.js` — create_commit (GET+PUT, base64, bloqueio main/master) |
+| 3 | 34fa4e2 | `schema/enavia-github-adapter.js` — open_pr (POST pulls, pr_number, html_url, merge_allowed=false) |
+| 4 | 015753f | `nv-enavia.js` — dispatcher + invariante main/master + comentário operações PR106 |
+| 5 | 7e9e7f7 | `tests/pr106-github-bridge-prova-real.prova.test.js` — prova real 19/19 ✅ |
+| 6 | 84becac | governança (status + handoff + execution log + INDEX.md) |
+| 7 | 1a3e34d | **fix bloqueador 1** — propaga commit_sha, pr_number, merge_allowed + asserção 4.1 |
+| 8 | 3d36322 | review PR106 atualizado — Bloqueador 1 e Achado C resolvidos |
+| 9 | 7660b8e | fix open_pr head_branch/base_branch + prova real 24/24 ✅ + docs finais |
+
+### Testes
+
+- `pr106-github-bridge-prova-real.prova.test.js`: **24/24 ✅** (Grupo 5 executado com GITHUB_TOKEN real)
+- `pr105-github-bridge-prova-real.prova.test.js`: 16/16 ✅ (regressão)
+- `pr105-cjs-esm-interop.test.js`: 32/32 ✅ (regressão)
+
+### Invariantes mantidos
+
+- merge/deploy_prod/secret_change: ALWAYS_BLOCKED sem exceção ✅
+- commit em main/master: bloqueio duro duplo (adapter + dispatcher) ✅
+- merge_allowed=false sempre em open_pr ✅
+- GITHUB_TOKEN via env.GITHUB_TOKEN — nunca hardcoded ✅
+- Safety Guard antes de toda execução real ✅
+- Event Log registra tentativa + resultado ✅
+- Token nunca em logs/response/Event Log ✅
+
+### Bloqueios e fixes
+
+- **Bloqueador 1 (RESOLVIDO — commit 1a3e34d):** `executeGithubBridgeRequest` não propagava `commit_sha`, `pr_number`, `pr_state`, `merge_allowed` e outros campos do adapter. Fix: 9 spreads condicionais adicionados.
+- **Bloqueador 2 (RESOLVIDO):** Grupo 5 executado com GITHUB_TOKEN real — 24/24 ✅. PR #273 criada, fechada, branch deletada.
+- **Achado B (RESOLVIDO):** `_executeOpenPr` agora aceita `head_branch`/`base_branch` (validator PR103) e `head`/`base` (alias direto). Teste 5.3 atualizado para enviar `head_branch`/`base_branch`.
+
+### Rollback
+
+- Reverter commits PR106 em ordem inversa (3d36322 → bb29dd0)
+- Reverter `schema/enavia-github-adapter.js` para estado pré-PR106
+- Reverter `nv-enavia.js` para estado pré-PR106
+
+---
+
 ## 2026-05-04 — PR105 — PR-IMPL+PROVA — GitHub Bridge Real Unificado
 
 - **Branch:** `copilot/pr105-github-bridge-real-unificado`
