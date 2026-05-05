@@ -1,5 +1,49 @@
 # ENAVIA — Execution Log
 
+## 2026-05-05 — PR109 — PR-FIX+PROVA — Fix Ciclo Codex + Prova Real End-to-End
+
+- **Branch:** `copilot/pr109-fix-ciclo-prova-real`
+- **Tipo:** PR-FIX+PROVA (correções bloqueadoras + prova real unificadas)
+- **Contrato:** `docs/CONTRATO_ENAVIA_FIX_PROVA_PR109.md` ✅
+- **PR anterior validada:** PR108 ✅ (branch copilot/pr108-motor-patch-orquestrador, PR #275)
+
+### Objetivo
+
+Corrigir os 3 problemas que impediam o ciclo Codex→GitHub de funcionar ponta a ponta (I1: formato de patches, I2: response sem pr_url, I5: OPENAI_API_KEY não declarado) e provar o ciclo completo com testes.
+
+### 4 Commits atômicos
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | d685219 | `executor/src/index.js` | Prompt callCodexEngine reformulado para pedir search+replace; normalizador filtra sem-search com skipped_no_search |
+| 2 | fa1877d | `executor/src/index.js` | githubOrchestrationResult capturado e surfaçado na response de /propose |
+| 3 | 9f32a92 | `executor/wrangler.toml` + `executor/README.md` | OPENAI_API_KEY e GITHUB_TOKEN documentados com instrução wrangler secret put |
+| 4 | 940b9a2 | `tests/pr109-ciclo-real.prova.test.js` | 38 testes em 3 grupos (Grupo 1: normalização Codex, Grupo 2: github_orchestration response, Grupo 3: e2e real opt-in) |
+
+### Testes executados
+
+- `pr109-ciclo-real.prova.test.js` Grupo 1: 23/23 ✅
+- `pr109-ciclo-real.prova.test.js` Grupo 2: 15/15 ✅
+- `pr109-ciclo-real.prova.test.js` Grupo 3: 5 skipped (opt-in, requer ENAVIA_EXECUTOR_URL + GITHUB_TOKEN)
+- `pr108-patch-engine.test.js`: 32/32 ✅ (regressão)
+- `pr108-code-chunker.test.js`: 25/25 ✅ (regressão)
+- `pr108-integration.test.js`: 34/34 ✅ (regressão)
+
+### Invariantes mantidos
+
+- merge_allowed=false ALWAYS_BLOCKED ✅
+- GITHUB_TOKEN nunca sai do Worker ✅
+- /worker-patch-safe valida sintaxe antes de qualquer commit ✅
+- Orquestrador só acionado se staging.ready = true ✅
+- Patches Codex sem search → aviso explícito, não crash silencioso ✅
+
+### Resultado
+
+- 11/12 critérios de conclusão do contrato ✅ (falta aprovação humana)
+- Branch pushed — aguarda abertura de PR e revisão de Bruno
+
+---
+
 ## 2026-05-05 — PR108 — PR-IMPL — Motor de Patch + Orquestrador Self-Patch
 
 - **Branch:** `copilot/pr108-motor-patch-orquestrador`
