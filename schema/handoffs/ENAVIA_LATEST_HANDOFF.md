@@ -1,8 +1,46 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-05-04
-**De:** PR106 — GitHub Bridge Branch + Commit + PR Real Supervisionados 🔄 EM EXECUÇÃO
-**Para:** PR107 — Self-patch supervisionado (após merge da PR106)
+**Data:** 2026-05-05
+**De:** PR107 — Integração do Ecossistema ✅ (branch: copilot/pr107-integracao-ecossistema)
+**Para:** PR108 — Self-patch supervisionado (após merge da PR #274)
+
+## Handoff atual — PR107 ✅ ABERTA (aguarda revisão Bruno)
+
+### O que foi feito
+
+- 5 commits atômicos na sequência do contrato `docs/CONTRATO_ENAVIA_ECOSSISTEMA_PR107.md`
+- Deploy Worker internalizado no repo (`deploy-worker/` — 1929 linhas, cópia fiel sha `48916b6`)
+- Fallback HTTP em `callExecutorBridge` e `callDeployBridge` no Worker (`nv-enavia.js`)
+- `POST /github-bridge/proxy` no Executor (via `env.ENAVIA_WORKER` — sem guardar token)
+- `delegateToDeployWorker` no Executor agora prefere service binding sobre HTTP
+- `ENAVIA_EXECUTOR_URL` → `ENAVIA_EXECUTOR_URL_FALLBACK` (clareza de intenção)
+- `docs/ARQUITETURA_ECOSSISTEMA.md` criado — mapa canônico dos 3 sistemas
+
+### Estado atual
+
+- PR GitHub #274: https://github.com/brunovasque/nv-enavia/pull/274
+- Status: ABERTA — aguarda revisão e aprovação de Bruno
+- Critérios técnicos do contrato: 11/12 ✅ (falta aprovação humana)
+- Testes PR99–PR106: todos passando (19/19 ✅ PR106, 32/32 ✅ PR105)
+
+### O que PR108 pode usar (após merge da PR107)
+
+1. Worker → Executor: service binding (+ fallback HTTP via `ENAVIA_EXECUTOR_URL_FALLBACK`)
+2. Executor → Deploy Worker: service binding (+ fallback HTTP via `DEPLOY_WORKER_URL`)
+3. Executor → Worker GitHub Bridge: `env.ENAVIA_WORKER` binding (sem guardar GITHUB_TOKEN)
+4. Deploy Worker: auditável no repo — não é mais caixa preta
+
+### Próxima etapa
+
+1. Bruno revisa e aprova PR #274 → merge em main
+2. Definir contrato PR108: self-patch supervisionado
+   - Trigger: Worker `/propose`
+   - Executor: lê código via CF API + gera patch via LLM (16k chars — estratégia de chunking a definir)
+   - Executor: `/github-bridge/proxy` → Worker → GitHub API
+   - Gate humano obrigatório antes de merge (herdado de PR106)
+
+---
+
 
 ## Handoff atual (PR106 — 5 commits atômicos entregues, PR aberta)
 

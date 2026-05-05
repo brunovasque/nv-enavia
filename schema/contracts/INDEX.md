@@ -7,16 +7,25 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`docs/CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106.md`** — Ativo (criado em 2026-05-05).
+🟢 **`docs/CONTRATO_ENAVIA_ECOSSISTEMA_PR107.md`** — Ativo (criado em 2026-05-05).
 
 Estado atual da frente:
-- PR106 (PR-IMPL+PROVA): 🔄 Em execução (branch: `copilot/pr106-github-bridge-branch-commit-pr`)
+- PR107 (PR-REORGANIZAÇÃO): ✅ Executada — PR #274 aberta (copilot/pr107-integracao-ecossistema)
+  - 5/5 commits atômicos concluídos
+  - Aguarda revisão e aprovação de Bruno antes do merge
 
-**Próxima etapa: merge da PR106 → PR107 (Self-patch supervisionado).**
+**Próxima etapa: merge da PR #274 → PR108 (Self-patch supervisionado).**
 
 ---
 
 ## Contrato anterior (encerrado)
+
+🔴 **`docs/CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106.md`** — Encerrado ✅ (2026-05-05)
+- PR106 (PR-IMPL+PROVA): ✅ Concluída — PR #272 mergeada, 24/24 testes reais
+
+---
+
+## Contrato anterior (encerrado — era o ativo)
 
 ✅ **`active/CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md`** — Encerrado em 2026-05-04.
 
