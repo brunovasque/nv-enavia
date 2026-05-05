@@ -29,8 +29,7 @@ preview_id = "235fd25ad3b44217975f6ce0d77615d0"
 # Configurar com escopo mínimo (repo: leitura/escrita de PRs e branches):
 #   wrangler secret put GITHUB_TOKEN
 # O binding expõe env.GITHUB_TOKEN no Worker — nunca logado, nunca retornado em response.
-# [secrets]
-# GITHUB_TOKEN
+secrets = ["GITHUB_TOKEN"]
 
 [[services]]
 binding = "EXECUTOR"
