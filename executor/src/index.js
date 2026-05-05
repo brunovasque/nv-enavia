@@ -5680,22 +5680,27 @@ async function callCodexEngine(env, params) {
       "Você recebe snapshot de Worker Cloudflare (JavaScript) e um objetivo técnico.",
       "Você deve devolver SOMENTE JSON válido, no formato:",
       "{",
-      '  \"ok\": true,',
-      '  \"patches\": [',
+      '  "ok": true,',
+      '  "patches": [',
       "    {",
-      '      \"title\": string,',
-      '      \"description\": string,',
-      '      \"anchor\": { \"match\": string } | null,',
-      '      \"patch_text\": string',
+      '      "title": "string — título da mudança",',
+      '      "anchor": { "match": "string — trecho único próximo à mudança" },',
+      '      "search": "string — linha exata a substituir (deve existir EXATAMENTE no código fornecido e ser única)",',
+      '      "replace": "string — novo conteúdo que substitui search (pode ser múltiplas linhas)",',
+      '      "patch_text": "string — descrição humana da mudança (opcional, para documentação)",',
+      '      "reason": "string — por que essa mudança é necessária"',
       "    }",
       "  ],",
-      '  \"notes\": string[] | null,',
-      '  \"tests\": [',
-      '    { \"description\": string, \"curl\": string }',
-      "  ]",
+      '  "notes": ["string"] | null,',
+      '  "tests": [{ "description": "string", "curl": "string" }]',
       "}",
       "",
-      "Não explique nada fora desse JSON. Não use markdown."
+      "REGRAS CRÍTICAS — search e replace:",
+      "- search DEVE ser uma string que existe EXATAMENTE no código fornecido (copia literal)",
+      "- search DEVE ser única no arquivo — não pode aparecer em múltiplos lugares",
+      "- replace é o novo conteúdo que substitui search integralmente",
+      "- Se não encontrar trecho único para search, omita esse patch — não invente",
+      "- Não use markdown. Não explique fora do JSON."
     ];
 
     if (contract) {
@@ -5785,13 +5790,19 @@ async function callCodexEngine(env, params) {
     }
 
     const normalized = [];
+    const skippedNoSearch = [];
     for (const rawPatch of patches) {
       if (!rawPatch || typeof rawPatch !== "object") continue;
-      const patchText =
-        rawPatch.patch_text ||
-        rawPatch.patchText ||
-        "";
-      if (!patchText) continue;
+
+      const search = typeof rawPatch.search === "string" ? rawPatch.search : null;
+      const replace = typeof rawPatch.replace === "string" ? rawPatch.replace : null;
+      const patchText = rawPatch.patch_text || rawPatch.patchText || null;
+
+      // PR109: search é obrigatório para applyPatch funcionar
+      if (!search) {
+        skippedNoSearch.push(String(rawPatch.title || "sem-título"));
+        continue;
+      }
 
       const anchor =
         rawPatch.anchor && typeof rawPatch.anchor.match === "string"
@@ -5800,17 +5811,12 @@ async function callCodexEngine(env, params) {
 
       normalized.push({
         title: String(rawPatch.title || "Patch codex"),
-        description: String(
-          rawPatch.description ||
-            intentText ||
-            "Patch sugerido pelo motor Codex."
-        ),
+        description: String(rawPatch.description || intentText || "Patch sugerido pelo motor Codex."),
         anchor,
-        patch_text: String(patchText),
-        reason: String(
-          rawPatch.reason ||
-            "Patch sugerido via Codex (não aplicado automaticamente)."
-        ),
+        search,
+        replace: replace !== null ? replace : "",
+        ...(patchText ? { patch_text: String(patchText) } : {}),
+        reason: String(rawPatch.reason || "Patch sugerido via Codex."),
       });
     }
 
@@ -5818,6 +5824,7 @@ async function callCodexEngine(env, params) {
       ok: normalized.length > 0,
       patches: normalized,
       notes: Array.isArray(parsed?.notes) ? parsed.notes : [],
+      ...(skippedNoSearch.length > 0 ? { skipped_no_search: skippedNoSearch } : {}),
       raw: parsed,
     };
   } catch (err) {
@@ -7260,10 +7267,15 @@ if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
     });
 
     if (codexResult && codexResult.ok && Array.isArray(codexResult.patches)) {
+      // PR109: avisar patches Codex sem search (skippados no normalizador)
+      if (Array.isArray(codexResult.skipped_no_search) && codexResult.skipped_no_search.length > 0) {
+        result.warnings.push(`CODEX_PATCHES_SKIPPED_NO_SEARCH:${codexResult.skipped_no_search.join(",")}`);
+        result.steps.push("codex_patches_skipped_no_search");
+      }
       for (const p of codexResult.patches) {
         if (!p || typeof p !== "object") continue;
-        const patchText = p.patch_text || p.patchText || "";
-        if (!patchText) continue;
+        // search é obrigatório — patches sem search já foram filtrados no normalizador
+        if (typeof p.search !== "string") continue;
 
         patches.push({
           target: "cloudflare_worker",
@@ -7274,10 +7286,10 @@ if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
             p.anchor && typeof p.anchor.match === "string"
               ? { match: p.anchor.match }
               : null,
-          patch_text: patchText,
-          reason:
-            p.reason ||
-            "Patch sugerido via Codex (não aplicado automaticamente).",
+          search: p.search,
+          replace: typeof p.replace === "string" ? p.replace : "",
+          ...(p.patch_text ? { patch_text: p.patch_text } : {}),
+          reason: p.reason || "Patch sugerido via Codex.",
         });
       }
     } else if (codexResult && !codexResult.ok) {
