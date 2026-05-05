@@ -1,5 +1,5 @@
 /**
- * enavia-github-adapter.js — PR105 — GitHub Bridge Real
+ * enavia-github-adapter.js — PR105 (base) + PR106 (create_branch validado, create_commit, open_pr)
  *
  * Adapter HTTP real para operações GitHub supervisionadas.
  * Responsabilidades:
@@ -7,15 +7,24 @@
  *   - executeGithubBridgeRequest(operation, token) — pipeline completo:
  *       validateGithubOperation → evaluateSafetyGuard → Event Log → executeGithubOperation → Event Log
  *
+ * Operações suportadas (PR105 + PR106):
+ *   - comment_pr   — comenta em PR existente
+ *   - create_branch — cria branch com SHA base dinâmico (GET ref → POST git/refs)
+ *   - create_commit — cria ou atualiza arquivo em branch (GET contents → PUT contents)
+ *   - open_pr       — abre PR real (POST pulls), sem merge automático
+ *
  * Invariantes obrigatórias:
  *   - merge / deploy_prod / secret_change: sempre bloqueados — sem exceção
+ *   - commit direto em main/master: sempre bloqueado
+ *   - merge de PR: sempre bloqueado (gate humano obrigatório)
  *   - Token nunca exposto em evidence, event ou response
  *   - Safety Guard sempre antes de executeGithubOperation
  *   - Event Log sempre registra tentativa e resultado
  *   - Operação sem token: erro claro, sem execução silenciosa
+ *   - content vazio em create_commit: erro imediato
  *
- * Contrato: CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md
- * PR: PR105 — GitHub Bridge Real — Adapter + Plugação + Prova Real Unificados
+ * Contratos: CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105.md (base)
+ *            CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106.md (extensão)
  */
 
 'use strict';
@@ -30,11 +39,16 @@ const { createEnaviaEvent } = require('./enavia-event-log');
 
 const ALWAYS_BLOCKED = ['merge', 'deploy_prod', 'secret_change'];
 
-const SUPPORTED_OPERATIONS = ['comment_pr', 'create_branch'];
+// Branches protegidas — commit direto proibido
+const PROTECTED_BRANCHES = ['main', 'master'];
+
+const SUPPORTED_OPERATIONS = ['comment_pr', 'create_branch', 'create_commit', 'open_pr'];
 
 const SOURCE_PR = 'PR105';
+const SOURCE_PR_106 = 'PR106';
 const CONTRACT_ID = 'CONTRATO_ENAVIA_GITHUB_BRIDGE_REAL_PR102_PR105';
-const USER_AGENT = 'enavia-github-bridge/PR105';
+const CONTRACT_ID_106 = 'CONTRATO_ENAVIA_GITHUB_BRIDGE_PR106';
+const USER_AGENT = 'enavia-github-bridge/PR106';
 
 // ---------------------------------------------------------------------------
 // _executeCommentPr — executa comentário real em PR do GitHub
@@ -254,6 +268,7 @@ async function _executeCreateBranch(operation, token) {
   }
 
   const ok = createResponse.status === 201;
+  const alreadyExists = createResponse.status === 422;
   const created_ref = ok ? (createData && createData.ref ? createData.ref : null) : null;
 
   const evidence = ok
@@ -262,7 +277,9 @@ async function _executeCreateBranch(operation, token) {
         `SHA base: ${sha.slice(0, 7)}`,
         created_ref ? `ref=${created_ref}` : null,
       ].filter(Boolean)
-    : [`Falha ao criar branch ${head_branch} no repo ${repo}: HTTP ${createResponse.status}`];
+    : alreadyExists
+      ? [`Branch ${head_branch} já existe no repo ${repo} (HTTP 422)`]
+      : [`Falha ao criar branch ${head_branch} no repo ${repo}: HTTP ${createResponse.status}`];
 
   return {
     ok,
@@ -274,9 +291,12 @@ async function _executeCreateBranch(operation, token) {
     head_branch,
     sha_used: ok ? sha : null,
     response_status: createResponse.status,
+    already_exists: alreadyExists,
     evidence,
-    error: ok ? null : `GitHub API retornou HTTP ${createResponse.status}`,
-    source_pr: SOURCE_PR,
+    error: ok ? null : alreadyExists
+      ? `Branch ${head_branch} já existe no repo ${repo}`
+      : `GitHub API retornou HTTP ${createResponse.status}`,
+    source_pr: SOURCE_PR_106,
   };
 }
 
@@ -326,6 +346,8 @@ async function executeGithubOperation(operation, token) {
   // Roteamento para operações suportadas
   if (opType === 'comment_pr') return _executeCommentPr(safeOp, token);
   if (opType === 'create_branch') return _executeCreateBranch(safeOp, token);
+  if (opType === 'create_commit') return _executeCreateCommit(safeOp, token);
+  if (opType === 'open_pr') return _executeOpenPr(safeOp, token);
 
   return {
     ok: false,
@@ -335,7 +357,7 @@ async function executeGithubOperation(operation, token) {
     blocked: false,
     error: `Operação "${opType}" não suportada pelo adapter atual (suportadas: ${SUPPORTED_OPERATIONS.join(', ')})`,
     evidence: [],
-    source_pr: SOURCE_PR,
+    source_pr: SOURCE_PR_106,
   };
 }
 
