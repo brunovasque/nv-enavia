@@ -301,6 +301,167 @@ async function _executeCreateBranch(operation, token) {
 }
 
 // ---------------------------------------------------------------------------
+// _toBase64 — encode UTF-8 string para base64 (compatível com Workers e Node.js)
+// ---------------------------------------------------------------------------
+
+function _toBase64(str) {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str, 'utf-8').toString('base64');
+  }
+  // Workers/browser fallback: encode UTF-8 chars corretamente
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/gi, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16)),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// _executeCreateCommit — cria ou atualiza arquivo em branch real do GitHub
+//
+// Sequência obrigatória (contrato PR106 seção 2.1):
+//   1. GET /repos/{owner}/{repo}/contents/{path}?ref={branch} — obter SHA se arquivo existir
+//   2. PUT /repos/{owner}/{repo}/contents/{path} — criar ou atualizar arquivo
+//
+// Invariantes:
+//   - content nunca pode ser vazio
+//   - branch de destino nunca pode ser "main" ou "master"
+//   - commit em branch protegida = bloqueio duro
+// ---------------------------------------------------------------------------
+
+async function _executeCreateCommit(operation, token) {
+  const repo = typeof operation.repo === 'string' ? operation.repo.trim() : '';
+  const branch = typeof operation.branch === 'string' ? operation.branch.trim() : '';
+  const file_path = typeof operation.file_path === 'string' ? operation.file_path.trim() : '';
+  const content = typeof operation.content === 'string' ? operation.content : '';
+  const commit_message = typeof operation.commit_message === 'string' ? operation.commit_message.trim() : '';
+
+  const parts = repo.split('/');
+  const owner = parts[0] || '';
+  const repoName = parts[1] || '';
+
+  if (!owner || !repoName) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'repo deve ter formato owner/repo', evidence: [] };
+  }
+
+  // Invariante: branch protegida = bloqueio duro
+  if (!branch) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'branch de destino ausente', evidence: [] };
+  }
+  if (PROTECTED_BRANCHES.includes(branch)) {
+    return {
+      ok: false,
+      executed: false,
+      github_execution: false,
+      operation_type: 'create_commit',
+      blocked: true,
+      error: `Commit direto em "${branch}" é proibido pelo GitHub Bridge — use uma branch de feature`,
+      evidence: [],
+      source_pr: SOURCE_PR_106,
+    };
+  }
+
+  // Invariante: content nunca pode ser vazio
+  if (!content) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'content não pode ser vazio', evidence: [] };
+  }
+
+  if (!file_path) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'file_path ausente', evidence: [] };
+  }
+
+  if (!commit_message) {
+    return { ok: false, executed: false, github_execution: false, operation_type: 'create_commit', error: 'commit_message ausente', evidence: [] };
+  }
+
+  // Passo 1: GET SHA do arquivo se existir (para update)
+  const contentsUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${file_path}`;
+  let existingSha = null;
+  try {
+    const getResponse = await fetch(`${contentsUrl}?ref=${encodeURIComponent(branch)}`, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': USER_AGENT,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (getResponse.status === 200) {
+      const getData = await getResponse.json().catch(() => ({}));
+      existingSha = getData.sha || null;
+    }
+    // 404 = arquivo não existe — ok para create
+  } catch (_) {
+    // Falha de rede ao checar existência — prossegue sem sha (create)
+  }
+
+  // Passo 2: PUT para criar ou atualizar arquivo
+  const contentBase64 = _toBase64(content);
+  const putBody = {
+    message: commit_message,
+    content: contentBase64,
+    branch,
+    ...(existingSha ? { sha: existingSha } : {}),
+  };
+
+  let putResponse, putData;
+  try {
+    putResponse = await fetch(contentsUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify(putBody),
+    });
+    putData = await putResponse.json().catch(() => ({}));
+  } catch (err) {
+    return {
+      ok: false,
+      executed: false,
+      github_execution: false,
+      operation_type: 'create_commit',
+      error: `Falha de rede ao criar commit em ${file_path}: ${String(err)}`,
+      evidence: [],
+    };
+  }
+
+  const ok = putResponse.status === 200 || putResponse.status === 201;
+  const operation_kind = existingSha ? 'update' : 'create';
+  const commit_sha = ok && putData.commit ? (putData.commit.sha || null) : null;
+  const html_url = ok && putData.content ? (putData.content.html_url || null) : null;
+
+  const evidence = ok
+    ? [
+        `Arquivo ${file_path} ${operation_kind === 'update' ? 'atualizado' : 'criado'} na branch ${branch} do repo ${repo}`,
+        commit_sha ? `commit_sha=${commit_sha.slice(0, 7)}` : null,
+        html_url ? `url=${html_url}` : null,
+        `operation_kind=${operation_kind}`,
+      ].filter(Boolean)
+    : [`Falha ao criar commit em ${file_path} na branch ${branch} do repo ${repo}: HTTP ${putResponse.status}`];
+
+  return {
+    ok,
+    executed: true,
+    github_execution: true,
+    operation_type: 'create_commit',
+    repo,
+    branch,
+    file_path,
+    operation_kind,
+    response_status: putResponse.status,
+    commit_sha,
+    html_url,
+    evidence,
+    error: ok ? null : `GitHub API retornou HTTP ${putResponse.status}`,
+    source_pr: SOURCE_PR_106,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // executeGithubOperation — adapter HTTP puro (sem Safety Guard aqui)
 //
 // Responsabilidade única: traduzir operation → chamada HTTP GitHub API → resultado.
