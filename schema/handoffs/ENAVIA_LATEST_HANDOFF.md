@@ -1,8 +1,47 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-04
-**De:** PR105 — GitHub Bridge Real Unificado ✅ CONCLUÍDA
-**Para:** PR106 — Commit + Branch + PR real supervisionados
+**De:** PR-DIAG Ecossistema ✅ (branch: claude/pr107-self-patch-diag)
+**Para:** Contrato formal PR107 — Self-patch completo (auditar→patch→branch→commit→PR)
+
+## Handoff atual — PR-DIAG Ecossistema ✅
+
+### O que foi feito
+
+- **PR106 concluída** (sessão anterior): create_branch + create_commit + open_pr reais, 24/24 testes ✅, PR GitHub #273 criada e fechada.
+- **DIAGNOSTICO_PR107.md** criado: Executor analisado linha-a-linha, SELF_WORKER_AUDITOR mapeado, 6 riscos identificados, veredito: PR107 BLOQUEADO para IMPL sem contrato.
+- **DIAGNOSTICO_ECOSSISTEMA.md** criado: diagnóstico completo dos 3 sistemas com código real lido.
+
+### Gaps críticos (impedir PR107 IMPL sem resolução)
+
+1. **Executor sem GITHUB_TOKEN**: não consegue criar branches/commits/PRs. Precisa receber token do Worker ou ter próprio secret.
+2. **Deploy Worker opaco**: sem código local, impossível auditar ou garantir comportamento.
+3. **LLM com 16k chars**: cobre < 5% do nv-enavia.js (9785 linhas). Patches serão parciais.
+4. **performDeploy() é STUB**: auto_deploy nunca funciona no Executor — deploy real só via Deploy Worker externo.
+5. **callExecutorBridge sem fallback**: falha total em dev local sem Miniflare configurado.
+
+### Próxima etapa segura
+
+1. Criar contrato formal para PR107 definindo:
+   - Como o Executor vai receber GITHUB_TOKEN (encaminhar do Worker ou secret próprio)
+   - Tamanho máximo do snapshot (estratégia de chunking ou fingerprint)
+   - Validação de sintaxe antes de commitar (antes de qualquer IMPL)
+   - Gate humano no ciclo self-patch
+2. Só após contrato aprovado: iniciar PR107-IMPL
+
+### Arquivos gerados nesta sessão (não alterar sem PR nova)
+
+- `docs/DIAGNOSTICO_PR107.md` ✅
+- `docs/DIAGNOSTICO_ECOSSISTEMA.md` ✅
+- `docs/PR106_PROVA_REAL.md` ✅
+- `docs/PR106_REVIEW.md` ✅
+
+### Branch atual
+
+`claude/pr107-self-patch-diag` — contém apenas diagnósticos (PR-DIAG), sem alteração de runtime.
+
+---
+
 
 ## Handoff atual (PR105 ✅ CONCLUÍDA — Contrato PR102–PR105 ENCERRADO ✅)
 

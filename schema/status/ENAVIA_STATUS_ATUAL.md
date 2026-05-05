@@ -1,10 +1,28 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR105 — GitHub Bridge Real Unificado ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr105-github-bridge-real-unificado`
-**Última tarefa:** PR105 — GitHub Bridge Real (Adapter + Plugação + Prova Real) ✅
+**Data:** 2026-05-04 (atualizado após PR-DIAG Ecossistema + DIAGNOSTICO_PR107 ✅)
+**Branch ativa:** `claude/pr107-self-patch-diag`
+**Última tarefa:** PR-DIAG — Diagnóstico completo do ecossistema (3 sistemas) ✅
 
 ## Estado atual do sistema
+
+## Atualização PR-DIAG Ecossistema ✅ — 2026-05-04
+
+- Branch: `claude/pr107-self-patch-diag`
+- Tipo: PR-DIAG (read-only, sem alteração de runtime)
+- Contrato ativo: identificar via INDEX.md (contrato PR106/PR107)
+- Documentos criados nesta sessão:
+  - `docs/DIAGNOSTICO_PR107.md` — análise do Executor + SELF_WORKER_AUDITOR (PR107 BLOQUEADO para IMPL)
+  - `docs/DIAGNOSTICO_ECOSSISTEMA.md` — diagnóstico completo dos 3 sistemas
+  - `docs/PR106_PROVA_REAL.md` — prova real 24/24 ✅ (PR #273)
+  - `docs/PR106_REVIEW.md` — veredito APROVADO PARA MERGE ✅
+- PR106 concluída antes desta sessão: branch+commit+PR real, 24/24 ✅
+- Gaps críticos identificados:
+  - Executor sem GITHUB_TOKEN — bloqueia self-patch completo (PR107)
+  - Deploy Worker é externo — sem código local auditável
+  - callCodexEngine lê apenas 16k chars de ~9785 linhas (< 5% do Worker)
+  - performDeploy() é STUB permanente — auto_deploy nunca funciona
+- Próxima etapa segura: definir contrato formal para PR107 antes de qualquer IMPL
 
 ## Atualização PR105 — GitHub Bridge Real Unificado ✅
 

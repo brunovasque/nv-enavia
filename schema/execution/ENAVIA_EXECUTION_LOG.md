@@ -1,5 +1,50 @@
 # ENAVIA — Execution Log
 
+## 2026-05-04 — PR-DIAG Ecossistema — Diagnóstico completo dos 3 sistemas
+
+- **Branch:** `claude/pr107-self-patch-diag`
+- **Tipo:** PR-DIAG (read-only, sem alteração de runtime)
+- **Contrato:** diagnóstico autônomo solicitado pelo usuário
+
+### Objetivo
+
+Mapear os 3 sistemas do ecossistema Enavia (Worker, Executor, Deploy Worker) lendo código real.
+Identificar gaps de integração, duplicações, o que está funcional vs stub, e o que falta para PR107.
+
+### Arquivos criados
+
+| Arquivo | Conteúdo |
+|---|---|
+| `docs/DIAGNOSTICO_ECOSSISTEMA.md` | Diagnóstico completo 6 seções: rotas, CF Bridge, inter-worker, mapa de comunicação, gaps |
+| `docs/DIAGNOSTICO_PR107.md` | Análise Executor + SELF_WORKER_AUDITOR para PR107 self-patch |
+
+### Fontes lidas (código real)
+
+- `nv-enavia.js` (9785 linhas) — rotas, callExecutorBridge, callDeployBridge, handleEngineerRequest
+- `executor/src/index.js` (7827 linhas) — todos endpoints, fetchCurrentWorkerSnapshot, callCodexEngine, delegateToDeployWorker, performDeploy (STUB)
+- `schema/enavia-github-adapter.js` — pipeline GitHub Bridge real
+- `wrangler.toml` (Worker) — bindings, secrets, KV
+- `executor/wrangler.toml` + `wrangler.executor.template.toml` — HTTP URL Deploy Worker, 3 KV namespaces
+- `schema/enavia-self-worker-auditor-skill.js` — SELF_WORKER_AUDITOR (estático, não conectado ao runtime)
+
+### Achados principais
+
+- Worker→Executor: SERVICE BINDING only (sem fallback HTTP)
+- Worker→Deploy Worker: SERVICE BINDING only (sem fallback HTTP)
+- Executor→Deploy Worker: HTTP only (DEPLOY_WORKER_URL) — inconsistência de padrão
+- Deploy Worker: EXTERNO, sem código local no repo
+- performDeploy(): STUB permanente por design
+- callCodexEngine: max 16k chars — < 5% do Worker real
+- Executor: sem GITHUB_TOKEN → PR107 IMPL bloqueada sem contrato
+
+### Resultado
+
+- docs/DIAGNOSTICO_ECOSSISTEMA.md criado ✅
+- docs/DIAGNOSTICO_PR107.md criado ✅ (criado anteriormente nesta sessão)
+- Governança atualizada: status, handoff, execution log ✅
+- Nenhum arquivo de runtime alterado ✅
+
+---
 
 ## 2026-05-04 — PR105 — PR-IMPL+PROVA — GitHub Bridge Real Unificado
 
