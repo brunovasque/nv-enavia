@@ -6164,6 +6164,7 @@ async function handleExecuteNext(request, env) {
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
+      github_token_available: !!env?.GITHUB_TOKEN,
     };
     const executorAuditResult = await callExecutorBridge(env, "/audit", _auditPayload);
     if (!executorAuditResult.ok) {
@@ -6194,6 +6195,7 @@ async function handleExecuteNext(request, env) {
       evidence: Array.isArray(body.evidence) ? body.evidence : [],
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
+      github_token_available: !!env?.GITHUB_TOKEN,
     };
     const executorProposeResult = await callExecutorBridge(env, "/propose", _proposePayload);
     if (!executorProposeResult.ok) {
