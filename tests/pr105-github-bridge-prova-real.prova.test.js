@@ -269,7 +269,7 @@ async function runGroup4() {
       comment: `[PR105 prova safety guard] ${new Date().toISOString()}`,
     };
     const result = await adapterNs.executeGithubBridgeRequest(operation, GITHUB_TOKEN);
-    assert.ok(result.safety !== undefined, 'campo safety deve estar presente (Safety Guard executado)');
+    assert.ok(result.safety_decision !== undefined, 'campo safety_decision deve estar presente (Safety Guard executado)');
   });
 
   await test('4.4 attempt_event.subsystem=github_bridge na execução real', async () => {
