@@ -289,25 +289,36 @@ const WORKER_SCRIPT_MAP = {
 
     // ============================================================
     // 🔀 DEPLOY-WORKER DELEGATION HELPER
-    // Encaminha request para deploy-worker quando DEPLOY_WORKER_URL
-    // está configurado. Retorna null se deploy-worker não disponível.
+    // Service binding (env.DEPLOY_WORKER) tem prioridade.
+    // Fallback HTTP via DEPLOY_WORKER_URL quando binding ausente.
+    // Retorna null se nenhum dos dois disponível.
     // ============================================================
     const DEPLOY_WORKER_BASE = (env.DEPLOY_WORKER_URL || "").replace(/\/$/, "");
 
     async function delegateToDeployWorker(path, body) {
-      if (!DEPLOY_WORKER_BASE) return null;
+      const useBinding = typeof env?.DEPLOY_WORKER?.fetch === "function";
+      if (!useBinding && !DEPLOY_WORKER_BASE) return null;
       try {
-        const url = DEPLOY_WORKER_BASE + path;
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(env.INTERNAL_TOKEN
-              ? { Authorization: `Bearer ${String(env.INTERNAL_TOKEN)}` }
-              : {}),
-          },
-          body: JSON.stringify(body),
-        });
+        let resp;
+        if (useBinding) {
+          resp = await env.DEPLOY_WORKER.fetch(`https://deploy-worker.internal${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        } else {
+          const url = DEPLOY_WORKER_BASE + path;
+          resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(env.INTERNAL_TOKEN
+                ? { "X-Internal-Token": String(env.INTERNAL_TOKEN) }
+                : {}),
+            },
+            body: JSON.stringify(body),
+          });
+        }
         let data = null;
         try {
           data = await resp.json();
@@ -319,7 +330,7 @@ const WORKER_SCRIPT_MAP = {
           ok: resp.ok && data.ok !== false,
           delegated: true,
           delegated_to: "deploy-worker",
-          deploy_worker_url: url,
+          deploy_worker_channel: useBinding ? "service-binding" : "http-fallback",
           response: data,
           http_status: resp.status,
         };
