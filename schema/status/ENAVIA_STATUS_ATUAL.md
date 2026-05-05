@@ -1,10 +1,24 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-04 (atualizado após PR105 — GitHub Bridge Real Unificado ✅ CONCLUÍDA)
-**Branch ativa:** `copilot/pr105-github-bridge-real-unificado`
-**Última tarefa:** PR105 — GitHub Bridge Real (Adapter + Plugação + Prova Real) ✅
+**Data:** 2026-05-04 (atualizado após PR106 — GitHub Bridge Branch + Commit + PR 🔄 EM EXECUÇÃO)
+**Branch ativa:** `copilot/pr106-github-bridge-branch-commit-pr`
+**Última tarefa:** PR106 — GitHub Bridge Branch + Commit + PR Real Supervisionados 🔄
 
 ## Estado atual do sistema
+
+## Atualização PR106 — GitHub Bridge Branch + Commit + PR 🔄
+
+- PR-IMPL+PROVA (unificado) — 5 commits atômicos executados na branch `copilot/pr106-github-bridge-branch-commit-pr`.
+- `schema/enavia-github-adapter.js` expandido:
+  - `create_branch` validado + tratamento 422 (branch já existente) + `PROTECTED_BRANCHES`
+  - `create_commit` novo: GET+PUT /contents/{path}, encode base64, invariante main/master bloqueado
+  - `open_pr` novo: POST /pulls, retorna pr_number + html_url + merge_allowed=false
+  - `SUPPORTED_OPERATIONS` atualizado para 4 operações (comment_pr, create_branch, create_commit, open_pr)
+- `nv-enavia.js` atualizado: dispatcher com invariante de bloqueio de commit em main/master (camada dupla)
+- `tests/pr106-github-bridge-prova-real.prova.test.js` criado: 19/19 ✅ (Grupo 5 opt-in com token real)
+- Regressão PR105: 16/16 ✅ | Interop: 32/32 ✅
+- **PR aberta aguardando revisão e aprovação de Bruno antes do merge.**
+- Próxima etapa: **PR107 — Self-patch supervisionado** (após merge da PR106).
 
 ## Atualização PR105 — GitHub Bridge Real Unificado ✅
 
