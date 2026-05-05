@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // 🔍 ACORN — real JS parser (pure JS, no eval, Workers-compatible)
 // Bundled by wrangler/esbuild at deploy time.
 // ============================================================
@@ -11,6 +11,9 @@ import {
   createCloudflareCredentialsError,
   resolveCloudflareCredentials,
 } from "./cloudflare-credentials.mjs";
+import { applyPatch } from "./patch-engine.js";
+import { extractRelevantChunk } from "./code-chunker.js";
+import { orchestrateGithubPR } from "./github-orchestrator.js";
 
 // ============================================================
 // 📜 CANONICAL BOUNDARY — EXECUTOR × DEPLOY-WORKER
@@ -1179,7 +1182,7 @@ if (METHOD === "POST" && pathname === "/propose") {
         fetched_at_ms: snap.fetched_at_ms,
       };
 
-      // ✅ Necessário para gerar PATCH TEXT com âncoras reais (sem “adivinhar”)
+      // ✅ Necessário para gerar PATCH TEXT com âncoras reais (sem "adivinhar")
       // (não é retornado ao cliente; apenas passado ao core)
       action.context =
         action.context && typeof action.context === "object"
@@ -1190,6 +1193,19 @@ if (METHOD === "POST" && pathname === "/propose") {
       action.context.target_code_len = snap.code.length;
       action.context.target_code_lines =
         snap.code.split(/\r?\n/).length;
+
+      // PR108: preservar cópia completa para applyPatch (antes do chunking)
+      action.context.target_code_original = snap.code;
+      // PR108: se use_codex=true e código > 16K, extrair chunk relevante para Codex
+      if (action.use_codex === true && snap.code.length > 16000) {
+        const intentForChunk = String(action.intent || action.prompt || '');
+        const chunkResult = extractRelevantChunk(snap.code, intentForChunk);
+        action.context.target_code = chunkResult.chunk;
+        action.context.target_code_chunked = true;
+        action.context.target_code_chunk_offset = chunkResult.offset;
+        action.context.target_code_chunk_anchor_found = chunkResult.anchor_found;
+        if (chunkResult.warning) action.context.target_code_chunk_warning = chunkResult.warning;
+      }
 
       // =========================
       // 📌 MAPA CANÔNICO DO ALVO (derivado do snap.code)
@@ -1393,6 +1409,38 @@ if (METHOD === "POST" && pathname === "/propose") {
           canonicalMap,
         });
       }
+
+  // PR108: se github_token_available=true e staging.ready=true, acionar ciclo GitHub
+  if (action.github_token_available === true && staging?.ready === true) {
+    const originalCode = action.context?.target_code_original || action.context?.target_code || null;
+    const patchList = execResult?.patch?.patchText || null;
+
+    if (originalCode && Array.isArray(patchList) && patchList.length > 0) {
+      const patchResult = applyPatch(originalCode, patchList);
+
+      if (patchResult.ok && patchResult.applied.length > 0) {
+        const targetWorkerId = action?.target?.workerId || action?.workerId || 'unknown';
+        const githubRepo = env?.GITHUB_REPO || 'brunovasque/nv-enavia';
+        const githubFilePath = env?.GITHUB_FILE_PATH || 'nv-enavia.js';
+
+        const orchestratorResult = await orchestrateGithubPR(env, {
+          workerId: targetWorkerId,
+          candidate: patchResult.candidate,
+          filePath: githubFilePath,
+          repo: githubRepo,
+          patchTitle: execResult?.message || 'Patch automático supervisionado',
+          patchDescription: typeof execResult?.plan === 'string' ? execResult.plan : null,
+          baseBranch: 'main',
+        });
+
+        if (execIdForPropose) {
+          await updateFlowStateKV(env, execIdForPropose, {
+            github_orchestration: orchestratorResult,
+          });
+        }
+      }
+    }
+  }
 
   return withCORS(
     jsonResponse({
@@ -5597,6 +5645,7 @@ async function callCodexEngine(env, params) {
     const workerCode = String(p.workerCode || "").slice(0, 16000);
     const contract = String(p.contract || "").slice(0, 8000);
     const targetWorkerId = p.targetWorkerId || null;
+    const auditFindings = p.auditFindings ? String(p.auditFindings).slice(0, 3000) : null;
 
     const systemLines = [
       "Você é o motor de engenharia de código da ENAVIA (CODEX).",
@@ -5625,6 +5674,12 @@ async function callCodexEngine(env, params) {
       systemLines.push("");
       systemLines.push("CONTRATO / CONTEXTO TÉCNICO:");
       systemLines.push(contract);
+    }
+
+    if (auditFindings) {
+      systemLines.push("");
+      systemLines.push("AUDIT FINDINGS (contexto do audit anterior):");
+      systemLines.push(auditFindings);
     }
 
     const messages = [
@@ -6931,7 +6986,7 @@ if (mode === "engineer") {
   // 4) Patch sugerido (ANCORADO no worker-alvo, sem chute)
 if (shouldGeneratePatch) {
   // Governança:
-  // - requireAnchors/strict_schema = só “assino” se eu provar âncoras REAIS compatíveis com o patch sugerido.
+  // - requireAnchors/strict_schema = só "assino" se eu provar âncoras REAIS compatíveis com o patch sugerido.
   // - NÃO depende de endpoints internos no alvo por padrão.
   // - Discovery (/__internal__/routes|capabilities) só entra se for solicitado explicitamente.
 
@@ -6976,7 +7031,7 @@ if (shouldGeneratePatch) {
 
   // Patch DISCOVERY (LOW-RISK) — somente se solicitado explicitamente
   if (wantsDiscovery) {
-    // Para discovery, a âncora “real” mínima é existir o /__internal__/build no código do alvo
+    // Para discovery, a âncora "real" mínima é existir o /__internal__/build no código do alvo
     if (buildLine) anchorProofOk = true;
 
     // 1) /__internal__/routes
@@ -7169,10 +7224,11 @@ if (shouldGeneratePatch) {
 if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
   try {
     const codexResult = await callCodexEngine(env, {
-      workerCode,
+      workerCode: raw?.context?.target_code || workerCode,
       intentText,
       contextSummary: context_summary,
       targetWorkerId,
+      auditFindings: raw?.audit_findings || null,
     });
 
     if (codexResult && codexResult.ok && Array.isArray(codexResult.patches)) {
@@ -7471,7 +7527,7 @@ if (mode === "patch_text") {
 }
 
     // =====================================================
-    // 5️⃣ Modo MODULE_PATCH — gerencia “arquivos de módulo” no ENAVIA_GIT
+    // 5️⃣ Modo MODULE_PATCH — gerencia "arquivos de módulo" no ENAVIA_GIT
     // =====================================================
     if (mode === "module_patch") {
       const kv = ENAVIA_GIT;
