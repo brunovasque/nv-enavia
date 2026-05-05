@@ -25,10 +25,11 @@ criar branch → commitar arquivo → abrir PR → com gate humano obrigatório 
 | 6 | 84becac | governança (status + handoff + execution log + INDEX.md) |
 | 7 | 1a3e34d | **fix bloqueador 1** — propaga commit_sha, pr_number, merge_allowed + asserção 4.1 |
 | 8 | 3d36322 | review PR106 atualizado — Bloqueador 1 e Achado C resolvidos |
+| 9 | (pendente) | fix open_pr head_branch/base_branch + prova real 24/24 ✅ + docs finais |
 
 ### Testes
 
-- `pr106-github-bridge-prova-real.prova.test.js`: 19/19 ✅ (Grupo 5 opt-in — pendente GITHUB_TOKEN real)
+- `pr106-github-bridge-prova-real.prova.test.js`: **24/24 ✅** (Grupo 5 executado com GITHUB_TOKEN real)
 - `pr105-github-bridge-prova-real.prova.test.js`: 16/16 ✅ (regressão)
 - `pr105-cjs-esm-interop.test.js`: 32/32 ✅ (regressão)
 
@@ -45,7 +46,8 @@ criar branch → commitar arquivo → abrir PR → com gate humano obrigatório 
 ### Bloqueios e fixes
 
 - **Bloqueador 1 (RESOLVIDO — commit 1a3e34d):** `executeGithubBridgeRequest` não propagava `commit_sha`, `pr_number`, `pr_state`, `merge_allowed` e outros campos do adapter. Fix: 9 spreads condicionais adicionados.
-- **Bloqueador 2 (PENDENTE):** Grupo 5 aguarda GITHUB_TOKEN real para provar ciclo completo. Meta: 24/24 ✅.
+- **Bloqueador 2 (RESOLVIDO):** Grupo 5 executado com GITHUB_TOKEN real — 24/24 ✅. PR #273 criada, fechada, branch deletada.
+- **Achado B (RESOLVIDO):** `_executeOpenPr` agora aceita `head_branch`/`base_branch` (validator PR103) e `head`/`base` (alias direto). Teste 5.3 atualizado para enviar `head_branch`/`base_branch`.
 
 ### Rollback
 

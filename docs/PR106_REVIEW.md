@@ -1,7 +1,7 @@
 # REVIEW CANÔNICO — PR106
 # GitHub Bridge — Branch + Commit + PR Real Supervisionados
 
-**Data:** 2026-05-05 (atualizado 2026-05-04 — fix Bloqueador 1 + Achado C)  
+**Data:** 2026-05-05 (atualizado 2026-05-04 — fix Bloqueador 1 + Achado C + prova real 24/24 ✅)  
 **Branch:** `copilot/pr106-github-bridge-branch-commit-pr`  
 **PR GitHub:** #272  
 **Revisor:** Claude Code (leitura de código real)  
@@ -130,24 +130,28 @@ merge_allowed → propagado ✅
 
 ---
 
-### ❌ Prova real completa: branch → commit → PR aberta sem merge
+### ✅ Prova real completa: branch → commit → PR aberta sem merge
 
-**Evidência:** Grupo 5 do arquivo de testes está **correto na estrutura** — testa o ciclo completo (5.1 → 5.2 → 5.3 → 5.4 → 5.5). Mas foi executado **apenas 19/19 testes dos Grupos 1–4**; Grupo 5 foi pulado pela ausência de `GITHUB_TOKEN`.
+**Evidência:** Grupo 5 executado com `GITHUB_TOKEN` real em 2026-05-04.
 
-Resultado reportado: `✅ PR106 prova real: 19/19 testes passando` — mas com aviso:  
-`(Grupo 5 — ciclo real branch+commit+PR — pulado: GITHUB_TOKEN ausente)`
+```
+Branch de teste: test/pr106-prova-1777946218829
+PR criada: #273 — https://github.com/brunovasque/nv-enavia/pull/273
+PR #273 state=open merged=false
+PR #273 fechada ✅
+Branch test/pr106-prova-1777946218829 deletada ✅
+✅ PR106 prova real: 24/24 testes passando
+```
 
-Além disso, mesmo com token, testes 5.2 e 5.3 **falhariam** pelo Bloqueador 1.
-
-**NÃO ATENDIDO** — prova real não foi executada. E tem bug que impede a prova de passar.
+**ATENDIDO** — ciclo completo provado com operações reais no GitHub.
 
 ---
 
-### ❌ PR de teste criada, evidência coletada, PR fechada e branch deletada após prova
+### ✅ PR de teste criada, evidência coletada, PR fechada e branch deletada após prova
 
-**Evidência:** Grupo 5 do teste tem o código correto (testes 5.1–5.5 com limpeza real via `closePr` e `deleteBranch` em 5.5). Mas **nunca foi executado**.
+**Evidência:** Teste 5.5 executado com sucesso — PR #273 fechada e branch `test/pr106-prova-1777946218829` deletada automaticamente após a prova.
 
-**NÃO ATENDIDO** — depende de GITHUB_TOKEN + depende de Bloqueador 1 ser corrigido.
+**ATENDIDO.**
 
 ---
 
@@ -299,30 +303,22 @@ Não é problemático (os testes validam via comportamento), mas exportar seria 
 ## 6. VEREDITO
 
 ```
-BLOQUEADO — 1 bloqueador restante
+APROVADO PARA MERGE ✅
 ```
 
-**Situação atual (pós-fix commit 1a3e34d):**
+**Situação final (2026-05-04):**
 
-**~~Bloqueador 1~~** ✅ RESOLVIDO — `executeGithubBridgeRequest` agora propaga todos os 9 campos críticos. PR106 19/19 ✅ | PR105 16/16 ✅ | Interop 32/32 ✅.
+| Bloqueador / Achado | Status |
+|---------------------|--------|
+| Bloqueador 1 — campos não propagados em `executeGithubBridgeRequest` | ✅ RESOLVIDO (commit `1a3e34d`) |
+| Bloqueador 2 — prova real não executada | ✅ RESOLVIDO — 24/24 ✅ |
+| Achado B — open_pr / create_commit: nomenclatura `head`/`base` vs `head_branch`/`base_branch` | ✅ RESOLVIDO — adapter aceita ambas |
+| Achado C — asserção fraca no teste 4.1 | ✅ RESOLVIDO (commit `1a3e34d`) |
 
-**~~Achado C~~** ✅ RESOLVIDO — Asserção 4.1 fortalecida.
+**Prova real confirmada:** PR #273 criada (branch → commit → PR aberta com `merge_allowed=false` → PR fechada → branch deletada). Todos os ciclos de limpeza executados.
+
+**Regressão limpa:** PR106 24/24 ✅ | PR105 16/16 ✅ | Interop 32/32 ✅
 
 ---
 
-**Bloqueador 2 — Prova real não executada (PENDENTE):**  
-Os critérios contratuais "Prova real completa: branch → commit → PR aberta sem merge" e "PR de teste criada, evidência coletada, PR fechada e branch deletada" exigem execução com `GITHUB_TOKEN` real. O Grupo 5 está estruturado corretamente e, com o fix do Bloqueador 1 aplicado, deve passar. Mas **nunca foi executado**.
-
-Para desbloquear: fornecer `GITHUB_TOKEN` com escopo `repo` e executar:
-```bash
-GITHUB_TOKEN=ghp_... node tests/pr106-github-bridge-prova-real.prova.test.js
-```
-
-Confirmar **24/24 ✅** (Grupos 1–5) antes do merge.
-
----
-
-**Ação restante para aprovação:**
-
-1. Executar Grupo 5 com `GITHUB_TOKEN` real e confirmar 24/24 ✅
-2. Aprovação humana (Bruno) via review da PR #272
+**Pendente exclusivamente aprovação humana de Bruno** via review da PR #272 antes do merge.

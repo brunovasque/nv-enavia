@@ -475,8 +475,12 @@ async function _executeOpenPr(operation, token) {
   const repo = typeof operation.repo === 'string' ? operation.repo.trim() : '';
   const title = typeof operation.title === 'string' ? operation.title.trim() : '';
   const body = typeof operation.body === 'string' ? operation.body : '';
-  const head = typeof operation.head === 'string' ? operation.head.trim() : '';
-  const base = typeof operation.base === 'string' ? operation.base.trim() : '';
+  // Aceita head_branch (validator PR103) ou head (alias direto)
+  const head = (typeof operation.head_branch === 'string' ? operation.head_branch.trim() : '')
+    || (typeof operation.head === 'string' ? operation.head.trim() : '');
+  // Aceita base_branch (validator PR103) ou base (alias direto)
+  const base = (typeof operation.base_branch === 'string' ? operation.base_branch.trim() : '')
+    || (typeof operation.base === 'string' ? operation.base.trim() : '');
 
   const parts = repo.split('/');
   const owner = parts[0] || '';

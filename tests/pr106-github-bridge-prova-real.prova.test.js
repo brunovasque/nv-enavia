@@ -406,8 +406,8 @@ async function runGroup5() {
         repo: TEST_REPO,
         title: `[PR106 prova real] branch+commit+PR supervisionados — ${TIMESTAMP}`,
         body: `Prova real do ciclo completo PR106.\n\nBranch: \`${TEST_BRANCH}\`\nTimestamp: ${new Date().toISOString()}\n\nEsta PR será fechada automaticamente após a prova.`,
-        head: TEST_BRANCH,
-        base: 'main',
+        head_branch: TEST_BRANCH,
+        base_branch: 'main',
       },
       GITHUB_TOKEN,
     );
