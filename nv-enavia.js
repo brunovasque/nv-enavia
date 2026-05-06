@@ -4108,6 +4108,91 @@ async function handleChatLLM(request, env) {
   } catch (_classifyErr) {
     _intentClassification = null;
   }
+  // PR110: IMPROVEMENT_REQUEST — gate de ciclo audit→PR a partir do chat.
+  // Verificado logo após a classificação de intenção, antes do Skill Router.
+  // Confirmação humana SEMPRE obrigatória antes de qualquer ação (pending_plan + "sim/não").
+  // TTL do pending_plan: 300s (5 minutos). Nunca cria pending_plan sem target claro.
+  // Nunca dispara execute_next sem contrato ativo em KV.
+  if (_intentClassification?.intent === "improvement_request" && session_id && env.ENAVIA_BRAIN) {
+    const _imprvTarget = _intentClassification.target || null;
+    const _imprvConf = _intentClassification.confidence || "low";
+
+    if (_imprvConf === "low" || !_imprvTarget) {
+      // Sem target identificável — pedir clarificação, nunca criar pending_plan
+      return jsonResponse({
+        ok: true,
+        system: "ENAVIA-NV-FIRST",
+        mode: "llm-first",
+        reply: "Entendi que você quer uma melhoria. Sobre qual parte específica? (ex: /audit, /chat, /propose)",
+        intent_classification: { intent: "improvement_request", confidence: "low", target: null },
+        timestamp: Date.now(),
+        telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_improvement_clarification" },
+      });
+    }
+
+    // Verificar contrato ativo em KV — se ausente, explicar ao usuário
+    let _activeContractExists = false;
+    try {
+      const _contractIndex = await env.ENAVIA_BRAIN.get("contract:index");
+      _activeContractExists = !!_contractIndex;
+    } catch (_) { /* KV failure — prosseguir sem bloquear */ }
+
+    if (!_activeContractExists) {
+      return jsonResponse({
+        ok: true,
+        system: "ENAVIA-NV-FIRST",
+        mode: "llm-first",
+        reply: `Entendi a melhoria solicitada em ${_imprvTarget}, mas não há contrato ativo no sistema. Crie um contrato antes de acionar o ciclo de autoevolução.`,
+        intent_classification: { intent: "improvement_request", confidence: _imprvConf, target: _imprvTarget },
+        timestamp: Date.now(),
+        telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_improvement_no_contract" },
+      });
+    }
+
+    // Criar pending_plan com action: "execute_next" e TTL de 5 minutos
+    const _TTL_IMPROVEMENT_S = 300;
+    const _imprvNow = Date.now();
+    const _imprvPendingKey = `chat:pending_plan:${session_id}`;
+    const _imprvPendingValue = {
+      session_id,
+      action: "execute_next",
+      target: _imprvTarget,
+      description: message,
+      requires_approval: true,
+      created_at: new Date(_imprvNow).toISOString(),
+      expires_at: new Date(_imprvNow + _TTL_IMPROVEMENT_S * 1000).toISOString(),
+      source: "chat_improvement",
+    };
+    try {
+      await env.ENAVIA_BRAIN.put(_imprvPendingKey, JSON.stringify(_imprvPendingValue), {
+        expirationTtl: _TTL_IMPROVEMENT_S,
+      });
+    } catch (_kvErr) {
+      logNV("⚠️ [CHAT/IMPROVEMENT] Falha ao salvar pending_plan (não crítico)", {
+        session_id,
+        error: String(_kvErr),
+      });
+    }
+
+    logNV("💾 [CHAT/IMPROVEMENT] pending_plan execute_next salvo", {
+      session_id,
+      target: _imprvTarget,
+      confidence: _imprvConf,
+    });
+
+    return jsonResponse({
+      ok: true,
+      system: "ENAVIA-NV-FIRST",
+      mode: "llm-first",
+      reply: `Entendi. Posso auditar o sistema e abrir uma PR com a melhoria em ${_imprvTarget}. Confirma? (sim/não)`,
+      intent_classification: { intent: "improvement_request", confidence: _imprvConf, target: _imprvTarget },
+      pending_plan_saved: true,
+      pending_plan_expires_in: _TTL_IMPROVEMENT_S,
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_improvement_pending" },
+    });
+  }
+
   // PR51: Skill Router read-only rodado aqui para gerar skill_routing aditivo na resposta.
   // Campo aditivo seguro — não quebra consumidor atual, não executa nada,
   // não cria endpoint, não aciona runtime. Somente referência documental.
