@@ -38,6 +38,7 @@ export const INTENT_TYPES = {
   SKILL_REQUEST:            "skill_request",
   MEMORY_REQUEST:           "memory_request",
   STRATEGY_QUESTION:        "strategy_question",
+  IMPROVEMENT_REQUEST:      "improvement_request",
   UNKNOWN:                  "unknown",
 };
 
@@ -222,6 +223,62 @@ const _STRATEGY_TERMS = [
   "faz sentido seguir", "faz sentido",
   "é uma boa ideia", "é boa ideia",
 ];
+
+// PR110: Melhoria — pedido de melhoria/correção de subsistema para disparar ciclo audit→PR
+// Termos gatilho: verbos de melhoria em português e inglês
+const _IMPROVEMENT_TRIGGER_TERMS = [
+  "melhora ", "melhore ", "melhoria no", "melhoria do", "melhoria em",
+  "melhorar o", "melhorar a", "melhorar os", "melhorar as",
+  "corrige o", "corrige a", "corrija o", "corrija a",
+  "corrigir o", "corrigir a",
+  "refatora o", "refatora a", "refatore o", "refatore a",
+  "refatorar o", "refatorar a",
+  "otimiza o", "otimiza a", "otimize o", "otimize a",
+  "otimizar o", "otimizar a",
+  "conserta o", "conserta a", "conserte o", "conserte a",
+  "consertar o", "consertar a",
+  "fix the", "fix this", "improve the", "improve this",
+  "enhance the", "enhance this", "refactor the", "refactor this",
+];
+
+// PR110: Padrões de target — rotas, subsistemas e funções nomeadas
+// Detecta alvos como /audit, /chat, /propose, nome-de-endpoint, etc.
+const _IMPROVEMENT_TARGET_PATTERNS = [
+  /\/[a-z][a-z0-9/_-]*/,                  // rotas: /audit, /chat/run, /contracts
+  /\b(audit|chat|propose|deploy|executor|worker|bridge|endpoint|função|function|handler|módulo|module)\b/i,
+  /\b(log(?:s)? de erro|mensagem de erro|erro de |error log|logging)\b/i,
+  /\b(validação|validation|sanitização|sanitization|autenticação|authentication)\b/i,
+];
+
+// PR110: Negações — palavras que, próximas ao gatilho, cancelam a intenção
+// Verificadas nos 5 tokens anteriores ao termo gatilho
+const _NEGATION_TERMS = [
+  "não", "nao", "sem", "never", "no ", "don't", "doesn't",
+  "without", "sem precisar", "não precisa",
+];
+
+// ---------------------------------------------------------------------------
+// PR110: _extractImprovementTarget — extrai o alvo da melhoria do texto
+// Retorna string com o target ou null se não encontrado.
+// ---------------------------------------------------------------------------
+function _extractImprovementTarget(normalized) {
+  for (const pattern of _IMPROVEMENT_TARGET_PATTERNS) {
+    const match = normalized.match(pattern);
+    if (match) return match[0].trim();
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// PR110: _hasNegationBefore — verifica se há negação nos 5 tokens anteriores
+// ao termo encontrado.
+// ---------------------------------------------------------------------------
+function _hasNegationBefore(normalized, term) {
+  const idx = normalized.indexOf(term);
+  if (idx < 0) return false;
+  const prefix = normalized.slice(Math.max(0, idx - 40), idx);
+  return _NEGATION_TERMS.some((neg) => prefix.includes(neg));
+}
 
 // ---------------------------------------------------------------------------
 // _normalize — normaliza texto para comparação
@@ -494,6 +551,33 @@ export function classifyEnaviaIntent(input) {
       reasons,
       signals,
     };
+  }
+
+  // ------------------------------------------------------------------
+  // PR110: IMPROVEMENT_REQUEST — pedido de melhoria de subsistema
+  // Classificado antes de STRATEGY para capturar "melhora X" com target.
+  // ------------------------------------------------------------------
+  const improvementMatches = _IMPROVEMENT_TRIGGER_TERMS.filter((t) => normalized.includes(t));
+  if (improvementMatches.length > 0) {
+    // Verificar negação próxima ao primeiro gatilho encontrado
+    const firstTrigger = improvementMatches[0];
+    if (!_hasNegationBefore(normalized, firstTrigger)) {
+      const target = _extractImprovementTarget(normalized);
+      const confidence = target
+        ? (improvementMatches.length >= 2 ? CONFIDENCE_LEVELS.HIGH : CONFIDENCE_LEVELS.MEDIUM)
+        : CONFIDENCE_LEVELS.LOW;
+      signals.push(...improvementMatches.map((t) => `improvement:${t.trim()}`));
+      if (target) signals.push(`improvement_target:${target}`);
+      reasons.push(`intenção de melhoria detectada: ${improvementMatches.join(", ")}${target ? ` — alvo: ${target}` : " — alvo não identificado"}`);
+      return {
+        intent: INTENT_TYPES.IMPROVEMENT_REQUEST,
+        confidence,
+        is_operational: true,
+        target: target || null,
+        reasons,
+        signals,
+      };
+    }
   }
 
   // ------------------------------------------------------------------
