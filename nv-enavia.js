@@ -3716,12 +3716,13 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
   const _proposePayload = {
     source: "chat_trigger",
     mode: "enavia_propose",
-    intent: "propose",
+    intent: pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`,
     improvement_target: improvementTarget,
     target: { system: "cloudflare_worker", workerId: "nv-enavia" },
     session_id: sessionId,
     github_token_available: true,
     use_codex: true,
+    generatePatch: true,
     context: {
       description: pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`,
       require_live_read: true,
