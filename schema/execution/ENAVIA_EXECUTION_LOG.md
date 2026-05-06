@@ -1,5 +1,38 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR120 — PR-IMPL — parser callCodexEngine: search/replace alinhado com applyPatch
+
+- **Branch:** `fix/pr120-codex-parser-search-replace`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR120.md` ✅
+- **PR anterior validada:** PR119 ✅ mergeada (PR #287)
+- **PR GitHub aberta:** [#288](https://github.com/brunovasque/nv-enavia/pull/288)
+
+### Objetivo
+
+O parser no loop de `callCodexEngine` lia `rawPatch.patch_text/patchText` mas o Codex
+retorna `{search, replace}`. Resultado: patches descartados → `staging.ready=false`.
+Corrigido para ler `rawPatch.search` (primário) com fallback, alinhado com `applyPatch`.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | a1b569e | `executor/src/index.js` loop normalização | `rawPatch.search`/`replace` + retrocompat `patch_text` |
+| 2 | 0039879 | `docs/PR120_REVIEW.md` | Review 5/7 critérios |
+
+### Pós-merge obrigatório
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+# Teste: POST /propose use_codex=true → warnings sem CODEX_ENGINE_NO_PATCH
+# Teste E2E: chat → "melhora o /audit" → "sim" → github_orchestration.pr_url
+```
+
+---
+
 ## 2026-05-06 — PR119 — PR-IMPL — action edit-worker + validateWorkerCode em edit-worker
 
 - **Branch:** `fix/pr119-action-edit-worker-dispatch`

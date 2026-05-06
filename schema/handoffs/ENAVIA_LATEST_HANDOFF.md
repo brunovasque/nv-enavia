@@ -1,10 +1,51 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR119 — action edit-worker + validateWorkerCode em edit-worker ✅ (branch: fix/pr119-action-edit-worker-dispatch)
+**De:** PR120 — parser callCodexEngine alinhado com applyPatch ✅ (branch: fix/pr120-codex-parser-search-replace)
 **Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
 
-## Handoff atual — PR119 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR120 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+2 commits na branch `fix/pr120-codex-parser-search-replace`:
+
+1. **fix: parser callCodexEngine** — `executor/src/index.js` loop de normalização (linha ~5848):
+   - ANTES: `rawPatch.patch_text || rawPatch.patchText` → sempre vazio → patch descartado
+   - DEPOIS: `rawPatch.search || rawPatch.patch_text || rawPatch.patchText` → lê campo correto
+   - `replace: rawPatch.replace || ""` adicionado
+   - Objeto normalizado agora inclui `search`, `replace`, `patch_text` (retrocompat), `raw`
+
+2. **docs: PR120_REVIEW.md** — 5/7 critérios, APROVADO
+
+### Estado dos gates e pipeline após PR120
+
+| Etapa | Condição | Estado |
+|-------|----------|--------|
+| Codex retorna {search, replace} | System prompt correto | ✅ PR112 |
+| Parser lê search/replace | rawPatch.search | ✅ PR120 |
+| patches[] não-vazio | normalized.length > 0 | ✅ (se OPENAI_API_KEY) |
+| staging.ready = true | patches.length > 0 | ✅ (se OPENAI_API_KEY) |
+| applyPatch recebe target_code_original | 790k snapshot | ✅ PR115 |
+| worker-patch-safe inline | validateWorkerCode() | ✅ PR118 |
+| action edit-worker no dispatch | _proposePayload | ✅ PR119 |
+
+### Único bloqueador operacional restante
+
+`OPENAI_API_KEY` ausente no executor → Codex não é chamado → `patches=[]` → ciclo não avança.
+
+### Pendências após merge da PR120
+
+1. Merge da PR #288 por Bruno ← GATE
+2. `wrangler secret put OPENAI_API_KEY --name enavia-executor` ← DESBLOQUEADOR PRINCIPAL
+3. `cd D:\nv-enavia && npx wrangler deploy`
+4. `cd D:\nv-enavia\executor && npx wrangler deploy`
+5. Teste: `POST /propose` com `use_codex=true` → `warnings` sem `CODEX_ENGINE_NO_PATCH`
+6. Teste E2E: chat → "melhora o log de erro do /audit" → "sim" → `github_orchestration.pr_url`
+
+---
+
+## Handoff anterior — PR119 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
