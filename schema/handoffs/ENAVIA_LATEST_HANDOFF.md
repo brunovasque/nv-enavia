@@ -1,10 +1,51 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR113 — Fix Mode Dispatch ✅ (branch: claude/pr113-fix-mode-dispatch)
-**Para:** Deploy nv-enavia Worker pós-merge + verificar ciclo E2E chat→Codex→PR
+**De:** PR114 — Fix Ciclo Chat→PR ✅ (branch: claude/pr114-fix-ciclo-chat-pr)
+**Para:** Deploy Worker + Executor pós-merge → teste E2E real do ciclo chat→PR
 
-## Handoff atual — PR113 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR114 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+3 commits na branch `claude/pr114-fix-ciclo-chat-pr`:
+
+1. **fix: generatePatch + intent** — `nv-enavia.js`:
+   - `intent: "propose"` → `intent: pendingPlan.description || \`Melhoria...\``
+   - Adição de `generatePatch: true,` no payload do dispatch
+
+2. **fix: github_orchestration no response** — `executor/src/index.js`:
+   - `let githubOrchestrationResult = null;` antes do bloco GitHub
+   - `githubOrchestrationResult = orchestratorResult;` após `orchestrateGithubPR`
+   - Spread condicional no response: `...(githubOrchestrationResult ? { github_orchestration: ... } : {})`
+
+3. **docs: PR114_REVIEW.md** — 5/5 critérios, 4/4 invariantes
+
+### Cadeia completa de fixes (PR111→PR114)
+
+| PR | Fix | Arquivo | Estado |
+|----|-----|---------|--------|
+| PR111 | `use_codex: false` → `true` | nv-enavia.js | Mergeada ✅ |
+| PR112 | Schema Codex `{search, replace}` | executor/src/index.js | Mergeada ✅ |
+| PR113 | `mode: chat_execute_next` → `enavia_propose` | nv-enavia.js | Mergeada ✅ |
+| PR114 | `generatePatch: true` + `intent` + `github_orchestration` | ambos | Aguarda merge |
+
+### Pendências após merge da PR114
+
+1. Merge da PR #282 por Bruno ← GATE
+2. `cd D:\nv-enavia && npx wrangler deploy` (Worker)
+3. `cd D:\nv-enavia && npx wrangler deploy --config wrangler.executor.generated.toml` (Executor)
+4. `wrangler secret put OPENAI_API_KEY --name enavia-executor` (sem isso Codex não roda)
+5. Verificar binding `ENAVIA_WORKER` no executor (sem isso orchestrateGithubPR falha)
+6. Teste E2E real: Bruno digita "melhora o log de erro do /audit" → "sim" → verificar PR aberta
+
+### O que ainda não foi endereçado
+
+- I2: LLM não consultado para reply de IMPROVEMENT_REQUEST (template only)
+- I4: Sem teste E2E automatizado com PR real via chat
+- Binding `ENAVIA_WORKER` ausente em `wrangler.executor.generated.toml` — requer ação manual
+
+## Handoff anterior — PR113 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
