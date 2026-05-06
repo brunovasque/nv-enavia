@@ -1,8 +1,29 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR119 — action edit-worker + validateWorkerCode em edit-worker)
-**Branch ativa:** `fix/pr119-action-edit-worker-dispatch`
-**Última tarefa:** PR119 — action edit-worker no dispatch + eliminar self-call em edit-worker ✅
+**Data:** 2026-05-06 (atualizado após PR120 — parser callCodexEngine lê search/replace)
+**Branch ativa:** `fix/pr120-codex-parser-search-replace`
+**Última tarefa:** PR120 — parser callCodexEngine alinhado com applyPatch ✅
+
+## Atualização PR120 — parser callCodexEngine search/replace — 2026-05-06
+
+- Branch: `fix/pr120-codex-parser-search-replace`
+- PR GitHub: [#288](https://github.com/brunovasque/nv-enavia/pull/288) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR120.md` ✅
+- PR anterior: PR119 ✅ (mergeada — PR #287)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | a1b569e | `executor/src/index.js` | parser `callCodexEngine` lê `rawPatch.search`/`rawPatch.replace` |
+| 2 | 0039879 | `docs/PR120_REVIEW.md` | Review 5/7 critérios, APROVADO |
+
+### Critérios de conclusão: 5/7 ✅ (2 pendentes de deploy + OPENAI_API_KEY)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR119 — action edit-worker + self-call edit-worker — 2026-05-06
 
