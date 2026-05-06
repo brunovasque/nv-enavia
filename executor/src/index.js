@@ -7262,22 +7262,20 @@ if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
     if (codexResult && codexResult.ok && Array.isArray(codexResult.patches)) {
       for (const p of codexResult.patches) {
         if (!p || typeof p !== "object") continue;
-        const patchText = p.patch_text || p.patchText || "";
-        if (!patchText) continue;
+        const search = p.search || "";
+        const replace = p.replace ?? "";
+        if (!search) continue;
 
         patches.push({
           target: "cloudflare_worker",
           workerId: targetWorkerId || (target && target.workerId) || null,
           title: p.title || "Patch codex",
           description: p.description || "Patch sugerido pelo motor Codex.",
-          anchor:
-            p.anchor && typeof p.anchor.match === "string"
-              ? { match: p.anchor.match }
-              : null,
-          patch_text: patchText,
+          search,
+          replace,
           reason:
             p.reason ||
-            "Patch sugerido via Codex (não aplicado automaticamente).",
+            "Patch sugerido via Codex.",
         });
       }
     } else if (codexResult && !codexResult.ok) {
