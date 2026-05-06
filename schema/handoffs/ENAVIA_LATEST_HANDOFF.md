@@ -1,10 +1,53 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR116 — Fix worker-patch-safe via env.ENAVIA_WORKER.fetch ✅ (branch: claude/pr116-fix-worker-patch-safe-binding)
-**Para:** Deploy Worker + Executor pós-merge → configurar OPENAI_API_KEY + ENAVIA_WORKER binding → teste E2E
+**De:** PR117 — Fix worker-patch-safe via URL pública do executor ✅ (branch: claude/pr117-fix-worker-patch-safe-self-url)
+**Para:** Deploy Worker + Executor pós-merge → configurar OPENAI_API_KEY → teste E2E
 
-## Handoff atual — PR116 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR117 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+2 commits na branch `claude/pr117-fix-worker-patch-safe-self-url`:
+
+1. **fix: URL pública do executor** — `executor/src/index.js` linha 1441:
+   - ANTES (PR116): `env.ENAVIA_WORKER.fetch('https://nv-enavia.internal/worker-patch-safe', ...)`
+   - DEPOIS: `fetch('https://enavia-executor.brunovasque.workers.dev/worker-patch-safe', ...)`
+   - Causa raiz: `/worker-patch-safe` existe no executor, não em `nv-enavia.js`. A chamada via `env.ENAVIA_WORKER` chegaria ao worker errado (404).
+
+2. **docs: PR117_REVIEW.md** — 5/6 critérios, APROVADO
+
+### Cadeia completa de fixes (PR111→PR117)
+
+| PR | Fix | Estado |
+|----|-----|--------|
+| PR111 | `use_codex: false` → `true` | Mergeada ✅ |
+| PR112 | Schema Codex `{search, replace}` | Mergeada ✅ |
+| PR113 | `mode: chat_execute_next` → `enavia_propose` | Mergeada ✅ |
+| PR114 | `generatePatch: true` + `intent` + `github_orchestration` | Mergeada ✅ |
+| PR115 | `applyPatch` usa `target_code_original` + diagnóstico | Mergeada ✅ |
+| PR116 | `worker-patch-safe` via `env.ENAVIA_WORKER.fetch` (intermediário) | Mergeada ✅ |
+| PR117 | `worker-patch-safe` via URL pública do executor (fix definitivo) | Aguarda merge |
+
+### Pendências após merge da PR117
+
+1. Merge da PR #285 por Bruno ← GATE
+2. `wrangler secret put OPENAI_API_KEY --name enavia-executor`
+3. `cd D:\nv-enavia && npx wrangler deploy` (Worker)
+4. `cd D:\nv-enavia\executor && npx wrangler deploy` (Executor)
+5. Teste E2E real: "melhora o log de erro do /audit" → "sim" → verificar PR aberta
+
+### Bloqueio operacional restante
+
+| Bloqueio | Sintoma | Ação |
+|----------|---------|------|
+| `OPENAI_API_KEY` ausente | `patches[] = []` → `staging.ready = false` → Gate 1 falha | `wrangler secret put OPENAI_API_KEY --name enavia-executor` |
+
+O binding `ENAVIA_WORKER` no executor já não é mais necessário para o Gate 6 (removido em PR117).
+
+---
+
+## Handoff anterior — PR116 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 

@@ -1438,7 +1438,7 @@ if (METHOD === "POST" && pathname === "/propose") {
         // PR108 B1: validar sintaxe via /worker-patch-safe antes de qualquer GitHub call
         let patchSafeData = null;
         try {
-          const patchSafeResp = await env.ENAVIA_WORKER.fetch('https://nv-enavia.internal/worker-patch-safe', {
+          const patchSafeResp = await fetch('https://enavia-executor.brunovasque.workers.dev/worker-patch-safe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

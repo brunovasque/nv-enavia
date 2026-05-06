@@ -1,5 +1,36 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR117 — PR-IMPL — Fix worker-patch-safe: URL pública do executor
+
+- **Branch:** `claude/pr117-fix-worker-patch-safe-self-url`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR117.md` ✅
+- **PR anterior validada:** PR116 ✅ mergeada (PR #284)
+- **PR GitHub aberta:** [#285](https://github.com/brunovasque/nv-enavia/pull/285)
+
+### Objetivo
+
+Fix definitivo do Gate 6: PR116 usou `env.ENAVIA_WORKER.fetch` apontando para `nv-enavia`,
+mas `/worker-patch-safe` está no executor. Substituído por `fetch(URL_pública)` que chega
+ao handler correto.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | dcf0765 | `executor/src/index.js:1441` | `fetch(URL_pública)` em vez de `env.ENAVIA_WORKER.fetch` |
+| 2 | 69ccdbc | `docs/PR117_REVIEW.md` | Review 5/6 critérios |
+
+### Pós-merge obrigatório
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+```
+
+---
+
 ## 2026-05-06 — PR116 — PR-IMPL — Fix worker-patch-safe: env.ENAVIA_WORKER.fetch
 
 - **Branch:** `claude/pr116-fix-worker-patch-safe-binding`
