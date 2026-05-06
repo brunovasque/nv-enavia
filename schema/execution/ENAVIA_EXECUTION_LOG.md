@@ -1,5 +1,43 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR122 — PR-IMPL — prompt Codex: exemplos concretos de search
+
+- **Branch:** `fix/pr122-codex-prompt-exemplo-search`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR122.md` ✅
+- **PR anterior validada:** PR121 ✅ mergeada (PR #289)
+- **PR GitHub aberta:** [#290](https://github.com/brunovasque/nv-enavia/pull/290)
+
+### Objetivo
+
+PR121 restringiu search para ≤120 chars com regra abstrata → modelo retornou `patches: []` vazio.
+LLMs precisam de exemplos concretos. PR122 substitui a restrição abstrata por exemplos inline:
+`console.log(err.message)`, `async function handleAudit(request, env) {` — padrão claro que
+o modelo pode seguir para gerar `search` de 1 linha identificadora.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | b6d2333 | `executor/src/index.js` systemLines | exemplos concretos de search (console.log, async function) |
+| 2 | c7e9a7b | `docs/PR122_REVIEW.md` | Review 3/7 critérios |
+
+### Desbloqueador único restante
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+```
+
+### Resultado após deploy esperado
+
+- `patchText[0].search.length < 300` (1 linha de código)
+- `apply_patch_error` ausente
+- `github_orchestration.pr_url` não null
+
+---
+
 ## 2026-05-06 — PR121 — PR-IMPL — prompt Codex: search ≤120 chars, linha única
 
 - **Branch:** `fix/pr121-codex-prompt-search-short`

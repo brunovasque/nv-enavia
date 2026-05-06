@@ -1,8 +1,29 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR121 — prompt Codex: search ≤120 chars)
-**Branch ativa:** `fix/pr121-codex-prompt-search-short`
-**Última tarefa:** PR121 — prompt Codex instrui search linha única ≤120 chars ✅
+**Data:** 2026-05-06 (atualizado após PR122 — prompt Codex: exemplos concretos de search)
+**Branch ativa:** `fix/pr122-codex-prompt-exemplo-search`
+**Última tarefa:** PR122 — prompt Codex usa exemplos concretos em vez de restrição abstrata ✅
+
+## Atualização PR122 — prompt Codex exemplos concretos — 2026-05-06
+
+- Branch: `fix/pr122-codex-prompt-exemplo-search`
+- PR GitHub: [#290](https://github.com/brunovasque/nv-enavia/pull/290) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR122.md` ✅
+- PR anterior: PR121 ✅ (mergeada — PR #289)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | b6d2333 | `executor/src/index.js` | systemLines: exemplos concretos de search (ex: `console.log`, `async function`) |
+| 2 | c7e9a7b | `docs/PR122_REVIEW.md` | Review 3/7 critérios, APROVADO |
+
+### Critérios de conclusão: 3/7 ✅ (4 pendentes de deploy + OPENAI_API_KEY)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR121 — prompt Codex search curto — 2026-05-06
 

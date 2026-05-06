@@ -1,23 +1,24 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR121 — prompt Codex search ≤120 chars ✅ (branch: fix/pr121-codex-prompt-search-short)
+**De:** PR122 — prompt Codex com exemplos concretos de search ✅ (branch: fix/pr122-codex-prompt-exemplo-search)
 **Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
 
-## Handoff atual — PR121 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR122 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
-2 commits na branch `fix/pr121-codex-prompt-search-short`:
+2 commits na branch `fix/pr122-codex-prompt-exemplo-search`:
 
-1. **fix: systemLines search ≤120 chars** — `executor/src/index.js` linhas 5748-5761:
-   - ANTES: `"search": string` sem restrição → Codex gerava bloco de ~1094 chars
-   - DEPOIS: instrução explícita "máximo 120 chars, linha única, inequívoca, UMA SÓ VEZ"
-   - Adicionada instrução CRÍTICO antes do "sem markdown"
+1. **fix: systemLines com exemplos concretos** — `executor/src/index.js` linhas 5748-5761:
+   - ANTES (PR121): restrição abstrata "máximo 120 chars" → Codex retornava `patches: []` vazio
+   - DEPOIS: exemplos inline concretos: `console.log(err.message)`, `async function handleAudit(`
+   - Regra CRÍTICA substituída por exemplos de assinatura de função, console.log, comentário único
+   - LLMs precisam de exemplos concretos, não só regras — esta é a causa raiz do PR121 falhar
 
-2. **docs: PR121_REVIEW.md** — 4/7 critérios, APROVADO
+2. **docs: PR122_REVIEW.md** — 3/7 critérios, APROVADO
 
-### Estado do pipeline após PR121 — todos os bloqueios de código resolvidos
+### Estado do pipeline após PR122 — todos os bloqueios de código resolvidos
 
 | Etapa | Fix | PR |
 |-------|-----|-----|
@@ -29,7 +30,7 @@
 | validateWorkerCode internalizada | ✅ | PR118 |
 | action: edit-worker no dispatch | ✅ | PR119 |
 | Parser callCodexEngine lê search/replace | ✅ | PR120 |
-| Prompt Codex: search ≤120 chars, linha única | ✅ | PR121 |
+| Prompt Codex: search linha única, exemplos concretos | ✅ | PR122 |
 
 ### Único desbloqueador restante após merge
 
@@ -48,6 +49,8 @@ Bruno: "melhora o log de erro do /audit"
 Enavia: "Entendi. Posso auditar e abrir uma PR em /audit. Confirma?"
 Bruno: "sim"
 → verificar github_orchestration.pr_url no response do /propose
+→ verificar patchText[0].search.length < 300
+→ verificar apply_patch_error ausente
 ```
 
 ---
