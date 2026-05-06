@@ -1,8 +1,31 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR112 — Corrigir formato do patch Codex)
-**Branch ativa:** `claude/pr112-fix-codex-patch-format`
-**Última tarefa:** PR112 — Corrigir formato do patch gerado pelo Codex ✅
+**Data:** 2026-05-06 (atualizado após PR113 — Corrigir mode do dispatch para enavia_propose)
+**Branch ativa:** `claude/pr113-fix-mode-dispatch`
+**Última tarefa:** PR113 — Corrigir mode do dispatch do chat ✅
+
+## Atualização PR113 — Fix Mode Dispatch — 2026-05-06
+
+- Branch: `claude/pr113-fix-mode-dispatch`
+- PR GitHub: [#281](https://github.com/brunovasque/nv-enavia/pull/281) — aguarda merge
+- Tipo: PR-IMPL (Worker-only)
+- Contrato: `docs/CONTRATO_PR113_FIX_MODE_DISPATCH.md` ✅
+- PR anterior: PR112 ✅ (mergeada)
+
+### Commits executados
+
+| # | Hash | Entrega |
+|---|------|---------|
+| 1 | a0c58bb | `nv-enavia.js` linha 3718: `mode: "chat_execute_next"` → `mode: "enavia_propose"` |
+| 2 | 426ab8f | `docs/PR113_REVIEW.md` — 3/3 critérios, 4/4 invariantes, APROVADO |
+
+### Critérios de conclusão: 3/3 ✅
+
+- [x] Linha 3718: `"chat_execute_next"` → `"enavia_propose"`
+- [x] Nenhuma outra linha alterada
+- [x] PR aberta com `docs/PR113_REVIEW.md` gerado
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
 ## Atualização PR112 — Fix Codex Patch Format — 2026-05-06
 

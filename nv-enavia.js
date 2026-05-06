@@ -3715,7 +3715,7 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
 
   const _proposePayload = {
     source: "chat_trigger",
-    mode: "chat_execute_next",
+    mode: "enavia_propose",
     intent: "propose",
     improvement_target: improvementTarget,
     target: { system: "cloudflare_worker", workerId: "nv-enavia" },

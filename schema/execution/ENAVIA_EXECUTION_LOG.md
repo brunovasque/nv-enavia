@@ -1,5 +1,36 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR113 — PR-IMPL — Fix Mode Dispatch
+
+- **Branch:** `claude/pr113-fix-mode-dispatch`
+- **Tipo:** PR-IMPL (Worker-only)
+- **Contrato:** `docs/CONTRATO_PR113_FIX_MODE_DISPATCH.md` ✅
+- **PR anterior validada:** PR112 ✅ mergeada
+- **PR GitHub aberta:** [#281](https://github.com/brunovasque/nv-enavia/pull/281)
+
+### Objetivo
+
+Corrigir `mode: "chat_execute_next"` (inexistente no executor) para `mode: "enavia_propose"` (reconhecido na linha 618 do executor). Pipeline correto acionado com `use_codex=true`.
+
+### 2 Commits atômicos
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | a0c58bb | `nv-enavia.js:3718` | mode: `chat_execute_next` → `enavia_propose` |
+| 2 | 426ab8f | `docs/PR113_REVIEW.md` | Review: 3/3 critérios, 4/4 invariantes |
+
+### Critérios validados: 3/3 ✅
+
+### Bloqueios: nenhum
+
+### Pós-merge obrigatório
+
+```powershell
+cd D:\nv-enavia && npx wrangler deploy
+```
+
+---
+
 ## 2026-05-06 — PR112 — PR-IMPL — Fix Codex Patch Format
 
 - **Branch:** `claude/pr112-fix-codex-patch-format`
