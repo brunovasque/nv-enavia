@@ -7,15 +7,27 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`docs/CONTRATO_ENAVIA_CHAT_TRIGGER_PR110.md`** — Ativo (criado em 2026-05-05).
+🟢 **`docs/CONTRATO_PR111_ATIVAR_CODEX_DISPATCH.md`** — Ativo (criado em 2026-05-06).
 
 Estado atual da frente:
-- PR110 (PR-IMPL): ⏳ Em execução — branch copilot/pr110-trigger-linguagem-natural
-  - 4/4 commits atômicos concluídos
+- PR111 (PR-IMPL): 🔄 Em execução — branch claude/pr111-ativar-codex-dispatch
+  - Corrige Issue I3: `use_codex: false` → `use_codex: true` em `_dispatchExecuteNextFromChat`
   - PR aberta — aguarda revisão e aprovação de Bruno
-  - 60/60 testes passando ✅
 
-**Próxima etapa: merge da PR110 → PR111 (Deploy real supervisionado).**
+**Próxima etapa: merge da PR111 → habilita ciclo chat→Codex→PR completo.**
+
+---
+
+## Contrato anterior (encerrado ✅ — 2026-05-06)
+
+🔴 **`docs/CONTRATO_ENAVIA_CHAT_TRIGGER_PR110.md`** — Encerrado ✅ (2026-05-06).
+
+- PR110 (PR-IMPL): ✅ Mergeada — PR #278 em main (d3eac88)
+  - 60/60 testes passando ✅
+  - Dois hotfixes cirúrgicos aplicados diretamente em main após merge:
+    - `7e7ff47` — adicionou `"sim"` a `_CHAT_BRIDGE_APPROVAL_TERMS`
+    - `8c60368` — corrigiu `target.workerId` no payload do `_dispatchExecuteNextFromChat`
+  - Issues não bloqueadores documentados: I1, I2, I3 (corrigido em PR111), I4
 
 ---
 

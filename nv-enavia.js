@@ -3684,6 +3684,7 @@ export {
 // ============================================================================
 const _CHAT_BRIDGE_APPROVAL_TERMS = [
   "aprovado", "pode executar", "confirmo", "sim, execute", "execute agora", "go",
+  "sim",
 ];
 const _CHAT_BRIDGE_DANGEROUS_TERMS = [
   "deploy", "delete", "rm ", "drop", "prod", "produção", "write", "patch", "post", "merge", "rollback",
@@ -3701,27 +3702,28 @@ const _PENDING_PLAN_TTL_SECONDS = 600;
 // ============================================================================
 async function _dispatchExecuteNextFromChat(env, pendingPlan) {
   const sessionId = pendingPlan.session_id || null;
-  const target = pendingPlan.target || null;
+  const improvementTarget = pendingPlan.target || null;
 
   if (!env.EXECUTOR || typeof env.EXECUTOR.fetch !== "function") {
-    return { ok: false, action: "execute_next", target, error: "EXECUTOR_NOT_AVAILABLE" };
+    return { ok: false, action: "execute_next", target: improvementTarget, error: "EXECUTOR_NOT_AVAILABLE" };
   }
 
   logNV("🚀 [CHAT/IMPROVEMENT] Disparando execute_next via chat aprovado", {
     sessionId,
-    target,
+    target: improvementTarget,
   });
 
   const _proposePayload = {
     source: "chat_trigger",
     mode: "chat_execute_next",
     intent: "propose",
-    target,
+    improvement_target: improvementTarget,
+    target: { system: "cloudflare_worker", workerId: "nv-enavia" },
     session_id: sessionId,
     github_token_available: true,
-    use_codex: false,
+    use_codex: true,
     context: {
-      description: pendingPlan.description || `Melhoria solicitada via chat em ${target}`,
+      description: pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`,
       require_live_read: true,
     },
   };
@@ -3745,7 +3747,7 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
       sessionId,
       error: String(netErr),
     });
-    return { ok: false, action: "execute_next", target, error: "NETWORK_ERROR", detail: String(netErr) };
+    return { ok: false, action: "execute_next", target: improvementTarget, error: "NETWORK_ERROR", detail: String(netErr) };
   }
 
   const prUrl = proposeJson?.github_orchestration?.pr_url || null;
@@ -3753,7 +3755,7 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
 
   logNV("🚀 [CHAT/IMPROVEMENT] Resposta do executor /propose", {
     sessionId,
-    target,
+    target: improvementTarget,
     propose_ok: proposeOk,
     pr_url: prUrl,
   });
@@ -3761,7 +3763,7 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
   return {
     ok: proposeOk,
     action: "execute_next",
-    target,
+    target: improvementTarget,
     pr_url: prUrl,
     propose_result: proposeJson,
   };
