@@ -1,5 +1,38 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR118 — PR-IMPL — Internalizar validateWorkerCode no executor
+
+- **Branch:** `fix/pr118-worker-patch-safe-internal-validate`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR118.md` ✅
+- **PR anterior validada:** PR117 ✅ mergeada (PR #285)
+- **PR GitHub aberta:** [#286](https://github.com/brunovasque/nv-enavia/pull/286)
+
+### Objetivo
+
+Eliminar self-call HTTP `fetch(request.url.replace("/worker-patch-safe", "/module-validate"), ...)`
+que o Cloudflare bloqueia com error 1042. Lógica extraída em `validateWorkerCode(content)` e
+chamada diretamente no handler `/worker-patch-safe` modo `stage`.
+
+### 3 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 85860b2 | `executor/src/index.js` antes do MÓDULO 9 | `validateWorkerCode()` +60 linhas |
+| 2 | 2e52692 | `executor/src/index.js` linha ~2552 | substituição do self-call |
+| 3 | 3bfb43c | `docs/PR118_REVIEW.md` | Review 6/7 critérios |
+
+### Pós-merge obrigatório
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+# Teste: POST /worker-patch-safe com candidate válido → ok:true (sem error 1042)
+```
+
+---
+
 ## 2026-05-06 — PR117 — PR-IMPL — Fix worker-patch-safe: URL pública do executor
 
 - **Branch:** `claude/pr117-fix-worker-patch-safe-self-url`
