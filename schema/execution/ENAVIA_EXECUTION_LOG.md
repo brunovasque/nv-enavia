@@ -1,5 +1,48 @@
 # ENAVIA — Execution Log
 
+## 2026-05-05 — PR110 — PR-IMPL — Trigger em Linguagem Natural via Chat
+
+- **Branch:** `copilot/pr110-trigger-linguagem-natural`
+- **Tipo:** PR-IMPL (bridge chat → ciclo de autoevolução)
+- **Contrato:** `docs/CONTRATO_ENAVIA_CHAT_TRIGGER_PR110.md` ✅
+- **PR anterior validada:** PR109 ✅ (implementada, aguarda merge)
+- **PR GitHub aberta:** (a abrir)
+
+### Objetivo
+
+Permitir que Bruno dispare o ciclo de autoevolução em linguagem natural via chat.
+"melhora o log de erro do /audit" → Enavia entende → pede confirmação → abre PR.
+
+### 4 Commits atômicos
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 5096066 | `schema/enavia-intent-classifier.js` | IMPROVEMENT_REQUEST: novo intent com termos gatilho, extração de target, negações |
+| 2 | 51e491f | `nv-enavia.js` | pending_plan execute_next + verificação de contrato + mensagem de confirmação |
+| 3 | fe03264 | `nv-enavia.js` | _dispatchExecuteNextFromChat + _dispatchFromChat execute_next + pr_url na response |
+| 4 | b4ff5df | `tests/pr110-chat-trigger.prova.test.js` | 60 cenários: classificador + pending_plan + dispatch + regressões |
+
+### Testes executados
+
+- `tests/pr110-chat-trigger.prova.test.js`: 60/60 ✅
+- `tests/pr50-intent-runtime.prova.test.js`: 124/124 ✅ (regressão)
+- `tests/pr60-anti-bot-final.prova.test.js`: 236/236 ✅ (regressão)
+
+### Invariantes mantidos
+
+- Confirmação humana SEMPRE antes de execute_next ✅
+- merge_allowed=false herdado ✅
+- pending_plan expirado (TTL 5min) = descartado automaticamente pelo KV ✅
+- execute_next nunca chamado mais de uma vez por pending_plan ✅
+- Ciclo não disparado se contrato ausente em KV ✅
+- Negações próximas ao gatilho → CONVERSATION ✅
+
+### Resultado geral: 60 testes passando, 0 falhas
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+---
+
 ## 2026-05-05 — PR107 — PR-REORGANIZAÇÃO — Integração do Ecossistema
 
 - **Branch:** `copilot/pr107-integracao-ecossistema`
