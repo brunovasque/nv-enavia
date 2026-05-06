@@ -1,10 +1,58 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR120 — parser callCodexEngine alinhado com applyPatch ✅ (branch: fix/pr120-codex-parser-search-replace)
+**De:** PR121 — prompt Codex search ≤120 chars ✅ (branch: fix/pr121-codex-prompt-search-short)
 **Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
 
-## Handoff atual — PR120 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR121 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+2 commits na branch `fix/pr121-codex-prompt-search-short`:
+
+1. **fix: systemLines search ≤120 chars** — `executor/src/index.js` linhas 5748-5761:
+   - ANTES: `"search": string` sem restrição → Codex gerava bloco de ~1094 chars
+   - DEPOIS: instrução explícita "máximo 120 chars, linha única, inequívoca, UMA SÓ VEZ"
+   - Adicionada instrução CRÍTICO antes do "sem markdown"
+
+2. **docs: PR121_REVIEW.md** — 4/7 critérios, APROVADO
+
+### Estado do pipeline após PR121 — todos os bloqueios de código resolvidos
+
+| Etapa | Fix | PR |
+|-------|-----|-----|
+| use_codex: true | ✅ | PR111 |
+| Schema Codex {search, replace} | ✅ | PR112 |
+| mode: enavia_propose | ✅ | PR113 |
+| generatePatch: true + github_orchestration | ✅ | PR114 |
+| applyPatch usa target_code_original (790k) | ✅ | PR115 |
+| validateWorkerCode internalizada | ✅ | PR118 |
+| action: edit-worker no dispatch | ✅ | PR119 |
+| Parser callCodexEngine lê search/replace | ✅ | PR120 |
+| Prompt Codex: search ≤120 chars, linha única | ✅ | PR121 |
+
+### Único desbloqueador restante após merge
+
+`OPENAI_API_KEY` — sem ele o Codex não é chamado, `patches=[]`, `staging.ready=false`.
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy       # Worker
+cd D:\nv-enavia\executor && npx wrangler deploy  # Executor
+```
+
+### Teste E2E após deploy
+
+```
+Bruno: "melhora o log de erro do /audit"
+Enavia: "Entendi. Posso auditar e abrir uma PR em /audit. Confirma?"
+Bruno: "sim"
+→ verificar github_orchestration.pr_url no response do /propose
+```
+
+---
+
+## Handoff anterior — PR120 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
