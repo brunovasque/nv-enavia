@@ -5745,8 +5745,8 @@ async function callCodexEngine(env, params) {
       "    {",
       '      \"title\": string,',
       '      \"description\": string,',
-      '      \"search\": \"LINHA ÚNICA e EXATA do código original — máximo 120 chars — deve ser inequívoca e aparecer UMA SÓ VEZ no arquivo. NÃO copie blocos inteiros. Use a assinatura da função, o início único do bloco, ou o comentário identificador mais próximo.\",',
-      '      \"replace\": \"código substituto completo para essa linha/bloco\",',
+      '      \"search\": \"UMA linha exata e única do código original (ex: \'  console.log(err.message);\' ou \'async function handleAudit(request, env) {\') — deve aparecer UMA SÓ VEZ no arquivo. NÃO copie blocos. Escolha a linha mais identificadora do trecho.\",',
+      '      \"replace\": \"bloco substituto completo — pode ter múltiplas linhas\",',
       "    }",
       "  ],",
       '  \"notes\": string[] | null,',
@@ -5755,7 +5755,7 @@ async function callCodexEngine(env, params) {
       "  ]",
       "}",
       "",
-      "CRÍTICO: search deve ter NO MÁXIMO 120 caracteres e aparecer EXATAMENTE UMA VEZ no código-fonte. Se não conseguir garantir unicidade com 120 chars, use o comentário ou nome de função mais próximo como âncora.",
+      "REGRA CRÍTICA para search: use a linha de assinatura da função (ex: 'async function handleAudit('), ou o console.log específico (ex: 'console.error(err)'), ou o comentário único mais próximo. NUNCA copie mais de 2 linhas no search.",
       "Não explique nada fora desse JSON. Não use markdown."
     ];
 
