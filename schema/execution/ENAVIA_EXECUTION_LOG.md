@@ -1,5 +1,39 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR115 — PR-IMPL — Fix applyPatch: target_code_original em vez de chunk
+
+- **Branch:** `claude/pr115-fix-apply-patch-original-code`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR115.md` ✅
+- **PR anterior validada:** PR114 ✅ mergeada (PR #282)
+- **PR GitHub aberta:** [#283](https://github.com/brunovasque/nv-enavia/pull/283)
+
+### Objetivo
+
+Corrigir Gate 4 do ciclo chat→PR: `applyPatch` recebia chunk de 16k em vez do snapshot completo
+de 790k. `ANCHOR_NOT_FOUND` silencioso impedia `orchestrateGithubPR` de ser chamada.
+
+### 3 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 59f607c | `executor/src/index.js:1416` | `originalCode` usa `target_code_original` sem fallback para chunk |
+| 2 | 0410ff4 | `executor/src/index.js:1412-1502` | `apply_patch_error` e `patch_safe_error` no response |
+| 3 | 0436bb8 | `docs/PR115_REVIEW.md` | Review 6/7 critérios |
+
+### Critérios validados: 6/7 (Critério 2 requer deploy)
+
+### Pós-merge obrigatório
+
+```powershell
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+# + configurar ENAVIA_WORKER binding em wrangler.executor.generated.toml
+```
+
+---
+
 ## 2026-05-06 — PR114 — PR-IMPL — Fix Ciclo Chat→Codex→PR
 
 - **Branch:** `claude/pr114-fix-ciclo-chat-pr`
