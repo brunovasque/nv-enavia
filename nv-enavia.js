@@ -3684,6 +3684,7 @@ export {
 // ============================================================================
 const _CHAT_BRIDGE_APPROVAL_TERMS = [
   "aprovado", "pode executar", "confirmo", "sim, execute", "execute agora", "go",
+  "sim",
 ];
 const _CHAT_BRIDGE_DANGEROUS_TERMS = [
   "deploy", "delete", "rm ", "drop", "prod", "produção", "write", "patch", "post", "merge", "rollback",
