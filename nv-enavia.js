@@ -3692,6 +3692,82 @@ const _CHAT_BRIDGE_DANGEROUS_TERMS = [
 const _PENDING_PLAN_TTL_SECONDS = 600;
 
 // ============================================================================
+// PR110: _dispatchExecuteNextFromChat — despacha ciclo execute_next a partir
+// de pending_plan gerado por IMPROVEMENT_REQUEST no chat.
+//
+// Chama o executor /propose diretamente via service binding (env.EXECUTOR).
+// O executor já encadeia audit→propose→GitHub orchestration internamente (PR108/PR109).
+// Retorna { ok, action, target, pr_url, propose_result?, error?, detail? }
+// ============================================================================
+async function _dispatchExecuteNextFromChat(env, pendingPlan) {
+  const sessionId = pendingPlan.session_id || null;
+  const target = pendingPlan.target || null;
+
+  if (!env.EXECUTOR || typeof env.EXECUTOR.fetch !== "function") {
+    return { ok: false, action: "execute_next", target, error: "EXECUTOR_NOT_AVAILABLE" };
+  }
+
+  logNV("🚀 [CHAT/IMPROVEMENT] Disparando execute_next via chat aprovado", {
+    sessionId,
+    target,
+  });
+
+  const _proposePayload = {
+    source: "chat_trigger",
+    mode: "chat_execute_next",
+    intent: "propose",
+    target,
+    session_id: sessionId,
+    github_token_available: true,
+    use_codex: false,
+    context: {
+      description: pendingPlan.description || `Melhoria solicitada via chat em ${target}`,
+      require_live_read: true,
+    },
+  };
+
+  let proposeJson = null;
+  let proposeStatus = null;
+  try {
+    const proposeRes = await env.EXECUTOR.fetch("https://internal/propose", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_proposePayload),
+    });
+    proposeStatus = proposeRes.status;
+    try {
+      proposeJson = await proposeRes.json();
+    } catch {
+      proposeJson = { ok: false, error: "PROPOSE_INVALID_JSON" };
+    }
+  } catch (netErr) {
+    logNV("🔴 [CHAT/IMPROVEMENT] Falha de rede ao chamar executor /propose", {
+      sessionId,
+      error: String(netErr),
+    });
+    return { ok: false, action: "execute_next", target, error: "NETWORK_ERROR", detail: String(netErr) };
+  }
+
+  const prUrl = proposeJson?.github_orchestration?.pr_url || null;
+  const proposeOk = proposeStatus >= 200 && proposeStatus < 300;
+
+  logNV("🚀 [CHAT/IMPROVEMENT] Resposta do executor /propose", {
+    sessionId,
+    target,
+    propose_ok: proposeOk,
+    pr_url: prUrl,
+  });
+
+  return {
+    ok: proposeOk,
+    action: "execute_next",
+    target,
+    pr_url: prUrl,
+    propose_result: proposeJson,
+  };
+}
+
+// ============================================================================
 // _dispatchFromChat — helper interno: despacha executor a partir de pending_plan
 //
 // Recebe env e pendingPlan (já recuperado do KV).
@@ -3700,6 +3776,12 @@ const _PENDING_PLAN_TTL_SECONDS = 600;
 // Retorna { ok, bridge_id, executor_ok, executor_response?, error?, detail? }
 // ============================================================================
 async function _dispatchFromChat(env, pendingPlan) {
+  // PR110: se o pending_plan for de tipo execute_next (gerado por IMPROVEMENT_REQUEST),
+  // delegar para o helper dedicado que chama o executor /propose diretamente.
+  if (pendingPlan.action === "execute_next") {
+    return await _dispatchExecuteNextFromChat(env, pendingPlan);
+  }
+
   const bridgeId = pendingPlan.bridge_id || safeId("bridge");
   const sessionId = pendingPlan.session_id || null;
   const ep = pendingPlan.bridge_executor_payload;
@@ -3946,24 +4028,41 @@ async function handleChatLLM(request, env) {
 
         const dispatchResult = await _dispatchFromChat(env, pendingPlan);
 
+        // PR110: reply adaptado para execute_next — inclui pr_url quando PR foi aberta
+        const _isExecuteNext = pendingPlan.action === "execute_next";
+        const _dispatchReply = _isExecuteNext
+          ? (dispatchResult.pr_url
+            ? `PR aberta: ${dispatchResult.pr_url} — revise e aprove o merge quando estiver pronto.`
+            : (dispatchResult.ok
+              ? "Execução concluída, mas nenhuma PR foi aberta (verifique o executor)."
+              : `Falha ao abrir a PR: ${dispatchResult.error || "erro desconhecido"}.`))
+          : (dispatchResult.ok
+            ? "Plano aprovado. Execução foi despachada para o executor."
+            : `Aprovação recebida, mas houve falha ao chamar o executor: ${dispatchResult.error || "erro desconhecido"}.`);
+
         return jsonResponse({
           ok: dispatchResult.ok,
           system: "ENAVIA-NV-FIRST",
           mode: "llm-first",
           execution_dispatched: true,
-          bridge_id: dispatchResult.bridge_id,
-          executor_ok: dispatchResult.executor_ok,
-          ...(dispatchResult.executor_response ? { executor_response: dispatchResult.executor_response } : {}),
+          ...(_isExecuteNext ? {
+            action: "execute_next",
+            target: dispatchResult.target || pendingPlan.target || null,
+            ...(dispatchResult.pr_url ? { pr_url: dispatchResult.pr_url } : {}),
+            ...(dispatchResult.propose_result ? { propose_result: dispatchResult.propose_result } : {}),
+          } : {
+            bridge_id: dispatchResult.bridge_id,
+            executor_ok: dispatchResult.executor_ok,
+            ...(dispatchResult.executor_response ? { executor_response: dispatchResult.executor_response } : {}),
+          }),
           ...(dispatchResult.error ? { executor_error: dispatchResult.error } : {}),
-          reply: dispatchResult.ok
-            ? "Plano aprovado. Execução foi despachada para o executor."
-            : `Aprovação recebida, mas houve falha ao chamar o executor: ${dispatchResult.error || "erro desconhecido"}.`,
+          reply: _dispatchReply,
           plan_summary: pendingPlan.plan_summary || null,
           timestamp: Date.now(),
           telemetry: {
             duration_ms: Date.now() - startedAt,
             session_id,
-            pipeline: "chat_bridge_approval",
+            pipeline: _isExecuteNext ? "chat_improvement_dispatch" : "chat_bridge_approval",
           },
         });
       }
@@ -4108,6 +4207,91 @@ async function handleChatLLM(request, env) {
   } catch (_classifyErr) {
     _intentClassification = null;
   }
+  // PR110: IMPROVEMENT_REQUEST — gate de ciclo audit→PR a partir do chat.
+  // Verificado logo após a classificação de intenção, antes do Skill Router.
+  // Confirmação humana SEMPRE obrigatória antes de qualquer ação (pending_plan + "sim/não").
+  // TTL do pending_plan: 300s (5 minutos). Nunca cria pending_plan sem target claro.
+  // Nunca dispara execute_next sem contrato ativo em KV.
+  if (_intentClassification?.intent === "improvement_request" && session_id && env.ENAVIA_BRAIN) {
+    const _imprvTarget = _intentClassification.target || null;
+    const _imprvConf = _intentClassification.confidence || "low";
+
+    if (_imprvConf === "low" || !_imprvTarget) {
+      // Sem target identificável — pedir clarificação, nunca criar pending_plan
+      return jsonResponse({
+        ok: true,
+        system: "ENAVIA-NV-FIRST",
+        mode: "llm-first",
+        reply: "Entendi que você quer uma melhoria. Sobre qual parte específica? (ex: /audit, /chat, /propose)",
+        intent_classification: { intent: "improvement_request", confidence: "low", target: null },
+        timestamp: Date.now(),
+        telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_improvement_clarification" },
+      });
+    }
+
+    // Verificar contrato ativo em KV — se ausente, explicar ao usuário
+    let _activeContractExists = false;
+    try {
+      const _contractIndex = await env.ENAVIA_BRAIN.get("contract:index");
+      _activeContractExists = !!_contractIndex;
+    } catch (_) { /* KV failure — prosseguir sem bloquear */ }
+
+    if (!_activeContractExists) {
+      return jsonResponse({
+        ok: true,
+        system: "ENAVIA-NV-FIRST",
+        mode: "llm-first",
+        reply: `Entendi a melhoria solicitada em ${_imprvTarget}, mas não há contrato ativo no sistema. Crie um contrato antes de acionar o ciclo de autoevolução.`,
+        intent_classification: { intent: "improvement_request", confidence: _imprvConf, target: _imprvTarget },
+        timestamp: Date.now(),
+        telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_improvement_no_contract" },
+      });
+    }
+
+    // Criar pending_plan com action: "execute_next" e TTL de 5 minutos
+    const _TTL_IMPROVEMENT_S = 300;
+    const _imprvNow = Date.now();
+    const _imprvPendingKey = `chat:pending_plan:${session_id}`;
+    const _imprvPendingValue = {
+      session_id,
+      action: "execute_next",
+      target: _imprvTarget,
+      description: message,
+      requires_approval: true,
+      created_at: new Date(_imprvNow).toISOString(),
+      expires_at: new Date(_imprvNow + _TTL_IMPROVEMENT_S * 1000).toISOString(),
+      source: "chat_improvement",
+    };
+    try {
+      await env.ENAVIA_BRAIN.put(_imprvPendingKey, JSON.stringify(_imprvPendingValue), {
+        expirationTtl: _TTL_IMPROVEMENT_S,
+      });
+    } catch (_kvErr) {
+      logNV("⚠️ [CHAT/IMPROVEMENT] Falha ao salvar pending_plan (não crítico)", {
+        session_id,
+        error: String(_kvErr),
+      });
+    }
+
+    logNV("💾 [CHAT/IMPROVEMENT] pending_plan execute_next salvo", {
+      session_id,
+      target: _imprvTarget,
+      confidence: _imprvConf,
+    });
+
+    return jsonResponse({
+      ok: true,
+      system: "ENAVIA-NV-FIRST",
+      mode: "llm-first",
+      reply: `Entendi. Posso auditar o sistema e abrir uma PR com a melhoria em ${_imprvTarget}. Confirma? (sim/não)`,
+      intent_classification: { intent: "improvement_request", confidence: _imprvConf, target: _imprvTarget },
+      pending_plan_saved: true,
+      pending_plan_expires_in: _TTL_IMPROVEMENT_S,
+      timestamp: Date.now(),
+      telemetry: { duration_ms: Date.now() - startedAt, session_id, pipeline: "chat_improvement_pending" },
+    });
+  }
+
   // PR51: Skill Router read-only rodado aqui para gerar skill_routing aditivo na resposta.
   // Campo aditivo seguro — não quebra consumidor atual, não executa nada,
   // não cria endpoint, não aciona runtime. Somente referência documental.

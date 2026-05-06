@@ -7,14 +7,31 @@ Atualizar sempre que um contrato for criado, encerrado ou substituído.
 
 ## Contrato ativo
 
-🟢 **`docs/CONTRATO_ENAVIA_ECOSSISTEMA_PR107.md`** — Ativo (criado em 2026-05-05).
+🟢 **`docs/CONTRATO_ENAVIA_CHAT_TRIGGER_PR110.md`** — Ativo (criado em 2026-05-05).
 
 Estado atual da frente:
-- PR107 (PR-REORGANIZAÇÃO): ✅ Executada — PR #274 aberta (copilot/pr107-integracao-ecossistema)
-  - 5/5 commits atômicos concluídos
-  - Aguarda revisão e aprovação de Bruno antes do merge
+- PR110 (PR-IMPL): ⏳ Em execução — branch copilot/pr110-trigger-linguagem-natural
+  - 4/4 commits atômicos concluídos
+  - PR aberta — aguarda revisão e aprovação de Bruno
+  - 60/60 testes passando ✅
 
-**Próxima etapa: merge da PR #274 → PR108 (Self-patch supervisionado).**
+**Próxima etapa: merge da PR110 → PR111 (Deploy real supervisionado).**
+
+---
+
+## Contrato anterior (tecnicamente concluído, aguarda merge)
+
+🔵 **`docs/CONTRATO_ENAVIA_FIX_PROVA_PR109.md`** — Encerrado tecnicamente, aguarda merge.
+
+- PR109 (PR-FIX+PROVA): ✅ Implementada — PR #276 (copilot/pr109-fix-ciclo-prova-real)
+  - 7 commits atômicos concluídos
+  - 44/44 testes passando ✅
+
+---
+
+## Contrato anterior encerrado
+
+🔴 **`docs/CONTRATO_ENAVIA_ECOSSISTEMA_PR107.md`** — Encerrado ✅ (2026-05-05)
 
 ---
 
