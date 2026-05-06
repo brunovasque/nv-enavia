@@ -1,5 +1,36 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR121 — PR-IMPL — prompt Codex: search ≤120 chars, linha única
+
+- **Branch:** `fix/pr121-codex-prompt-search-short`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR121.md` ✅
+- **PR anterior validada:** PR120 ✅ mergeada (PR #288)
+- **PR GitHub aberta:** [#289](https://github.com/brunovasque/nv-enavia/pull/289)
+
+### Objetivo
+
+O Codex gerava `search` com ~1094 chars (bloco inteiro). `applyPatch` usa `indexOf(search)` —
+qualquer diferença de espaço/tab causava `ANCHOR_NOT_FOUND`. Prompt atualizado para instruir
+search ≤120 chars, linha única, inequívoca, UMA SÓ VEZ no arquivo.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 127d46f | `executor/src/index.js` systemLines | search ≤120 chars + instrução CRÍTICO |
+| 2 | a642fbc | `docs/PR121_REVIEW.md` | Review 4/7 critérios |
+
+### Desbloqueador único restante
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+```
+
+---
+
 ## 2026-05-06 — PR120 — PR-IMPL — parser callCodexEngine: search/replace alinhado com applyPatch
 
 - **Branch:** `fix/pr120-codex-parser-search-replace`

@@ -1,8 +1,29 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR120 — parser callCodexEngine lê search/replace)
-**Branch ativa:** `fix/pr120-codex-parser-search-replace`
-**Última tarefa:** PR120 — parser callCodexEngine alinhado com applyPatch ✅
+**Data:** 2026-05-06 (atualizado após PR121 — prompt Codex: search ≤120 chars)
+**Branch ativa:** `fix/pr121-codex-prompt-search-short`
+**Última tarefa:** PR121 — prompt Codex instrui search linha única ≤120 chars ✅
+
+## Atualização PR121 — prompt Codex search curto — 2026-05-06
+
+- Branch: `fix/pr121-codex-prompt-search-short`
+- PR GitHub: [#289](https://github.com/brunovasque/nv-enavia/pull/289) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR121.md` ✅
+- PR anterior: PR120 ✅ (mergeada — PR #288)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | 127d46f | `executor/src/index.js` | systemLines: search ≤120 chars + instrução CRÍTICO |
+| 2 | a642fbc | `docs/PR121_REVIEW.md` | Review 4/7 critérios, APROVADO |
+
+### Critérios de conclusão: 4/7 ✅ (3 pendentes de deploy + OPENAI_API_KEY)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR120 — parser callCodexEngine search/replace — 2026-05-06
 
