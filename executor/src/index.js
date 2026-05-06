@@ -2435,6 +2435,66 @@ if (method === "GET" && pathname === "/audit-log") {
 // ============================================================================
 
 // ============================================================================
+// MÓDULO 9A — Função interna de validação sintática (extraída do /module-validate)
+// Elimina self-call HTTP que era bloqueado pelo Cloudflare (error 1042)
+// ============================================================================
+async function validateWorkerCode(content) {
+  if (!content || content.length < 10) {
+    return { ok: false, status: "invalid", error: "Content too small or corrupted",
+      syntaxOK: false, riskLevel: "high", requiresApproval: true,
+      protectedHits: [], notes: ["Content too small"] };
+  }
+
+  const protectedVars = ["env","src","request","url","pathname","method",
+    "NV_INDEX_CACHE","ENAVIA_GIT","logNV","loadIndex","queueModuleLoad"];
+  const protectedHits = [];
+  for (let v of protectedVars) {
+    const regex = new RegExp(`\\b${v}\\s*=`, "g");
+    if (regex.test(content)) protectedHits.push(v);
+  }
+
+  let syntaxOK = true;
+  let syntaxError = null;
+  const notes = [];
+  try {
+    try { acornParse(content, { ecmaVersion: "latest", sourceType: "module" });
+    } catch (_m) { acornParse(content, { ecmaVersion: "latest", sourceType: "script" }); }
+  } catch (parseErr) {
+    syntaxOK = false;
+    syntaxError = parseErr.message + " " + parseErr.toString();
+    notes.push("JavaScript syntax error detected.");
+  }
+
+  if (!syntaxError) {
+    try {
+      let braces=0,parens=0,brackets=0,inString=false,strChar="",inLineComment=false,inBlockComment=false;
+      for (let ci=0;ci<content.length;ci++){
+        const ch=content[ci],next=content[ci+1]||"";
+        if(inLineComment){if(ch==="\n")inLineComment=false;continue;}
+        if(inBlockComment){if(ch==="*"&&next==="/"){inBlockComment=false;ci++;}continue;}
+        if(inString){if(ch==="\\"&&next===strChar){ci++;continue;}if(ch===strChar)inString=false;continue;}
+        if(ch==='"'||ch==="'"||ch==="`"){inString=true;strChar=ch;continue;}
+        if(ch==="/"&&next==="/"){inLineComment=true;continue;}
+        if(ch==="/"&&next==="*"){inBlockComment=true;continue;}
+        if(ch==="{")braces++;else if(ch==="}")braces--;
+        else if(ch==="(")parens++;else if(ch===")")parens--;
+        else if(ch==="[")brackets++;else if(ch==="]")brackets--;
+        if(braces<0||parens<0||brackets<0){syntaxError=`Unbalanced delimiter at position ${ci}: '${ch}'`;break;}
+      }
+      if(!syntaxError&&(braces!==0||parens!==0||brackets!==0)){
+        syntaxError=`Unbalanced delimiters: braces=${braces}, parens=${parens}, brackets=${brackets}`;
+      }
+    } catch(_){}
+  }
+
+  const riskLevel = protectedHits.length > 0 ? "high" : syntaxOK ? "low" : "high";
+  const requiresApproval = !syntaxOK || protectedHits.length > 0;
+  return { ok: syntaxOK && protectedHits.length === 0, status: "validated",
+    syntaxOK, syntaxError, riskLevel, requiresApproval,
+    protectedHits, notes, size: content.length };
+}
+
+// ============================================================================
 // 🧩 MÓDULO 9 — /worker-patch-safe
 // Staging + rollback seguro para código de Worker (nv-enavia, nv-first, etc.)
 // - NUNCA aplica deploy real sozinho (Cloudflare continua manual)
@@ -2488,20 +2548,8 @@ if (method === "POST" && pathname === "/worker-patch-safe") {
         );
       }
 
-      // 1) Validar candidato com /module-validate (sem exigir NV-MODULE)
-      // ✅ PR6: env.fetch() não existe em Workers — usar fetch() global
-      const validateResp = await fetch(
-        request.url.replace("/worker-patch-safe", "/module-validate"),
-        {
-          method: "POST",
-          body: JSON.stringify({
-            content: candidate,
-            expectModule: false,
-          }),
-        }
-      );
-
-      const validateData = await validateResp.json();
+      // PR118: internalizar validação — self-call HTTP bloqueado pelo Cloudflare (error 1042)
+      const validateData = await validateWorkerCode(candidate);
 
       // Se inválido, não grava staging, apenas devolve risco
       if (!validateData.ok) {

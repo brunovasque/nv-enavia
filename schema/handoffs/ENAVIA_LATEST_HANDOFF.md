@@ -1,10 +1,50 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR117 — Fix worker-patch-safe via URL pública do executor ✅ (branch: claude/pr117-fix-worker-patch-safe-self-url)
-**Para:** Deploy Worker + Executor pós-merge → configurar OPENAI_API_KEY → teste E2E
+**De:** PR118 — Internalizar validateWorkerCode, eliminar self-call HTTP ✅ (branch: fix/pr118-worker-patch-safe-internal-validate)
+**Para:** Deploy Worker + Executor pós-merge → configurar OPENAI_API_KEY → teste E2E real
 
-## Handoff atual — PR117 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR118 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+3 commits na branch `fix/pr118-worker-patch-safe-internal-validate`:
+
+1. **feat: validateWorkerCode()** — `executor/src/index.js` antes do MÓDULO 9:
+   - Função pura que replica a lógica de `/module-validate`
+   - Validação acorn (module → fallback script), heurística de delimitadores, detecção de protectedVars
+   - Mesma interface de retorno que o handler `/module-validate`
+
+2. **fix: substituição do self-call** — `executor/src/index.js` linha ~2552:
+   - ANTES: `fetch(request.url.replace("/worker-patch-safe", "/module-validate"), ...)`
+   - DEPOIS: `await validateWorkerCode(candidate)`
+   - Elimina o error 1042 (Cloudflare loop detection)
+
+3. **docs: PR118_REVIEW.md** — 6/7 critérios, APROVADO
+
+### Pendências após merge da PR118
+
+1. Merge da PR #286 por Bruno ← GATE
+2. `wrangler secret put OPENAI_API_KEY --name enavia-executor`
+3. `cd D:\nv-enavia && npx wrangler deploy` (Worker)
+4. `cd D:\nv-enavia\executor && npx wrangler deploy` (Executor)
+5. Teste: `POST /worker-patch-safe` com candidate válido → `ok:true` sem error 1042
+6. Teste ciclo completo: chat → "melhora o /audit" → "sim" → PR aberta
+
+### Estado dos gates após PR118
+
+| Gate | Condição | Estado esperado pós-deploy |
+|------|----------|---------------------------|
+| 1 | staging.ready=true | Requer OPENAI_API_KEY |
+| 2 | originalCode existe | ✅ (PR115) |
+| 3 | patchList não-vazio | Requer OPENAI_API_KEY |
+| 4 | applyPatch.ok=true | ✅ (PR115) |
+| 5 | patchResult.applied.length>0 | ✅ (PR115) |
+| 6 | worker-patch-safe ok=true | ✅ (PR118 — sem error 1042) |
+
+---
+
+## Handoff anterior — PR117 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
