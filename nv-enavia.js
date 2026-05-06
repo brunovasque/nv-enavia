@@ -3721,7 +3721,7 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
     target: { system: "cloudflare_worker", workerId: "nv-enavia" },
     session_id: sessionId,
     github_token_available: true,
-    use_codex: false,
+    use_codex: true,
     context: {
       description: pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`,
       require_live_read: true,
