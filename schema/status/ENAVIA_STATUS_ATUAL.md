@@ -1,8 +1,28 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR113 — Corrigir mode do dispatch para enavia_propose)
-**Branch ativa:** `claude/pr113-fix-mode-dispatch`
-**Última tarefa:** PR113 — Corrigir mode do dispatch do chat ✅
+**Data:** 2026-05-06 (atualizado após PR114 — Fixes finais ciclo chat→Codex→PR)
+**Branch ativa:** `claude/pr114-fix-ciclo-chat-pr`
+**Última tarefa:** PR114 — Fechar ciclo chat→Codex→PR ✅
+
+## Atualização PR114 — Fix Ciclo Chat→PR — 2026-05-06
+
+- Branch: `claude/pr114-fix-ciclo-chat-pr`
+- PR GitHub: [#282](https://github.com/brunovasque/nv-enavia/pull/282) — aguarda merge
+- Tipo: PR-IMPL (Worker + Executor)
+- Contrato: `docs/CONTRATO_PR114_FIX_CICLO_CHAT_PR.md` ✅
+- PRs anteriores: PR111 ✅, PR112 ✅, PR113 ✅ — todas mergeadas
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | 94aac3b | `nv-enavia.js` | `generatePatch: true` + `intent` descritivo no payload |
+| 2 | 7c79e4d | `executor/src/index.js` | `github_orchestration` incluído no response do /propose |
+| 3 | 9774e17 | `docs/PR114_REVIEW.md` | Review 5/5 critérios, 4/4 invariantes, APROVADO |
+
+### Critérios de conclusão: 5/5 ✅
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
 ## Atualização PR113 — Fix Mode Dispatch — 2026-05-06
 

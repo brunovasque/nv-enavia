@@ -1,5 +1,39 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR114 — PR-IMPL — Fix Ciclo Chat→Codex→PR
+
+- **Branch:** `claude/pr114-fix-ciclo-chat-pr`
+- **Tipo:** PR-IMPL (Worker + Executor)
+- **Contrato:** `docs/CONTRATO_PR114_FIX_CICLO_CHAT_PR.md` ✅
+- **PR anterior validada:** PR111+PR112+PR113 ✅ mergeadas
+- **PR GitHub aberta:** [#282](https://github.com/brunovasque/nv-enavia/pull/282)
+
+### Objetivo
+
+Fechar o ciclo chat→Codex→PR corrigindo 3 bugs em cascata:
+1. `generatePatch: true` ausente → UNKNOWN MODE no executor
+2. `intent: "propose"` inútil para o Codex
+3. `github_orchestration` não incluído no response → `pr_url` nunca chegava ao usuário
+
+### 3 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 94aac3b | `nv-enavia.js:3719+3725` | `intent` descritivo + `generatePatch: true` |
+| 2 | 7c79e4d | `executor/src/index.js:1414+1464+1487` | `github_orchestration` no response |
+| 3 | 9774e17 | `docs/PR114_REVIEW.md` | Review 5/5 critérios |
+
+### Critérios validados: 5/5 ✅
+
+### Pós-merge obrigatório
+
+```powershell
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia && npx wrangler deploy --config wrangler.executor.generated.toml
+```
+
+---
+
 ## 2026-05-06 — PR113 — PR-IMPL — Fix Mode Dispatch
 
 - **Branch:** `claude/pr113-fix-mode-dispatch`
