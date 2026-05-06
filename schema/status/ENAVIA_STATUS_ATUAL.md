@@ -1,8 +1,28 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR114 — Fixes finais ciclo chat→Codex→PR)
-**Branch ativa:** `claude/pr114-fix-ciclo-chat-pr`
-**Última tarefa:** PR114 — Fechar ciclo chat→Codex→PR ✅
+**Data:** 2026-05-06 (atualizado após PR115 — Fix applyPatch usa código completo)
+**Branch ativa:** `claude/pr115-fix-apply-patch-original-code`
+**Última tarefa:** PR115 — Fix Gate 4: applyPatch recebe target_code_original ✅
+
+## Atualização PR115 — Fix applyPatch: target_code_original — 2026-05-06
+
+- Branch: `claude/pr115-fix-apply-patch-original-code`
+- PR GitHub: [#283](https://github.com/brunovasque/nv-enavia/pull/283) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR115.md` ✅
+- PR anterior: PR114 ✅ (mergeada — PR #282)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | 59f607c | `executor/src/index.js` | `originalCode` = `target_code_original` sem fallback para chunk |
+| 2 | 0410ff4 | `executor/src/index.js` | `apply_patch_error` + `patch_safe_error` no response |
+| 3 | 0436bb8 | `docs/PR115_REVIEW.md` | Review 6/7 critérios, APROVADO |
+
+### Critérios de conclusão: 6/7 ✅ (1 pendente de deploy)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
 ## Atualização PR114 — Fix Ciclo Chat→PR — 2026-05-06
 

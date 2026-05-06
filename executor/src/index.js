@@ -1412,12 +1412,23 @@ if (METHOD === "POST" && pathname === "/propose") {
 
   // PR108: se github_token_available=true e staging.ready=true, acionar ciclo GitHub
   let githubOrchestrationResult = null;
+  let applyPatchError = null;
+  let patchSafeError = null;
   if (action.github_token_available === true && staging?.ready === true) {
-    const originalCode = action.context?.target_code_original || action.context?.target_code || null;
+    const originalCode = action.context?.target_code_original || null;
     const patchList = execResult?.patch?.patchText || null;
 
     if (originalCode && Array.isArray(patchList) && patchList.length > 0) {
       const patchResult = applyPatch(originalCode, patchList);
+
+      if (!patchResult.ok) {
+        applyPatchError = {
+          ok: false,
+          reason: patchResult.reason || patchResult.error || 'APPLY_PATCH_FAILED',
+          applied_count: patchResult.applied?.length ?? 0,
+          failed_count: patchResult.failed?.length ?? 0,
+        };
+      }
 
       if (patchResult.ok && patchResult.applied.length > 0) {
         const targetWorkerId = action?.target?.workerId || action?.workerId || 'unknown';
@@ -1444,6 +1455,11 @@ if (METHOD === "POST" && pathname === "/propose") {
         }
 
         if (!patchSafeData?.ok) {
+          patchSafeError = {
+            ok: false,
+            error: patchSafeData?.error || 'WORKER_PATCH_SAFE_FAILED',
+            detail: patchSafeData,
+          };
           if (execIdForPropose) {
             await updateFlowStateKV(env, execIdForPropose, {
               github_orchestration: { ok: false, step: 'worker_patch_safe', error: patchSafeData?.error || 'STAGING_FAILED', detail: patchSafeData },
@@ -1485,6 +1501,8 @@ if (METHOD === "POST" && pathname === "/propose") {
       },
       ...(pipeline ? { pipeline } : {}),
       ...(githubOrchestrationResult ? { github_orchestration: githubOrchestrationResult } : {}),
+      ...(applyPatchError ? { apply_patch_error: applyPatchError } : {}),
+      ...(patchSafeError ? { patch_safe_error: patchSafeError } : {}),
     })
   );
 }

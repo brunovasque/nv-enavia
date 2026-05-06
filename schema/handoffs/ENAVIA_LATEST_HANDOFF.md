@@ -1,8 +1,57 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR114 — Fix Ciclo Chat→PR ✅ (branch: claude/pr114-fix-ciclo-chat-pr)
-**Para:** Deploy Worker + Executor pós-merge → teste E2E real do ciclo chat→PR
+**De:** PR115 — Fix applyPatch usa target_code_original ✅ (branch: claude/pr115-fix-apply-patch-original-code)
+**Para:** Deploy Worker + Executor pós-merge → configurar OPENAI_API_KEY + ENAVIA_WORKER binding → teste E2E
+
+## Handoff atual — PR115 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+3 commits na branch `claude/pr115-fix-apply-patch-original-code`:
+
+1. **fix: originalCode usa target_code_original** — `executor/src/index.js` linha 1416:
+   - ANTES: `action.context?.target_code_original || action.context?.target_code || null`
+   - DEPOIS: `action.context?.target_code_original || null`
+   - Causa raiz: `target_code` é chunk de 16k (offset 86443). `applyPatch` falhava com `ANCHOR_NOT_FOUND`
+     silenciosamente porque `async fetch(request, env, ctx) {` existe no arquivo completo mas não no chunk.
+
+2. **feat: apply_patch_error + patch_safe_error no response** — `executor/src/index.js`:
+   - `applyPatchError` capturado quando `!patchResult.ok`
+   - `patchSafeError` capturado quando `!patchSafeData?.ok`
+   - Ambos expostos no response HTTP como campos condicionais
+
+3. **docs: PR115_REVIEW.md** — 6/7 critérios, APROVADO
+
+### Cadeia completa de fixes (PR111→PR115)
+
+| PR | Fix | Arquivo | Estado |
+|----|-----|---------|--------|
+| PR111 | `use_codex: false` → `true` | nv-enavia.js | Mergeada ✅ |
+| PR112 | Schema Codex `{search, replace}` | executor/src/index.js | Mergeada ✅ |
+| PR113 | `mode: chat_execute_next` → `enavia_propose` | nv-enavia.js | Mergeada ✅ |
+| PR114 | `generatePatch: true` + `intent` + `github_orchestration` | ambos | Mergeada ✅ |
+| PR115 | `applyPatch` usa `target_code_original` + diagnóstico | executor/src/index.js | Aguarda merge |
+
+### Pendências após merge da PR115
+
+1. Merge da PR #283 por Bruno ← GATE
+2. `cd D:\nv-enavia && npx wrangler deploy` (Worker)
+3. `cd D:\nv-enavia\executor && npx wrangler deploy` (Executor)
+4. `wrangler secret put OPENAI_API_KEY --name enavia-executor` (sem isso Codex não roda)
+5. Configurar binding `ENAVIA_WORKER` em `wrangler.executor.generated.toml` (sem isso orchestrateGithubPR retorna `ENAVIA_WORKER_BINDING_ABSENT`)
+6. Teste E2E real: Bruno digita "melhora o log de erro do /audit" → "sim" → verificar PR aberta
+
+### Bloqueios operacionais conhecidos (pós-code-fixes)
+
+| Bloqueio | Sintoma | Ação necessária |
+|----------|---------|-----------------|
+| `OPENAI_API_KEY` ausente | `patches[] = []` → `staging.ready = false` → Gate 1 falha | `wrangler secret put OPENAI_API_KEY --name enavia-executor` |
+| `ENAVIA_WORKER` binding ausente | `orchestrateGithubPR` → `ENAVIA_WORKER_BINDING_ABSENT` | Editar `wrangler.executor.generated.toml` + redeploy |
+
+---
+
+
 
 ## Handoff atual — PR114 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
