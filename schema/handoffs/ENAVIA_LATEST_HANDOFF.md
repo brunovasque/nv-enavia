@@ -1,8 +1,55 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-05-05
-**De:** PR110 — Trigger em Linguagem Natural via Chat ✅ (branch: copilot/pr110-trigger-linguagem-natural)
-**Para:** PR111 — Deploy real supervisionado (após merge de PR110)
+**Data:** 2026-05-06
+**De:** PR112 — Fix Codex Patch Format ✅ (branch: claude/pr112-fix-codex-patch-format)
+**Para:** Deploy executor + verificar ciclo E2E chat→Codex→PR
+
+## Handoff atual — PR112 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+3 commits na branch `claude/pr112-fix-codex-patch-format`:
+
+1. **fix: schema systemLines** — `executor/src/index.js` linha 5688-5689:
+   - ANTES: `"anchor": { "match": string } | null,` + `"patch_text": string`
+   - DEPOIS: `"search": string,` + `"replace": string`
+   - Codex agora é instruído a retornar o formato que `applyPatch` espera
+
+2. **fix: consumer codexResult.patches** — `executor/src/index.js` linha 7265-7279:
+   - ANTES: `p.patch_text || p.patchText` + `p.anchor`
+   - DEPOIS: `p.search` + `p.replace`
+   - Patches construídos com `{ search, replace }` — compatível com `applyPatch`
+
+3. **docs: PR112_REVIEW.md** — 6/6 critérios, 5/5 invariantes atendidos
+
+### Issues corrigidos nesta sessão (completo)
+
+| Issue | Descrição | Fix |
+|-------|-----------|-----|
+| I3 | `use_codex: false` bloqueia Codex | PR111 ✅ mergeada |
+| I1 | Formato patch incompatível | PR112 ✅ (esta PR) |
+| Hotfix | "sim" ausente dos termos de aprovação | Commit `7e7ff47` em main |
+| Hotfix | `target.workerId` ausente no payload | Commit `8c60368` em main |
+
+### Issues ainda abertos
+
+| Issue | Descrição | Status |
+|-------|-----------|--------|
+| I2 | LLM não consultado para IMPROVEMENT_REQUEST | Não endereçado |
+| I4 | Sem teste E2E com PR real via chat | Não endereçado |
+| F1 | OPENAI_API_KEY não declarado no executor | Requer ação manual |
+| F3 | wrangler.executor.generated.toml commitado com IDs reais | Risco documentado |
+
+### Pendências antes do próximo ciclo
+
+1. Merge da PR #280 (PR112) por Bruno ← GATE
+2. `cd executor && npx wrangler deploy` ← deploy pós-merge
+3. `wrangler secret put OPENAI_API_KEY --name enavia-executor` ← sem isso Codex é ignorado
+4. Teste manual: Bruno digita "melhora o log do /audit" → "sim" → verificar PR aberta
+
+### Próxima sessão
+
+Após merge e deploy: verificar ciclo E2E real. Se `staging.ready = true` e PR aberta, o loop chat→Codex→PR está funcional.
 
 ## Handoff atual — PR110 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 

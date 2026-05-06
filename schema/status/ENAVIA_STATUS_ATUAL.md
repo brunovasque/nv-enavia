@@ -1,8 +1,55 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-05 (atualizado após PR110 — Trigger em Linguagem Natural via Chat ✅ APROVADO)
-**Branch ativa:** `copilot/pr110-trigger-linguagem-natural`
-**Última tarefa:** PR110 — Trigger em Linguagem Natural via Chat ✅
+**Data:** 2026-05-06 (atualizado após PR112 — Corrigir formato do patch Codex)
+**Branch ativa:** `claude/pr112-fix-codex-patch-format`
+**Última tarefa:** PR112 — Corrigir formato do patch gerado pelo Codex ✅
+
+## Atualização PR112 — Fix Codex Patch Format — 2026-05-06
+
+- Branch: `claude/pr112-fix-codex-patch-format`
+- PR GitHub: [#280](https://github.com/brunovasque/nv-enavia/pull/280) — aguarda merge
+- Tipo: PR-IMPL
+- Contrato: `docs/CONTRATO_PR112_FIX_CODEX_PATCH_FORMAT.md` ✅
+- PR anterior: PR111 ✅ (mergeada — `use_codex=true` ativo)
+
+### Commits executados
+
+| # | Hash | Entrega |
+|---|------|---------|
+| 1 | a43118d | `executor/src/index.js` — schema systemLines: `anchor/patch_text` → `search/replace` |
+| 2 | e94f11f | `executor/src/index.js` — consumer codexResult.patches: `p.patch_text/p.anchor` → `p.search/p.replace` |
+| 3 | f915118 | `docs/PR112_REVIEW.md` — 6/6 critérios, 5/5 invariantes, APROVADO |
+
+### Critérios de conclusão: 6/6 ✅
+
+- [x] `systemLines` não contém mais `anchor` nem `patch_text`
+- [x] `systemLines` contém `search` e `replace` no schema
+- [x] Consumer não usa mais `p.patch_text`, `p.patchText` nem `p.anchor`
+- [x] Consumer usa `p.search` e `p.replace`
+- [x] Nenhuma outra linha alterada fora do escopo
+- [x] PR aberta com `docs/PR112_REVIEW.md` gerado
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+## Hotfixes aplicados em main (2026-05-05)
+
+- `7e7ff47` — `"sim"` adicionado a `_CHAT_BRIDGE_APPROVAL_TERMS`
+- `8c60368` — `target.workerId` corrigido em `_dispatchExecuteNextFromChat`
+- `0c97f1a` — PR111: `use_codex=true` ativo
+
+## PR pendente de merge
+
+- PR #280 — PR112: Fix Codex patch format (`claude/pr112-fix-codex-patch-format`)
+
+## Próximo passo após merge
+
+```powershell
+cd D:\nv-enavia\executor
+npx wrangler deploy
+```
+E configurar: `wrangler secret put OPENAI_API_KEY --name enavia-executor`
+
+
 
 ## Atualização PR110 — Trigger em Linguagem Natural via Chat ✅ — 2026-05-05
 
