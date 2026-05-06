@@ -54,3 +54,11 @@
 - Deploy real supervisionado (após merge de PR110 por Bruno)
 - Enavia faz deploy da PR para ambiente TEST automaticamente
 - Bruno valida em TEST e aprova PROD
+
+## Status anterior PR108 — Motor de Patch + Orquestrador Self-Patch ✅ — mergeado via PR #275
+
+- Branch: `copilot/pr108-motor-patch-orquestrador`
+- PR GitHub: [#275](https://github.com/brunovasque/nv-enavia/pull/275) — mergeada em main ✅
+- Tipo: PR-IMPL (fundação do ciclo de autoevolução)
+- Contrato: `docs/CONTRATO_ENAVIA_MOTOR_PATCH_PR108.md` ✅
+- PR anterior validada: PR107 ✅ (mergeada como PR #274)

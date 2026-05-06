@@ -6368,6 +6368,7 @@ async function handleExecuteNext(request, env) {
     }
 
     // PR14 — Step B: Executor /propose (apenas execute_next)
+    // PR108: encadeia audit_verdict + audit_findings + require_live_read + use_codex
     const _proposePayload = {
       source: "nv-enavia", mode: "contract_execute_next", executor_action: "propose",
       ...buildExecutorTargetPayload(auditTargetResolution.workerId),
@@ -6380,6 +6381,10 @@ async function handleExecuteNext(request, env) {
       approved_by: body.approved_by || null,
       audit_id: auditId, timestamp: new Date().toISOString(),
       github_token_available: !!env?.GITHUB_TOKEN,
+      context: { require_live_read: true },
+      use_codex: !!env?.GITHUB_TOKEN,
+      audit_verdict: executorAuditResult?.data?.audit?.verdict || executorAuditResult?.data?.result?.verdict || null,
+      audit_findings: executorAuditResult?.data?.evidence || null,
     };
     const executorProposeResult = await callExecutorBridge(env, "/propose", _proposePayload);
     if (!executorProposeResult.ok) {
