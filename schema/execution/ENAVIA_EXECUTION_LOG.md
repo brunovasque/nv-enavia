@@ -1,5 +1,45 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR116 — PR-IMPL — Fix worker-patch-safe: env.ENAVIA_WORKER.fetch
+
+- **Branch:** `claude/pr116-fix-worker-patch-safe-binding`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR116.md` ✅
+- **PR anterior validada:** PR115 ✅ mergeada (PR #283)
+- **PR GitHub aberta:** [#284](https://github.com/brunovasque/nv-enavia/pull/284)
+
+### Objetivo
+
+Corrigir Gate 6: self-fetch via URL inválida substituído por `env.ENAVIA_WORKER.fetch`.
+Via Service Binding, `request.url = https://internal/propose`, logo `new URL('/worker-patch-safe', request.url)`
+gerava URL não resolvível. Resultado: `worker_patch_safe_parse_error` → Gate 6 sempre falha.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | ac0934a | `executor/src/index.js:1441-1442` | `env.ENAVIA_WORKER.fetch` em vez de `fetch(patchSafeUrl, ...)` |
+| 2 | 9a4ca98 | `docs/PR116_REVIEW.md` | Review 5/6 critérios |
+
+### Critérios validados: 5/6 (Critério 3 requer deploy)
+
+### Pós-merge obrigatório
+
+```toml
+# wrangler.executor.generated.toml
+[[services]]
+binding = "ENAVIA_WORKER"
+service = "nv-enavia"
+```
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+```
+
+---
+
 ## 2026-05-06 — PR115 — PR-IMPL — Fix applyPatch: target_code_original em vez de chunk
 
 - **Branch:** `claude/pr115-fix-apply-patch-original-code`

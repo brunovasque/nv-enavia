@@ -1,8 +1,27 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR115 — Fix applyPatch usa código completo)
-**Branch ativa:** `claude/pr115-fix-apply-patch-original-code`
-**Última tarefa:** PR115 — Fix Gate 4: applyPatch recebe target_code_original ✅
+**Data:** 2026-05-06 (atualizado após PR116 — Fix worker-patch-safe usa ENAVIA_WORKER binding)
+**Branch ativa:** `claude/pr116-fix-worker-patch-safe-binding`
+**Última tarefa:** PR116 — Fix Gate 6: worker-patch-safe via env.ENAVIA_WORKER.fetch ✅
+
+## Atualização PR116 — Fix worker-patch-safe binding — 2026-05-06
+
+- Branch: `claude/pr116-fix-worker-patch-safe-binding`
+- PR GitHub: [#284](https://github.com/brunovasque/nv-enavia/pull/284) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR116.md` ✅
+- PR anterior: PR115 ✅ (mergeada — PR #283)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | ac0934a | `executor/src/index.js` | `env.ENAVIA_WORKER.fetch` em vez de `fetch(patchSafeUrl, ...)` |
+| 2 | 9a4ca98 | `docs/PR116_REVIEW.md` | Review 5/6 critérios, APROVADO |
+
+### Critérios de conclusão: 5/6 ✅ (1 pendente de deploy)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
 ## Atualização PR115 — Fix applyPatch: target_code_original — 2026-05-06
 
