@@ -2548,20 +2548,8 @@ if (method === "POST" && pathname === "/worker-patch-safe") {
         );
       }
 
-      // 1) Validar candidato com /module-validate (sem exigir NV-MODULE)
-      // ✅ PR6: env.fetch() não existe em Workers — usar fetch() global
-      const validateResp = await fetch(
-        request.url.replace("/worker-patch-safe", "/module-validate"),
-        {
-          method: "POST",
-          body: JSON.stringify({
-            content: candidate,
-            expectModule: false,
-          }),
-        }
-      );
-
-      const validateData = await validateResp.json();
+      // PR118: internalizar validação — self-call HTTP bloqueado pelo Cloudflare (error 1042)
+      const validateData = await validateWorkerCode(candidate);
 
       // Se inválido, não grava staging, apenas devolve risco
       if (!validateData.ok) {
