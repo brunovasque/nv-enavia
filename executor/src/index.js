@@ -5847,11 +5847,12 @@ async function callCodexEngine(env, params) {
     const normalized = [];
     for (const rawPatch of patches) {
       if (!rawPatch || typeof rawPatch !== "object") continue;
-      const patchText =
-        rawPatch.patch_text ||
-        rawPatch.patchText ||
-        "";
-      if (!patchText) continue;
+
+      // PR120: Codex retorna {search, replace} — alinhado com applyPatch em patch-engine.js
+      const search = rawPatch.search || rawPatch.patch_text || rawPatch.patchText || "";
+      const replace = rawPatch.replace || "";
+
+      if (!search) continue;
 
       const anchor =
         rawPatch.anchor && typeof rawPatch.anchor.match === "string"
@@ -5866,11 +5867,14 @@ async function callCodexEngine(env, params) {
             "Patch sugerido pelo motor Codex."
         ),
         anchor,
-        patch_text: String(patchText),
+        search: String(search),
+        replace: String(replace),
+        patch_text: String(search), // retrocompatibilidade
         reason: String(
           rawPatch.reason ||
             "Patch sugerido via Codex (não aplicado automaticamente)."
         ),
+        raw: rawPatch,
       });
     }
 
