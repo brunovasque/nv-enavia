@@ -1,10 +1,42 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR112 — Fix Codex Patch Format ✅ (branch: claude/pr112-fix-codex-patch-format)
-**Para:** Deploy executor + verificar ciclo E2E chat→Codex→PR
+**De:** PR113 — Fix Mode Dispatch ✅ (branch: claude/pr113-fix-mode-dispatch)
+**Para:** Deploy nv-enavia Worker pós-merge + verificar ciclo E2E chat→Codex→PR
 
-## Handoff atual — PR112 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR113 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+2 commits na branch `claude/pr113-fix-mode-dispatch`:
+
+1. **fix: mode do dispatch** — `nv-enavia.js` linha 3718:
+   - ANTES: `mode: "chat_execute_next"` — mode inexistente no executor
+   - DEPOIS: `mode: "enavia_propose"` — mode reconhecido na linha 618 do executor
+   - O executor entra agora no pipeline correto com `use_codex=true`
+
+2. **docs: PR113_REVIEW.md** — 3/3 critérios, 4/4 invariantes atendidos
+
+### Fixes encadeados nesta sessão (PR111 → PR112 → PR113)
+
+| PR | Fix | Estado |
+|----|-----|--------|
+| PR111 | `use_codex: false` → `true` | Mergeada ✅ |
+| PR112 | Formato patch: `anchor/patch_text` → `search/replace` | Mergeada ✅ |
+| PR113 | Mode dispatch: `chat_execute_next` → `enavia_propose` | Aguarda merge |
+
+### Pendências antes do próximo ciclo
+
+1. Merge da PR #281 (PR113) por Bruno ← GATE
+2. `cd D:\nv-enavia && npx wrangler deploy` ← deploy do Worker pós-merge
+3. Teste manual: Bruno digita "melhora o log do /audit" → "sim" → verificar PR aberta
+
+### O que falta após PR113
+
+- Issues I2 (LLM não consultado para IMPROVEMENT_REQUEST) e I4 (sem teste E2E) não endereçados
+- `OPENAI_API_KEY` no executor ainda requer ação manual
+
+## Handoff anterior — PR112 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
