@@ -1411,6 +1411,7 @@ if (METHOD === "POST" && pathname === "/propose") {
       }
 
   // PR108: se github_token_available=true e staging.ready=true, acionar ciclo GitHub
+  let githubOrchestrationResult = null;
   if (action.github_token_available === true && staging?.ready === true) {
     const originalCode = action.context?.target_code_original || action.context?.target_code || null;
     const patchList = execResult?.patch?.patchText || null;
@@ -1460,6 +1461,8 @@ if (METHOD === "POST" && pathname === "/propose") {
             baseBranch: 'main',
           });
 
+          githubOrchestrationResult = orchestratorResult;
+
           if (execIdForPropose) {
             await updateFlowStateKV(env, execIdForPropose, {
               github_orchestration: orchestratorResult,
@@ -1481,6 +1484,7 @@ if (METHOD === "POST" && pathname === "/propose") {
         ...(canonicalMap ? { map: canonicalMap } : {}),
       },
       ...(pipeline ? { pipeline } : {}),
+      ...(githubOrchestrationResult ? { github_orchestration: githubOrchestrationResult } : {}),
     })
   );
 }
