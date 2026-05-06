@@ -1,5 +1,59 @@
 # ENAVIA — Execution Log
 
+## 2026-05-05 — PR109 — PR-FIX+PROVA — Fix Ciclo Codex + Prova Real End-to-End
+
+- **Branch:** `copilot/pr109-fix-ciclo-prova-real`
+- **Tipo:** PR-FIX+PROVA (correções bloqueadoras + prova real unificadas)
+- **Contrato:** `docs/CONTRATO_ENAVIA_FIX_PROVA_PR109.md` ✅
+- **PR anterior validada:** PR108 ✅ (branch copilot/pr108-motor-patch-orquestrador, PR #275)
+
+### Objetivo
+
+Corrigir os 3 problemas que impediam o ciclo Codex→GitHub de funcionar ponta a ponta (I1: formato de patches, I2: response sem pr_url, I5: OPENAI_API_KEY não declarado) e provar o ciclo completo com testes.
+
+### 4 Commits atômicos
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | d685219 | `executor/src/index.js` | Prompt callCodexEngine reformulado para pedir search+replace; normalizador filtra sem-search com skipped_no_search |
+| 2 | fa1877d | `executor/src/index.js` | githubOrchestrationResult capturado e surfaçado na response de /propose |
+| 3 | 9f32a92 | `executor/wrangler.toml` + `executor/README.md` | OPENAI_API_KEY e GITHUB_TOKEN documentados com instrução wrangler secret put |
+| 4 | 940b9a2 | `tests/pr109-ciclo-real.prova.test.js` | 38 testes em 3 grupos (Grupo 1: normalização Codex, Grupo 2: github_orchestration response, Grupo 3: e2e real opt-in) |
+
+### 3 Commits adicionais (fixes dos bloqueadores)
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 5 | 25648b6 | `executor/src/index.js` | Fix B2 — warning correto quando todos patches Codex sem search |
+| 6 | b698b6d | `docs/PR109_REVIEW.md` | Review brutalmente honesta — 2 bloqueadores (B1 e B2) |
+| 7 | 33c6965 | `executor/src/index.js` + `tests/pr109-ciclo-real.prova.test.js` | Fix B1 — pre-core capture, search text correto, Acorn inline, multipart fix |
+
+### Testes executados
+
+- `pr109-ciclo-real.prova.test.js` Grupo 1: 23/23 ✅
+- `pr109-ciclo-real.prova.test.js` Grupo 2: 15/15 ✅
+- `pr109-ciclo-real.prova.test.js` Grupo 3: 6/6 ✅ — PR real #277 aberta e fechada
+- `pr108-patch-engine.test.js`: 32/32 ✅ (regressão)
+- `pr108-code-chunker.test.js`: 25/25 ✅ (regressão)
+- `pr108-integration.test.js`: 34/34 ✅ (regressão)
+
+### Invariantes mantidos
+
+- merge_allowed=false ALWAYS_BLOCKED ✅
+- GITHUB_TOKEN nunca sai do Worker ✅
+- Sintaxe validada (Acorn inline) antes de qualquer commit GitHub ✅
+- Orquestrador acionado se staging.ready=true OU overridePatchList ✅
+- Patches Codex sem search → aviso explícito, não crash silencioso ✅
+
+### Resultado
+
+- 11/12 critérios de conclusão do contrato ✅ (falta aprovação humana)
+- 44/44 testes passando
+- PR real #277 aberta e fechada — ciclo e2e provado
+- Veredito: APROVADO PARA MERGE — aguarda revisão de Bruno
+
+---
+
 ## 2026-05-05 — PR108 — PR-IMPL — Motor de Patch + Orquestrador Self-Patch
 
 - **Branch:** `copilot/pr108-motor-patch-orquestrador`

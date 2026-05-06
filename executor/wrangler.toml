@@ -51,3 +51,11 @@ DEPLOY_WORKER_URL = "https://deploy-worker.brunovasque.workers.dev"
 ENAVIA_ENV = "production"
 OPENAI_CODE_MODEL = "gpt-5.2"
 TARGET_WORKER_NAME = "nv-enavia"
+
+# Secrets obrigatórios — configurar via CLI (não commitar valores):
+#   wrangler secret put OPENAI_API_KEY   ← necessário para callCodexEngine funcionar
+#   wrangler secret put GITHUB_TOKEN     ← necessário para orchestrateGithubPR funcionar
+#
+# Sem esses secrets configurados no Cloudflare, o ciclo Codex→GitHub é silenciosamente pulado.
+# OPENAI_API_KEY: chave da API OpenAI (modelo definido em OPENAI_CODE_MODEL acima)
+# GITHUB_TOKEN: Personal Access Token com permissão contents:write e pull-requests:write

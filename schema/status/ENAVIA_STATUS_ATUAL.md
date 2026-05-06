@@ -1,53 +1,50 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-05 (atualizado após PR108 — Motor de Patch + Orquestrador Self-Patch ✅ PR ABERTA)
-**Branch ativa:** `copilot/pr108-motor-patch-orquestrador`
-**Última tarefa:** PR108 — Motor de Patch + Orquestrador do Ciclo Self-Patch supervisionado ✅
+**Data:** 2026-05-05 (atualizado após PR109 — Fix Ciclo Codex + Prova Real ✅ APROVADO)
+**Branch ativa:** `copilot/pr109-fix-ciclo-prova-real`
+**Última tarefa:** PR109 — Fix do Ciclo Codex→GitHub + Prova Real End-to-End ✅
 
-## Atualização PR108 — Motor de Patch + Orquestrador Self-Patch ✅ — 2026-05-05
+## Atualização PR109 — Fix Ciclo Codex + Prova Real ✅ — 2026-05-05
 
-- Branch: `copilot/pr108-motor-patch-orquestrador`
-- PR GitHub: [#275](https://github.com/brunovasque/nv-enavia/pull/275) — aguarda revisão e aprovação de Bruno
-- Tipo: PR-IMPL (fundação do ciclo de autoevolução)
-- Contrato: `docs/CONTRATO_ENAVIA_MOTOR_PATCH_PR108.md` ✅
-- PR anterior validada: PR107 ✅ (mergeada como PR #274)
+- Branch: `copilot/pr109-fix-ciclo-prova-real`
+- PR GitHub: #276 (aguarda merge por Bruno)
+- Tipo: PR-FIX+PROVA (correções bloqueadoras + prova real unificadas)
+- Contrato: `docs/CONTRATO_ENAVIA_FIX_PROVA_PR109.md` ✅
+- PR anterior validada: PR108 ✅ (branch copilot/pr108-motor-patch-orquestrador, PR #275)
 
-### 6 commits atômicos executados
+### Commits executados
 
 | # | Hash | Entrega |
 |---|------|---------|
-| 1 | ab64d5f | `executor/src/patch-engine.js` — `applyPatch` com 6 invariantes de segurança |
-| 2 | 26fd384 | `executor/src/code-chunker.js` — `extractRelevantChunk` com estratégia de âncora |
-| 3 | c492b83 | `nv-enavia.js` — `audit_findings`, `require_live_read`, `use_codex` no `_proposePayload` |
-| 4 | c9e3ff9 | `executor/src/github-orchestrator.js` — `orchestrateGithubPR` ciclo branch→commit→PR |
-| 5 | 4d2af1b | `executor/src/index.js` — imports, chunking, auditFindings, orquestração pós-staging |
-| 6 | 2290372 | `tests/pr108-*.test.js` — 91 testes passando (32+25+34) |
+| 1 | d685219 | `executor/src/index.js` — prompt callCodexEngine solicita search+replace; normalizador filtra sem-search |
+| 2 | fa1877d | `executor/src/index.js` — githubOrchestrationResult capturado e surfaçado na response de /propose |
+| 3 | 9f32a92 | `executor/wrangler.toml` — OPENAI_API_KEY e GITHUB_TOKEN documentados |
+| 4 | 940b9a2 | `tests/pr109-ciclo-real.prova.test.js` — 3 grupos de testes |
+| 5 | 25648b6 | Fix B2 — warning correto quando todos patches Codex sem search |
+| 6 | b698b6d | Review PR109 — 2 bloqueadores identificados |
+| 7 | 33c6965 | Fix B1 — ciclo e2e real: pre-core capture, Acorn inline, multipart fix, search text correto |
 
-### Critérios de conclusão do contrato: 15/16 ✅ (1 pendente — aprovação humana)
+### Critérios de conclusão do contrato: 11/12 ✅ (1 pendente — aprovação humana)
 
-- [x] executor/src/patch-engine.js existe e exporta applyPatch
-- [x] applyPatch retorna erro para anchor não encontrado
-- [x] applyPatch retorna erro para candidato < 50% do original
-- [x] executor/src/code-chunker.js existe e exporta extractRelevantChunk
-- [x] _proposePayload inclui audit_findings, require_live_read: true, use_codex: true
-- [x] github_token_available consumido no handler de /propose
-- [x] executor/src/github-orchestrator.js existe e exporta orchestrateGithubPR
-- [x] Orquestrador só acionado quando staging.ready = true
-- [x] Branch gerada com padrão enavia/self-patch-{workerId}-{timestamp}
-- [x] callCodexEngine acionado quando use_codex: true no payload
-- [x] extractRelevantChunk usado antes de callCodexEngine
-- [x] Testes de unidade applyPatch — 32 cenários (mínimo 10) ✅
-- [x] Testes de unidade extractRelevantChunk — 25 cenários (mínimo 5) ✅
-- [x] Testes de integração ciclo completo (mock proxy GitHub) — 34 ✅
-- [x] Nenhum teste anterior (PR99–PR107) quebrado ✅
-- [ ] PR revisada e aprovada por Bruno antes do merge
+- [x] Prompt callCodexEngine solicita search e replace explicitamente
+- [x] Patches Codex sem search geram aviso visível (todos os cenários cobertos)
+- [x] github_orchestration presente na response quando PR aberta
+- [x] github_orchestration ausente quando orquestração não ocorreu
+- [x] OPENAI_API_KEY documentado em executor/wrangler.toml
+- [x] Instrução wrangler secret put documentada
+- [x] Grupo 1 passando: 23/23
+- [x] Grupo 2 passando: 15/15
+- [x] Grupo 3 passando: 6/6 — PR real #277 aberta + limpeza confirmada
+- [x] PR real de prova aberta: https://github.com/brunovasque/nv-enavia/pull/277
+- [x] Testes anteriores PR108: 91/91 ✅
+- [ ] PR revisada e aprovada por Bruno ← PENDENTE
 
-### Testes de regressão
+### Resultado geral: 44 testes passando, 0 falhas
 
-- pr105-cjs-esm-interop.test.js: 32/32 ✅
-- pr106-github-bridge-prova-real.prova.test.js: 19/19 ✅
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
-## Estado anterior — PR107 ✅ mergeada
+## Próxima PR planejada: PR110
 
-- PR GitHub #274: mergeada em main ✅
-- Deploy Worker internalizado, fallback HTTP, ENAVIA_WORKER binding
+- Trigger em linguagem natural via chat
+- Bruno digita no chat → Enavia entende, audita, propõe, abre PR automaticamente
+- Gate obrigatório: merge da PR109 por Bruno

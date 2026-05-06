@@ -1342,6 +1342,14 @@ if (METHOD === "POST" && pathname === "/propose") {
     }
   }
 
+  // PR109 B1: capturar antes do core (que pode modificar action) para
+  // garantir que overridePatchList e originalCode reflitam o payload original.
+  const _preCorePatchText = action?.patch?.patchText;
+  const _preCoreOverridePatchList = Array.isArray(_preCorePatchText) && _preCorePatchText.length > 0
+    ? _preCorePatchText : null;
+  const _preCoreGithubTokenAvailable = action.github_token_available === true;
+  const _preCoreOriginalCode = action.context?.target_code_original || action.context?.target_code || null;
+
   let execResult;
   try {
     execResult = await enaviaExecutorCore(env, action);
@@ -1410,10 +1418,14 @@ if (METHOD === "POST" && pathname === "/propose") {
         });
       }
 
-  // PR108: se github_token_available=true e staging.ready=true, acionar ciclo GitHub
-  if (action.github_token_available === true && staging?.ready === true) {
-    const originalCode = action.context?.target_code_original || action.context?.target_code || null;
-    const patchList = execResult?.patch?.patchText || null;
+  // PR108/PR109: ciclo GitHub — github_token_available=true e staging.ready=true
+  // PR109 B1: usa valores capturados ANTES do core (o core pode modificar action.patch)
+  const overridePatchList = _preCoreOverridePatchList;
+
+  let githubOrchestrationResult = null;
+  if (_preCoreGithubTokenAvailable && (staging?.ready === true || overridePatchList !== null)) {
+    const originalCode = _preCoreOriginalCode;
+    const patchList = execResult?.patch?.patchText || overridePatchList || null;
 
     if (originalCode && Array.isArray(patchList) && patchList.length > 0) {
       const patchResult = applyPatch(originalCode, patchList);
@@ -1423,32 +1435,34 @@ if (METHOD === "POST" && pathname === "/propose") {
         const githubRepo = env?.GITHUB_REPO || 'brunovasque/nv-enavia';
         const githubFilePath = env?.GITHUB_FILE_PATH || 'nv-enavia.js';
 
-        // PR108 B1: validar sintaxe via /worker-patch-safe antes de qualquer GitHub call
+        // PR108 B1 / PR109 B1: validação de sintaxe inline com Acorn
+        // (self-call via fetch não funciona em Cloudflare Workers — erro 1042 loop detected)
         let patchSafeData = null;
         try {
-          const patchSafeUrl = new URL('/worker-patch-safe', request.url).toString();
-          const patchSafeResp = await fetch(patchSafeUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              mode: 'stage',
-              workerId: targetWorkerId,
-              current: originalCode,
-              candidate: patchResult.candidate,
-            }),
-          });
-          patchSafeData = await patchSafeResp.json().catch(() => ({ ok: false, error: 'worker_patch_safe_parse_error' }));
-        } catch (patchSafeErr) {
-          patchSafeData = { ok: false, error: `worker_patch_safe_fetch_error: ${String(patchSafeErr)}` };
+          try {
+            acornParse(patchResult.candidate, { ecmaVersion: 'latest', sourceType: 'module' });
+          } catch (_) {
+            acornParse(patchResult.candidate, { ecmaVersion: 'latest', sourceType: 'script' });
+          }
+          // Sintaxe válida — salvar backup + candidate no KV (best-effort)
+          const _patchTs = Date.now();
+          try {
+            await env.ENAVIA_GIT.put(`WORKER_BACKUP:${targetWorkerId}:${_patchTs}`, originalCode);
+            await env.ENAVIA_GIT.put(`WORKER_CANDIDATE:${targetWorkerId}:${_patchTs}`, patchResult.candidate);
+          } catch (_kvErr) { /* KV failure não bloqueia a orquestração */ }
+          patchSafeData = { ok: true };
+        } catch (parseErr) {
+          patchSafeData = { ok: false, error: `SYNTAX_ERROR: ${String(parseErr.message || parseErr)}` };
         }
 
         if (!patchSafeData?.ok) {
+          // PR109: capturar resultado de staging falho para surfaçar na response
+          githubOrchestrationResult = { ok: false, step: 'worker_patch_safe', error: patchSafeData?.error || 'STAGING_FAILED' };
           if (execIdForPropose) {
             await updateFlowStateKV(env, execIdForPropose, {
-              github_orchestration: { ok: false, step: 'worker_patch_safe', error: patchSafeData?.error || 'STAGING_FAILED', detail: patchSafeData },
+              github_orchestration: githubOrchestrationResult,
             });
           }
-          // candidato invalido ou staging falhou — nao acionar GitHub
         } else {
           const orchestratorResult = await orchestrateGithubPR(env, {
             workerId: targetWorkerId,
@@ -1460,6 +1474,8 @@ if (METHOD === "POST" && pathname === "/propose") {
             baseBranch: 'main',
           });
 
+          // PR109: capturar resultado da orquestração para surfaçar na response
+          githubOrchestrationResult = orchestratorResult;
           if (execIdForPropose) {
             await updateFlowStateKV(env, execIdForPropose, {
               github_orchestration: orchestratorResult,
@@ -1481,6 +1497,8 @@ if (METHOD === "POST" && pathname === "/propose") {
         ...(canonicalMap ? { map: canonicalMap } : {}),
       },
       ...(pipeline ? { pipeline } : {}),
+      // PR109: surfaçar resultado da orquestração GitHub quando ocorreu
+      ...(githubOrchestrationResult !== null ? { github_orchestration: githubOrchestrationResult } : {}),
     })
   );
 }
@@ -5531,10 +5549,27 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
     throw new Error(`Falha ao buscar snapshot do worker (${resp.status}): ${text}`);
   }
 
-  const code = await resp.text();
+  const rawBody = await resp.text();
+
+  if (!rawBody || !rawBody.trim()) {
+    throw new Error("Snapshot do worker está vazio");
+  }
+
+  // PR109: Cloudflare retorna multipart mesmo com Accept: application/javascript
+  // para workers com múltiplos arquivos. Extrair só o conteúdo JS.
+  let code = rawBody;
+  if (rawBody.startsWith('--')) {
+    const headersEnd = rawBody.indexOf('\n\n');
+    if (headersEnd !== -1) {
+      let content = rawBody.slice(headersEnd + 2);
+      const lastBoundary = content.lastIndexOf('\n--');
+      if (lastBoundary !== -1) content = content.slice(0, lastBoundary);
+      code = content.trim();
+    }
+  }
 
   if (!code || !code.trim()) {
-    throw new Error("Snapshot do worker está vazio");
+    throw new Error("Conteúdo JavaScript vazio após parsing multipart");
   }
 
   return {
@@ -5680,22 +5715,27 @@ async function callCodexEngine(env, params) {
       "Você recebe snapshot de Worker Cloudflare (JavaScript) e um objetivo técnico.",
       "Você deve devolver SOMENTE JSON válido, no formato:",
       "{",
-      '  \"ok\": true,',
-      '  \"patches\": [',
+      '  "ok": true,',
+      '  "patches": [',
       "    {",
-      '      \"title\": string,',
-      '      \"description\": string,',
-      '      \"anchor\": { \"match\": string } | null,',
-      '      \"patch_text\": string',
+      '      "title": "string — título da mudança",',
+      '      "anchor": { "match": "string — trecho único próximo à mudança" },',
+      '      "search": "string — linha exata a substituir (deve existir EXATAMENTE no código fornecido e ser única)",',
+      '      "replace": "string — novo conteúdo que substitui search (pode ser múltiplas linhas)",',
+      '      "patch_text": "string — descrição humana da mudança (opcional, para documentação)",',
+      '      "reason": "string — por que essa mudança é necessária"',
       "    }",
       "  ],",
-      '  \"notes\": string[] | null,',
-      '  \"tests\": [',
-      '    { \"description\": string, \"curl\": string }',
-      "  ]",
+      '  "notes": ["string"] | null,',
+      '  "tests": [{ "description": "string", "curl": "string" }]',
       "}",
       "",
-      "Não explique nada fora desse JSON. Não use markdown."
+      "REGRAS CRÍTICAS — search e replace:",
+      "- search DEVE ser uma string que existe EXATAMENTE no código fornecido (copia literal)",
+      "- search DEVE ser única no arquivo — não pode aparecer em múltiplos lugares",
+      "- replace é o novo conteúdo que substitui search integralmente",
+      "- Se não encontrar trecho único para search, omita esse patch — não invente",
+      "- Não use markdown. Não explique fora do JSON."
     ];
 
     if (contract) {
@@ -5785,13 +5825,19 @@ async function callCodexEngine(env, params) {
     }
 
     const normalized = [];
+    const skippedNoSearch = [];
     for (const rawPatch of patches) {
       if (!rawPatch || typeof rawPatch !== "object") continue;
-      const patchText =
-        rawPatch.patch_text ||
-        rawPatch.patchText ||
-        "";
-      if (!patchText) continue;
+
+      const search = typeof rawPatch.search === "string" ? rawPatch.search : null;
+      const replace = typeof rawPatch.replace === "string" ? rawPatch.replace : null;
+      const patchText = rawPatch.patch_text || rawPatch.patchText || null;
+
+      // PR109: search é obrigatório para applyPatch funcionar
+      if (!search) {
+        skippedNoSearch.push(String(rawPatch.title || "sem-título"));
+        continue;
+      }
 
       const anchor =
         rawPatch.anchor && typeof rawPatch.anchor.match === "string"
@@ -5800,17 +5846,12 @@ async function callCodexEngine(env, params) {
 
       normalized.push({
         title: String(rawPatch.title || "Patch codex"),
-        description: String(
-          rawPatch.description ||
-            intentText ||
-            "Patch sugerido pelo motor Codex."
-        ),
+        description: String(rawPatch.description || intentText || "Patch sugerido pelo motor Codex."),
         anchor,
-        patch_text: String(patchText),
-        reason: String(
-          rawPatch.reason ||
-            "Patch sugerido via Codex (não aplicado automaticamente)."
-        ),
+        search,
+        replace: replace !== null ? replace : "",
+        ...(patchText ? { patch_text: String(patchText) } : {}),
+        reason: String(rawPatch.reason || "Patch sugerido via Codex."),
       });
     }
 
@@ -5818,6 +5859,7 @@ async function callCodexEngine(env, params) {
       ok: normalized.length > 0,
       patches: normalized,
       notes: Array.isArray(parsed?.notes) ? parsed.notes : [],
+      ...(skippedNoSearch.length > 0 ? { skipped_no_search: skippedNoSearch } : {}),
       raw: parsed,
     };
   } catch (err) {
@@ -7260,10 +7302,15 @@ if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
     });
 
     if (codexResult && codexResult.ok && Array.isArray(codexResult.patches)) {
+      // PR109: avisar patches Codex sem search (skippados no normalizador)
+      if (Array.isArray(codexResult.skipped_no_search) && codexResult.skipped_no_search.length > 0) {
+        result.warnings.push(`CODEX_PATCHES_SKIPPED_NO_SEARCH:${codexResult.skipped_no_search.join(",")}`);
+        result.steps.push("codex_patches_skipped_no_search");
+      }
       for (const p of codexResult.patches) {
         if (!p || typeof p !== "object") continue;
-        const patchText = p.patch_text || p.patchText || "";
-        if (!patchText) continue;
+        // search é obrigatório — patches sem search já foram filtrados no normalizador
+        if (typeof p.search !== "string") continue;
 
         patches.push({
           target: "cloudflare_worker",
@@ -7274,16 +7321,23 @@ if (wantCodex && (env?.OPENAI_API_KEY || env?.CODEX_API_KEY)) {
             p.anchor && typeof p.anchor.match === "string"
               ? { match: p.anchor.match }
               : null,
-          patch_text: patchText,
-          reason:
-            p.reason ||
-            "Patch sugerido via Codex (não aplicado automaticamente).",
+          search: p.search,
+          replace: typeof p.replace === "string" ? p.replace : "",
+          ...(p.patch_text ? { patch_text: p.patch_text } : {}),
+          reason: p.reason || "Patch sugerido via Codex.",
         });
       }
     } else if (codexResult && !codexResult.ok) {
-      const reason = codexResult.reason || "unknown";
-      result.warnings.push(`CODEX_ENGINE_NO_PATCH:${reason}`);
-      result.steps.push("codex_engine_no_patch");
+      // PR109 B2: quando todos patches Codex não têm search, ok=false mas skipped_no_search está populado
+      // Emitir warning informativo em vez do genérico CODEX_ENGINE_NO_PATCH:unknown
+      if (Array.isArray(codexResult.skipped_no_search) && codexResult.skipped_no_search.length > 0) {
+        result.warnings.push(`CODEX_PATCHES_SKIPPED_NO_SEARCH:${codexResult.skipped_no_search.join(",")}`);
+        result.steps.push("codex_patches_skipped_no_search");
+      } else {
+        const reason = codexResult.reason || "unknown";
+        result.warnings.push(`CODEX_ENGINE_NO_PATCH:${reason}`);
+        result.steps.push("codex_engine_no_patch");
+      }
 
       // debug leve pra gente enxergar o que o modelo mandou
       if (codexResult.raw) {
