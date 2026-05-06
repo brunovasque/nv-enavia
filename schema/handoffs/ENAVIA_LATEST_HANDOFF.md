@@ -1,10 +1,48 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR118 — Internalizar validateWorkerCode, eliminar self-call HTTP ✅ (branch: fix/pr118-worker-patch-safe-internal-validate)
-**Para:** Deploy Worker + Executor pós-merge → configurar OPENAI_API_KEY → teste E2E real
+**De:** PR119 — action edit-worker + validateWorkerCode em edit-worker ✅ (branch: fix/pr119-action-edit-worker-dispatch)
+**Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
 
-## Handoff atual — PR118 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR119 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+3 commits na branch `fix/pr119-action-edit-worker-dispatch`:
+
+1. **fix: action edit-worker** — `nv-enavia.js` linha 3719:
+   - `action: "edit-worker"` adicionado ao `_proposePayload`
+   - Sem este campo o executor retornava `403 Invalid action: undefined`
+
+2. **fix: validateWorkerCode em edit-worker** — `executor/src/index.js` bloco `if (action === "edit-worker")`:
+   - `fetch(request.url.replace("/engineer-core", "/module-validate"), ...)` → `await validateWorkerCode(workerContent)`
+   - Elimina error 1042 do Cloudflare (loop detection) neste handler
+
+3. **docs: PR119_REVIEW.md** — 5/7 critérios, APROVADO
+
+### Estado dos gates após PR119
+
+| Gate | Condição | Estado esperado pós-deploy |
+|------|----------|---------------------------|
+| 1 | staging.ready=true | Requer OPENAI_API_KEY |
+| 2 | originalCode existe | ✅ (PR115) |
+| 3 | patchList não-vazio | Requer OPENAI_API_KEY |
+| 4 | applyPatch.ok=true | ✅ (PR115) |
+| 5 | patchResult.applied>0 | ✅ (PR115) |
+| 6 | worker-patch-safe ok=true | ✅ (PR118) |
+| 7 | action válida no executor | ✅ (PR119) |
+
+### Pendências após merge da PR119
+
+1. Merge da PR #287 por Bruno ← GATE
+2. `wrangler secret put OPENAI_API_KEY --name enavia-executor`
+3. `cd D:\nv-enavia && npx wrangler deploy` (Worker)
+4. `cd D:\nv-enavia\executor && npx wrangler deploy` (Executor)
+5. Teste E2E: chat → "melhora o log de erro do /audit" → "sim" → verificar `github_orchestration.pr_url`
+
+---
+
+## Handoff anterior — PR118 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
