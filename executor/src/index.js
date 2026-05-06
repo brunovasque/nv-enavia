@@ -1413,7 +1413,7 @@ if (METHOD === "POST" && pathname === "/propose") {
   // PR108: se github_token_available=true e staging.ready=true, acionar ciclo GitHub
   let githubOrchestrationResult = null;
   if (action.github_token_available === true && staging?.ready === true) {
-    const originalCode = action.context?.target_code_original || action.context?.target_code || null;
+    const originalCode = action.context?.target_code_original || null;
     const patchList = execResult?.patch?.patchText || null;
 
     if (originalCode && Array.isArray(patchList) && patchList.length > 0) {
