@@ -2115,18 +2115,9 @@ if (method === "POST" && pathname === "/engineer-core") {
       const workerContent = body.content;
 
       // 1) Validar sintaxe + riscos
-      // ✅ PR6: env.fetch() não existe em Workers — usar fetch() global
-      const validateResp = await fetch(
-        request.url.replace("/engineer-core", "/module-validate"),
-        {
-          method: "POST",
-          body: JSON.stringify({
-            content: workerContent,
-            expectModule: false
-          })
-        }
-      );
-      const validateData = await validateResp.json();
+      // PR119: internalizar validação — self-call HTTP bloqueado pelo Cloudflare (error 1042)
+      // validateWorkerCode() disponível desde PR118
+      const validateData = await validateWorkerCode(workerContent);
 
       // Se inválido, retornar RISK REPORT
       if (!validateData.ok) {

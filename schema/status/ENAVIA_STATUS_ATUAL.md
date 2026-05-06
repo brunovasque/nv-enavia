@@ -1,8 +1,30 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR118 — Internalizar validateWorkerCode no executor)
-**Branch ativa:** `fix/pr118-worker-patch-safe-internal-validate`
-**Última tarefa:** PR118 — Fix Gate 6 definitivo: eliminar self-call HTTP, internalizar validação ✅
+**Data:** 2026-05-06 (atualizado após PR119 — action edit-worker + validateWorkerCode em edit-worker)
+**Branch ativa:** `fix/pr119-action-edit-worker-dispatch`
+**Última tarefa:** PR119 — action edit-worker no dispatch + eliminar self-call em edit-worker ✅
+
+## Atualização PR119 — action edit-worker + self-call edit-worker — 2026-05-06
+
+- Branch: `fix/pr119-action-edit-worker-dispatch`
+- PR GitHub: [#287](https://github.com/brunovasque/nv-enavia/pull/287) — aguarda merge
+- Tipo: PR-IMPL (Worker + Executor)
+- Contrato: `docs/CONTRATO_PR119.md` ✅
+- PR anterior: PR118 ✅ (mergeada — PR #286)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | efadfea | `nv-enavia.js` | `action: "edit-worker"` no `_proposePayload` |
+| 2 | 692e3f2 | `executor/src/index.js` | self-call `edit-worker` → `validateWorkerCode(workerContent)` |
+| 3 | 3b98a86 | `docs/PR119_REVIEW.md` | Review 5/7 critérios, APROVADO |
+
+### Critérios de conclusão: 5/7 ✅ (2 pendentes de deploy)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR118 — Internalizar validateWorkerCode — 2026-05-06
 

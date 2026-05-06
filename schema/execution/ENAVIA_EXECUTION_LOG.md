@@ -1,5 +1,37 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR119 — PR-IMPL — action edit-worker + validateWorkerCode em edit-worker
+
+- **Branch:** `fix/pr119-action-edit-worker-dispatch`
+- **Tipo:** PR-IMPL (Worker + Executor)
+- **Contrato:** `docs/CONTRATO_PR119.md` ✅
+- **PR anterior validada:** PR118 ✅ mergeada (PR #286)
+- **PR GitHub aberta:** [#287](https://github.com/brunovasque/nv-enavia/pull/287)
+
+### Objetivo
+
+Fix 1: `_dispatchExecuteNextFromChat` enviava payload sem `action` → executor retornava 403.
+Fix 2: handler `edit-worker` usava self-call HTTP bloqueado pelo Cloudflare (error 1042).
+
+### 3 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | efadfea | `nv-enavia.js:3719` | `action: "edit-worker"` no `_proposePayload` |
+| 2 | 692e3f2 | `executor/src/index.js` bloco edit-worker | `validateWorkerCode(workerContent)` |
+| 3 | 3b98a86 | `docs/PR119_REVIEW.md` | Review 5/7 critérios |
+
+### Pós-merge obrigatório
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy
+cd D:\nv-enavia\executor && npx wrangler deploy
+# Teste E2E: chat → "melhora o /audit" → "sim" → verificar github_orchestration.pr_url
+```
+
+---
+
 ## 2026-05-06 — PR118 — PR-IMPL — Internalizar validateWorkerCode no executor
 
 - **Branch:** `fix/pr118-worker-patch-safe-internal-validate`
