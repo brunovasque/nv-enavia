@@ -1,8 +1,31 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR124 — normalizar quebras de linha no indexOf)
-**Branch ativa:** `fix/pr124-patch-engine-normalize-newlines`
-**Última tarefa:** PR124 — normalização de quebras de linha no search/candidate antes do indexOf ✅
+**Data:** 2026-05-06 (atualizado após PR125 — GitHub source + keep_names)
+**Branch ativa:** `feat/pr125-github-source-keep-names`
+**Última tarefa:** PR125 — ler source GitHub em vez do bundle CF API + keep_names no wrangler.toml ✅
+
+## Atualização PR125 — GitHub source + keep_names — 2026-05-06
+
+- Branch: `feat/pr125-github-source-keep-names`
+- PR GitHub: [#293](https://github.com/brunovasque/nv-enavia/pull/293) — aguarda merge
+- Tipo: PR-IMPL (Executor-only + Worker-config)
+- Contrato: `docs/CONTRATO_PR125.md` ✅
+- PR anterior: PR124 ✅ (mergeada — PR #292)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | fd6a989 | `wrangler.toml` | `keep_names = true` na seção `[esbuild]` |
+| 2 | 25ec093 | `executor/src/index.js` | função `_fetchWorkerSource` |
+| 3 | 6cbb7f3 | `executor/src/index.js` | `/propose` usa `_fetchWorkerSource` com fallback CF API |
+| 4 | d2d6776 | `docs/PR125_REVIEW.md` | Review 4/8 critérios, APROVADO |
+
+### Critérios de conclusão: 4/8 ✅ (4 pendentes de deploy)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR124 — normalização de quebras de linha — 2026-05-06
 

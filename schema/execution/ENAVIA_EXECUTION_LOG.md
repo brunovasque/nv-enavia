@@ -1,5 +1,47 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR125 — PR-IMPL — GitHub source + keep_names
+
+- **Branch:** `feat/pr125-github-source-keep-names`
+- **Tipo:** PR-IMPL (Executor-only + Worker-config)
+- **Contrato:** `docs/CONTRATO_PR125.md` ✅
+- **PR anterior validada:** PR124 ✅ mergeada (PR #292)
+- **PR GitHub aberta:** [#293](https://github.com/brunovasque/nv-enavia/pull/293)
+
+### Objetivo
+
+Causa raiz confirmada do ANCHOR_NOT_FOUND: o executor lia o bundle compilado pelo esbuild (~790k chars)
+via CF API. `handleAudit` não existe no bundle. O Codex gerava search com o nome original mas o
+`indexOf` falhava. Fix: ler source do GitHub (legível, ~350k chars) com fallback CF API.
+
+### 4 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | fd6a989 | `wrangler.toml` | `keep_names = true` na seção `[esbuild]` |
+| 2 | 25ec093 | `executor/src/index.js` | função `_fetchWorkerSource` (GitHub → CF fallback) |
+| 3 | 6cbb7f3 | `executor/src/index.js` | `/propose` usa `_fetchWorkerSource`, chunking usa source real |
+| 4 | d2d6776 | `docs/PR125_REVIEW.md` | Review 4/8 critérios |
+
+### Critérios verificados
+
+| # | Critério | Status |
+|---|----------|--------|
+| 1 | keep_names = true no wrangler.toml | ✅ |
+| 2 | _fetchWorkerSource presente no executor | ✅ |
+| 3 | api.github.com/repos dentro da função | ✅ |
+| 4 | snapshot_chars ~350k (pós-deploy) | ⚠️ |
+| 5 | search com nome real do source | ⚠️ |
+| 6 | apply_patch_error ausente | ⚠️ |
+| 7 | E2E: pr_url não null | ⚠️ |
+| 8 | merge_allowed=false intocado | ✅ |
+
+### Veredito
+
+APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+---
+
 ## 2026-05-06 — PR124 — PR-IMPL — normalização de quebras de linha no indexOf
 
 - **Branch:** `fix/pr124-patch-engine-normalize-newlines`
