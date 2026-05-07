@@ -1,33 +1,50 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-07
-**De:** PR127 — Codex 1 patch + search 2-4 linhas únicas ✅ (branch: fix/pr127-codex-one-patch-unique-search)
+**De:** PR128 — GitHub source propagado para engineer mode + log de fallback ✅ (branch: fix/pr128-fetchsource-github-first)
 **Para:** push + abertura PR GitHub → merge → teste E2E
 
-## Handoff atual — PR127 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
+## Handoff atual — PR128 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
 
-### O que foi feito (PR127)
+### O que foi feito (PR128)
 
-2 commits na branch `fix/pr127-codex-one-patch-unique-search`:
+3 commits de código + 1 docs na branch `fix/pr128-fetchsource-github-first`:
 
-1. **fix: systemLines do callCodexEngine** — `executor/src/index.js`:
-   - Regra 1: "APENAS 1 (UM) patch por request" — Codex limitado a 1 item em patches
-   - Regra 2: "search deve ter 2 a 4 linhas de contexto" — elimina ambiguous match
-   - Resultado deploy: Codex gerou 1 patch com search de 4 linhas (✅ sem AMBIGUOUS_MATCH)
+1. **fix: cfFallbackCode em `_fetchWorkerSource`** — `executor/src/index.js`:
+   - Assinatura expandida: `async function _fetchWorkerSource(env, targetWorkerId, targetRepo, cfFallbackCode = null)`
+   - Early return se `cfFallbackCode` presente: evita CF API duplicada
 
-2. **docs: PR127_REVIEW.md** — 6/8 critérios, APROVADO
+2. **fix: requireLiveRead GitHub-first com log** — `executor/src/index.js`:
+   - Passa `snap.code` como `cfFallbackCode` → sem 2ª chamada CF API
+   - `else` e `catch` explícitos com `console.warn("[PR128] GitHub fallback...")`
+
+3. **fix: engineer mode usa `target_code_original` injetado** — `executor/src/index.js`:
+   - `_injectedCode = raw?.context?.target_code_original || null`
+   - Se disponível, pula `fetchCurrentWorkerSnapshot` completamente
+   - `context_proof_local` usa `snap?.etag || null` (safe access quando snap=null)
+
+4. **docs: PR128_REVIEW.md** — 8/9 critérios, APROVADO
 
 ### Deploy confirmado
 
-- Versão: `ae95e427-7003-4e13-a24f-010e01731866`
-- Teste: `POST /propose` → Codex patch com search 4 linhas, sem erros
-- Sem AMBIGUOUS_MATCH, sem CODEX_ENGINE_NO_PATCH
+- Versão: `b2019017-31c8-4280-9762-9dba268d15c1`
+- Teste: `POST /propose + require_live_read=true + generatePatch=true`
+- `context_proof.source: "github"` ✅
+- `context_summary.snapshot_chars: 374087` ✅ (era SEMPRE 796366 antes)
+- `apply_patch_error: null`, `result.ok: true` ✅
+
+### Impacto
+
+| Métrica | Antes | Depois |
+|---------|-------|--------|
+| CF API calls (GitHub ok) | 2 | 1 |
+| `context_summary.snapshot_chars` | 796366 | 374087 |
+| Visibilidade falha GitHub | silenciosa | `console.warn` + `context_proof` |
 
 ### Próximos passos
 
 1. Bruno faz merge desta PR no GitHub
 2. Teste E2E: chat → "melhora o log de erro do /audit" → "sim" → verificar `pr_url` não null
-3. Se pr_url null: verificar se search 4-linhas aparece exatamente 1 vez em nv-enavia.js
 
 ---
 
