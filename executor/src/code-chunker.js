@@ -101,6 +101,19 @@ function _extractSearchTokens(intent) {
   const routeMatches = intent.match(/\/[\w/-]+/g) || [];
   tokens.push(...routeMatches);
 
+  // PR126: expandir tokens de rota para incluir padrões de implementação
+  // Ex: "/audit" → também busca "runEnaviaSelfAudit", "pathname.*audit"
+  const routeHandlerMap = {
+    "/audit": ["runEnaviaSelfAudit", "listAuditEvents", "audit"],
+    "/propose": ["runEnaviaSelfAudit", "callExecutorBridge", "propose"],
+    "/chat": ["handleChatLLM", "chat"],
+    "/github": ["executeGithubOperation", "githubBridge"],
+  };
+  for (const route of routeMatches) {
+    const extras = routeHandlerMap[route] || [];
+    tokens.push(...extras);
+  }
+
   // Funções/variáveis camelCase (mínimo 4 chars): callCodexEngine, applyPatch
   const camelMatches = intent.match(/\b[a-z][a-zA-Z0-9]{3,}\b/g) || [];
   tokens.push(...camelMatches);
