@@ -5606,6 +5606,51 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
 }
 
 // ============================================================
+// PR125: _fetchWorkerSource — GitHub primeiro, CF API como fallback
+// O bundle CF não preserva nomes de função (esbuild renomeia/inlina).
+// O source do GitHub tem as funções originais — o Codex gera anchors corretos.
+// ============================================================
+async function _fetchWorkerSource(env, targetWorkerId, targetRepo) {
+  const repo = targetRepo || `brunovasque/${targetWorkerId}`;
+  const branch = "main";
+  const fileMap = { "nv-enavia": "nv-enavia.js" };
+  const fileName = fileMap[targetWorkerId] || `${targetWorkerId}.js`;
+
+  // Tentativa 1: GitHub API (source legível)
+  try {
+    const githubToken = env.GITHUB_TOKEN || env.GIT_TOKEN || null;
+    const githubUrl = `https://api.github.com/repos/${repo}/contents/${fileName}?ref=${branch}`;
+    const ghResp = await fetch(githubUrl, {
+      headers: {
+        Accept: "application/vnd.github.v3.raw",
+        ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+        "User-Agent": "enavia-executor",
+      },
+    });
+    if (ghResp.ok) {
+      const source = await ghResp.text();
+      if (source && source.length > 100) {
+        return { code: source, source: "github", repo, file: fileName };
+      }
+    }
+  } catch (_) {}
+
+  // Fallback: CF API (bundle compilado)
+  try {
+    const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${targetWorkerId}`;
+    const cfResp = await fetch(cfUrl, {
+      headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` },
+    });
+    if (cfResp.ok) {
+      const bundle = await cfResp.text();
+      return { code: bundle, source: "cloudflare_api", repo: null, file: null };
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+// ============================================================
 // 🔍 LISTAGEM DINÂMICA DE SCRIPTS DA CONTA CLOUDFLARE
 // Fonte única — usado por resolveScriptName (antes estava dentro do fetch handler)
 // ============================================================
