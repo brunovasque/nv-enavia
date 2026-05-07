@@ -1,10 +1,34 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-07
-**De:** PR127 — Codex 1 patch + search 2-4 linhas únicas ✅ (branch: fix/pr127-codex-one-patch-unique-search)
-**Para:** push + abertura PR GitHub → merge → teste E2E
+**De:** DIAG-PR128 — _fetchWorkerSource inconsistente ✅ (branch: diag/pr128-fetchsource-inconsistency)
+**Para:** PR128 — fix GitHub-first + log explícito (fix/pr128-fetchsource-github-first)
 
-## Handoff atual — PR127 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
+## Handoff atual — DIAG-PR128 ✅ CONCLUÍDO
+
+### Root cause
+
+`_fetchWorkerSource` falha silenciosamente quando GitHub API não responde.
+3 bugs em `executor/src/index.js` linhas 1147-1227:
+
+1. Silent catch na linha 1215 → sem log, sem visibilidade
+2. Ordem invertida: CF API primeiro (1148), GitHub depois (1202) → GitHub nunca é fallback de CF
+3. Chamada CF duplicada dentro de `_fetchWorkerSource` quando GitHub falha
+
+### Próximo passo
+
+PR128 — PR-IMPL — `fix/pr128-fetchsource-github-first`:
+1. Reordenar: GitHub ANTES de CF API no requireLiveRead
+2. Adicionar `console.warn` quando GitHub falha (visível via wrangler tail)
+3. Evitar chamada CF duplicada passando `snap.code` como fallback para `_fetchWorkerSource`
+
+### Diagnóstico completo
+
+`docs/DIAG_FETCHSOURCE.md`
+
+---
+
+## Handoff anterior — PR127 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
 
 ### O que foi feito (PR127)
 

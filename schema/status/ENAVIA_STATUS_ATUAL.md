@@ -1,8 +1,47 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-07 (atualizado após PR127 — Codex 1 patch + search 2-4 linhas únicas)
-**Branch ativa:** `fix/pr127-codex-one-patch-unique-search`
-**Última tarefa:** PR127 — Codex limitado a 1 patch + search com contexto de 2-4 linhas ✅
+**Data:** 2026-05-07 (atualizado após DIAG PR128 — _fetchWorkerSource inconsistente)
+**Branch ativa:** `diag/pr128-fetchsource-inconsistency`
+**Última tarefa:** DIAG-PR128 — root cause de _fetchWorkerSource alternando GitHub/CF bundle ✅
+
+## Atualização DIAG-PR128 — _fetchWorkerSource inconsistente — 2026-05-07
+
+- Branch: `diag/pr128-fetchsource-inconsistency`
+- Tipo: PR-DIAG (read-only)
+- PR anterior: PR127 ✅ (mergeada — PR #295)
+
+### Root cause identificado
+
+3 bugs estruturais em `executor/src/index.js`:
+
+**Bug 1 (principal)** — Silent catch na linha 1215:
+- `_fetchWorkerSource` falha silenciosamente → `target_code_original` permanece como CF bundle
+- Sem log → sem visibilidade da causa
+
+**Bug 2** — Ordem incorreta de tentativa:
+- CF API é chamado PRIMEIRO (linha 1148), GitHub é tentado DEPOIS (linha 1202)
+- Quando CF API falha, GitHub nunca é tentado
+- Deveria ser o oposto: GitHub primeiro, CF API como fallback
+
+**Bug 3** — Chamada CF duplicada:
+- `_fetchWorkerSource` faz sua PRÓPRIA chamada CF quando GitHub falha
+- `/propose` já tinha feito CF snapshot na linha 1148 — 2 chamadas CF idênticas
+
+### "current" no /worker-patch-safe
+
+`current = action.context.target_code_original` (linha 1466)
+- GitHub sucesso → 374087 chars (source legível) ✅
+- GitHub falha → 796366 chars (CF bundle esbuild) ❌
+
+### Arquivo do diagnóstico
+
+`docs/DIAG_FETCHSOURCE.md`
+
+### Próximo passo
+
+PR128 — PR-IMPL — reordenar GitHub antes de CF + log explícito de falha
+
+
 
 ## Atualização PR127 — Codex 1 patch + search único — 2026-05-07
 

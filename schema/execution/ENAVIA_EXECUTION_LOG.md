@@ -1,5 +1,36 @@
 # ENAVIA — Execution Log
 
+## 2026-05-07 — DIAG-PR128 — PR-DIAG — _fetchWorkerSource inconsistente
+
+- **Branch:** `diag/pr128-fetchsource-inconsistency`
+- **Tipo:** PR-DIAG (read-only — zero alterações de runtime)
+- **Contrato:** inline (diagnóstico solicitado diretamente)
+- **PR anterior validada:** PR127 ✅ mergeada (PR #295)
+
+### Sintoma
+
+`snapshot_chars` alternando entre `374087` (GitHub source) e `796366` (CF bundle) 
+em requests diferentes para POST /propose com require_live_read=true.
+
+### 3 Bugs identificados
+
+| Bug | Linha | Descrição |
+|-----|-------|-----------|
+| 1 (principal) | 1215 | `catch (_gh_err) {}` silencia qualquer falha do GitHub sem log |
+| 2 | 1147-1202 | CF API é chamado ANTES do GitHub — ordem invertida vs intenção |
+| 3 | 5657-5667 | `_fetchWorkerSource` faz 2ª chamada CF API quando GitHub falha (duplicata de linha 1148) |
+
+### "current" no /worker-patch-safe
+
+- GitHub sucesso: `current` = 374087 chars (source legível) ✅
+- GitHub falha: `current` = 796366 chars (CF bundle esbuild) ❌
+
+### Arquivo de diagnóstico
+
+`docs/DIAG_FETCHSOURCE.md`
+
+---
+
 ## 2026-05-07 — PR127 — PR-IMPL — Codex 1 patch + search 2-4 linhas únicas
 
 - **Branch:** `fix/pr127-codex-one-patch-unique-search`
