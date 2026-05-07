@@ -1,5 +1,49 @@
 # ENAVIA — Execution Log
 
+## 2026-05-07 — PR127 — PR-IMPL — Codex 1 patch + search 2-4 linhas únicas
+
+- **Branch:** `fix/pr127-codex-one-patch-unique-search`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR127.md` ✅
+- **PR anterior validada:** PR126 ✅ mergeada (PR #294)
+- **PR GitHub:** aguarda push
+
+### Objetivo
+
+Eliminar AMBIGUOUS_MATCH causado por Codex gerar 2 patches com search de 1 linha genérica
+que aparece 13 vezes em nv-enavia.js. Fix: systemLines obriga 1 patch com search 2-4 linhas.
+
+### 2 Commits (commit 2 no-op — logs DIAG_CODEX nunca existiram neste branch)
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 4a61e60 | `executor/src/index.js` | 5 systemLines — 1 patch obrigatório + search 2-4 linhas |
+| 2 | 8d01de1 | `docs/PR127_REVIEW.md` | Review 6/8 critérios, deploy OK |
+
+### Deploy
+
+- Versão: `ae95e427-7003-4e13-a24f-010e01731866`
+- Comando: `npx wrangler deploy --config wrangler.executor.generated.toml` ✅
+
+### Critérios verificados
+
+| # | Critério | Status |
+|---|----------|--------|
+| 1 | "APENAS 1 (UM) patch" no systemLines | ✅ |
+| 2 | "2 a 4 linhas de contexto" no systemLines | ✅ |
+| 3 | [DIAG_CODEX] ausente em index.js | ✅ (never existed) |
+| 4 | patchText.length === 1 | ⚠️ Parcial (total=2; Codex=1) |
+| 5 | patch.search com 2+ linhas | ✅ (4 linhas) |
+| 6 | apply_patch_error ausente | ✅ |
+| 7 | E2E: pr_url não null | ⚠️ Pendente |
+| 8 | merge_allowed=false intocado | ✅ |
+
+### Veredito
+
+APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+---
+
 ## 2026-05-07 — PR126 — PR-IMPL — chunker route tokens + anti-alucinação
 
 - **Branch:** `fix/pr126-chunker-route-tokens-anti-hallucination`
