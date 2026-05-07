@@ -1,10 +1,82 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR124 — normalização de quebras de linha no indexOf ✅ (branch: fix/pr124-patch-engine-normalize-newlines)
-**Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
+**De:** PR125 — GitHub source + keep_names ✅ (branch: feat/pr125-github-source-keep-names)
+**Para:** Deploy executor pós-merge → teste E2E ciclo completo
 
-## Handoff atual — PR124 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR125 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+4 commits na branch `feat/pr125-github-source-keep-names`:
+
+1. **feat: keep_names=true no wrangler.toml** — seção `[esbuild]`:
+   - `keep_names = true` instrui o esbuild a preservar nomes de funções e classes no bundle
+   - Impacto: deploys futuros do `nv-enavia` worker preservarão `handleAudit`, `handleChat` etc.
+   - Efeito imediato: leve aumento no bundle size (~1-2%)
+
+2. **feat: `_fetchWorkerSource` no executor** — `executor/src/index.js` linha 5632:
+   - Tenta GitHub API primeiro (`Accept: application/vnd.github.v3.raw`) → retorna source legível
+   - Fallback: CF API (bundle compilado) se GitHub falhar
+   - Usa `env.GITHUB_TOKEN` existente (já declarado como secret em wrangler.toml)
+
+3. **feat: `/propose` usa `_fetchWorkerSource`** — bloco `requireLiveRead` (linha 1198+):
+   - Após CF snap (fallback), tenta GitHub source
+   - Se GitHub ok: sobrescreve `target_code_original`, `target_code`, `target_code_source`, `context_proof.snapshot_chars`
+   - Chunking para Codex agora usa `_codeForChunking = action.context.target_code_original` (source real)
+
+4. **docs: PR125_REVIEW.md** — 4/8 critérios, APROVADO
+
+### Por que isso resolve ANCHOR_NOT_FOUND
+
+Diagnóstico confirmou:
+- CF bundle (~790k chars): `handleAudit` não existe (esbuild renomeia/inlina)
+- GitHub source (~350k chars): `async function handleAudit(request, env) {` existe
+- Com GitHub source, Codex vê a função real → gera `search` correto → `indexOf` encontra → PR aberta
+
+### Estado do pipeline após PR125
+
+| Etapa | Fix | PR |
+|-------|-----|-----|
+| use_codex: true | ✅ | PR111 |
+| Schema Codex {search, replace} | ✅ | PR112 |
+| mode: enavia_propose | ✅ | PR113 |
+| generatePatch: true + github_orchestration | ✅ | PR114 |
+| applyPatch usa target_code_original | ✅ | PR115 |
+| validateWorkerCode internalizada | ✅ | PR118 |
+| action: edit-worker no dispatch | ✅ | PR119 |
+| Parser callCodexEngine lê search/replace | ✅ | PR120 |
+| Prompt Codex: exemplos concretos de search | ✅ | PR122 |
+| Loop retry + validação LLM + alerta Bruno | ✅ | PR123 |
+| Normalização de quebras de linha no indexOf | ✅ | PR124 |
+| GitHub source + keep_names | ✅ | PR125 |
+
+### Próximos passos obrigatórios pós-merge
+
+```powershell
+cd D:\nv-enavia
+npx wrangler deploy --config wrangler.executor.generated.toml  # executor
+```
+
+Teste direto:
+```bash
+curl -X POST https://enavia-executor.brunovasque.workers.dev/propose \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"enavia_propose","action":"edit-worker","intent":"melhora o log de erro do /audit","use_codex":true,"github_token_available":true,"target":{"system":"cloudflare_worker","workerId":"nv-enavia"},"context":{"require_live_read":true}}'
+# Esperado: context_proof.snapshot_chars ~350k, apply_patch_error ausente
+```
+
+Teste E2E:
+```
+Bruno: "melhora o log de erro do /audit"
+Enavia: "Entendi. Posso auditar e abrir uma PR em /audit. Confirma?"
+Bruno: "sim"
+→ github_orchestration.pr_url não null na tentativa 1
+```
+
+---
+
+## Handoff anterior — PR124 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 

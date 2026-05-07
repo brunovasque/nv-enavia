@@ -1196,10 +1196,29 @@ if (METHOD === "POST" && pathname === "/propose") {
 
       // PR108: preservar cópia completa para applyPatch (antes do chunking)
       action.context.target_code_original = snap.code;
+
+      // PR125: tentar GitHub como fonte primária (source legível vs bundle esbuild compilado)
+      // O bundle CF não tem nomes de função originais — GitHub tem o source real
+      try {
+        const _ghResult = await _fetchWorkerSource(env, targetWorkerId, action.target?.repo || null);
+        if (_ghResult?.code && _ghResult.source === "github") {
+          action.context.target_code_original = _ghResult.code;
+          action.context.target_code = _ghResult.code;
+          action.context.target_code_source = "github";
+          action.context.target_code_len = _ghResult.code.length;
+          action.context.target_code_lines = _ghResult.code.split(/\r?\n/).length;
+          action.context_proof.snapshot_chars = _ghResult.code.length;
+          action.context_proof.snapshot_lines = _ghResult.code.split(/\r?\n/).length;
+          action.context_proof.source = "github";
+          action.context_proof.github_file = _ghResult.file;
+        }
+      } catch (_gh_err) {}
+
       // PR108: se use_codex=true e código > 16K, extrair chunk relevante para Codex
-      if (action.use_codex === true && snap.code.length > 16000) {
+      const _codeForChunking = action.context.target_code_original;
+      if (action.use_codex === true && _codeForChunking.length > 16000) {
         const intentForChunk = String(action.intent || action.prompt || '');
-        const chunkResult = extractRelevantChunk(snap.code, intentForChunk);
+        const chunkResult = extractRelevantChunk(_codeForChunking, intentForChunk);
         action.context.target_code = chunkResult.chunk;
         action.context.target_code_chunked = true;
         action.context.target_code_chunk_offset = chunkResult.offset;
@@ -5603,6 +5622,51 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
     last_modified: resp.headers.get("last-modified") || null,
     fetched_at_ms: Date.now(),
   };
+}
+
+// ============================================================
+// PR125: _fetchWorkerSource — GitHub primeiro, CF API como fallback
+// O bundle CF não preserva nomes de função (esbuild renomeia/inlina).
+// O source do GitHub tem as funções originais — o Codex gera anchors corretos.
+// ============================================================
+async function _fetchWorkerSource(env, targetWorkerId, targetRepo) {
+  const repo = targetRepo || `brunovasque/${targetWorkerId}`;
+  const branch = "main";
+  const fileMap = { "nv-enavia": "nv-enavia.js" };
+  const fileName = fileMap[targetWorkerId] || `${targetWorkerId}.js`;
+
+  // Tentativa 1: GitHub API (source legível)
+  try {
+    const githubToken = env.GITHUB_TOKEN || env.GIT_TOKEN || null;
+    const githubUrl = `https://api.github.com/repos/${repo}/contents/${fileName}?ref=${branch}`;
+    const ghResp = await fetch(githubUrl, {
+      headers: {
+        Accept: "application/vnd.github.v3.raw",
+        ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+        "User-Agent": "enavia-executor",
+      },
+    });
+    if (ghResp.ok) {
+      const source = await ghResp.text();
+      if (source && source.length > 100) {
+        return { code: source, source: "github", repo, file: fileName };
+      }
+    }
+  } catch (_) {}
+
+  // Fallback: CF API (bundle compilado)
+  try {
+    const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${targetWorkerId}`;
+    const cfResp = await fetch(cfUrl, {
+      headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` },
+    });
+    if (cfResp.ok) {
+      const bundle = await cfResp.text();
+      return { code: bundle, source: "cloudflare_api", repo: null, file: null };
+    }
+  } catch (_) {}
+
+  return null;
 }
 
 // ============================================================
