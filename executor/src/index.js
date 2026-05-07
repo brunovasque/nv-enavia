@@ -5629,7 +5629,7 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
 // O bundle CF não preserva nomes de função (esbuild renomeia/inlina).
 // O source do GitHub tem as funções originais — o Codex gera anchors corretos.
 // ============================================================
-async function _fetchWorkerSource(env, targetWorkerId, targetRepo) {
+async function _fetchWorkerSource(env, targetWorkerId, targetRepo, cfFallbackCode = null) {
   const repo = targetRepo || `brunovasque/${targetWorkerId}`;
   const branch = "main";
   const fileMap = { "nv-enavia": "nv-enavia.js" };
@@ -5654,7 +5654,12 @@ async function _fetchWorkerSource(env, targetWorkerId, targetRepo) {
     }
   } catch (_) {}
 
-  // Fallback: CF API (bundle compilado)
+  // PR128: usar snap.code já disponível se passado como parâmetro (evita CF API dupla)
+  if (cfFallbackCode) {
+    return { code: cfFallbackCode, source: "cloudflare_api_cached", repo: null, file: null };
+  }
+
+  // Fallback: CF API (bundle compilado — só se não tiver snap.code disponível)
   try {
     const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${targetWorkerId}`;
     const cfResp = await fetch(cfUrl, {
