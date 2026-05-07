@@ -7043,15 +7043,20 @@ if (mode === "engineer") {
             );
           }
     
-          // ✅ caminho canônico (igual o /audit): snapshot live
-          const snap = await fetchCurrentWorkerSnapshot({
-            accountId,
-            apiToken,
-            scriptName,
-          });
-    
-          // ✅ workerCode LOCAL (não depende de escopo externo)
-          workerCode = String(snap?.code || "");
+          // PR128: usar target_code_original se disponível (pode ser GitHub source)
+          // Evita nova chamada CF API quando /propose requireLiveRead já buscou o source
+          const _injectedCode = raw?.context?.target_code_original || null;
+          let snap = null;
+          if (_injectedCode) {
+            workerCode = _injectedCode;
+          } else {
+            snap = await fetchCurrentWorkerSnapshot({
+              accountId,
+              apiToken,
+              scriptName,
+            });
+            workerCode = String(snap?.code || "");
+          }
           if (!workerCode.trim()) {
             throw new Error("Snapshot vazio do worker-alvo");
           }
@@ -7075,9 +7080,9 @@ if (mode === "engineer") {
             snapshot_fingerprint: `fnv1a32:${fnv1a32(workerCode)}`,
             snapshot_chars,
             snapshot_lines,
-            cf_etag: snap.etag,
-            cf_last_modified: snap.last_modified,
-            fetched_at_ms: snap.fetched_at_ms,
+            cf_etag: snap?.etag || null,
+            cf_last_modified: snap?.last_modified || null,
+            fetched_at_ms: snap?.fetched_at_ms || null,
           };
 
           context_used = true;
