@@ -1,10 +1,70 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-05-06
-**De:** PR125 — GitHub source + keep_names ✅ (branch: feat/pr125-github-source-keep-names)
-**Para:** Deploy executor pós-merge → teste E2E ciclo completo
+**Data:** 2026-05-07
+**De:** PR126 — chunker route tokens + anti-alucinação ✅ (branch: fix/pr126-chunker-route-tokens-anti-hallucination)
+**Para:** wrangler login → deploy executor → teste E2E
 
-## Handoff atual — PR125 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR126 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+3 commits na branch `fix/pr126-chunker-route-tokens-anti-hallucination`:
+
+1. **fix: routeHandlerMap no chunker** — `executor/src/code-chunker.js`:
+   - Causa raiz da alucinação: chunk de 16k não continha handler real de `/audit`
+   - `routeHandlerMap` expande tokens de rota para tokens de implementação real:
+     - `/audit` → `["runEnaviaSelfAudit", "listAuditEvents", "audit"]`
+     - `/propose` → `["runEnaviaSelfAudit", "callExecutorBridge", "propose"]`
+     - `/chat` → `["handleChatLLM", "chat"]`
+   - O chunker agora busca `runEnaviaSelfAudit` além de `/audit`, centrando o chunk no código real
+
+2. **fix: prompt anti-alucinação** — `executor/src/index.js` systemLines:
+   - ANTES: "use a linha de assinatura da função (ex: 'async function handleAudit(')"
+   - DEPOIS: "use APENAS código que aparece literalmente no trecho fornecido"
+   - Nova linha: "PROIBIDO: gerar search com nomes não visíveis (ex: handleAudit, handlePropose)"
+
+3. **docs: PR126_REVIEW.md** — 4/8 critérios, APROVADO
+
+### Diagnóstico que originou este PR
+
+`docs/DIAG_PR125_GITHUB.md`:
+- GitHub source funciona: `snapshot_chars: 374087`, `source: "github"` ✅
+- `patch[0].search: "  async fetch(request, env, ctx) {"` → encontrado (1 ocorrência) ✅
+- `patch[1].search: "async function handleAudit(request, env) {"` → NÃO EXISTE ❌
+- `grep -c "handleAudit" nv-enavia.js` → `0`
+- `grep -c "runEnaviaSelfAudit" nv-enavia.js` → `2` (import + chamada)
+
+### Bloqueador de deploy
+
+Sessão Cloudflare expirou: `Authentication error [code: 10000]`.
+
+```powershell
+npx wrangler login
+# OU:
+$env:CLOUDFLARE_API_TOKEN = "<token-novo>"
+npx wrangler deploy --config wrangler.executor.generated.toml
+```
+
+### Próximos passos pós-merge + deploy
+
+```bash
+curl -X POST https://enavia-executor.brunovasque.workers.dev/propose \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"enavia_propose","action":"edit-worker","intent":"melhora o log de erro do /audit","use_codex":true,"github_token_available":true,"generatePatch":true,"target":{"system":"cloudflare_worker","workerId":"nv-enavia"},"context":{"require_live_read":true}}'
+# Esperado: patch[].search sem "handleAudit", apply_patch_error ausente
+```
+
+Teste E2E:
+```
+Bruno: "melhora o log de erro do /audit"
+Enavia: confirma?
+Bruno: "sim"
+→ github_orchestration.pr_url não null
+```
+
+---
+
+## Handoff anterior — PR125 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
