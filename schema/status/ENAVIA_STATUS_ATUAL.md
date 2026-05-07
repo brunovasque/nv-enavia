@@ -1,8 +1,29 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR122 — prompt Codex: exemplos concretos de search)
-**Branch ativa:** `fix/pr122-codex-prompt-exemplo-search`
-**Última tarefa:** PR122 — prompt Codex usa exemplos concretos em vez de restrição abstrata ✅
+**Data:** 2026-05-06 (atualizado após PR123 — loop de validação + retry + alerta Bruno)
+**Branch ativa:** `feat/pr123-validation-loop-retry-bruno`
+**Última tarefa:** PR123 — loop de validação com retry inteligente e alerta Bruno ✅
+
+## Atualização PR123 — loop de validação + retry — 2026-05-06
+
+- Branch: `feat/pr123-validation-loop-retry-bruno`
+- PR GitHub: [#291](https://github.com/brunovasque/nv-enavia/pull/291) — aguarda merge
+- Tipo: PR-IMPL (Worker-only)
+- Contrato: `docs/CONTRATO_PR123.md` ✅
+- PR anterior: PR122 ✅ (mergeada — PR #290)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | ed0a290 | `nv-enavia.js` | `_dispatchExecuteNextFromChat`: loop 5 tentativas + `_gerarPossívelSolução` |
+| 2 | 9102b31 | `docs/PR123_REVIEW.md` | Review 8/8 critérios, APROVADO |
+
+### Critérios de conclusão: 8/8 ✅ (todos verificados estaticamente)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR122 — prompt Codex exemplos concretos — 2026-05-06
 

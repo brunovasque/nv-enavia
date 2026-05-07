@@ -1,5 +1,30 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR123 — PR-IMPL — loop de validação + retry + alerta Bruno
+
+- **Branch:** `feat/pr123-validation-loop-retry-bruno`
+- **Tipo:** PR-IMPL (Worker-only)
+- **Contrato:** `docs/CONTRATO_PR123.md` ✅
+- **PR anterior validada:** PR122 ✅ mergeada (PR #290)
+- **PR GitHub aberta:** [#291](https://github.com/brunovasque/nv-enavia/pull/291)
+
+### Objetivo
+
+Ciclo anterior: dispatch simples (1 tentativa) → retorna sem verificar patch.
+PR123: loop de até 5 tentativas com intent adaptativo, feedback ao executor, validação LLM
+do candidate e comunicado para Bruno com diagnóstico após esgotamento.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | ed0a290 | `nv-enavia.js` `_dispatchExecuteNextFromChat` | loop MAX_ATTEMPTS=5 + feedbackForExecutor + comunicado_bruno + _gerarPossívelSolução |
+| 2 | 9102b31 | `docs/PR123_REVIEW.md` | Review 8/8 critérios |
+
+### Critérios: 8/8 ✅ (todos verificados estaticamente)
+
+---
+
 ## 2026-05-06 — PR122 — PR-IMPL — prompt Codex: exemplos concretos de search
 
 - **Branch:** `fix/pr122-codex-prompt-exemplo-search`

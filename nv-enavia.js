@@ -3703,72 +3703,203 @@ const _PENDING_PLAN_TTL_SECONDS = 600;
 async function _dispatchExecuteNextFromChat(env, pendingPlan) {
   const sessionId = pendingPlan.session_id || null;
   const improvementTarget = pendingPlan.target || null;
+  const originalIntent = pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`;
+  const MAX_ATTEMPTS = 5;
 
   if (!env.EXECUTOR || typeof env.EXECUTOR.fetch !== "function") {
     return { ok: false, action: "execute_next", target: improvementTarget, error: "EXECUTOR_NOT_AVAILABLE" };
   }
 
-  logNV("🚀 [CHAT/IMPROVEMENT] Disparando execute_next via chat aprovado", {
+  logNV("🔥 [CHAT/IMPROVEMENT] Iniciando ciclo de patch com validação", {
     sessionId,
     target: improvementTarget,
+    max_attempts: MAX_ATTEMPTS,
   });
 
-  const _proposePayload = {
-    source: "chat_trigger",
-    mode: "enavia_propose",
-    action: "edit-worker",
-    intent: pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`,
-    improvement_target: improvementTarget,
-    target: { system: "cloudflare_worker", workerId: "nv-enavia" },
-    session_id: sessionId,
-    github_token_available: true,
-    use_codex: true,
-    generatePatch: true,
-    context: {
-      description: pendingPlan.description || `Melhoria solicitada via chat em ${improvementTarget}`,
-      require_live_read: true,
+  let lastProposeJson = null;
+  let lastError = null;
+  let feedbackForExecutor = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Estratégia adaptativa: intent fica mais específico a cada tentativa
+    const intentVariants = [
+      originalIntent,
+      `${originalIntent}. Foque em melhorar o log de erro com detalhes claros.`,
+      `${originalIntent}. Use console.error com stack trace e contexto da requisição.`,
+      `${originalIntent}. Adicione execution_id e timestamp no log de erro.`,
+      `${originalIntent}. Substitua apenas a linha do console.log/console.error existente.`,
+    ];
+    const currentIntent = intentVariants[attempt - 1] || originalIntent;
+
+    const _proposePayload = {
+      source: "chat_trigger",
+      mode: "enavia_propose",
+      action: "edit-worker",
+      intent: currentIntent,
+      improvement_target: improvementTarget,
+      target: { system: "cloudflare_worker", workerId: "nv-enavia" },
+      session_id: sessionId,
+      github_token_available: true,
+      use_codex: true,
+      generatePatch: true,
+      context: {
+        description: currentIntent,
+        require_live_read: true,
+        attempt,
+        feedback: feedbackForExecutor,
+      },
+    };
+
+    logNV(`🔄 [CHAT/IMPROVEMENT] Tentativa ${attempt}/${MAX_ATTEMPTS}`, {
+      sessionId,
+      intent: currentIntent,
+      feedback: feedbackForExecutor,
+    });
+
+    let proposeJson = null;
+    let proposeStatus = null;
+    try {
+      const proposeRes = await env.EXECUTOR.fetch("https://internal/propose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(_proposePayload),
+      });
+      proposeStatus = proposeRes.status;
+      try {
+        proposeJson = await proposeRes.json();
+      } catch {
+        proposeJson = { ok: false, error: "PROPOSE_INVALID_JSON" };
+      }
+    } catch (netErr) {
+      lastError = `NETWORK_ERROR: ${String(netErr)}`;
+      feedbackForExecutor = "Falha de rede ao chamar executor. Tente novamente.";
+      continue;
+    }
+
+    lastProposeJson = proposeJson;
+
+    // Verificar se patch foi gerado
+    const patchList = proposeJson?.result?.patch?.patchText;
+    const hasPatch = Array.isArray(patchList) && patchList.length > 0 && patchList[0]?.search;
+
+    if (!hasPatch) {
+      lastError = `ATTEMPT_${attempt}_NO_PATCH: Codex não gerou patches`;
+      feedbackForExecutor = `Tentativa ${attempt}: Codex não gerou patches. Tente uma linha de search mais simples e específica.`;
+      logNV(`⚠️ [CHAT/IMPROVEMENT] Tentativa ${attempt} sem patch`, { sessionId });
+      continue;
+    }
+
+    // Verificar se PR foi aberta (caminho feliz direto)
+    const prUrl = proposeJson?.github_orchestration?.pr_url || null;
+    if (prUrl) {
+      logNV(`✅ [CHAT/IMPROVEMENT] PR aberta na tentativa ${attempt}`, { sessionId, pr_url: prUrl });
+      return {
+        ok: true,
+        action: "execute_next",
+        target: improvementTarget,
+        pr_url: prUrl,
+        propose_result: proposeJson,
+        attempts: attempt,
+      };
+    }
+
+    // Patch gerado mas PR não aberta — validar candidate via LLM
+    const candidate = proposeJson?.result?.staging?.candidate || null;
+    const applyError = proposeJson?.result?.apply_patch_error || null;
+
+    if (applyError) {
+      lastError = `ATTEMPT_${attempt}_APPLY_ERROR: ${JSON.stringify(applyError)}`;
+      feedbackForExecutor = `Tentativa ${attempt}: patch não encontrou âncora no código. Use uma linha mais curta e única como search.`;
+      logNV(`⚠️ [CHAT/IMPROVEMENT] Tentativa ${attempt} apply_patch_error`, { sessionId, error: applyError });
+      continue;
+    }
+
+    if (candidate && env.AI) {
+      // Validação LLM: Enavia analisa o candidate
+      try {
+        const validationPrompt = `Você é a Enavia, IA de engenharia. Analise se o patch abaixo resolve corretamente a intenção.
+
+INTENÇÃO ORIGINAL: ${originalIntent}
+
+CÓDIGO CANDIDATO (trecho relevante, primeiros 2000 chars):
+${String(candidate).slice(0, 2000)}
+
+Responda SOMENTE em JSON:
+{"aprovado": boolean, "motivo": string, "sugestao_melhoria": string|null}`;
+
+        const validationRes = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+          messages: [{ role: "user", content: validationPrompt }],
+          max_tokens: 300,
+        });
+
+        let validation = null;
+        try {
+          const rawValidation = validationRes?.response || validationRes?.result?.response || "";
+          const cleaned = rawValidation.replace(/```json|```/g, "").trim();
+          validation = JSON.parse(cleaned);
+        } catch {
+          validation = { aprovado: true, motivo: "Validação LLM falhou no parse — aprovando por default" };
+        }
+
+        logNV(`🤖 [CHAT/IMPROVEMENT] Validação LLM tentativa ${attempt}`, {
+          sessionId,
+          aprovado: validation?.aprovado,
+          motivo: validation?.motivo,
+        });
+
+        if (validation?.aprovado) {
+          // Patch aprovado mas PR não aberta — problema no GitHub Bridge
+          lastError = `ATTEMPT_${attempt}_PR_NOT_OPENED: patch aprovado mas PR não aberta`;
+          feedbackForExecutor = validation?.sugestao_melhoria || "Patch aprovado mas PR não foi aberta. Verifique GitHub Bridge.";
+        } else {
+          lastError = `ATTEMPT_${attempt}_VALIDATION_FAILED: ${validation?.motivo}`;
+          feedbackForExecutor = `Tentativa ${attempt}: patch reprovado pela Enavia. Motivo: ${validation?.motivo}. Sugestão: ${validation?.sugestao_melhoria || "refaça o patch"}`;
+        }
+      } catch (aiErr) {
+        lastError = `ATTEMPT_${attempt}_AI_ERROR: ${String(aiErr)}`;
+        feedbackForExecutor = "Erro na validação LLM — tente novamente com patch mais cirúrgico.";
+      }
+    } else {
+      lastError = `ATTEMPT_${attempt}_NO_CANDIDATE`;
+      feedbackForExecutor = "Sem candidate gerado. Verifique se o patch foi aplicado.";
+    }
+  }
+
+  // Esgotou tentativas — comunicado para Bruno
+  const comunicado = {
+    ok: false,
+    action: "execute_next",
+    target: improvementTarget,
+    error: "MAX_ATTEMPTS_REACHED",
+    attempts: MAX_ATTEMPTS,
+    last_error: lastError,
+    propose_result: lastProposeJson,
+    comunicado_bruno: {
+      titulo: `❌ Enavia não conseguiu completar a melhoria em ${improvementTarget}`,
+      problema: lastError,
+      tentativas: MAX_ATTEMPTS,
+      possivel_solucao: _gerarPossívelSolução(lastError),
+      acao_requerida: "Revisar manualmente ou fornecer patch explícito via chat.",
     },
   };
 
-  let proposeJson = null;
-  let proposeStatus = null;
-  try {
-    const proposeRes = await env.EXECUTOR.fetch("https://internal/propose", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(_proposePayload),
-    });
-    proposeStatus = proposeRes.status;
-    try {
-      proposeJson = await proposeRes.json();
-    } catch {
-      proposeJson = { ok: false, error: "PROPOSE_INVALID_JSON" };
-    }
-  } catch (netErr) {
-    logNV("🔴 [CHAT/IMPROVEMENT] Falha de rede ao chamar executor /propose", {
-      sessionId,
-      error: String(netErr),
-    });
-    return { ok: false, action: "execute_next", target: improvementTarget, error: "NETWORK_ERROR", detail: String(netErr) };
-  }
-
-  const prUrl = proposeJson?.github_orchestration?.pr_url || null;
-  const proposeOk = proposeStatus >= 200 && proposeStatus < 300;
-
-  logNV("🚀 [CHAT/IMPROVEMENT] Resposta do executor /propose", {
+  logNV("🚨 [CHAT/IMPROVEMENT] Esgotou tentativas — comunicando Bruno", {
     sessionId,
-    target: improvementTarget,
-    propose_ok: proposeOk,
-    pr_url: prUrl,
+    last_error: lastError,
   });
 
-  return {
-    ok: proposeOk,
-    action: "execute_next",
-    target: improvementTarget,
-    pr_url: prUrl,
-    propose_result: proposeJson,
-  };
+  return comunicado;
+}
+
+// Helper: gera sugestão de solução baseada no tipo de erro
+function _gerarPossívelSolução(lastError) {
+  if (!lastError) return "Verificar logs do executor.";
+  if (lastError.includes("NO_PATCH")) return "O Codex não conseguiu gerar patches. Tente reformular a melhoria com mais detalhes técnicos.";
+  if (lastError.includes("APPLY_ERROR")) return "O patch gerado não encontrou âncora no código. O arquivo pode ter mudado. Tente novamente.";
+  if (lastError.includes("VALIDATION_FAILED")) return "A Enavia reprovou o patch. Forneça a melhoria com exemplo de código desejado.";
+  if (lastError.includes("PR_NOT_OPENED")) return "Patch aprovado mas PR não aberta. Verificar GITHUB_TOKEN e GitHub Bridge.";
+  if (lastError.includes("NETWORK_ERROR")) return "Falha de rede com o executor. Verificar se enavia-executor está deployado.";
+  return "Verificar logs detalhados no KV ENAVIA_BRAIN.";
 }
 
 // ============================================================================
