@@ -1197,10 +1197,12 @@ if (METHOD === "POST" && pathname === "/propose") {
       // PR108: preservar cópia completa para applyPatch (antes do chunking)
       action.context.target_code_original = snap.code;
 
-      // PR125: tentar GitHub como fonte primária (source legível vs bundle esbuild compilado)
-      // O bundle CF não tem nomes de função originais — GitHub tem o source real
+      // PR128: GitHub-first com snap.code como fallback (sem CF API dupla)
+      // Passa snap.code já disponível — se GitHub falhar, usa CF bundle cacheado
       try {
-        const _ghResult = await _fetchWorkerSource(env, targetWorkerId, action.target?.repo || null);
+        const _ghResult = await _fetchWorkerSource(
+          env, targetWorkerId, action.target?.repo || null, snap.code
+        );
         if (_ghResult?.code && _ghResult.source === "github") {
           action.context.target_code_original = _ghResult.code;
           action.context.target_code = _ghResult.code;
@@ -1211,8 +1213,17 @@ if (METHOD === "POST" && pathname === "/propose") {
           action.context_proof.snapshot_lines = _ghResult.code.split(/\r?\n/).length;
           action.context_proof.source = "github";
           action.context_proof.github_file = _ghResult.file;
+        } else {
+          // Fallback para CF bundle — logar motivo para diagnóstico via wrangler tail
+          action.context_proof.github_fetch_result = _ghResult?.source || "null";
+          action.context_proof.source = "cloudflare_api";
+          console.warn("[PR128] GitHub fallback para CF bundle, source:", _ghResult?.source || "null");
         }
-      } catch (_gh_err) {}
+      } catch (_gh_err) {
+        action.context_proof.github_fetch_result = "error";
+        action.context_proof.source = "cloudflare_api";
+        console.warn("[PR128] GitHub fetch erro:", _gh_err?.message || String(_gh_err));
+      }
 
       // PR108: se use_codex=true e código > 16K, extrair chunk relevante para Codex
       const _codeForChunking = action.context.target_code_original;
