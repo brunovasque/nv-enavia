@@ -1,5 +1,51 @@
 # ENAVIA — Execution Log
 
+## 2026-05-07 — PR126 — PR-IMPL — chunker route tokens + anti-alucinação
+
+- **Branch:** `fix/pr126-chunker-route-tokens-anti-hallucination`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR126.md` ✅
+- **PR anterior validada:** PR125 ✅ mergeada (PR #293)
+- **PR GitHub aberta:** [#294](https://github.com/brunovasque/nv-enavia/pull/294)
+
+### Objetivo
+
+Eliminar alucinação de `handleAudit` pelo Codex. O chunker não incluía tokens de implementação
+real do `/audit` (usa `runEnaviaSelfAudit`, não `handleAudit`). Fix: `routeHandlerMap` expande
+tokens e prompt anti-alucinação proíbe nomes de função não visíveis.
+
+### 3 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | bab6461 | `executor/src/code-chunker.js` | `routeHandlerMap` — 13 linhas adicionadas |
+| 2 | f32f2cb | `executor/src/index.js` | instrução anti-alucinação — 2 linhas substituem 1 |
+| 3 | cc1c887 | `docs/PR126_REVIEW.md` | Review 4/8 critérios |
+
+### Critérios verificados
+
+| # | Critério | Status |
+|---|----------|--------|
+| 1 | routeHandlerMap com runEnaviaSelfAudit | ✅ |
+| 2 | "NUNCA invente ou infira nomes" no systemLines | ✅ |
+| 3 | patch[].search sem handleAudit | ⚠️ Requer deploy |
+| 4 | patch[].search existe em nv-enavia.js | ⚠️ Requer deploy |
+| 5 | apply_patch_error ausente | ⚠️ Requer deploy |
+| 6 | E2E: pr_url não null | ⚠️ Requer deploy |
+| 7 | merge_allowed=false intocado | ✅ |
+| 8 | Apenas 2 arquivos modificados | ✅ |
+
+### Bloqueador de deploy
+
+Sessão Cloudflare expirou: `Authentication error [code: 10000]`.
+Ação: `npx wrangler login` (Bruno) → `npx wrangler deploy --config wrangler.executor.generated.toml`
+
+### Veredito
+
+APROVADO PARA MERGE — aguarda revisão de Bruno + re-auth wrangler para deploy.
+
+---
+
 ## 2026-05-06 — PR125 — PR-IMPL — GitHub source + keep_names
 
 - **Branch:** `feat/pr125-github-source-keep-names`

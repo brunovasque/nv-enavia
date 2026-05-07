@@ -1,8 +1,32 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR125 — GitHub source + keep_names)
-**Branch ativa:** `feat/pr125-github-source-keep-names`
-**Última tarefa:** PR125 — ler source GitHub em vez do bundle CF API + keep_names no wrangler.toml ✅
+**Data:** 2026-05-07 (atualizado após PR126 — chunker route tokens + anti-alucinação)
+**Branch ativa:** `fix/pr126-chunker-route-tokens-anti-hallucination`
+**Última tarefa:** PR126 — routeHandlerMap no chunker + prompt anti-alucinação Codex ✅
+
+## Atualização PR126 — chunker route tokens + anti-alucinação — 2026-05-07
+
+- Branch: `fix/pr126-chunker-route-tokens-anti-hallucination`
+- PR GitHub: [#294](https://github.com/brunovasque/nv-enavia/pull/294) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR126.md` ✅
+- PR anterior: PR125 ✅ (mergeada — PR #293)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | bab6461 | `executor/src/code-chunker.js` | `routeHandlerMap` com tokens de implementação real |
+| 2 | f32f2cb | `executor/src/index.js` | instrução anti-alucinação no systemLines Codex |
+| 3 | cc1c887 | `docs/PR126_REVIEW.md` | Review 4/8 critérios, APROVADO |
+
+### Critérios de conclusão: 4/8 ✅ (4 pendentes de deploy — wrangler re-auth necessária)
+
+**Bloqueador de deploy:** sessão Cloudflare expirou — `npx wrangler login` necessário.
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR125 — GitHub source + keep_names — 2026-05-06
 

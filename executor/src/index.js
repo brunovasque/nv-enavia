@@ -5819,7 +5819,8 @@ async function callCodexEngine(env, params) {
       "  ]",
       "}",
       "",
-      "REGRA CRÍTICA para search: use a linha de assinatura da função (ex: 'async function handleAudit('), ou o console.log específico (ex: 'console.error(err)'), ou o comentário único mais próximo. NUNCA copie mais de 2 linhas no search.",
+      "REGRA CRÍTICA para search: use APENAS código que aparece literalmente no trecho fornecido acima. NUNCA invente ou infira nomes de função que não estejam visíveis no código. Se não encontrar o trecho exato, use a linha de log ou comentário mais próximo que EXISTA no código.",
+      "PROIBIDO: gerar search com nomes de função que não aparecem no código fornecido (ex: handleAudit, handlePropose). Use apenas o que você VÊ.",
       "Não explique nada fora desse JSON. Não use markdown."
     ];
 
