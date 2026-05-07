@@ -3,6 +3,15 @@ main = "nv-enavia.js"
 compatibility_date = "2026-04-10"
 workers_dev = true
 
+[build]
+command = ""
+
+[build.upload]
+format = "modules"
+
+[esbuild]
+keep_names = true
+
 [observability.logs]
 enabled = true
 
