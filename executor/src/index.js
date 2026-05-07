@@ -1196,10 +1196,29 @@ if (METHOD === "POST" && pathname === "/propose") {
 
       // PR108: preservar cópia completa para applyPatch (antes do chunking)
       action.context.target_code_original = snap.code;
+
+      // PR125: tentar GitHub como fonte primária (source legível vs bundle esbuild compilado)
+      // O bundle CF não tem nomes de função originais — GitHub tem o source real
+      try {
+        const _ghResult = await _fetchWorkerSource(env, targetWorkerId, action.target?.repo || null);
+        if (_ghResult?.code && _ghResult.source === "github") {
+          action.context.target_code_original = _ghResult.code;
+          action.context.target_code = _ghResult.code;
+          action.context.target_code_source = "github";
+          action.context.target_code_len = _ghResult.code.length;
+          action.context.target_code_lines = _ghResult.code.split(/\r?\n/).length;
+          action.context_proof.snapshot_chars = _ghResult.code.length;
+          action.context_proof.snapshot_lines = _ghResult.code.split(/\r?\n/).length;
+          action.context_proof.source = "github";
+          action.context_proof.github_file = _ghResult.file;
+        }
+      } catch (_gh_err) {}
+
       // PR108: se use_codex=true e código > 16K, extrair chunk relevante para Codex
-      if (action.use_codex === true && snap.code.length > 16000) {
+      const _codeForChunking = action.context.target_code_original;
+      if (action.use_codex === true && _codeForChunking.length > 16000) {
         const intentForChunk = String(action.intent || action.prompt || '');
-        const chunkResult = extractRelevantChunk(snap.code, intentForChunk);
+        const chunkResult = extractRelevantChunk(_codeForChunking, intentForChunk);
         action.context.target_code = chunkResult.chunk;
         action.context.target_code_chunked = true;
         action.context.target_code_chunk_offset = chunkResult.offset;
