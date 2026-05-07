@@ -2926,6 +2926,72 @@ if (method === "POST" && pathname === "/worker-deploy") {
     }
 
     // ----------------------------------------
+    // POST /diag-codex — diagnóstico raw da OpenAI (retorna no body, não em logs)
+    // Evita limite de 256KB do wrangler tail. Remover após diagnóstico.
+    // ----------------------------------------
+    if (METHOD === "POST" && pathname === "/diag-codex") {
+      const diagBody = await request.json().catch(() => ({}));
+      const diagIntent = String(diagBody.intent || "melhora o log de erro do /audit");
+      const diagCode = String(diagBody.code || "// placeholder code\nasync function handleAudit(request, env) {\n  console.log('audit');\n}");
+      const model = env?.OPENAI_CODE_MODEL || env?.OPENAI_MODEL || "gpt-4.1-mini";
+      const apiKey = env?.OPENAI_API_KEY || env?.CODEX_API_KEY || null;
+
+      if (!apiKey) {
+        return withCORS(jsonResponse({ ok: false, error: "OPENAI_API_KEY ausente no env" }));
+      }
+
+      const systemPrompt = [
+        "Você é o motor de engenharia de código da ENAVIA (CODEX).",
+        "Você deve devolver SOMENTE JSON válido no formato:",
+        '{ "ok": true, "patches": [{ "title": string, "search": string, "replace": string }], "notes": null }',
+        "Não use markdown. Não explique nada fora do JSON.",
+      ].join("\n");
+
+      let rawTxt = null;
+      let httpStatus = null;
+      let contentField = null;
+      let parsedResult = null;
+      let fetchError = null;
+
+      try {
+        const openaiResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `OBJETIVO:\n${diagIntent}\n\nSNAPSHOT:\n${diagCode}` },
+            ],
+            temperature: 0.15,
+            response_format: { type: "json_object" },
+          }),
+        });
+        httpStatus = openaiResp.status;
+        rawTxt = await openaiResp.text();
+        try {
+          const parsed = JSON.parse(rawTxt);
+          contentField = parsed?.choices?.[0]?.message?.content || null;
+          try { parsedResult = JSON.parse(contentField); } catch (_) {}
+        } catch (_) {}
+      } catch (e) {
+        fetchError = String(e);
+      }
+
+      return withCORS(jsonResponse({
+        diag: "codex_raw",
+        model,
+        intent: diagIntent,
+        http_status: httpStatus,
+        fetch_error: fetchError,
+        raw_openai_response: rawTxt,
+        content_field: contentField,
+        parsed_result: parsedResult,
+        patches_count: Array.isArray(parsedResult?.patches) ? parsedResult.patches.length : null,
+      }));
+    }
+
+    // ----------------------------------------
     // GET /health
     // ----------------------------------------
     if (METHOD === "GET" && pathname === "/health") {
@@ -5858,6 +5924,8 @@ async function callCodexEngine(env, params) {
       },
     ];
 
+    console.log(`[DIAG_CODEX] calling OpenAI model=${model} intent_len=${intentText.length} code_len=${workerCode.length}`);
+
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -5874,6 +5942,9 @@ async function callCodexEngine(env, params) {
     });
 
     const txt = await resp.text();
+    console.log(`[DIAG_CODEX] http_status=${resp.status} ok=${resp.ok} txt_len=${txt.length}`);
+    console.log(`[DIAG_CODEX] RAW_OPENAI_RESPONSE=${txt.slice(0, 4000)}`);
+
     let data = null;
     try {
       data = JSON.parse(txt);
@@ -5891,17 +5962,22 @@ async function callCodexEngine(env, params) {
     }
 
     const content = data?.choices?.[0]?.message?.content || "";
+    console.log(`[DIAG_CODEX] content_len=${content.length} content_preview=${content.slice(0, 1000)}`);
+
     let parsed = null;
     try {
       parsed = JSON.parse(content);
     } catch (_) {
       // modelo não retornou JSON puro
+      console.log(`[DIAG_CODEX] PARSE_ERROR: content is not valid JSON`);
       return {
         ok: false,
         reason: "invalid_json_from_model",
         raw: content,
       };
     }
+
+    console.log(`[DIAG_CODEX] parsed_ok=${parsed?.ok} patches_type=${typeof parsed?.patches} patches_count=${Array.isArray(parsed?.patches)?parsed.patches.length:'N/A'} parsed_keys=${Object.keys(parsed||{}).join(',')}}`);
 
     let patches = [];
     if (parsed && Array.isArray(parsed.patches)) {
@@ -5944,6 +6020,13 @@ async function callCodexEngine(env, params) {
       });
     }
 
+    console.log(`[DIAG_CODEX] normalized_count=${normalized.length} ok=${normalized.length > 0}`);
+    if (normalized.length > 0) {
+      normalized.forEach((p, i) => console.log(`[DIAG_CODEX] patch[${i}].search=${JSON.stringify(p.search.slice(0,120))}`));
+    } else {
+      console.log(`[DIAG_CODEX] NO_PATCH — patches array from model: ${JSON.stringify(parsed?.patches || null).slice(0,500)}`);
+    }
+
     return {
       ok: normalized.length > 0,
       patches: normalized,
@@ -5951,6 +6034,7 @@ async function callCodexEngine(env, params) {
       raw: parsed,
     };
   } catch (err) {
+    console.log(`[DIAG_CODEX] EXCEPTION: ${String(err?.message || err)}`);
     return {
       ok: false,
       reason: "codex_engine_exception",
