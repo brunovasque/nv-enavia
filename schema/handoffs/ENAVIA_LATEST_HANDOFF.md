@@ -1,24 +1,30 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR122 — prompt Codex com exemplos concretos de search ✅ (branch: fix/pr122-codex-prompt-exemplo-search)
+**De:** PR123 — loop de validação + retry + alerta Bruno ✅ (branch: feat/pr123-validation-loop-retry-bruno)
 **Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
 
-## Handoff atual — PR122 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR123 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 
-2 commits na branch `fix/pr122-codex-prompt-exemplo-search`:
+2 commits na branch `feat/pr123-validation-loop-retry-bruno`:
 
-1. **fix: systemLines com exemplos concretos** — `executor/src/index.js` linhas 5748-5761:
-   - ANTES (PR121): restrição abstrata "máximo 120 chars" → Codex retornava `patches: []` vazio
-   - DEPOIS: exemplos inline concretos: `console.log(err.message)`, `async function handleAudit(`
-   - Regra CRÍTICA substituída por exemplos de assinatura de função, console.log, comentário único
-   - LLMs precisam de exemplos concretos, não só regras — esta é a causa raiz do PR121 falhar
+1. **feat: loop de validação com retry** — `nv-enavia.js` função `_dispatchExecuteNextFromChat` (linhas 3703–3892):
+   - ANTES: dispatch simples — 1 tentativa, retorna proposeJson direto
+   - DEPOIS: loop `for (attempt = 1..MAX_ATTEMPTS=5)`:
+     - `intentVariants[attempt-1]` — estratégia adaptativa (intent mais específico a cada falha)
+     - `context.feedback` — feedback da tentativa anterior passado ao executor
+     - Detecção de `hasPatch` (NO_PATCH) → `feedbackForExecutor` + `continue`
+     - Detecção de `prUrl` → return imediato com `attempts` (nº da tentativa)
+     - Detecção de `applyError` → feedback sobre âncora + `continue`
+     - `env.AI.run` validation — LLM analisa candidate vs originalIntent → aprovado/motivo/sugestao
+   - Após 5 falhas: `comunicado_bruno` com `titulo`, `problema`, `possivel_solucao`, `acao_requerida`
+   - Helper `_gerarPossívelSolução(lastError)` adicionado após a função
 
-2. **docs: PR122_REVIEW.md** — 3/7 critérios, APROVADO
+2. **docs: PR123_REVIEW.md** — 8/8 critérios, APROVADO
 
-### Estado do pipeline após PR122 — todos os bloqueios de código resolvidos
+### Estado do pipeline após PR123
 
 | Etapa | Fix | PR |
 |-------|-----|-----|
@@ -31,6 +37,7 @@
 | action: edit-worker no dispatch | ✅ | PR119 |
 | Parser callCodexEngine lê search/replace | ✅ | PR120 |
 | Prompt Codex: search linha única, exemplos concretos | ✅ | PR122 |
+| Loop retry + validação LLM + alerta Bruno | ✅ | PR123 |
 
 ### Único desbloqueador restante após merge
 
@@ -48,9 +55,9 @@ cd D:\nv-enavia\executor && npx wrangler deploy  # Executor
 Bruno: "melhora o log de erro do /audit"
 Enavia: "Entendi. Posso auditar e abrir uma PR em /audit. Confirma?"
 Bruno: "sim"
-→ verificar github_orchestration.pr_url no response do /propose
-→ verificar patchText[0].search.length < 300
-→ verificar apply_patch_error ausente
+→ verificar `attempts` no response (nº da tentativa que funcionou)
+→ verificar `github_orchestration.pr_url` não null
+→ se falhar 5x: verificar `comunicado_bruno.titulo` + `possivel_solucao`
 ```
 
 ---
