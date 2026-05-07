@@ -30,8 +30,17 @@ export function applyPatch(originalCode, patches) {
 
   for (const patch of patches) {
     const title = typeof patch.title === 'string' ? patch.title : '(sem título)';
-    const search = typeof patch.search === 'string' ? patch.search : '';
-    const replace = typeof patch.replace === 'string' ? patch.replace : '';
+    // PR124: normalizar quebras de linha — Codex pode gerar \n escapado ou \r\n
+    const search = (typeof patch.search === 'string' ? patch.search : '')
+      .replace(/\\n/g, '\n')   // \n literal → quebra real
+      .replace(/\\t/g, '\t')   // \t literal → tab real
+      .replace(/\r\n/g, '\n')  // CRLF → LF
+      .replace(/\r/g, '\n');   // CR → LF
+    const replace = (typeof patch.replace === 'string' ? patch.replace : '')
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
     const anchorMatch =
       patch.anchor && typeof patch.anchor.match === 'string'
         ? patch.anchor.match
@@ -51,22 +60,24 @@ export function applyPatch(originalCode, patches) {
     }
 
     // Verificar que search existe no código atual
-    const firstIdx = candidate.indexOf(search);
+    // PR124: normalizar candidate também para garantir match
+    const candidateNorm = candidate.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const firstIdx = candidateNorm.indexOf(search);
     if (firstIdx === -1) {
       return { ok: false, error: 'ANCHOR_NOT_FOUND', patch_title: title };
     }
 
     // Verificar unicidade (sem matches ambíguos)
-    const secondIdx = candidate.indexOf(search, firstIdx + 1);
+    const secondIdx = candidateNorm.indexOf(search, firstIdx + 1);
     if (secondIdx !== -1) {
       return { ok: false, error: 'AMBIGUOUS_MATCH', patch_title: title };
     }
 
     // Aplicar substituição
     candidate =
-      candidate.slice(0, firstIdx) +
+      candidateNorm.slice(0, firstIdx) +
       replace +
-      candidate.slice(firstIdx + search.length);
+      candidateNorm.slice(firstIdx + search.length);
 
     applied.push(title);
   }

@@ -1,10 +1,63 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-06
-**De:** PR123 — loop de validação + retry + alerta Bruno ✅ (branch: feat/pr123-validation-loop-retry-bruno)
+**De:** PR124 — normalização de quebras de linha no indexOf ✅ (branch: fix/pr124-patch-engine-normalize-newlines)
 **Para:** Deploy Worker + Executor pós-merge → OPENAI_API_KEY → teste E2E ciclo completo
 
-## Handoff atual — PR123 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR124 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+
+### O que foi feito
+
+2 commits na branch `fix/pr124-patch-engine-normalize-newlines`:
+
+1. **fix: normalização de quebras de linha** — `executor/src/patch-engine.js`:
+   - Causa raiz do ANCHOR_NOT_FOUND: Codex gera `search` com `\n` escapado (`\\n` no JSON)
+     ou `\r\n` (CRLF); arquivo real tem `\n` simples → `indexOf` retornava -1
+   - `search` e `replace`: 4 `.replace()` encadeados (`\\n` → `\n`, `\\t` → `\t`, CRLF → LF, CR → LF)
+   - `candidateNorm`: cópia normalizada do candidate (CRLF → LF, CR → LF)
+   - Todos os `indexOf` e `slice` agora usam `candidateNorm`
+   - Evidência do problema: loop PR123 → 5 tentativas, todas ANCHOR_NOT_FOUND
+
+2. **docs: PR124_REVIEW.md** — 4/7 critérios, APROVADO
+
+### Estado do pipeline após PR124 — todos os code-fixes concluídos
+
+| Etapa | Fix | PR |
+|-------|-----|-----|
+| use_codex: true | ✅ | PR111 |
+| Schema Codex {search, replace} | ✅ | PR112 |
+| mode: enavia_propose | ✅ | PR113 |
+| generatePatch: true + github_orchestration | ✅ | PR114 |
+| applyPatch usa target_code_original (790k) | ✅ | PR115 |
+| validateWorkerCode internalizada | ✅ | PR118 |
+| action: edit-worker no dispatch | ✅ | PR119 |
+| Parser callCodexEngine lê search/replace | ✅ | PR120 |
+| Prompt Codex: exemplos concretos de search | ✅ | PR122 |
+| Loop retry + validação LLM + alerta Bruno | ✅ | PR123 |
+| Normalização de quebras de linha no indexOf | ✅ | PR124 |
+
+### Único desbloqueador restante após merge
+
+`OPENAI_API_KEY` — sem ele o Codex não é chamado, `patches=[]`, loop não avança.
+
+```powershell
+wrangler secret put OPENAI_API_KEY --name enavia-executor
+cd D:\nv-enavia && npx wrangler deploy       # Worker
+cd D:\nv-enavia\executor && npx wrangler deploy  # Executor
+```
+
+### Teste E2E após deploy
+
+```
+Bruno: "melhora o log de erro do /audit"
+Enavia: "Entendi. Posso auditar e abrir uma PR em /audit. Confirma?"
+Bruno: "sim"
+→ verificar apply_patch_error ausente
+→ verificar staging.ready=true, patchResult.applied.length > 0
+→ verificar github_orchestration.pr_url na tentativa 1 do loop PR123
+```
+
+## Handoff anterior — PR123 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 

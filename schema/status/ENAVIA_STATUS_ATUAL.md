@@ -1,8 +1,29 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-06 (atualizado após PR123 — loop de validação + retry + alerta Bruno)
-**Branch ativa:** `feat/pr123-validation-loop-retry-bruno`
-**Última tarefa:** PR123 — loop de validação com retry inteligente e alerta Bruno ✅
+**Data:** 2026-05-06 (atualizado após PR124 — normalizar quebras de linha no indexOf)
+**Branch ativa:** `fix/pr124-patch-engine-normalize-newlines`
+**Última tarefa:** PR124 — normalização de quebras de linha no search/candidate antes do indexOf ✅
+
+## Atualização PR124 — normalização de quebras de linha — 2026-05-06
+
+- Branch: `fix/pr124-patch-engine-normalize-newlines`
+- PR GitHub: [#292](https://github.com/brunovasque/nv-enavia/pull/292) — aguarda merge
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR124.md` ✅
+- PR anterior: PR123 ✅ (mergeada — PR #291)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | c3b8e62 | `executor/src/patch-engine.js` | normalização de `\n`, `\r\n`, `\r`, `\\n` em search/replace/candidateNorm |
+| 2 | 2f57ad7 | `docs/PR124_REVIEW.md` | Review 4/7 critérios, APROVADO |
+
+### Critérios de conclusão: 4/7 ✅ (3 pendentes de deploy + OPENAI_API_KEY)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
 
 ## Atualização PR123 — loop de validação + retry — 2026-05-06
 

@@ -1,5 +1,30 @@
 # ENAVIA — Execution Log
 
+## 2026-05-06 — PR124 — PR-IMPL — normalização de quebras de linha no indexOf
+
+- **Branch:** `fix/pr124-patch-engine-normalize-newlines`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR124.md` ✅
+- **PR anterior validada:** PR123 ✅ mergeada (PR #291)
+- **PR GitHub aberta:** [#292](https://github.com/brunovasque/nv-enavia/pull/292)
+
+### Objetivo
+
+Causa raiz do ANCHOR_NOT_FOUND em todas as 5 tentativas do loop PR123:
+Codex gerava `search` com `\n` escapado (`\\n` no JSON); arquivo real tem `\n` simples.
+`indexOf` retornava -1. Fix: normalizar search/replace/candidateNorm antes do indexOf.
+
+### 2 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | c3b8e62 | `executor/src/patch-engine.js` | search/replace + candidateNorm normalizados |
+| 2 | 2f57ad7 | `docs/PR124_REVIEW.md` | Review 4/7 critérios |
+
+### Critérios: 4/7 ✅ (3 pendentes de deploy + OPENAI_API_KEY)
+
+---
+
 ## 2026-05-06 — PR123 — PR-IMPL — loop de validação + retry + alerta Bruno
 
 - **Branch:** `feat/pr123-validation-loop-retry-bruno`
