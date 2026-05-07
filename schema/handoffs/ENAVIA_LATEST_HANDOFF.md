@@ -1,10 +1,37 @@
 # ENAVIA — Latest Handoff
 
 **Data:** 2026-05-07
-**De:** PR126 — chunker route tokens + anti-alucinação ✅ (branch: fix/pr126-chunker-route-tokens-anti-hallucination)
-**Para:** wrangler login → deploy executor → teste E2E
+**De:** PR127 — Codex 1 patch + search 2-4 linhas únicas ✅ (branch: fix/pr127-codex-one-patch-unique-search)
+**Para:** push + abertura PR GitHub → merge → teste E2E
 
-## Handoff atual — PR126 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
+## Handoff atual — PR127 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
+
+### O que foi feito (PR127)
+
+2 commits na branch `fix/pr127-codex-one-patch-unique-search`:
+
+1. **fix: systemLines do callCodexEngine** — `executor/src/index.js`:
+   - Regra 1: "APENAS 1 (UM) patch por request" — Codex limitado a 1 item em patches
+   - Regra 2: "search deve ter 2 a 4 linhas de contexto" — elimina ambiguous match
+   - Resultado deploy: Codex gerou 1 patch com search de 4 linhas (✅ sem AMBIGUOUS_MATCH)
+
+2. **docs: PR127_REVIEW.md** — 6/8 critérios, APROVADO
+
+### Deploy confirmado
+
+- Versão: `ae95e427-7003-4e13-a24f-010e01731866`
+- Teste: `POST /propose` → Codex patch com search 4 linhas, sem erros
+- Sem AMBIGUOUS_MATCH, sem CODEX_ENGINE_NO_PATCH
+
+### Próximos passos
+
+1. Bruno faz merge desta PR no GitHub
+2. Teste E2E: chat → "melhora o log de erro do /audit" → "sim" → verificar `pr_url` não null
+3. Se pr_url null: verificar se search 4-linhas aparece exatamente 1 vez em nv-enavia.js
+
+---
+
+## Handoff anterior — PR126 ✅ APROVADO PARA MERGE (aguarda revisão Bruno)
 
 ### O que foi feito
 

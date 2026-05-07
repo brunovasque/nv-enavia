@@ -1,8 +1,36 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-07 (atualizado após PR126 — chunker route tokens + anti-alucinação)
-**Branch ativa:** `fix/pr126-chunker-route-tokens-anti-hallucination`
-**Última tarefa:** PR126 — routeHandlerMap no chunker + prompt anti-alucinação Codex ✅
+**Data:** 2026-05-07 (atualizado após PR127 — Codex 1 patch + search 2-4 linhas únicas)
+**Branch ativa:** `fix/pr127-codex-one-patch-unique-search`
+**Última tarefa:** PR127 — Codex limitado a 1 patch + search com contexto de 2-4 linhas ✅
+
+## Atualização PR127 — Codex 1 patch + search único — 2026-05-07
+
+- Branch: `fix/pr127-codex-one-patch-unique-search`
+- PR GitHub: aguarda push + abertura
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR127.md` ✅
+- PR anterior: PR126 ✅ (mergeada — PR #294)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | 4a61e60 | `executor/src/index.js` | 5 linhas systemLines (eram 3 no PR126) — 1 patch obrigatório + search 2-4 linhas |
+| 2 | (no-op) | — | DIAG_CODEX logs nunca existiram neste branch |
+| 3 | 8d01de1 | `docs/PR127_REVIEW.md` | Review 6/8 critérios, APROVADO |
+
+### Deploy
+
+**Versão:** `ae95e427-7003-4e13-a24f-010e01731866`
+**Resultado:** ✅ Codex gera 1 patch com search de 4 linhas — sem AMBIGUOUS_MATCH
+
+### Critérios de conclusão: 6/8 ✅ (critério 4 parcial; critério 7 pendente E2E)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
+
+
+
 
 ## Atualização PR126 — chunker route tokens + anti-alucinação — 2026-05-07
 
