@@ -3836,6 +3836,18 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
       continue;
     }
 
+    // PR129 — detectar NO_VALID_CANDIDATE (mudança 3 do executor)
+    const patchSafeError = proposeJson?.propose_result?.patch_safe_error || proposeJson?.patch_safe_error || proposeJson?.result?.patch_safe_error || null;
+    if (patchSafeError && patchSafeError.error === "NO_VALID_CANDIDATE") {
+      lastError = `ATTEMPT_${attempt}_NO_VALID_CANDIDATE: ${JSON.stringify(patchSafeError.detail || {})}`;
+      feedbackForExecutor = `Tentativa ${attempt}: applyPatch falhou ou todos os patches foram descartados. Tente intent mais específica com trecho de código de referência.`;
+      logNV(`⚠️ [CHAT/IMPROVEMENT] Tentativa ${attempt} no valid candidate`, { sessionId, detail: patchSafeError.detail });
+      const _sig = "NO_VALID_CANDIDATE";
+      if (_previousErrorSignature === _sig) _earlyStop = true;
+      _previousErrorSignature = _sig;
+      continue;
+    }
+
     if (candidate && env.AI) {
       // Validação LLM: Enavia analisa o candidate
       try {
@@ -3887,14 +3899,16 @@ Responda SOMENTE em JSON:
     }
   }
 
-  // Esgotou tentativas — comunicado para Bruno
+  // Esgotou tentativas (ou early-stop) — comunicado para Bruno
+  const _finalError = _earlyStop ? "EARLY_STOP_DETERMINISTIC_ERROR" : "MAX_ATTEMPTS_REACHED";
   const comunicado = {
     ok: false,
     action: "execute_next",
     target: improvementTarget,
-    error: "MAX_ATTEMPTS_REACHED",
+    error: _finalError,
     attempts: MAX_ATTEMPTS,
     last_error: lastError,
+    last_error_signature: _previousErrorSignature,
     propose_result: lastProposeJson,
     comunicado_bruno: {
       titulo: `❌ Enavia não conseguiu completar a melhoria em ${improvementTarget}`,
@@ -3916,6 +3930,8 @@ Responda SOMENTE em JSON:
 // Helper: gera sugestão de solução baseada no tipo de erro
 function _gerarPossívelSolução(lastError) {
   if (!lastError) return "Verificar logs do executor.";
+  if (lastError.includes("EARLY_STOP_DETERMINISTIC_ERROR")) return "Loop parado cedo: erro determinístico repetido em 2 tentativas seguidas. O Codex não consegue encontrar âncora no snapshot atual. Tente reformular a intent com trecho de código de referência.";
+  if (lastError.includes("NO_VALID_CANDIDATE")) return "applyPatch falhou ou todos os patches foram descartados (patches de desistência filtrados). Tente intent mais específica ou forneça trecho de código como referência.";
   if (lastError.includes("NO_PATCH")) return "O Codex não conseguiu gerar patches. Tente reformular a melhoria com mais detalhes técnicos.";
   if (lastError.includes("APPLY_ERROR")) return "O patch gerado não encontrou âncora no código. O arquivo pode ter mudado. Tente novamente.";
   if (lastError.includes("VALIDATION_FAILED")) return "A Enavia reprovou o patch. Forneça a melhoria com exemplo de código desejado.";
