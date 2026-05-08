@@ -1465,22 +1465,45 @@ if (METHOD === "POST" && pathname === "/propose") {
         const githubRepo = env?.GITHUB_REPO || 'brunovasque/nv-enavia';
         const githubFilePath = env?.GITHUB_FILE_PATH || 'nv-enavia.js';
 
-        // PR108 B1: validar sintaxe via /worker-patch-safe antes de qualquer GitHub call
+        // PR129 — Gate 3: validar candidate ANTES de chamar /worker-patch-safe
+        // Se applyPatch falhou (ANCHOR_NOT_FOUND, AMBIGUOUS_MATCH, todos descartados),
+        // candidate fica vazio/igual ao original. Não faz sentido chamar staging — retornar erro claro.
         let patchSafeData = null;
-        try {
-          const patchSafeResp = await fetch('https://enavia-executor.brunovasque.workers.dev/worker-patch-safe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              mode: 'stage',
-              workerId: targetWorkerId,
-              current: originalCode,
-              candidate: patchResult.candidate,
-            }),
-          });
-          patchSafeData = await patchSafeResp.json().catch(() => ({ ok: false, error: 'worker_patch_safe_parse_error' }));
-        } catch (patchSafeErr) {
-          patchSafeData = { ok: false, error: `worker_patch_safe_fetch_error: ${String(patchSafeErr)}` };
+        const _candidateValid = patchResult?.candidate &&
+                                typeof patchResult.candidate === 'string' &&
+                                patchResult.candidate.length > 0 &&
+                                patchResult.candidate !== originalCode;
+
+        if (!_candidateValid) {
+          patchSafeData = {
+            ok: false,
+            error: 'NO_VALID_CANDIDATE',
+            detail: {
+              candidate_present: !!patchResult?.candidate,
+              candidate_type: typeof patchResult?.candidate,
+              candidate_length: patchResult?.candidate?.length || 0,
+              candidate_equals_original: patchResult?.candidate === originalCode,
+              apply_patch_error: patchResult?.apply_patch_error || null,
+              reason: 'applyPatch falhou ou todos os patches foram descartados — não há candidate válido para staging.',
+            },
+          };
+        } else {
+          // PR108 B1: validar sintaxe via /worker-patch-safe antes de qualquer GitHub call
+          try {
+            const patchSafeResp = await fetch('https://enavia-executor.brunovasque.workers.dev/worker-patch-safe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mode: 'stage',
+                workerId: targetWorkerId,
+                current: originalCode,
+                candidate: patchResult.candidate,
+              }),
+            });
+            patchSafeData = await patchSafeResp.json().catch(() => ({ ok: false, error: 'worker_patch_safe_parse_error' }));
+          } catch (patchSafeErr) {
+            patchSafeData = { ok: false, error: `worker_patch_safe_fetch_error: ${String(patchSafeErr)}` };
+          }
         }
 
         if (!patchSafeData?.ok) {
