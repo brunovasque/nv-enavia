@@ -5929,6 +5929,7 @@ async function callCodexEngine(env, params) {
     }
 
     const normalized = [];
+    const _rejectedPatches = []; // PR129: telemetria de patches descartados
     for (const rawPatch of patches) {
       if (!rawPatch || typeof rawPatch !== "object") continue;
 
@@ -5937,6 +5938,25 @@ async function callCodexEngine(env, params) {
       const replace = rawPatch.replace || "";
 
       if (!search) continue;
+
+      // PR129 — Gate 1: descartar "patch de desistência" do modelo
+      // Sintomas comuns: search === replace (no-op), description com "Não foi possível aplicar",
+      //                  ou replace que apenas adiciona comentário sem mudar lógica.
+      const _desc = String(rawPatch.description || "").toLowerCase();
+      const _isNoOp = String(search).trim() === String(replace).trim();
+      const _isGiveUp = _desc.includes("não foi possível aplicar") ||
+                       _desc.includes("nao foi possivel aplicar") ||
+                       _desc.includes("not possible to apply") ||
+                       _desc.includes("snapshot não contém") ||
+                       _desc.includes("snapshot nao contem");
+      if (_isNoOp || _isGiveUp) {
+        _rejectedPatches.push({
+          title: rawPatch.title || "(sem título)",
+          reason: _isNoOp ? "no_op_search_equals_replace" : "give_up_description",
+          description_preview: _desc.slice(0, 120),
+        });
+        continue;
+      }
 
       const anchor =
         rawPatch.anchor && typeof rawPatch.anchor.match === "string"
