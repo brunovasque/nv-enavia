@@ -5982,11 +5982,26 @@ async function callCodexEngine(env, params) {
       });
     }
 
+    // PR129 — Gate 2: limitar a 1 patch (defesa contra Codex desobediente)
+    // Mesmo com instrução explícita "OBRIGATÓRIO: gere APENAS 1 patch" no prompt,
+    // o modelo às vezes retorna 2+ patches. Truncar para garantir 1 patch único por ciclo.
+    let _truncatedCount = 0;
+    if (normalized.length > 1) {
+      _truncatedCount = normalized.length - 1;
+      normalized.length = 1;
+    }
+
     return {
       ok: normalized.length > 0,
       patches: normalized,
       notes: Array.isArray(parsed?.notes) ? parsed.notes : [],
       raw: parsed,
+      _diagnostic: {
+        rejected_patches: _rejectedPatches,
+        truncated_count: _truncatedCount,
+        original_count: patches.length,
+        final_count: normalized.length,
+      },
     };
   } catch (err) {
     return {
