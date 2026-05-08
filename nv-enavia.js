@@ -3719,8 +3719,22 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
   let lastProposeJson = null;
   let lastError = null;
   let feedbackForExecutor = null;
+  let _previousErrorSignature = null; // PR129: detectar erros repetidos
+  let _earlyStop = false;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // PR129 — Early-stop: se a tentativa anterior teve o mesmo tipo de erro determinístico, parar.
+    // Erros determinísticos: NO_VALID_CANDIDATE, ANCHOR_NOT_FOUND, ATTEMPT_X_NO_PATCH.
+    // Tentar de novo não vai mudar o resultado — Codex não tem como achar âncora que não existe no snapshot.
+    if (_earlyStop) {
+      logNV("⏹️ [CHAT/IMPROVEMENT] Early-stop ativado — erro determinístico repetido", {
+        sessionId,
+        attempt,
+        previous_error: _previousErrorSignature,
+      });
+      lastError = `EARLY_STOP_DETERMINISTIC_ERROR: ${_previousErrorSignature}`;
+      break;
+    }
     // Estratégia adaptativa: intent fica mais específico a cada tentativa
     const intentVariants = [
       originalIntent,
@@ -3786,6 +3800,10 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
       lastError = `ATTEMPT_${attempt}_NO_PATCH: Codex não gerou patches`;
       feedbackForExecutor = `Tentativa ${attempt}: Codex não gerou patches. Tente uma linha de search mais simples e específica.`;
       logNV(`⚠️ [CHAT/IMPROVEMENT] Tentativa ${attempt} sem patch`, { sessionId });
+      // PR129 — Early-stop: se 2 tentativas seguidas sem patch, parar
+      const _sig = "NO_PATCH";
+      if (_previousErrorSignature === _sig) _earlyStop = true;
+      _previousErrorSignature = _sig;
       continue;
     }
 
@@ -3811,6 +3829,10 @@ async function _dispatchExecuteNextFromChat(env, pendingPlan) {
       lastError = `ATTEMPT_${attempt}_APPLY_ERROR: ${JSON.stringify(applyError)}`;
       feedbackForExecutor = `Tentativa ${attempt}: patch não encontrou âncora no código. Use uma linha mais curta e única como search.`;
       logNV(`⚠️ [CHAT/IMPROVEMENT] Tentativa ${attempt} apply_patch_error`, { sessionId, error: applyError });
+      // PR129 — Early-stop: se 2 tentativas seguidas com apply_error do mesmo tipo, parar
+      const _sig = `APPLY_ERROR:${applyError?.reason || "unknown"}`;
+      if (_previousErrorSignature === _sig) _earlyStop = true;
+      _previousErrorSignature = _sig;
       continue;
     }
 
