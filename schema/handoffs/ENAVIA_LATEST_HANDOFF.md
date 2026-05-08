@@ -1,50 +1,56 @@
 # ENAVIA — Latest Handoff
 
-**Data:** 2026-05-07
-**De:** PR128 — GitHub source propagado para engineer mode + log de fallback ✅ (branch: fix/pr128-fetchsource-github-first)
-**Para:** push + abertura PR GitHub → merge → teste E2E
+**Data:** 2026-05-08
+**De:** PR129 — Hardening estrutural ciclo autônomo ✅ (branch: pr129-hardening-estrutural-ciclo-autonomo)
+**Para:** push + abertura PR GitHub → merge → teste E2E (verificar EARLY_STOP em 2 tentativas)
 
-## Handoff atual — PR128 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
+## Handoff atual — PR129 ✅ APROVADO PARA MERGE (aguarda push + revisão Bruno)
 
-### O que foi feito (PR128)
+### O que foi feito (PR129)
 
-3 commits de código + 1 docs na branch `fix/pr128-fetchsource-github-first`:
+5 commits de código + 1 docs na branch `pr129-hardening-estrutural-ciclo-autonomo`:
 
-1. **fix: cfFallbackCode em `_fetchWorkerSource`** — `executor/src/index.js`:
-   - Assinatura expandida: `async function _fetchWorkerSource(env, targetWorkerId, targetRepo, cfFallbackCode = null)`
-   - Early return se `cfFallbackCode` presente: evita CF API duplicada
+1. **Gate 1: filtro patches de desistência** — `executor/src/index.js`:
+   - `_rejectedPatches[]` + descarte de patches com `search === replace` (no-op) ou description "Não foi possível aplicar"
+   - Patches descartados aparecem em `_diagnostic.rejected_patches`
 
-2. **fix: requireLiveRead GitHub-first com log** — `executor/src/index.js`:
-   - Passa `snap.code` como `cfFallbackCode` → sem 2ª chamada CF API
-   - `else` e `catch` explícitos com `console.warn("[PR128] GitHub fallback...")`
+2. **Gate 2: truncar a 1 patch** — `executor/src/index.js`:
+   - Após Gate 1, se restarem 2+ patches válidos: `normalized.length = 1`
+   - `_diagnostic.truncated_count` registra quantos foram descartados
 
-3. **fix: engineer mode usa `target_code_original` injetado** — `executor/src/index.js`:
-   - `_injectedCode = raw?.context?.target_code_original || null`
-   - Se disponível, pula `fetchCurrentWorkerSnapshot` completamente
-   - `context_proof_local` usa `snap?.etag || null` (safe access quando snap=null)
+3. **Gate 3: validar candidate** — `executor/src/index.js`:
+   - Antes de chamar `/worker-patch-safe`: verifica se `candidate` é string não-vazia ≠ original
+   - Se inválido: retorna `{ ok: false, error: "NO_VALID_CANDIDATE", detail: {...} }` sem chamar endpoint
 
-4. **docs: PR128_REVIEW.md** — 8/9 critérios, APROVADO
+4. **Early-stop** — `nv-enavia.js`:
+   - `_previousErrorSignature` + `_earlyStop` detectam 2 tentativas seguidas com mesmo erro
+   - Assinaturas: `NO_PATCH`, `APPLY_ERROR:reason`, `NO_VALID_CANDIDATE`
+   - Quando detectado: quebra loop com `EARLY_STOP_DETERMINISTIC_ERROR`
+
+5. **NO_VALID_CANDIDATE + telemetria** — `nv-enavia.js`:
+   - Reconhece `NO_VALID_CANDIDATE` do executor, gera feedback contextualizado
+   - `_finalError`: `EARLY_STOP_DETERMINISTIC_ERROR` ou `MAX_ATTEMPTS_REACHED`
+   - `last_error_signature` no comunicado final
 
 ### Deploy confirmado
 
-- Versão: `b2019017-31c8-4280-9762-9dba268d15c1`
-- Teste: `POST /propose + require_live_read=true + generatePatch=true`
-- `context_proof.source: "github"` ✅
-- `context_summary.snapshot_chars: 374087` ✅ (era SEMPRE 796366 antes)
-- `apply_patch_error: null`, `result.ok: true` ✅
+| Worker | Versão | Resultado |
+|--------|--------|-----------|
+| `enavia-executor` | `8fc3e4fd-adb8-489a-bde4-62d9115a2c30` | ✅ |
+| `nv-enavia` | `8cd458eb-e293-4fcd-aa8b-64c5d44a994a` | ✅ |
 
-### Impacto
+### Impacto esperado
 
-| Métrica | Antes | Depois |
+| Cenário | Antes | Depois |
 |---------|-------|--------|
-| CF API calls (GitHub ok) | 2 | 1 |
-| `context_summary.snapshot_chars` | 796366 | 374087 |
-| Visibilidade falha GitHub | silenciosa | `console.warn` + `context_proof` |
+| Codex gera patch de desistência | AMBIGUOUS_MATCH/ANCHOR_NOT_FOUND | Descartado no Gate 1 |
+| `applyPatch` falha → candidate nulo | `parse_error` no `/worker-patch-safe` | `NO_VALID_CANDIDATE` sem chamar endpoint |
+| Erro determinístico repetido | 5 tentativas → MAX_ATTEMPTS_REACHED | 2 tentativas → EARLY_STOP |
 
 ### Próximos passos
 
 1. Bruno faz merge desta PR no GitHub
-2. Teste E2E: chat → "melhora o log de erro do /audit" → "sim" → verificar `pr_url` não null
+2. Teste E2E: chat → "melhora o log de erro do /audit" → "sim" → verificar se para em 2 tentativas com `EARLY_STOP_DETERMINISTIC_ERROR` em vez de 5
 
 ---
 

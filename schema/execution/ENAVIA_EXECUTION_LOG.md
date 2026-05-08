@@ -1,5 +1,58 @@
 # ENAVIA — Execution Log
 
+## 2026-05-08 — PR129 — PR-IMPL — Hardening estrutural ciclo autônomo
+
+- **Branch:** `pr129-hardening-estrutural-ciclo-autonomo`
+- **Tipo:** PR-IMPL (Executor-only + Worker-only)
+- **Contrato:** `docs/CONTRATO_PR129.md` ✅
+- **PR anterior validada:** PR128 ✅ mergeada (PR #296)
+- **PR GitHub:** aguarda push
+
+### Objetivo
+
+Tornar o ciclo `chat → patch → PR` resiliente a falhas do modelo Codex com 3 gates defensivos em camadas e early-stop no loop:
+- Gate 1: filtrar patches de desistência (search === replace, description "Não foi possível aplicar")
+- Gate 2: truncar a 1 patch (defesa contra Codex desobediente que gera 2+)
+- Gate 3: validar candidate antes de `/worker-patch-safe` (evita `parse_error`)
+- Early-stop: detectar 2 tentativas seguidas com mesmo erro determinístico
+
+### 6 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 19a70e9 | `executor/src/index.js` | Gate 1: filtro patches de desistência |
+| 2 | bdbd993 | `executor/src/index.js` | Gate 2: truncar a 1 + `_diagnostic` |
+| 3 | 988a4b0 | `executor/src/index.js` | Gate 3: validar candidate |
+| 4 | da3b334 | `nv-enavia.js` | Early-stop no loop |
+| 5 | 660a026 | `nv-enavia.js` | NO_VALID_CANDIDATE + telemetria |
+| 6 | 0df463e | `docs/PR129_REVIEW.md` | Review 8/8 critérios, deploy OK |
+
+### Deploy
+
+| Worker | Versão | Resultado |
+|--------|--------|-----------|
+| `enavia-executor` | `8fc3e4fd-adb8-489a-bde4-62d9115a2c30` | ✅ |
+| `nv-enavia` | `8cd458eb-e293-4fcd-aa8b-64c5d44a994a` | ✅ |
+
+### Critérios verificados
+
+| # | Critério | Status |
+|---|----------|--------|
+| C1 | Filtro patches de desistência | ✅ |
+| C2 | Limitação a 1 patch + `_diagnostic` | ✅ |
+| C3 | Validação candidate antes de `/worker-patch-safe` | ✅ |
+| C4 | Early-stop (erro determinístico repetido) | ✅ |
+| C5 | Tratamento NO_VALID_CANDIDATE no loop | ✅ |
+| C6 | Telemetria: `EARLY_STOP_DETERMINISTIC_ERROR` + `last_error_signature` | ✅ |
+| C7 | Sem regressão em ciclo feliz | ✅ (lógico) |
+| C8 | Invariantes preservadas | ✅ |
+
+### Veredito
+
+APROVADO PARA MERGE — 8/8 critérios estáticos. E2E pendente de teste manual.
+
+---
+
 ## 2026-05-07 — PR128 — PR-IMPL — GitHub source propagado para engineer mode + log fallback
 
 - **Branch:** `fix/pr128-fetchsource-github-first`

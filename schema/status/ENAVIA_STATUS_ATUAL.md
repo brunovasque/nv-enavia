@@ -1,8 +1,38 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-07 (atualizado após PR128 — GitHub source propagado para engineer mode + log de fallback)
-**Branch ativa:** `fix/pr128-fetchsource-github-first`
-**Última tarefa:** PR128 — GitHub-first + cfFallbackCode + _injectedCode engineer mode ✅
+**Data:** 2026-05-08 (atualizado após PR129 — hardening estrutural ciclo autônomo)
+**Branch ativa:** `pr129-hardening-estrutural-ciclo-autonomo`
+**Última tarefa:** PR129 — Gate 1 (filtro desistência) + Gate 2 (truncar 1 patch) + Gate 3 (candidate válido) + early-stop ✅
+
+## Atualização PR129 — Hardening estrutural ciclo autônomo — 2026-05-08
+
+- Branch: `pr129-hardening-estrutural-ciclo-autonomo`
+- PR GitHub: aguarda push + abertura
+- Tipo: PR-IMPL (Executor-only + Worker-only)
+- Contrato: `docs/CONTRATO_PR129.md` ✅
+- PR anterior: PR128 ✅ (mergeada — PR #296)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | 19a70e9 | `executor/src/index.js` | Gate 1: filtro patches de desistência |
+| 2 | bdbd993 | `executor/src/index.js` | Gate 2: truncar a 1 patch + `_diagnostic` |
+| 3 | 988a4b0 | `executor/src/index.js` | Gate 3: validar candidate antes de `/worker-patch-safe` |
+| 4 | da3b334 | `nv-enavia.js` | Early-stop no loop `_dispatchExecuteNextFromChat` |
+| 5 | 660a026 | `nv-enavia.js` | Tratamento NO_VALID_CANDIDATE + telemetria |
+| 6 | 0df463e | `docs/PR129_REVIEW.md` | Review 8/8 critérios estáticos |
+
+### Deploy
+
+| Worker | Versão | Resultado |
+|--------|--------|-----------|
+| `enavia-executor` | `8fc3e4fd-adb8-489a-bde4-62d9115a2c30` | ✅ |
+| `nv-enavia` | `8cd458eb-e293-4fcd-aa8b-64c5d44a994a` | ✅ |
+
+### Critérios de conclusão: 8/8 ✅ (E2E pendente teste manual)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
 ## Atualização PR128 — GitHub source propagado para engineer mode — 2026-05-07
 
