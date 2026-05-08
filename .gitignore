@@ -1,3 +1,10 @@
 # Arquivo gerado em runtime pelo workflow deploy-executor.yml
 # Nunca commitar — contém KV namespace IDs reais.
 wrangler.executor.generated.toml
+
+# Arquivos de leitura consolidada (sessao 2026-05-08, NAO commitar)
+BLOCO*_LEITURA.txt
+node_modules/
+**/node_modules/
+.DS_Store
+*.log
