@@ -1,242 +1,207 @@
-# CLAUDE.md — Regras operacionais do repo nv-enavia
+# CLAUDE.md — REPO nv-enavia (v2)
 
-## Permissões
-Todas as operações são pré-aprovadas neste repo:
-- Leitura e escrita de arquivos
-- Execução de comandos bash/shell
-- Operações git (commit, branch, push)
-- Sem necessidade de confirmação para operações locais
-
-## 1. Regra obrigatória inicial
-
-Antes de qualquer ação, leia este arquivo inteiro.
-
-Se não conseguir acessar ou ler este arquivo, pare e avise.
-
-Responda sempre em português.
-
-PRÉ-REQUISITO OBRIGATÓRIO ANTES DO PATCH:
-Atualize a branch com `origin/main` antes de qualquer edição. Se houver conflito, resolva primeiro. A tarefa só pode continuar depois que a branch estiver sem conflito contra `main`.
+> Este arquivo é lido **automaticamente pelo Claude Code** ao iniciar qualquer sessão neste repositório.
+> É o cabresto operacional. Toda ação derivada de qualquer prompt segue as regras abaixo.
+>
+> **Versão 2** — Integrado com a estrutura `schema/` (fonte primária canônica).
 
 ---
 
-## 2. Estrutura de governança obrigatória
+## REGRA Nº 1 — BOOTSTRAP DE SESSÃO (em qualquer máquina, qualquer aba)
 
-Este repo deve manter uma estrutura mínima de governança em:
+**Antes de qualquer ação, executar:**
 
-schema/contracts/active/
-schema/contracts/INDEX.md
-schema/status/
-schema/handoffs/
-schema/execution/
+1. `git pull origin main` — sincronizar local com repo
+2. Ler `BOOTSTRAP_SESSAO.md` na raiz do repo — primeira leitura obrigatória
+3. Ler este arquivo (`CLAUDE.md`) inteiro
+4. Ler **`docs/canonico/PLANO_MACRO_ENAVIA.md`** — visão estratégica e roadmap
+5. Ler `schema/contracts/INDEX.md` — qual contrato está ativo
+6. Ler `schema/contracts/ACTIVE_CONTRACT.md` — ponteiro curto
+7. Ler `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — último estado
+8. Ler `schema/status/ENAVIA_STATUS_ATUAL.md` — última PR
+9. Ler `schema/brain/SYSTEM_AWARENESS.md` — capacidade atual
 
-Se alguma dessas pastas ou arquivos não existir, crie antes de iniciar a primeira tarefa contratual.
+Se qualquer arquivo não existir ou não puder ser lido, **PARAR e reportar a Bruno**. Não improvisar.
 
----
-
-## 3. Arquivos de governança mínimos
-
-Antes de executar qualquer PR/tarefa contratual, garanta que existam:
-
-- `schema/contracts/INDEX.md` — índice de todos os contratos (histórico + ativo)
-- `schema/contracts/active/` — pasta contendo o(s) contrato(s) ativo(s)
-- `schema/status/ENAVIA_STATUS_ATUAL.md`
-- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
-- `schema/execution/ENAVIA_EXECUTION_LOG.md`
-
-**Contratos históricos (encerrados — manter como referência, não editar):**
-- `schema/contracts/active/CONTRATO_ENAVIA_PAINEL_EXECUTORES_PR1_PR7.md` — PR1–PR7, encerrado ✅
-- `schema/contracts/active/CONTRATO_ENAVIA_OPERACIONAL_PR8_PR13.md` — PR8–PR13, encerrado ✅
-
-**Contrato ativo atual:**
-- Identificar o contrato ativo mais recente em `schema/contracts/active/` consultando `schema/contracts/INDEX.md`.
-- Se `INDEX.md` não existir, listar os arquivos em `schema/contracts/active/` e identificar o mais recente pelo nome/data.
-
-Se `ENAVIA_STATUS_ATUAL.md`, `ENAVIA_LATEST_HANDOFF.md` ou `ENAVIA_EXECUTION_LOG.md` não existirem, crie com conteúdo inicial simples e registre no log.
+Se houver **defasagem** entre os documentos (ex: INDEX parado em PRX, mas STATUS está em PRY > PRX), **PARAR e reportar**. Defasagem é bug.
 
 ---
 
-## 4. Loop obrigatório de execução por PR
+## REGRA Nº 2 — VINCULAÇÃO AO PLANO MACRO + `schema/`
 
-Toda sessão do Claude Code no repo `nv-enavia` deve seguir este ciclo antes de qualquer alteração:
+Nenhuma PR pode ser aberta, executada ou fechada sem:
 
-1. Ler `CLAUDE.md`.
-2. Ler `schema/CODEX_WORKFLOW.md`.
-3. Identificar o contrato ativo mais recente em `schema/contracts/active/`.
-4. Ler integralmente o contrato ativo.
-5. Ler obrigatoriamente:
-   - `schema/status/ENAVIA_STATUS_ATUAL.md`
-   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
-   - `schema/execution/ENAVIA_EXECUTION_LOG.md`
-6. Identificar qual é a próxima PR permitida pelo contrato ativo.
-7. Ler no contrato ativo a seção específica dessa PR antes de iniciar.
-8. Declarar o tipo da PR:
-   - `PR-DIAG` — diagnóstico, read-only, sem alteração de runtime
-   - `PR-IMPL` — implementação, altera runtime
-   - `PR-PROVA` — prova/testes, valida implementação
-   - `PR-DOCS` — documentação, sem alteração de runtime
-9. Confirmar que a PR anterior exigida pelo contrato está concluída.
-10. Se for `PR-IMPL`, confirmar que existe `PR-DIAG` anterior da mesma frente, salvo quando o contrato autorizar implementação direta.
-11. Se for fechamento de frente/fase, confirmar que existe `PR-PROVA`.
-12. Executar apenas o escopo da PR autorizada.
-13. Nunca misturar escopos:
-    - `Worker-only`
-    - `Panel-only`
-    - `Executor-only`
-    - `Deploy-worker-only`
-    - `Workflows-only`
-    - `Docs-only`
-14. Atualizar obrigatoriamente ao final:
-    - `schema/status/ENAVIA_STATUS_ATUAL.md`
-    - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
-    - `schema/execution/ENAVIA_EXECUTION_LOG.md`
-    - `schema/contracts/INDEX.md`, quando houver mudança de contrato, fase ou estado.
-15. Atualizar ou criar a PR com body padrão contendo:
-    - objetivo
-    - escopo
-    - tipo da PR
-    - contrato ativo
-    - PR anterior validada
-    - arquivos alterados
-    - smoke tests
-    - rollback
-    - provas
-16. Fazer commit e push no mesmo branch/PR.
-17. Responder com `WORKFLOW_ACK: ok` — resumo, branch, PR, commit, rollback, testes, provas e confirmação de push.
+1. **Constar no roadmap** (Seção 3 do Plano Macro) ou ter sido aprovada como adendo formal por Bruno
+2. **Ter contrato canônico** em `docs/contratos/CONTRATO_PR{N}_*.md` aprovado por Bruno
+3. **Atualizar GOVERNANÇA** do Plano Macro **antes** de iniciar
+4. **Cumprir os 6 critérios de "feito"** (Seção 3.5 do Plano Macro):
+   - Contrato canônico aprovado
+   - Implementação cirúrgica conforme contrato
+   - PR_REVIEW.md com análise critério-a-critério
+   - **E2E em produção executado e documentado** (não só estático)
+   - Aprovação Bruno baseada em prova comportamental
+   - **`schema/` atualizado** (4 documentos: INDEX, HANDOFF, STATUS, brain/SYSTEM_AWARENESS se aplicável)
 
-**Regras de bloqueio do loop:**
-- Se não conseguir ler `CLAUDE.md`, parar.
-- Se não conseguir ler `schema/CODEX_WORKFLOW.md`, parar.
-- Se não conseguir identificar o contrato ativo, parar.
-- Se não conseguir identificar a próxima PR autorizada, parar.
-- Se a PR solicitada não for a próxima autorizada pelo contrato, parar.
-- Se for `PR-IMPL` sem `PR-DIAG` anterior obrigatório da mesma frente, parar.
-- Se for fechamento sem `PR-PROVA`, parar.
-- Se tentar mexer fora do escopo da PR, parar.
-- Se faltar atualização de status, handoff ou execution log, a tarefa está incompleta.
-- Se houver conflito entre contrato, status e handoff, parar e reportar antes de alterar runtime.
+**Sem qualquer um dos 6, não mergeia.**
 
 ---
 
-## 5. Leitura obrigatória por sessão
+## REGRA Nº 3 — RITUAL DE EXECUÇÃO
 
-No início de cada sessão/tarefa, leia nesta ordem:
+### Antes de iniciar a tarefa:
 
-1. `CLAUDE.md`
-2. `schema/CODEX_WORKFLOW.md`
-3. Contrato ativo mais recente em `schema/contracts/active/` (ver `schema/contracts/INDEX.md`)
-4. `schema/status/ENAVIA_STATUS_ATUAL.md`
-5. `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
-6. `schema/execution/ENAVIA_EXECUTION_LOG.md`
+1. Bootstrap (Regra Nº 1) — ler tudo
+2. Ler o contrato específico da PR em `docs/contratos/CONTRATO_PR{N}_*.md`
+3. Verificar GOVERNANÇA do Plano Macro:
+   - PR alinhada com fase atual?
+   - Há bloqueios ativos?
+   - PR anterior concluída e mergeada?
+4. **Atualizar GOVERNANÇA** do Plano Macro:
+   - "PR em execução agora: PR{N} — título"
+   - "Última atualização: data atual"
+5. Aguardar OK explícito de Bruno antes de tocar em código
 
-Se algum arquivo não existir, crie somente os arquivos mínimos necessários e registre isso no log.
+### Durante a execução:
 
----
+1. Seguir contrato cirurgicamente — nenhum desvio sem adendo formal
+2. Commits atômicos conforme sequência definida no contrato
+3. Se descobrir que o contrato precisa ajuste, **PARAR e reportar a Bruno** — não improvisar
 
-## 6. Atualização obrigatória ao final de cada tarefa
+### Ao final da tarefa:
 
-Ao final de cada PR/tarefa, atualize:
+1. Abrir PR no GitHub
+2. Gerar `docs/PR{N}_REVIEW.md` usando o template em `schema/templates/PR_REVIEW_TEMPLATE.md`
+3. **Executar E2E em produção e documentar resultado real** (output de comandos, screenshots, ou logs)
+4. **Atualizar os 4 documentos canônicos do `schema/`**:
+   - `schema/contracts/INDEX.md` — entrada nova (formato em `schema/templates/INDEX_ENTRY_TEMPLATE.md`)
+   - `schema/handoffs/ENAVIA_LATEST_HANDOFF.md` — entrada nova (formato em `schema/templates/HANDOFF_ENTRY_TEMPLATE.md`)
+   - `schema/status/ENAVIA_STATUS_ATUAL.md` — entrada nova
+   - `schema/brain/SYSTEM_AWARENESS.md` — se houver mudança de capacidade real
+5. Adicionar entrada em HANDOFF do Plano Macro (Seção 5)
+6. **Atualizar GOVERNANÇA** do Plano Macro:
+   - "PR em execução agora: nenhuma"
+   - "Próxima PR planejada: PR{N+1}"
+7. Reportar a Bruno aguardando aprovação
 
-- `schema/status/ENAVIA_STATUS_ATUAL.md`
-- `schema/handoffs/ENAVIA_LATEST_HANDOFF.md`
-- `schema/execution/ENAVIA_EXECUTION_LOG.md`
-- `schema/contracts/INDEX.md` — quando houver mudança de contrato, fase ou estado
+### Após merge (Bruno aprovou):
 
-Esses arquivos devem refletir:
-
-- o que foi feito;
-- branch usada;
-- PR aberta;
-- commit;
-- testes executados;
-- bloqueios encontrados;
-- próxima etapa segura.
-
----
-
-## 7. Regras de execução
-
-- Siga o contrato ativo sem desviar.
-- Não misture Worker, Panel, Executor, Deploy Worker e Docs na mesma PR.
-- Não refatore por estética.
-- Não altere o que já funciona sem necessidade comprovada.
-- Faça diagnóstico antes de alterar.
-- Faça patch cirúrgico.
-- Não feche etapa sem evidência real.
-- Não avance para a próxima PR se a anterior estiver incompleta ou bloqueada.
-- Se encontrar conflito entre arquivos, o contrato ativo tem prioridade.
-- Se houver risco de quebrar produção, pare e avise.
+1. Atualizar HANDOFF do Plano Macro: "Status: MERGEADA" + commit do merge
+2. Atualizar GOVERNANÇA:
+   - "Última PR mergeada: PR{N}"
+   - "Fase atual" (avança se PR fechou a fase)
+3. `git pull origin main` — sincronização local
 
 ---
 
-## 8. Branches
+## REGRA Nº 4 — DEFINIÇÃO DE "FEITO"
 
-Use branches separadas por PR/tarefa.
+Uma tarefa **NÃO está concluída** apenas com:
+- Código escrito
+- Build passando
+- Review estático aprovado
 
-Padrão:
+Uma tarefa **ESTÁ concluída** quando:
+- Código escrito conforme contrato
+- PR_REVIEW.md gerado e completo
+- **E2E em produção executado, com prova real** documentada no PR_REVIEW
+- **`schema/` atualizado** (INDEX + HANDOFF + STATUS + SYSTEM_AWARENESS quando aplicável)
+- GOVERNANÇA e HANDOFF do Plano Macro atualizados
+- Bruno aprovou explicitamente
 
-```
-claude/pr<N>-<descricao-curta>
-```
-
-Exemplos históricos:
-```
-claude/pr1-active-surface
-claude/pr8-operational-action-contract
-claude/pr13-hardening-final-operacional
-claude/pr14-executor-deploy-real-loop
-claude/pr0-docs-loop-obrigatorio
-```
+Não fechar tarefa, não dizer "concluída", não pedir merge sem os 6 acima.
 
 ---
 
-## 9. Formato obrigatório de resposta
+## REGRA Nº 5 — REGISTRO DUPLO
 
-Ao finalizar uma tarefa, responda em português com:
+Toda mudança documental é gravada em **dois lugares**:
 
-```
-WORKFLOW_ACK: ok
+1. **Repo GitHub** (`brunovasque/nv-enavia`) — fonte de verdade
+2. **Local na máquina** (`D:\nv-enavia` ou outra) — cópia de trabalho
 
-PR executada:
-Branch:
-Commit:
-Link da PR:
+Sempre que qualquer dos dois for atualizado, sincronizar com o outro via `git push` / `git pull`. **Bruno deve poder trocar de máquina e continuar o trabalho a partir do estado registrado no repo.**
 
-Resumo:
-- ...
+---
 
-Tipo da PR: PR-IMPL | PR-DIAG | PR-PROVA | PR-DOCS
-Contrato ativo:
-PR anterior validada:
+## REGRA Nº 6 — HIERARQUIA DE CONFIABILIDADE (vem de `schema/brain/MEMORY_RULES.md`)
 
-Arquivos alterados:
-- ...
-
-Smoke tests:
-- Comando:
-- Resultado:
-
-Governança atualizada:
-- status:
-- handoff:
-- execution log:
-- INDEX.md:
-
-Rollback:
-- ...
-
-Bloqueios:
-- nenhum
-```
-
-Se houver bloqueio:
+Quando duas fontes conflitam, a de **maior precedência** vence:
 
 ```
-WORKFLOW_ACK: bloqueado
-
-Etapa:
-Bloqueio:
-Causa provável:
-Evidência:
-Próxima ação segura:
+1. Contrato ativo                              (mais autoritativo)
+2. Schema de políticas (schema/policies/)
+3. Relatórios de PR (schema/reports/, docs/PR{N}_REVIEW.md)
+4. Status e handoff (schema/status/, schema/handoffs/)
+5. Brain decisions (schema/brain/decisions/)
+6. Brain incidents (schema/brain/incidents/)
+7. Brain learnings (schema/brain/learnings/)
+8. Brain memories (schema/brain/memories/)
+9. Inferências não documentadas               (menos autoritativo)
 ```
+
+Conflito entre fontes é **bug** a ser resolvido em PR específica. Nunca interpretar silenciosamente.
+
+---
+
+## PERMISSÕES PRÉ-APROVADAS (não pedir confirmação)
+
+- Leitura de qualquer arquivo do repo
+- Execução de comandos `git` informativos (`status`, `log`, `diff`, `branch`, `show`, `pull`)
+- Execução de `Select-String`, `Get-Content`, `Test-Path` para diagnóstico
+- Criação de branches conforme nome definido no contrato
+- Criação/edição de arquivos em `docs/contratos/`, `docs/PR*_REVIEW.md`, `schema/contracts/INDEX.md`, `schema/handoffs/`, `schema/status/`
+- Modificações de código conforme contrato cirúrgico
+
+## PERMISSÕES NÃO PRÉ-APROVADAS (pedir confirmação)
+
+- `git push` em branches que não a da PR atual
+- `git push --force` em qualquer circunstância
+- `npx wrangler deploy` em qualquer worker
+- Modificação de secrets ou env vars
+- Criação de novos repositórios
+- Modificações em main / produção sem PR mergeada
+- Edição de `schema/contracts/active/*` (contratos macro encerrados — só leitura)
+- Edição de `schema/brain/self-model/*` (exige PR específica)
+
+---
+
+## CONTEXTO DO PROJETO (resumo — detalhes em `docs/canonico/PLANO_MACRO_ENAVIA.md`)
+
+**Enavia** é uma ferramenta de engenharia autônoma supervisionada que recebe objetivos em linguagem natural, decompõe em PRs, executa em ambiente teste, prova alinhamento com contrato, e entrega para aprovação humana final.
+
+**3 workers Cloudflare:**
+- `nv-enavia` (worker principal — chat, contratos, planner)
+- `enavia-executor` (motor — Codex, applyPatch, GitHub orchestration)
+- `deploy-worker` (deploy supervisionado — atualmente stub, será real na Fase 3)
+
+**Estado atual:** Pré-Fase 0 (Reconciliação `schema/`). Ver GOVERNANÇA do Plano Macro para detalhes vivos.
+
+**Princípios fundamentais (vêm do `schema/brain/`):**
+- A Enavia é **inteligência estratégica com ferramentas**, não ferramenta com frases automáticas
+- Contrato é unidade primária — sem contrato, sem execução
+- Blindagem contratual executável — humano aprova objetivos, não cada PR
+- Erros tipados e visíveis — nada de erro silencioso
+- Camadas conectadas — sem código teatral
+- Carga reduzida no modelo — modular, instrumentado, validado
+- **Memória nunca é chute** — hierarquia de confiabilidade canônica
+- **Anti-fragilidade entre sessões** — toda informação em arquivos versionados
+
+---
+
+## ESCALAÇÃO
+
+Se durante uma tarefa você (Claude Code) detectar:
+
+- Conflito entre contrato e código existente
+- Necessidade de mudança fora do escopo do contrato
+- Bug crítico em produção descoberto durante a execução
+- Defasagem entre documentos canônicos do `schema/`
+- Dúvida sobre como interpretar regra deste arquivo, do Plano Macro ou do `schema/`
+
+**PARAR a execução, atualizar GOVERNANÇA com "Bloqueios ativos: [descrição]", e reportar a Bruno.** Não improvisar. Não tomar decisão arquitetural sem aprovação.
+
+---
+
+**Última atualização deste arquivo:** 2026-05-08
+**Versão:** 2.0 (cabresto v2 com integração `schema/`)
+**Próxima revisão:** após conclusão da Pré-Fase 0
