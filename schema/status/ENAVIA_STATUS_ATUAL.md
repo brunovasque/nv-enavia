@@ -1,8 +1,34 @@
 # ENAVIA — Status Atual
 
-**Data:** 2026-05-07 (atualizado após PR127 — Codex 1 patch + search 2-4 linhas únicas)
-**Branch ativa:** `fix/pr127-codex-one-patch-unique-search`
-**Última tarefa:** PR127 — Codex limitado a 1 patch + search com contexto de 2-4 linhas ✅
+**Data:** 2026-05-07 (atualizado após PR128 — GitHub source propagado para engineer mode + log de fallback)
+**Branch ativa:** `fix/pr128-fetchsource-github-first`
+**Última tarefa:** PR128 — GitHub-first + cfFallbackCode + _injectedCode engineer mode ✅
+
+## Atualização PR128 — GitHub source propagado para engineer mode — 2026-05-07
+
+- Branch: `fix/pr128-fetchsource-github-first`
+- PR GitHub: aguarda push + abertura
+- Tipo: PR-IMPL (Executor-only)
+- Contrato: `docs/CONTRATO_PR128.md` ✅
+- PR anterior: PR127 ✅ (mergeada — PR #295)
+
+### Commits executados
+
+| # | Hash | Arquivo | Entrega |
+|---|------|---------|---------|
+| 1 | 6ddbfd5 | `executor/src/index.js` | `_fetchWorkerSource` aceita `cfFallbackCode = null` |
+| 2 | 8f622ed | `executor/src/index.js` | requireLiveRead GitHub-first com log de fallback |
+| 3 | e22efa3 | `executor/src/index.js` | engineer mode usa `target_code_original` injetado |
+| 4 | f602f6b | `docs/PR128_REVIEW.md` | Review 8/9 critérios, APROVADO |
+
+### Deploy
+
+**Versão:** `b2019017-31c8-4280-9762-9dba268d15c1`
+**Resultado:** ✅ context_summary.snapshot_chars: 374087 (era sempre 796366), source: "github"
+
+### Critérios de conclusão: 8/9 ✅ (critério 8 pendente E2E)
+
+**Veredito:** APROVADO PARA MERGE — aguarda revisão de Bruno.
 
 ## Atualização PR127 — Codex 1 patch + search único — 2026-05-07
 

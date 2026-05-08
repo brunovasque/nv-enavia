@@ -1197,10 +1197,12 @@ if (METHOD === "POST" && pathname === "/propose") {
       // PR108: preservar cópia completa para applyPatch (antes do chunking)
       action.context.target_code_original = snap.code;
 
-      // PR125: tentar GitHub como fonte primária (source legível vs bundle esbuild compilado)
-      // O bundle CF não tem nomes de função originais — GitHub tem o source real
+      // PR128: GitHub-first com snap.code como fallback (sem CF API dupla)
+      // Passa snap.code já disponível — se GitHub falhar, usa CF bundle cacheado
       try {
-        const _ghResult = await _fetchWorkerSource(env, targetWorkerId, action.target?.repo || null);
+        const _ghResult = await _fetchWorkerSource(
+          env, targetWorkerId, action.target?.repo || null, snap.code
+        );
         if (_ghResult?.code && _ghResult.source === "github") {
           action.context.target_code_original = _ghResult.code;
           action.context.target_code = _ghResult.code;
@@ -1211,8 +1213,17 @@ if (METHOD === "POST" && pathname === "/propose") {
           action.context_proof.snapshot_lines = _ghResult.code.split(/\r?\n/).length;
           action.context_proof.source = "github";
           action.context_proof.github_file = _ghResult.file;
+        } else {
+          // Fallback para CF bundle — logar motivo para diagnóstico via wrangler tail
+          action.context_proof.github_fetch_result = _ghResult?.source || "null";
+          action.context_proof.source = "cloudflare_api";
+          console.warn("[PR128] GitHub fallback para CF bundle, source:", _ghResult?.source || "null");
         }
-      } catch (_gh_err) {}
+      } catch (_gh_err) {
+        action.context_proof.github_fetch_result = "error";
+        action.context_proof.source = "cloudflare_api";
+        console.warn("[PR128] GitHub fetch erro:", _gh_err?.message || String(_gh_err));
+      }
 
       // PR108: se use_codex=true e código > 16K, extrair chunk relevante para Codex
       const _codeForChunking = action.context.target_code_original;
@@ -5629,7 +5640,7 @@ async function fetchCurrentWorkerSnapshot({ accountId, apiToken, scriptName }) {
 // O bundle CF não preserva nomes de função (esbuild renomeia/inlina).
 // O source do GitHub tem as funções originais — o Codex gera anchors corretos.
 // ============================================================
-async function _fetchWorkerSource(env, targetWorkerId, targetRepo) {
+async function _fetchWorkerSource(env, targetWorkerId, targetRepo, cfFallbackCode = null) {
   const repo = targetRepo || `brunovasque/${targetWorkerId}`;
   const branch = "main";
   const fileMap = { "nv-enavia": "nv-enavia.js" };
@@ -5654,7 +5665,12 @@ async function _fetchWorkerSource(env, targetWorkerId, targetRepo) {
     }
   } catch (_) {}
 
-  // Fallback: CF API (bundle compilado)
+  // PR128: usar snap.code já disponível se passado como parâmetro (evita CF API dupla)
+  if (cfFallbackCode) {
+    return { code: cfFallbackCode, source: "cloudflare_api_cached", repo: null, file: null };
+  }
+
+  // Fallback: CF API (bundle compilado — só se não tiver snap.code disponível)
   try {
     const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${targetWorkerId}`;
     const cfResp = await fetch(cfUrl, {
@@ -7027,15 +7043,20 @@ if (mode === "engineer") {
             );
           }
     
-          // ✅ caminho canônico (igual o /audit): snapshot live
-          const snap = await fetchCurrentWorkerSnapshot({
-            accountId,
-            apiToken,
-            scriptName,
-          });
-    
-          // ✅ workerCode LOCAL (não depende de escopo externo)
-          workerCode = String(snap?.code || "");
+          // PR128: usar target_code_original se disponível (pode ser GitHub source)
+          // Evita nova chamada CF API quando /propose requireLiveRead já buscou o source
+          const _injectedCode = raw?.context?.target_code_original || null;
+          let snap = null;
+          if (_injectedCode) {
+            workerCode = _injectedCode;
+          } else {
+            snap = await fetchCurrentWorkerSnapshot({
+              accountId,
+              apiToken,
+              scriptName,
+            });
+            workerCode = String(snap?.code || "");
+          }
           if (!workerCode.trim()) {
             throw new Error("Snapshot vazio do worker-alvo");
           }
@@ -7059,9 +7080,9 @@ if (mode === "engineer") {
             snapshot_fingerprint: `fnv1a32:${fnv1a32(workerCode)}`,
             snapshot_chars,
             snapshot_lines,
-            cf_etag: snap.etag,
-            cf_last_modified: snap.last_modified,
-            fetched_at_ms: snap.fetched_at_ms,
+            cf_etag: snap?.etag || null,
+            cf_last_modified: snap?.last_modified || null,
+            fetched_at_ms: snap?.fetched_at_ms || null,
           };
 
           context_used = true;

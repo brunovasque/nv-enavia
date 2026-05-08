@@ -1,5 +1,54 @@
 # ENAVIA — Execution Log
 
+## 2026-05-07 — PR128 — PR-IMPL — GitHub source propagado para engineer mode + log fallback
+
+- **Branch:** `fix/pr128-fetchsource-github-first`
+- **Tipo:** PR-IMPL (Executor-only)
+- **Contrato:** `docs/CONTRATO_PR128.md` ✅
+- **PR anterior validada:** PR127 ✅ mergeada (PR #295)
+- **PR GitHub:** aguarda push
+
+### Objetivo
+
+Corrigir 3 bugs encadeados identificados em DIAG_FETCHSOURCE:
+1. Silent catch (GitHub falha sem log)
+2. Engineer mode ignorava GitHub source (sempre chamava CF API independentemente)
+3. CF API dupla quando GitHub falhava (snap.code já disponível)
+
+### 4 Commits
+
+| # | Hash | Escopo | Entrega |
+|---|------|--------|---------|
+| 1 | 6ddbfd5 | `executor/src/index.js` | `_fetchWorkerSource` aceita `cfFallbackCode = null` |
+| 2 | 8f622ed | `executor/src/index.js` | requireLiveRead GitHub-first + log explícito fallback |
+| 3 | e22efa3 | `executor/src/index.js` | engineer mode usa `target_code_original` injetado |
+| 4 | f602f6b | `docs/PR128_REVIEW.md` | Review 8/9 critérios, deploy OK |
+
+### Deploy
+
+- Versão: `b2019017-31c8-4280-9762-9dba268d15c1`
+- Comando: `npx wrangler deploy --config wrangler.executor.generated.toml` ✅
+
+### Critérios verificados
+
+| # | Critério | Status |
+|---|----------|--------|
+| 1 | `cfFallbackCode` na assinatura de `_fetchWorkerSource` | ✅ |
+| 2 | `[PR128] GitHub fallback` no requireLiveRead | ✅ |
+| 3 | `_injectedCode = raw?.context?.target_code_original` no engineer mode | ✅ |
+| 4 | `context_proof.source = "github"` | ✅ |
+| 5 | `context_proof.snapshot_chars` = ~374087 | ✅ |
+| 6 | `context_summary.snapshot_chars` = ~374087 (engineer mode) | ✅ |
+| 7 | `apply_patch_error` ausente | ✅ |
+| 8 | E2E: pr_url não null | ⚠️ Pendente |
+| 9 | `merge_allowed=false` intocado | ✅ |
+
+### Veredito
+
+APROVADO PARA MERGE — 8/9 critérios. Critério 8 pendente de E2E manual.
+
+---
+
 ## 2026-05-07 — PR127 — PR-IMPL — Codex 1 patch + search 2-4 linhas únicas
 
 - **Branch:** `fix/pr127-codex-one-patch-unique-search`
